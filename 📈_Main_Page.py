@@ -19,7 +19,6 @@ from scipy.stats import skew
 from pypfopt import plotting
 
 
-pd.options.display.float_format='{:.2f %%}'.format
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
 
