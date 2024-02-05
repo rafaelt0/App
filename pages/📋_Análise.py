@@ -15,7 +15,7 @@ import datetime
 from scipy.stats import kurtosis
 from scipy.stats import skew
 from pypfopt import plotting
-from Main_Page import ticker
+from Main_Page import tickers
 
 st.sidebar.header('Configurações ⚙️')
 lista=list(np.arange(2024,2000,-1))
