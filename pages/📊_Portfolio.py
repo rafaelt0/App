@@ -5,7 +5,7 @@ import numpy as np
 import fundamentus
 import pandas as pd
 import seaborn as sns
-from quantstats import stats.max_drawdown
+from quantstats.stats import max_drawdown
 import warnings
 import scienceplots
 import pypfopt
