@@ -15,7 +15,7 @@ import datetime
 from scipy.stats import kurtosis
 from scipy.stats import skew
 from pypfopt import plotting
-from Main_Page import tickers 
+from Main_Page import ticker
 
 st.sidebar.header('Configurações ⚙️')
 lista=list(np.arange(2024,2000,-1))
@@ -27,14 +27,14 @@ interval_selected = st.sidebar.selectbox('Intervalo 📊', ['dia','3 meses','mê
 interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m','semana':'1wk'}
 
 stocks = fundamentus.list_papel_all()
-tickers_analysis = list(st.sidebar.multiselect('Monte seu Portfolio (Escolha mais de uma ação)',stocks, value=tickers))
+tickers = list(st.sidebar.multiselect('Monte seu Portfolio (Escolha mais de uma ação)',stocks, value=tickers))
 try:
-    df = fundamentus.get_papel(list(tickers_analysis)[0])
+    df = fundamentus.get_papel(list(tickers)[0])
     i=1
     for i in range(len(tickers)):
-            df = pd.concat([df,fundamentus.get_papel(list(tickers_analysis)[i])])
-    tickers = [ticker+".SA" for ticker in tickers_analysis]
-    ticker = yf.Tickers(tickers_analysis)
+            df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
+    tickers = [ticker+".SA" for ticker in tickers]
+    ticker = yf.Tickers(tickers)
 except:
     pass
 
