@@ -6,7 +6,6 @@ import fundamentus
 import pandas as pd
 import seaborn as sns
 import warnings
-import scienceplots
 import pypfopt
 from pypfopt.expected_returns import mean_historical_return
 from pypfopt.risk_models import CovarianceShrinkage
