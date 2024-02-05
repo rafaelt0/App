@@ -86,7 +86,7 @@ try:
     returns_calc=round(returns_calc,3)
     returns_calc_string = returns_calc.astype("str")+"%"
     st.dataframe(returns_calc_string)
-    stats=[qt.stats.max_drawdown(returns_calc_non_pct)]
+    stats=[max_drawdown(returns_calc_non_pct)]
     avg=pd.DataFrame(stats)
     cum_return=(1+returns_calc_non_pct).cumprod()-1
     cum_returns=round(cum_return*100,3)
