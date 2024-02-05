@@ -8,4 +8,4 @@ scipy==1.12.0
 seaborn==0.13.2
 streamlit==1.30.0
 yfinance==0.2.35
-pypfoft==1.5.5
+pypfopt==1.5.5
