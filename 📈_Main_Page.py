@@ -45,9 +45,7 @@ with col3:
     st.write("")
 
 stocks = fundamentus.list_papel_all()
-st.write("""
-## **Portfolio 💼**
- """)
+st.subheader("Explore ações da B3 🧭")
 tickers = list(st.multiselect('Monte seu Portfolio (Escolha mais de uma ação)',stocks))
 try:
     df = fundamentus.get_papel(list(tickers)[0])
