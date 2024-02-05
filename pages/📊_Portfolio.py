@@ -5,7 +5,7 @@ import numpy as np
 import fundamentus
 import pandas as pd
 import seaborn as sns
-from quanstats import stats
+from quantstats import stats
 import warnings
 import scienceplots
 import pypfopt
