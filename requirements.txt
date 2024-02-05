@@ -1,13 +1,12 @@
 fundamentus==0.2.0
-ipython=8.15.0
+ipython==8.15.0
 matplotlib==3.7.2
 numpy==1.24.3
 pandas==2.0.3
 plotly==5.9.0
-quantstats==0.0.62
+QuantStats==0.0.62
+SciencePlots==2.1.0
 scipy==1.12.0
 seaborn==0.13.2
 streamlit==1.30.0
 yfinance==0.2.35
-PyPortfolioOpt==1.5.5
-
