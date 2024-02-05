@@ -3,7 +3,7 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import numpy as np
 import fundamentus
-import ssklearn
+import sklearn
 import pandas as pd
 import seaborn as sns
 from quantstats.stats import max_drawdown
