@@ -1,0 +1,19 @@
+body {
+    background-color: #131313;
+    background-image: '/home/rafael/Imagens/1200-480288054-binary-number-system-1.webp';
+    background-size: 8px;
+    color: rgb(57, 219, 57);
+    font-family: "Consolas", "Andale Mono", "Lucida Console", monospace;
+  }
+
+  h2{
+    text-align: center;
+    color:limegreen;
+  }
+  
+  
+  h1 {
+    text-align: center;
+    color: rgb(57, 219, 57);
+
+  }
