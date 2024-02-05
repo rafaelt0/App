@@ -58,49 +58,47 @@ try:
 except:
      pass
 
-try:
-    mu = mean_historical_return(data)
-    S = CovarianceShrinkage(data).ledoit_wolf()
-    ef = EfficientFrontier(mu, S)
-    ef.add_objective(objective_functions.L2_reg, gamma=0.1)
-    w = ef.max_sharpe()
-    weights=pd.DataFrame(ef.clean_weights(), index=[0])
-    weights=weights.rename({0:"Pesos"}, axis=0)
-    weights=round(weights,4)
-    weights_graph=np.array(weights).ravel()
-    weights_string= (weights*100).astype("str")+"%"
-    st.subheader("Porcentagem ótima no Portfolio")
-    fig, ax = plt.subplots(figsize=(12,5))
-    ax.pie(weights_graph,labels=weights.columns.values,autopct='%1.1f%%')
-    fig = px.pie(weights_graph, values=weights_graph, names=weights.columns.values)
-    st.plotly_chart(fig)
-    st.dataframe(weights_string)
-    weights=(weights*1_000_000).astype("int").T
-    returns_calc=(returns*1000_000).astype("int")
-    returns_calc=np.dot(returns_calc,weights)
-    returns=returns.index
-    returns_calc=pd.DataFrame(returns_calc/1_000_000_000_000)
-    returns_calc_non_pct=returns_calc/100
-    returns_calc.rename({0:"Retornos do Portfolio"},axis=1, inplace=True)
-    returns_calc.index=returns
-    returns_calc=round(returns_calc,3)
-    returns_calc_string = returns_calc.astype("str")+"%"
-    st.dataframe(returns_calc_string)
-    cum_return=(1+returns_calc_non_pct).cumprod()-1
-    cum_returns=round(cum_return*100,3)
-    cum_returns_string=cum_returns.astype("str")+"%"
-    cum_returns_df=pd.DataFrame(cum_returns_string)
-    cum_returns_df.index=returns
-    cum_returns_df=cum_returns_df.rename({0:"Retornos Acumulados Portfolio"}, axis=1)
-    st.dataframe(cum_returns_df)
-    valor=valor_inicial
-    portfolio_value=(1+cum_return)*valor
-    portfolio_value_df=pd.DataFrame(portfolio_value)
-    portfolio_value_df.index=returns
-    portfolio_value_df.rename({0:'Valor do Portfolio'}, axis=1, inplace=True)
-    st.write(portfolio_value_df)
-except:
-     st.write("Monte seu Portfolio.")
+mu = mean_historical_return(data)
+S = CovarianceShrinkage(data).ledoit_wolf()
+ef = EfficientFrontier(mu, S)
+ef.add_objective(objective_functions.L2_reg, gamma=0.1)
+w = ef.max_sharpe()
+weights=pd.DataFrame(ef.clean_weights(), index=[0])
+weights=weights.rename({0:"Pesos"}, axis=0)
+weights=round(weights,4)
+weights_graph=np.array(weights).ravel()
+weights_string= (weights*100).astype("str")+"%"
+st.subheader("Porcentagem ótima no Portfolio")
+fig, ax = plt.subplots(figsize=(12,5))
+ax.pie(weights_graph,labels=weights.columns.values,autopct='%1.1f%%')
+fig = px.pie(weights_graph, values=weights_graph, names=weights.columns.values)
+st.plotly_chart(fig)
+st.dataframe(weights_string)
+weights=(weights*1_000_000).astype("int").T
+returns_calc=(returns*1000_000).astype("int")
+returns_calc=np.dot(returns_calc,weights)
+returns=returns.index
+returns_calc=pd.DataFrame(returns_calc/1_000_000_000_000)
+returns_calc_non_pct=returns_calc/100
+returns_calc.rename({0:"Retornos do Portfolio"},axis=1, inplace=True)
+returns_calc.index=returns
+returns_calc=round(returns_calc,3)
+returns_calc_string = returns_calc.astype("str")+"%"
+st.dataframe(returns_calc_string)
+cum_return=(1+returns_calc_non_pct).cumprod()-1
+cum_returns=round(cum_return*100,3)
+cum_returns_string=cum_returns.astype("str")+"%"
+cum_returns_df=pd.DataFrame(cum_returns_string)
+cum_returns_df.index=returns
+cum_returns_df=cum_returns_df.rename({0:"Retornos Acumulados Portfolio"}, axis=1)
+st.dataframe(cum_returns_df)
+valor=valor_inicial
+portfolio_value=(1+cum_return)*valor
+portfolio_value_df=pd.DataFrame(portfolio_value)
+portfolio_value_df.index=returns
+portfolio_value_df.rename({0:'Valor do Portfolio'}, axis=1, inplace=True)
+st.write(portfolio_value_df)
+
 
 
 
