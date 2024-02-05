@@ -133,13 +133,8 @@ stats=stats.rename({0:"Índice Sharpe", 1:"Índice Sortino", 2:"Max Drawdown",
                      3:"Curtose", 4:"Volatilidade", 5:"Assimetria"}, axis=1)
 stats=stats.rename({0:"Estatísticas"}, axis=0)
 returns_calc_non_pct.index=returns
-st.write(returns_calc_non_pct.shape)
 st.dataframe(stats)
-df_03 = download_returns(tickers)
-st.write(df_03.index)
-returns_calc=np.dot(df_03,weights)
-df=pd.DataFrame(returns_calc)
-df.index=df_03.index
+
 
 
 
