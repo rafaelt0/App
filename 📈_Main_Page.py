@@ -15,7 +15,7 @@ import datetime
 from scipy.stats import kurtosis
 from scipy.stats import skew
 from pypfopt import plotting
-import IPython
+import ipython
 
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
