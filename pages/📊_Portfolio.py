@@ -6,6 +6,7 @@ import fundamentus
 import pandas as pd
 import seaborn as sns
 from quantstats import stats
+import IPýthon
 import warnings
 import scienceplots
 import pypfopt
