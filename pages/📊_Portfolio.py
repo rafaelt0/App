@@ -7,7 +7,6 @@ import pandas as pd
 import seaborn as sns
 from quantstats.stats import max_drawdown
 import warnings
-import scienceplots
 import pypfopt
 from pypfopt.expected_returns import mean_historical_return
 from pypfopt.risk_models import CovarianceShrinkage
