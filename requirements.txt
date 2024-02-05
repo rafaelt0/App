@@ -9,4 +9,4 @@ seaborn==0.13.2
 streamlit==1.30.0
 yfinance==0.2.35
 PyPortfolioOpt==1.5.5
-ipython=8.15.0
+IPython=8.15.0
