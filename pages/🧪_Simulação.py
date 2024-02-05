@@ -9,7 +9,7 @@ mu_selected = st.sidebar.slider("Média",-4.00,4.00,0.01)
 sigma_selected = st.sidebar.slider("Volatilidade",-4.00,4.00,0.001)
 n_simulations = st.sidebar.slider("Número de Simulações",10,1000,10)
 valor = st.sidebar.number_input("Capital Inicial", min_value=10)
-periodos = int(st.sidebar.number_input("Passos", min_value=12))
+periodos = int(st.sidebar.number_input("Passos", 12,min_value=1))
 years = int(st.sidebar.number_input("Anos", min_value=1))
 
 try:
