@@ -99,6 +99,7 @@ portfolio_value_df=pd.DataFrame(portfolio_value)
 portfolio_value_df.index=returns
 portfolio_value_df.rename({0:'Valor do Portfolio'}, axis=1, inplace=True)
 st.write(portfolio_value_df)
+st.write(max_drawdown(returns_non_pct))
 
 
 
