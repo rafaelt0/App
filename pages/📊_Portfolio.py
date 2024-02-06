@@ -145,12 +145,10 @@ try:
                         sharpe(returns_calc_non_pct, rf=float(taxa_selic)/100), 
                         sortino(returns_calc_non_pct, rf=float(taxa_selic)/100), 
                         max_drawdown(returns_calc_non_pct),
-                        kurtosis(returns_calc_non_pct),
-                        volatility(returns_calc_non_pct),
-                        skew(returns_calc_non_pct)])
+                        var(returns_calc_non_pct)])
     stats=stats.T
     stats=stats.rename({0:"Índice Sharpe", 1:"Índice Sortino", 2:"Max Drawdown",
-                         3:"Curtose", 4:"Volatilidade", 5:"Assimetria"}, axis=1)
+                         3:"VaR"}, axis=1)
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
