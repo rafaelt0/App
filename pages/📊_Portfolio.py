@@ -155,7 +155,7 @@ try:
 except:
     print("Hello World")
     
-st.write(np.array(bench_data), returns_calc_non_pct)
+st.write(np.array(bench_returns), returns_calc_non_pct)
 
 
 
