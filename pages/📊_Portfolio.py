@@ -108,17 +108,8 @@ try:
     fig.update_xaxes(title="Período")
     
     st.plotly_chart(fig)
-    fig= px.histogram(returns_calc_non_pct, title="Distribuição dos Retornos")
-    fig.update_yaxes(title="Densidade")
-    fig.update_xaxes(title="Retorno")
-    fig.update_layout(
-        xaxis = dict(
-            tickmode = 'linear',
-            tick0 = -.3,
-            dtick = 0.025
-        )
-    )
-    st.plotly_chart(fig)
+    fig = sns.histplot(returns_calc_non_pct)
+    st.pyplot(fig)
     st.dataframe(returns_calc_string)
     cum_return=(1+returns_calc_non_pct).cumprod()-1
     cum_returns=round(cum_return*100,3)
