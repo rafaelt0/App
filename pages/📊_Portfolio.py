@@ -36,7 +36,8 @@ interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m
 valor_inicial = st.sidebar.number_input("Valor Investido 💵", min_value=10, max_value=1_000_000)
 taxa_selic = st.sidebar.number_input("Taxa Selic 🪙 (%)", min_value=0.92, max_value=15.0)
 
-stocks = fundamentus.list_papel_all()
+data = pd.read_csv('acoes-listadas-b3.csv')
+stocks = list(data['Ticker'].values)
 tickers = list(st.sidebar.multiselect('Monte seu Portfolio (Escolha mais de uma ação)',stocks))
 try:
     df = fundamentus.get_papel(list(tickers)[0])
