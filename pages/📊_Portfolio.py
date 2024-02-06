@@ -49,7 +49,7 @@ taxa_selic = st.sidebar.number_input("Taxa Selic 🪙 (%)", min_value=0.92, max_
 
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
-tickers = list(st.sidebar.multiselect('Monte seu Portfolio (Escolha mais de uma ação)',stocks))
+tickers = list(st.multiselect('Monte seu Portfolio (Escolha mais de uma ação)',stocks))
 try:
     df = fundamentus.get_papel(list(tickers)[0])
     i=1
