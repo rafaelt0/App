@@ -151,6 +151,8 @@ try:
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
+    corr = bench_data.corr(returns_non_pct)
+    st.write(corr)
 except:
     print("Hello World")
 
