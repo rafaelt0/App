@@ -153,9 +153,8 @@ try:
     st.dataframe(stats)
 except:
     print("Hello World")
-
-corr = np.correlate(bench_data, returns_calc_non_pct)
-st.write(corr)
+    
+st.write(bench_data)
 
 
 
