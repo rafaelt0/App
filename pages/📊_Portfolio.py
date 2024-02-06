@@ -6,7 +6,7 @@ import fundamentus
 import sklearn
 import pandas as pd
 import seaborn as sns
-from quantstats.stats import sharpe, sortino, max_drawdown, risk_of_ruin, skew, kurtosis, var, volatility, beta
+from quantstats.stats import sharpe, sortino, max_drawdown, risk_of_ruin, skew, kurtosis, var, volatility
 from quantstats.utils import download_returns
 from quantstats.plots import rolling_sharpe
 from quantstats.reports import full
@@ -140,7 +140,7 @@ try:
     fig.update_xaxes(title="Período")
     st.plotly_chart(fig)
     st.write(portfolio_value_df)
-    stats=pd.DataFrame([beta(returns_calc_non_pct),
+    stats=pd.DataFrame([
                         sharpe(returns_calc_non_pct, rf=float(taxa_selic)/100), 
                         sortino(returns_calc_non_pct, rf=float(taxa_selic)/100), 
                         max_drawdown(returns_calc_non_pct),
