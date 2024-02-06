@@ -108,8 +108,8 @@ try:
     fig.update_xaxes(title="Período")
     
     st.plotly_chart(fig)
-    fig = sns.histplot(returns_calc_non_pct)
-    st.pyplot(fig)
+    returns_graph = returns.plot()
+    st.pyplot(returns_graph.figure)
     st.dataframe(returns_calc_string)
     cum_return=(1+returns_calc_non_pct).cumprod()-1
     cum_returns=round(cum_return*100,3)
