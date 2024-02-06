@@ -155,7 +155,7 @@ try:
     st.subheader("Glossário")
     st.write("""
     """
-        }
+            )
 except:
     print("Hello World")
     
