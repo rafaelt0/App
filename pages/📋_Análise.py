@@ -25,6 +25,8 @@ data_inicio = st.sidebar.date_input("Data Inicial📅", datetime.date(2024,1,1),
 interval_selected = st.sidebar.selectbox('Intervalo 📊', ['dia','3 meses','mês','semana','hora','minuto'])
 interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m','semana':'1wk'}
 
+st.subheader("Análise")
+
 stocks = fundamentus.list_papel_all()
 tickers = list(st.sidebar.multiselect('Monte seu Portfolio (Escolha mais de uma ação)', stocks))
                
