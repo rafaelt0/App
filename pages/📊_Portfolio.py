@@ -6,7 +6,7 @@ import fundamentus
 import sklearn
 import pandas as pd
 import seaborn as sns
-from quantstats.stats import sharpe, sortino, max_drawdown, risk_of_ruin, skew, kurtosis, var, volatility, cvar
+from quantstats.stats import sharpe, sortino, max_drawdown, risk_of_ruin, skew, kurtosis, var, volatility, cvar, tail_ratio
 from quantstats.utils import download_returns
 from quantstats.plots import rolling_sharpe
 from quantstats.reports import full
@@ -145,10 +145,11 @@ try:
                         sharpe(returns_calc_non_pct, rf=float(taxa_selic)/100), 
                         sortino(returns_calc_non_pct, rf=float(taxa_selic)/100), 
                         max_drawdown(returns_calc_non_pct),
-                        cvar(returns_calc_non_pct)])
+                        cvar(returns_calc_non_pct),
+                        tail_ratio(returns_calc_non_pct)])
     stats=stats.T
     stats=stats.rename({0:"Índice Sharpe", 1:"Índice Sortino", 2:"Max Drawdown",
-                         3:"CVaR"}, axis=1)
+                         3:"CVaR", 4:"Tail Ratio"}, axis=1)
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
