@@ -156,6 +156,8 @@ except:
     print("Hello World")
     
 corr = np.correlate(list(bench_returns), list(returns_calc_non_pct))
+corr_mat = sns.heatmap(corr, annot=True)
+st.pyplot(corr_mat.figure)
 
 
 
