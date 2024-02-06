@@ -106,11 +106,17 @@ try:
     fig = px.line(returns_calc_non_pct.values,title="Retornos do Portfolio")
     fig.update_yaxes(title="Retornos")
     fig.update_xaxes(title="Período")
-     st.plotly_chart(fig)
-    dat['returns']= data.pct_change()
-    pct = data.returns
-    returns_graph = pct.plot()
-    st.pyplot(returns_graph.figure)
+    st.plotly_chart(fig)
+    fig= px.histogram(returns_calc_non_pct, title="Distribuição dos Retornos")
+    fig.update_yaxes(title="Densidade")
+    fig.update_xaxes(title="Retorno")
+    fig.update_layout(
+        xaxis = dict(
+            tickmode = 'linear',
+            tick0 = -.3,
+            dtick = 0.025
+        )
+    )
     st.dataframe(returns_calc_string)
     cum_return=(1+returns_calc_non_pct).cumprod()-1
     cum_returns=round(cum_return*100,3)
