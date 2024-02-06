@@ -155,7 +155,7 @@ try:
 except:
     print("Hello World")
     
-corr = np.correlate(np.array(bench_returns), np.array(returns_calc_non_pct))
+corr = np.correlate(list(bench_returns), list(returns_calc_non_pct))
 
 
 
