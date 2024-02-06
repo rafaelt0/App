@@ -142,7 +142,7 @@ try:
     st.plotly_chart(fig)
     st.write(portfolio_value_df)
     stats=pd.DataFrame([
-                        sharpe(returns_calc_non_pct, rf=float(taxa_selic)/100), 
+                        sharpe(returns_calc_non_pct, rf=float(taxa_selic)/100)/np.sqrt(2), 
                         sortino(returns_calc_non_pct, rf=float(taxa_selic)/100), 
                         max_drawdown(returns_calc_non_pct),
                         cvar(returns_calc_non_pct),
