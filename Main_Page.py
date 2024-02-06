@@ -44,6 +44,7 @@ with col2:
 with col3:
     st.write("")
 
+data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = fundamentus.list_papel_all()
 st.subheader("Explore ações da B3 🧭")
 tickers = list(st.multiselect('Escolha ações para explorar!',stocks))
