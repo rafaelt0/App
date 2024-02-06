@@ -61,9 +61,9 @@ except:
     pass
 
 try:
-    data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
+    dat = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
                           ,interval=interval_dict[interval_selected],rounding=True)
-    data = data.Close
+    data = dat.Close
     returns= data.pct_change()
     returns = returns.dropna()*100
     returns_percentage = np.round(returns,2)
@@ -106,9 +106,10 @@ try:
     fig = px.line(returns_calc_non_pct.values,title="Retornos do Portfolio")
     fig.update_yaxes(title="Retornos")
     fig.update_xaxes(title="Período")
-    
-    st.plotly_chart(fig)
-    returns_graph = returns.plot()
+     st.plotly_chart(fig)
+    dat['returns']= data.pct_change()
+    pct = data.returns
+    returns_graph = pct.plot()
     st.pyplot(returns_graph.figure)
     st.dataframe(returns_calc_string)
     cum_return=(1+returns_calc_non_pct).cumprod()-1
