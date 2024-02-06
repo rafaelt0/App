@@ -154,7 +154,7 @@ try:
 except:
     print("Hello World")
 
-corr = np.correlate(bench_data, returns_non_pct)
+corr = np.correlate(bench_data, returns_calc_non_pct)
 st.write(corr)
 
 
