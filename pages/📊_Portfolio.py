@@ -41,10 +41,10 @@ lista=list(np.arange(2024,2000,-1))
 lista.append("None")
 period_selected = st.sidebar.selectbox('Período ⏰', ['diário','semanal','trimestral','semestral','mensal','anual'])
 period_dict = {'diário':'1d','semanal':'1w','mensal':'1mo','trimestral':'3mo','semestral':'6mo','anual':'1y'}
-data_inicio = st.sidebar.date_input("Data Inicial📅", datetime.date(2023,1,1),min_value=datetime.date(2000,1,1))
+data_inicio = st.sidebar.date_input("Data Inicial📅", datetime.date(2020,1,1),min_value=datetime.date(2000,1,1))
 interval_selected = st.sidebar.selectbox('Intervalo 📊', ['mês','3 meses','dia','semana','hora','minuto'])
 interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m','semana':'1wk'}
-valor_inicial = st.sidebar.number_input("Valor Investido 💵", min_value=10, max_value=1_000_000)
+valor_inicial = st.sidebar.number_input("Valor Investido 💵", min_value=100, max_value=1_000_000)
 taxa_selic = st.sidebar.number_input("Taxa Selic 🪙 (%)", min_value=0.92, max_value=15.0)
 
 data = pd.read_csv('acoes-listadas-b3.csv')
