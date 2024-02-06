@@ -154,8 +154,7 @@ try:
 except:
     print("Hello World")
     
-st.write(bench_data)
-
+st.write(bench_data, returns_calc_non_pct)
 
 
 
