@@ -47,7 +47,7 @@ with col3:
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 st.subheader("Explore ações da B3 🧭")
-tickers = list(st.multiselect('Escolha ações para explorar!',stocks))
+tickers = list(st.multiselect('Escolha ações para explorar! (2 ou mais ações)',stocks))
 try:
     df = fundamentus.get_papel(list(tickers)[0])
     i=1
