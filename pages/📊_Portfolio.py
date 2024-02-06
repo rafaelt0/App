@@ -22,6 +22,9 @@ from scipy.stats import skew
 from pypfopt import plotting
 import plotly.express as px
 
+st.subheader("Análise de Portfolio")
+
+
 st.sidebar.header('Configurações ⚙️')
 lista=list(np.arange(2024,2000,-1))
 lista.append("None")
