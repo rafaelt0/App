@@ -86,7 +86,7 @@ try:
     mu = mean_historical_return(data)
     S = CovarianceShrinkage(data).ledoit_wolf()
     ef = EfficientFrontier(mu, S)
-    ef.add_objective(objective_functions.L2_reg, gamma=20000000)
+    ef.add_objective(objective_functions.L2_reg, gamma=1)
     w = ef.max_sharpe()
     weights=pd.DataFrame(ef.clean_weights(), index=[0])
     weights=weights.rename({0:"Pesos"}, axis=0)
@@ -122,6 +122,7 @@ try:
             dtick = 0.025
         )
     )
+    st.plotly_chart(fig)
     st.dataframe(returns_calc_string)
     cum_return=(1+returns_calc_non_pct).cumprod()-1
     cum_returns=round(cum_return*100,3)
