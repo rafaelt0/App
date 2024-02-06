@@ -152,6 +152,10 @@ try:
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
+    st.subheader("Glossário")
+    st.write("""
+    """
+        }
 except:
     print("Hello World")
     
