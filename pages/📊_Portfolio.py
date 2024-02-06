@@ -87,7 +87,7 @@ try:
     S = CovarianceShrinkage(data).ledoit_wolf()
     ef = EfficientFrontier(mu, S)
     ef.add_objective(objective_functions.L2_reg, gamma=2)
-    w = ef.max_sharpe(risk_free_rate=taxa_selic)
+    w = ef.max_sharpe(risk_free_rate=taxa_selic/100)
     weights=pd.DataFrame(ef.clean_weights(), index=[0])
     weights=weights.rename({0:"Pesos"}, axis=0)
     weights=round(weights,4)
