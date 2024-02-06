@@ -148,7 +148,7 @@ try:
                         cvar(returns_calc_non_pct),
                         tail_ratio(returns_calc_non_pct)])
     stats=stats.T
-    stats=stats.rename({0:"Índice Sharpe", 1:"Índice Sortino", 2:"Max Drawdown",
+    stats=stats.rename({0:"Índice Sharpe", 1:"Índice Sortino Ajustado", 2:"Max Drawdown",
                          3:"CVaR", 4:"Tail Ratio"}, axis=1)
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
