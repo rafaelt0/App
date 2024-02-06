@@ -64,6 +64,10 @@ try:
     data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
                           ,interval=interval_dict[interval_selected],rounding=True)
     data = data.Close
+    bench = yf.Ticker("^BVSP")
+    bench_data = bench.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
+                          ,interval=interval_dict[interval_selected],rounding=True)
+    bench_data = bench_data.Close
     returns= data.pct_change()
     returns = returns.dropna()*100
     returns_percentage = np.round(returns,2)
