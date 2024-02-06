@@ -75,9 +75,7 @@ try:
     st.subheader("Heatmap")
     st.pyplot(heatmap.figure)
 except:
-     st.write("""
-    Escolha uma ação para prosseguir
-              """)
+    pass
 
 
 try:
