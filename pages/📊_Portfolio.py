@@ -86,7 +86,7 @@ try:
     mu = mean_historical_return(data)
     S = CovarianceShrinkage(data).ledoit_wolf()
     ef = EfficientFrontier(mu, S)
-    ef.add_objective(objective_functions.L2_reg, gamma=2)
+    ef.add_objective(objective_functions.L2_reg, gamma=20)
     w = ef.max_sharpe()
     weights=pd.DataFrame(ef.clean_weights(), index=[0])
     weights=weights.rename({0:"Pesos"}, axis=0)
