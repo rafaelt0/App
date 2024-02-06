@@ -26,6 +26,16 @@ interval_selected = st.sidebar.selectbox('Intervalo 📊', ['dia','3 meses','mê
 interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m','semana':'1wk'}
 
 st.subheader("Análise")
+ol1, col2, col3 = st.columns([1,3,1])
+
+with col1:
+    st.write("")
+
+with col2:
+    st.image('OIG2.jpeg', width=(400))
+
+with col3:
+    st.write("")
 
 stocks = fundamentus.list_papel_all()
 tickers = list(st.sidebar.multiselect('Monte seu Portfolio (Escolha mais de uma ação)', stocks))
