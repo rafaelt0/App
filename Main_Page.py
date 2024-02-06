@@ -30,7 +30,7 @@ st.sidebar.success("Select Page")
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 st.write("""
-# **Stock Market App 📈**
+# **B3 Explorer 📈**
  """)
 
 col1, col2, col3 = st.columns([1,3,1])
