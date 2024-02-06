@@ -154,6 +154,7 @@ try:
     st.dataframe(stats)
     st.subheader("Glossário")
     st.write("""
+    * Índice Sharpe:  Medida do excesso de rendimento por unidade de risco de um investimento. O índice apura o retorno médio de um ativo em um determinado período e a volatilidade (desvio padrão) desse retorno médio. 
     """
             )
 except:
