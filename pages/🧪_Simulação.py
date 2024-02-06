@@ -15,6 +15,8 @@ years = int(st.sidebar.number_input("Anos", min_value=1))
 
 
 st.header("Simulação 🧪")
+
+
 mu = mu_selected
 n = periodos
 M = n_simulations
