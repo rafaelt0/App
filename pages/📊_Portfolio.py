@@ -29,7 +29,7 @@ with col1:
     st.write("")
 
 with col2:
-    st.image('OIG2.jpeg', width=(400))
+    st.image('OIG3.jpeg', width=(400))
 
 with col3:
     st.write("")
