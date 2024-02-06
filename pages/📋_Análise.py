@@ -176,11 +176,6 @@ try:
     da = DiscreteAllocation(w, latest_prices, total_portfolio_value=20000)
     allocation, leftover = da.lp_portfolio()
     st.write(allocation)
-    
-except:
-     pass
-
-try:
     dictionary = dict(ticker.tickers)
     lista=list(dictionary.keys())
     factors=[]
@@ -189,10 +184,6 @@ try:
     df=pd.DataFrame(factors, index=lista).T
     st.subheader("Sentimento de Investidores")
     st.write(df)
-except:
-     pass
-
-try:
     dictionary = dict(ticker.tickers)
     lista=list(dictionary.keys())
     factors=[]
@@ -203,3 +194,4 @@ try:
     st.write(df)
 except:
      pass
+
