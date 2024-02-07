@@ -153,12 +153,6 @@ try:
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
-    st.subheader("Glossário")
-    st.write("""
-    * Índice Sharpe:  Medida do excesso de rendimento por unidade de risco de um investimento. O índice apura o retorno médio de um ativo em um determinado período e a volatilidade (desvio padrão) desse retorno médio.
-    * O Max Drawdown , ou perda máxima, é um indicador de risco que evidencia a maior perda ocorrida desde um ponto de alta (pico) até um ponto de mínima em uma série histórica. Ou seja, mensura a maior queda de valor de um ativo, em porcentagem, entre um pico que ocorreu no passado e determinada data posterior.
-    """
-            )
 except:
     print("Hello World")
     
