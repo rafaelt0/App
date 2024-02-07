@@ -88,6 +88,7 @@ try:
     df = pd.DataFrame(factors, index=lista)
     df = df.set_axis(["Descrição"], axis=1)
     st.subheader("Descrição da Empresa")
+    df = df.T
     st.table(df[['PL']])
 except:
      pass
