@@ -56,7 +56,7 @@ try:
 
         
 
-    st.write(df.drop_duplicates(keep='last').T)
+    st.write(df.drop_duplicates(keep='last'))
     tickers = [ticker+".SA" for ticker in tickers]
     ticker = yf.Tickers(tickers)
 except:
