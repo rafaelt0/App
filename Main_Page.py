@@ -53,7 +53,7 @@ try:
     i=1
     for i in range(len(tickers)):
             df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
-    df['pl'] = df['Cotacao']/df['Lucro_Liquido_12m']
+    df['plopl'] = df['Cotacao']/df['Lucro_Liquido_12m']
     st.write(df['pl'])
     df_basic = df[['Empresa', 'Setor', 'Subsetor']]    
     st.write(df_basic.drop_duplicates(keep='last'))
