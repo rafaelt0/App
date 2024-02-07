@@ -49,7 +49,7 @@ stocks = list(data['Ticker'].values)
 st.subheader("Explore ações da B3 🧭")
 tickers = list(st.multiselect('Escolha ações para explorar! (2 ou mais ações)',stocks))
 try:
-    df = fundamentus.get_resultado_raw(list(tickers)[0])
+    df = fundamentus.get_papel(list(tickers)[0])
     i=1
     for i in range(len(tickers)):
             df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
