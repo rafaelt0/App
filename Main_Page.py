@@ -55,7 +55,7 @@ try:
             df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
 
         
-
+    df = df['PL']
     st.write(df.drop_duplicates(keep='last'))
     tickers = [ticker+".SA" for ticker in tickers]
     ticker = yf.Tickers(tickers)
