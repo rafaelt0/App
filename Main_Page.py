@@ -88,7 +88,7 @@ try:
     df = pd.DataFrame(factors, index=lista)
     df = df.set_axis(["Descrição"], axis=1)
     st.subheader("Descrição da Empresa")
-    st.table(df)
+    st.table(df[['PL']])
 except:
      pass
 
