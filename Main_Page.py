@@ -56,7 +56,7 @@ try:
     df['PL'] = df['PL'].astype('float64')/100
     df_basic = df[['Empresa', 'Setor', 'Subsetor']]    
     st.write(df_basic.drop_duplicates(keep='last'))
-    df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 'Valor_de_mercado', 'Data_ult_cot']]
+    df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 'Valor_de_mercado', 'Data_ult_cot', 'EV_EBITDA']]
     st.dataframe(df_price.drop_duplicates(keep='last'))
     df_indicadores = df[['Marg_Liquida','ROE', 'ROIC', 'Div_Yield', 'Cres_Rec_5a', 'PL']]
     st.dataframe(df_indicadores.drop_duplicates(keep='last'))
