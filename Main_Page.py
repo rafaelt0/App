@@ -53,8 +53,8 @@ try:
     i=1
     for i in range(len(tickers)):
             df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
-
-    st.write(df)
+    df['pl'] = df['Cotacao']/df['Lucro_Liquido_12m']
+    st.write(df['pl'])
     df_basic = df[['Empresa', 'Setor', 'Subsetor']]    
     st.write(df_basic.drop_duplicates(keep='last'))
     df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 'Valor_de_mercado', 'Data_ult_cot']]
