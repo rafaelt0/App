@@ -56,6 +56,8 @@ try:
 
     df_basic = df[['Empresa', 'Setor', 'Subsetor']]    
     st.write(df_basic.drop_duplicates(keep='last'))
+    df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem']]
+    st.write(df_price.drop_duplicates(keep='last').T)
     tickers = [ticker+".SA" for ticker in tickers]
     ticker = yf.Tickers(tickers)
 except:
