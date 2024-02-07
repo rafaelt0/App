@@ -55,7 +55,7 @@ try:
             df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
 
     df_basic = df[['Empresa', 'Setor', 'Subsetor', 'Cotacao']]    
-    st.write(df_basic.drop_duplicates(keep='last'))
+    st.write(df_basic.drop_duplicates(keep='last').T)
     tickers = [ticker+".SA" for ticker in tickers]
     ticker = yf.Tickers(tickers)
 except:
