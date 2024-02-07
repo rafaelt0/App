@@ -53,6 +53,7 @@ try:
     i=1
     for i in range(len(tickers)):
             df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
+            df = df.loc['PL']
         
 
     st.write(df.drop_duplicates(keep='last').T)
