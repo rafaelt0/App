@@ -142,14 +142,10 @@ except:
     
 
 
-try:
-
-    statistics_df = pd.DataFrame(statistics)
-    st.subheader("Outras Estatísticas Fundamentais")
-    statistics_df=statistics_df.set_axis(['Média','Mediana','Volatilidade','Máximo','Mínimo'], axis=0)
-    st.write(statistics_df)
-except:
-     pass
+statistics_df = pd.DataFrame(statistics)
+st.subheader("Outras Estatísticas Fundamentais")
+statistics_df=statistics_df.set_axis(['Média','Mediana','Volatilidade','Máximo','Mínimo'], axis=0)
+st.write(statistics_df)
 
 try:
     fig,ax = plt.subplots()
@@ -160,38 +156,3 @@ try:
 except:
      pass
         
-try:
-    mu = mean_historical_return(data)
-    S = CovarianceShrinkage(data).ledoit_wolf()
-    ef = EfficientFrontier(mu, S)
-    ef.add_objective(objective_functions.L2_reg, gamma=0.1)
-    w = ef.max_sharpe()
-    weights=pd.DataFrame(ef.clean_weights(), index=[0])*100
-    weights= weights.astype(str)+'%'
-    st.subheader("Porcentagem ótima no Portfolio")
-    weights=np.round(weights,2)
-    st.write(weights)
-    from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
-    latest_prices = get_latest_prices(df)
-    da = DiscreteAllocation(w, latest_prices, total_portfolio_value=20000)
-    allocation, leftover = da.lp_portfolio()
-    st.write(allocation)
-    dictionary = dict(ticker.tickers)
-    lista=list(dictionary.keys())
-    factors=[]
-    for _ in lista:
-        factors.append(yf.Ticker(_).info['recommendationKey'])
-    df=pd.DataFrame(factors, index=lista).T
-    st.subheader("Sentimento de Investidores")
-    st.write(df)
-    dictionary = dict(ticker.tickers)
-    lista=list(dictionary.keys())
-    factors=[]
-    for _ in lista:
-        factors.append(yf.Ticker(_).info['beta'])
-    df=pd.DataFrame(factors, index=lista).T
-    st.subheader("Índice Beta")
-    st.write(df)
-except:
-     pass
-
