@@ -142,11 +142,13 @@ except:
     pass
     
 
-
-statistics_df = pd.DataFrame(statistics)
-st.subheader("Outras Estatísticas Fundamentais")
-statistics_df=statistics_df.set_axis(['Média','Mediana','Volatilidade','Máximo','Mínimo'], axis=0)
-st.write(statistics_df)
+try:
+    statistics_df = pd.DataFrame(statistics)
+    st.subheader("Outras Estatísticas Fundamentais")
+    statistics_df=statistics_df.set_axis(['Média','Mediana','Volatilidade','Máximo','Mínimo'], axis=0)
+    st.write(statistics_df)
+except:
+    pass
 
 try:
     fig,ax = plt.subplots()
