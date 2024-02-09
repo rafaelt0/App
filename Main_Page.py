@@ -55,7 +55,7 @@ try:
             df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
     df['PL'] = df['PL'].astype('float64')/100
     df_basic = df[['Empresa', 'Setor', 'Subsetor']]
-    st.subheader("Informações")
+    st.subheader("Setor")
     st.write(df_basic.drop_duplicates(keep='last'))
     df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 'Valor_de_mercado', 'Data_ult_cot']]
     st.dataframe(df_price.drop_duplicates(keep='last'))
