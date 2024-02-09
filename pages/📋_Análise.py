@@ -79,22 +79,22 @@ except:
     pass
 
 
-try:
-    fig,ax = plt.subplots()
-    histograma=sns.histplot(returns, kde=True, fill=False, element='bars')
-    st.subheader("Histograma Retornos")
-    st.pyplot(histograma.figure)
-    i=0
-    curtoses = []
-    excess_curtoses = []
-    for i in range(len(tickers)):
-        curtoses.append(kurtosis(np.array(returns.iloc[:,i])))
-        excess_curtoses.append(kurtosis(np.array(returns.iloc[:,i]))-3)
-    curtoses = np.array(curtoses).reshape(1,2)
-    excess_curtoses = np.array(excess_curtoses).reshape(1,2)
-    statistics = returns.mean(), returns.median(), returns.std(), returns.max(), returns.min()
-    curtoses = pd.DataFrame(curtoses)
-    excess_curtoses = pd.DataFrame(excess_curtoses)
+
+fig,ax = plt.subplots()
+histograma=sns.histplot(returns, kde=True, fill=False, element='bars')
+st.subheader("Histograma Retornos")
+st.pyplot(histograma.figure)
+i=0
+curtoses = []
+excess_curtoses = []
+ for i in range(len(tickers)):
+    curtoses.append(kurtosis(np.array(returns.iloc[:,i])))
+    excess_curtoses.append(kurtosis(np.array(returns.iloc[:,i]))-3)
+curtoses = np.array(curtoses).reshape(1,2)
+excess_curtoses = np.array(excess_curtoses).reshape(1,2)
+statistics = returns.mean(), returns.median(), returns.std(), returns.max(), returns.min()
+curtoses = pd.DataFrame(curtoses)
+excess_curtoses = pd.DataFrame(excess_curtoses)
 
     curtoses = curtoses.set_axis(tickers, axis=1)
     excess_curtoses = excess_curtoses.set_axis(tickers, axis=1)
