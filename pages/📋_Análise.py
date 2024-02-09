@@ -95,13 +95,13 @@ statistics = returns.mean(), returns.median(), returns.std(), returns.max(), ret
 curtoses = pd.DataFrame(curtoses)
 excess_curtoses = pd.DataFrame(excess_curtoses)
 
-    curtoses = curtoses.set_axis(tickers, axis=1)
-    excess_curtoses = excess_curtoses.set_axis(tickers, axis=1)
-    excess_curtoses = excess_curtoses.set_axis(['Excesso de Curtose'], axis=0)
-    curtoses = curtoses.set_axis(['Curtose'], axis=0)
-    st.subheader("Curtose")
-    st.write(curtoses, excess_curtoses)
-    st.write("""
+curtoses = curtoses.set_axis(tickers, axis=1)
+excess_curtoses = excess_curtoses.set_axis(tickers, axis=1)
+excess_curtoses = excess_curtoses.set_axis(['Excesso de Curtose'], axis=0)
+curtoses = curtoses.set_axis(['Curtose'], axis=0)
+st.subheader("Curtose")
+st.write(curtoses, excess_curtoses)
+st.write("""
             Definição Curtose/Excesso de Curtose:
             1. **Curtose**: Medida de forma que caracteriza o achatamento da curva da função de distribuição de probabilidade 
             2. **Excesso de Curtose** = Curtose - 3(Curtose de uma Normal)
@@ -111,7 +111,8 @@ excess_curtoses = pd.DataFrame(excess_curtoses)
             * Excesso de Curtose < 0: **Platicúrtica**, ie. a distribuição é mais achatada que a Normal
              """)
 
-    
+
+
 try:
     skewness = []
     for i in range(len(tickers)):
