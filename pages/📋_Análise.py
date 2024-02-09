@@ -86,7 +86,7 @@ st.pyplot(histograma.figure)
 i=0
 curtoses = []
 excess_curtoses = []
- for i in range(len(tickers)):
+for i in range(len(tickers)):
     curtoses.append(kurtosis(np.array(returns.iloc[:,i])))
     excess_curtoses.append(kurtosis(np.array(returns.iloc[:,i]))-3)
 curtoses = np.array(curtoses).reshape(1,2)
