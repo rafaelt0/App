@@ -154,7 +154,7 @@ try:
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
 except:
-    print("Hello World")
+    st.write("Portfolio inadequado, selecione outras ou mais ações")
     
 
 
