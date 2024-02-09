@@ -59,6 +59,7 @@ try:
     st.write(df_basic.drop_duplicates(keep='last'))
     df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 'Valor_de_mercado', 'Data_ult_cot']]
     st.dataframe(df_price.drop_duplicates(keep='last'))
+    st.write("Indicadores")
     df_indicadores = df[['Marg_Liquida','Marg_EBIT','ROE', 'ROIC', 'Div_Yield', 'Cres_Rec_5a', 'PL', 'EV_EBITDA']]
     st.dataframe(df_indicadores.drop_duplicates(keep='last'))
     tickers = [ticker+".SA" for ticker in tickers]
