@@ -79,7 +79,6 @@ except:
     pass
 
 
-
 fig,ax = plt.subplots()
 histograma=sns.histplot(returns, kde=True, fill=False, element='bars')
 st.subheader("Histograma Retornos")
@@ -111,8 +110,7 @@ excess_curtoses = pd.DataFrame(excess_curtoses)
             * Excesso de Curtose = 0: **Mesocúrtica**, ie. distribuição Normal
             * Excesso de Curtose < 0: **Platicúrtica**, ie. a distribuição é mais achatada que a Normal
              """)
-except:
-    pass
+
     
 try:
     skewness = []
