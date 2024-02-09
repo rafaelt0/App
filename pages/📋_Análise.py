@@ -78,38 +78,40 @@ try:
 except:
     pass
 
-
-fig,ax = plt.subplots()
-histograma=sns.histplot(returns, kde=True, fill=False, element='bars')
-st.subheader("Histograma Retornos")
-st.pyplot(histograma.figure)
-i=0
-curtoses = []
-excess_curtoses = []
-for i in range(len(tickers)):
-    curtoses.append(kurtosis(np.array(returns.iloc[:,i])))
-    excess_curtoses.append(kurtosis(np.array(returns.iloc[:,i]))-3)
-curtoses = np.array(curtoses).reshape(1,2)
-excess_curtoses = np.array(excess_curtoses).reshape(1,2)
-statistics = returns.mean(), returns.median(), returns.std(), returns.max(), returns.min()
-curtoses = pd.DataFrame(curtoses)
-excess_curtoses = pd.DataFrame(excess_curtoses)
-
-curtoses = curtoses.set_axis(tickers, axis=1)
-excess_curtoses = excess_curtoses.set_axis(tickers, axis=1)
-excess_curtoses = excess_curtoses.set_axis(['Excesso de Curtose'], axis=0)
-curtoses = curtoses.set_axis(['Curtose'], axis=0)
-st.subheader("Curtose")
-st.write(curtoses, excess_curtoses)
-st.write("""
-            Definição Curtose/Excesso de Curtose:
-            1. **Curtose**: Medida de forma que caracteriza o achatamento da curva da função de distribuição de probabilidade 
-            2. **Excesso de Curtose** = Curtose - 3(Curtose de uma Normal)
-            ###### Categorias 
-            * Excesso de Curtose > 0: **Leptocúrtica**, ie. a distribuição apresenta caudas pesadas
-            * Excesso de Curtose = 0: **Mesocúrtica**, ie. distribuição Normal
-            * Excesso de Curtose < 0: **Platicúrtica**, ie. a distribuição é mais achatada que a Normal
-             """)
+try:
+    fig,ax = plt.subplots()
+    histograma=sns.histplot(returns, kde=True, fill=False, element='bars')
+    st.subheader("Histograma Retornos")
+    st.pyplot(histograma.figure)
+    i=0
+    curtoses = []
+    excess_curtoses = []
+    for i in range(len(tickers)):
+        curtoses.append(kurtosis(np.array(returns.iloc[:,i])))
+        excess_curtoses.append(kurtosis(np.array(returns.iloc[:,i]))-3)
+    curtoses = np.array(curtoses).reshape(1,2)
+    excess_curtoses = np.array(excess_curtoses).reshape(1,2)
+    statistics = returns.mean(), returns.median(), returns.std(), returns.max(), returns.min()
+    curtoses = pd.DataFrame(curtoses)
+    excess_curtoses = pd.DataFrame(excess_curtoses)
+    
+    curtoses = curtoses.set_axis(tickers, axis=1)
+    excess_curtoses = excess_curtoses.set_axis(tickers, axis=1)
+    excess_curtoses = excess_curtoses.set_axis(['Excesso de Curtose'], axis=0)
+    curtoses = curtoses.set_axis(['Curtose'], axis=0)
+    st.subheader("Curtose")
+    st.write(curtoses, excess_curtoses)
+    st.write("""
+                Definição Curtose/Excesso de Curtose:
+                1. **Curtose**: Medida de forma que caracteriza o achatamento da curva da função de distribuição de probabilidade 
+                2. **Excesso de Curtose** = Curtose - 3(Curtose de uma Normal)
+                ###### Categorias 
+                * Excesso de Curtose > 0: **Leptocúrtica**, ie. a distribuição apresenta caudas pesadas
+                * Excesso de Curtose = 0: **Mesocúrtica**, ie. distribuição Normal
+                * Excesso de Curtose < 0: **Platicúrtica**, ie. a distribuição é mais achatada que a Normal
+                 """)
+except:
+    pass
 
 
 
