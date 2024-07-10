@@ -28,15 +28,14 @@ data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 tickers = list(st.multiselect('Escolha uma ação para simular', stocks))
 
-try:
-    df = fundamentus.get_papel(list(tickers)[0])
-    i=1
-    for i in range(len(tickers)):
-            df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
-    tickers = [ticker+".SA" for ticker in tickers]
-    ticker = yf.Tickers(tickers)
-except:
-    pass
+
+df = fundamentus.get_papel(list(tickers)[0])
+i=1
+for i in range(len(tickers)):
+    df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
+tickers = [ticker+".SA" for ticker in tickers]
+ticker = yf.Tickers(tickers)
+
 
 
 data = ticker.history(start=data_inicio, end=datetime.datetime.now(),interval='1mo',rounding=True)
