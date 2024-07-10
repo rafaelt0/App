@@ -25,6 +25,20 @@ with col1:
 with col3:
     st.write("")
 
+data = pd.read_csv('acoes-listadas-b3.csv')
+stocks = list(data['Ticker'].values)
+tickers = list(st.multiselect('Escolha ações para analisar (2 ou mais).', stocks))
+
+try:
+    df = fundamentus.get_papel(list(tickers)[0])
+    i=1
+    for i in range(len(tickers)):
+            df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
+    tickers = [ticker+".SA" for ticker in tickers]
+    ticker = yf.Tickers(tickers)
+except:
+    pass
+
 
 mu = mu_selected
 n = periodos
