@@ -38,15 +38,14 @@ try:
 except:
     pass
 
-try:
-    data = ticker.history(start=data_inicio, end=datetime.datetime.now(),interval='1mo',rounding=True)
-    data = data.Close
-    returns= data.pct_change()
-    returns = returns.dropna()*100
-    mu_selected = returns.mean()
-    sigma_selected = returns.std()
-except:
-    pass
+
+data = ticker.history(start=data_inicio, end=datetime.datetime.now(),interval='1mo',rounding=True)
+data = data.Close
+returns= data.pct_change()
+returns = returns.dropna()*100
+mu_selected = returns.mean()
+sigma_selected = returns.std()
+
     
 
 
