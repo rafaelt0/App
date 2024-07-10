@@ -9,7 +9,7 @@ n_simulations = st.sidebar.slider("Número de Simulações",10,1000,10)
 valor = st.sidebar.number_input("Capital Inicial", min_value=10)
 periodos = int(st.sidebar.number_input("Passos", value=12, min_value=1))
 years = int(st.sidebar.number_input("Anos", min_value=1))         
-
+data_inicio = st.sidebar.date_input("Data Inicial📅", datetime.date(2024,1,1),min_value=datetime.date(2000,1,1))
 
 
 st.header("Simulação 🧪")
@@ -38,8 +38,7 @@ except:
     pass
 
 try:
-    data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
-                          ,interval=interval_dict[interval_selected],rounding=True)
+    data = ticker.history(start=data_inicio, end=datetime.datetime.now(),interval='1mo',rounding=True)
     data = data.Close
     returns= data.pct_change()
     returns = returns.dropna()*100
