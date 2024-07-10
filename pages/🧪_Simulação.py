@@ -27,7 +27,7 @@ with col3:
 
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
-tickers = list(st.select('Escolha uma ação para simular', stocks))
+tickers = list(st.multiselect('Escolha uma ação para simular', stocks))
 
 try:
     df = fundamentus.get_papel(list(tickers)[0])
