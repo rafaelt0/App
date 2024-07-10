@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import datetime
 import fundamentus
+import yfinance as yf
 
 st.sidebar.header("Opções Simulação 👨‍🔬")
 n_simulations = st.sidebar.slider("Número de Simulações",10,1000,10)
