@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 
 st.sidebar.header("Opções Simulação 👨‍🔬")
-mu_selected = st.sidebar.slider("Média",-4.00,4.00,0.01)
-sigma_selected = st.sidebar.slider("Volatilidade",-4.00,4.00,0.001)
 n_simulations = st.sidebar.slider("Número de Simulações",10,1000,10)
 valor = st.sidebar.number_input("Capital Inicial", min_value=10)
 periodos = int(st.sidebar.number_input("Passos", value=12, min_value=1))
