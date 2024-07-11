@@ -156,7 +156,8 @@ try:
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
     statistics = returns_calc.mean(), returns_calc.median(), returns_calc.std(), returns_calc.max(), returns_calc.min()
-    statistics_df = pd.DataFrame(statistics+'%')
+    statistics= statistics.astype("str")+"%"
+    statistics_df = pd.DataFrame(statistics)
     st.subheader("Outras Estatísticas Fundamentais")
     statistics_df=statistics_df.set_axis(['Média','Mediana','Volatilidade','Máximo','Mínimo'], axis=0)
     st.write(statistics_df)
