@@ -36,7 +36,7 @@ returns= data.pct_change()
 mean = float(returns.mean())
 mu_selected = (1+mean)**12-1
 
-sigma_selected = returns.std()
+sigma_selected = returns.std()*np.sqrt(12)
     
 
 
