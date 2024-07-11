@@ -172,8 +172,8 @@ returns= data.pct_change()
  
 result=st.button('Generate report')
 if result:
-    plt = quantstats.plots.distribution(returns['PETR3.SA'])
-    st.pyplot(plt)
+    QUANTILE = quantstats.plots.distribution(returns['PETR3.SA'])
+    st.pyplot(QUANTILE)
 else:
     print('Error')
 
