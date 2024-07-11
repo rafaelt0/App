@@ -6,6 +6,7 @@ import fundamentus
 import sklearn
 import pandas as pd
 import seaborn as sns
+import quantstats
 from quantstats.stats import sharpe, sortino, max_drawdown, risk_of_ruin, skew, kurtosis, var, volatility, cvar, tail_ratio
 from quantstats.utils import download_returns
 from quantstats.plots import rolling_sharpe
