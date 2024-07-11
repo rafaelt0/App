@@ -159,7 +159,8 @@ try:
         quantstats.reports.full(returns)
     else:
         print('Error')
-
+except:
+    pass
 
 
 
