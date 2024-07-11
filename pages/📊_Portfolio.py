@@ -150,6 +150,7 @@ try:
     statistics_df = pd.DataFrame(statistics)
     st.subheader("Outras Estatísticas Fundamentais")
     statistics_df=statistics_df.set_axis(['Média','Mediana','Volatilidade','Máximo','Mínimo'], axis=0)
+    statistics_df.rename({0:'Estatísticas'}, axis=0)
     st.write(statistics_df.T)
 except:
     pass
