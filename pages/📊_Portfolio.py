@@ -135,7 +135,7 @@ try:
     
     cum_returns_df.index=returns
     cum_returns_df=cum_returns_df.rename({0:"Retornos Acumulados Portfolio"}, axis=1)
-    st.dataframe(cum_returns_df, cum_returns_bench_df)
+    st.dataframe(cum_returns_bench_df)
     valor=valor_inicial
     portfolio_value=(1+cum_return)*valor
     portfolio_value_df=pd.DataFrame(portfolio_value)
