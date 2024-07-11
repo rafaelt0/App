@@ -121,6 +121,8 @@ try:
     st.dataframe(returns_calc_string)
     cum_return=(1+returns_calc_non_pct).cumprod()-1
     cum_bench_return=(1+bench_returns).cumprod()-1
+    cum_bench_returns=round(cum_bench_return*100,3)
+    cum_bench_returns_string=cum_bench_returns.astype("str")+"%"
     cum_returns=round(cum_return*100,3)
     cum_returns_string=cum_returns.astype("str")+"%"
     cum_returns_df=pd.DataFrame(cum_returns_string)
