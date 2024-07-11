@@ -26,16 +26,6 @@ interval_selected = st.sidebar.selectbox('Intervalo 📊', ['dia','3 meses','mê
 interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m','semana':'1wk'}
 
 st.subheader("Análise")
-col1, col2, col3 = st.columns([1,3,1])
-
-with col1:
-    st.write("")
-
-with col2:
-    st.image('OIG2.jpeg', width=(400))
-
-with col3:
-    st.write("")
 
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
@@ -101,15 +91,6 @@ try:
     curtoses = curtoses.set_axis(['Curtose'], axis=0)
     st.subheader("Curtose")
     st.write(curtoses, excess_curtoses)
-    st.write("""
-                Definição Curtose/Excesso de Curtose:
-                1. **Curtose**: Medida de forma que caracteriza o achatamento da curva da função de distribuição de probabilidade 
-                2. **Excesso de Curtose** = Curtose - 3(Curtose de uma Normal)
-                ###### Categorias 
-                * Excesso de Curtose > 0: **Leptocúrtica**, ie. a distribuição apresenta caudas pesadas
-                * Excesso de Curtose = 0: **Mesocúrtica**, ie. distribuição Normal
-                * Excesso de Curtose < 0: **Platicúrtica**, ie. a distribuição é mais achatada que a Normal
-                 """)
 except:
     pass
 
@@ -125,19 +106,6 @@ try:
     skewness=skewness.set_axis(['Assimetria da Distribuição'], axis=0)
     st.subheader("Assimetria da Distribuição")
     st.write(skewness)
-    st.write(
-        """
-    Definição Assimetria da Distribuição:
-    1. Assimetria é uma medida de falta de \
-        simetria de uma determinada distribuição de frequência.\
-        Mede a asssimetria das caudas da distribuição.
-    ######
-    * Se v>0, então a distribuição tem uma cauda direita (valores acima da média) mais pesada
-    * Se v<0, então a distribuição tem uma cauda esquerda (valores abaixo da média) mais pesada
-    * Se v=0, então a distribuição é aproximadamente simétrica (na terceira potência do desvio em relação à média).
-    
-"""
-    )
 except:
     pass
     
