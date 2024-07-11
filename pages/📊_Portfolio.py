@@ -74,8 +74,6 @@ try:
     df = df.set_axis(["Descrição"], axis=1)
     heatmap=sns.heatmap(data.corr(), annot=True)
     st.subheader("Matrix de Correlação")
-    st.write(data.corr())
-    st.subheader("Heatmap")
     st.pyplot(heatmap.figure)
 except:
      pass
