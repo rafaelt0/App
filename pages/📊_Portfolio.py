@@ -173,7 +173,7 @@ returns_calc=(returns*1000_000).astype("int")
 returns_calc=np.dot(returns_calc,weights)   
 result=st.button('Generate report')
 if result:
-    st.write(returns_calc_non_pct)
+    st.write(returns_calc)
     quantstats.reports.plots(returns_calc)
 else:
     print('Error')
