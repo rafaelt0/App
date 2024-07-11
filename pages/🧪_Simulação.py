@@ -28,15 +28,12 @@ with col3:
 
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
-tickers = list(st.multiselect('Escolha uma ação para simular', stocks))
+ticker = list(st.multiselect('Escolha uma ação para simular', stocks))
 
 
-df = fundamentus.get_papel(list(tickers)[0])
-i=1
-for i in range(len(tickers)):
-    df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
-tickers = [ticker+".SA" for ticker in tickers]
-ticker = yf.Tickers(tickers)
+df = fundamentus.get_papel(ticker)
+ticker = ticker+'.SA'
+ticker = yf.Tickers(ticker)
 
 
 
