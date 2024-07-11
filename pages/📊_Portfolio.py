@@ -157,6 +157,37 @@ try:
 except:
     pass
 
+try:
+    df = fundamentus.get_papel(list(tickers)[0])
+    i=1
+    for i in range(len(tickers)):
+            df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
+    tickers = [ticker+".SA" for ticker in tickers]
+    ticker = yf.Tickers(tickers)
+except:
+    pass
+
+try:
+    data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
+                          ,interval=interval_dict[interval_selected],rounding=True)
+    data = data.Close
+    bench = yf.Ticker("^BVSP")
+    bench_data = bench.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
+                          ,interval=interval_dict[interval_selected],rounding=True)
+    bench_data = bench_data.Close
+    bench_returns = bench_data.pct_change()
+    returns= data.pct_change()
+    data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
+                          ,interval=interval_dict[interval_selected],rounding=True)
+    data = data.Close
+    bench = yf.Ticker("^BVSP")
+    bench_data = bench.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
+                          ,interval=interval_dict[interval_selected],rounding=True)
+    bench_data = bench_data.Close
+    bench_returns = bench_data.pct_change()
+    returns= data.pct_change()
+except:
+    pass
 result=st.button('Generate report')
 if result:
     st.write(returns)
