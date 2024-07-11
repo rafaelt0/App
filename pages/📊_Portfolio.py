@@ -155,7 +155,7 @@ try:
     st.dataframe(stats)
     result=st.button('Generate report')
     if result:
-        quantstats.reports.html(returns)
+        quantstats.reports.full(returns)
     else:
         print('Error')
 except:
