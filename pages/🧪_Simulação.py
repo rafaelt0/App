@@ -29,7 +29,7 @@ with col3:
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = data['Ticker'].values
 ticker = st.selectbox('Escolha uma ação para simular', stocks)+'.SA'
-ticker = yf.Tickers(ticker)
+ticker = yf.Ticker(ticker)
 data = ticker.history(start=data_inicio, end=datetime.datetime.now(),rounding=True)
 data = data.Close
 returns= data.pct_change()
