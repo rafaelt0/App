@@ -28,9 +28,7 @@ with col3:
 
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = data['Ticker'].values
-ticker = st.selectbox('Escolha uma ação para simular', stocks)
-for _ in ticker:
-    _+'.SA'
+ticker = st.selectbox('Escolha uma ação para simular', stocks)+'.SA'
 ticker = yf.Tickers(ticker)
 data = ticker.history(start=data_inicio, end=datetime.datetime.now(),rounding=True)
 data = data.Close
