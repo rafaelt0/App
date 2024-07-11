@@ -155,6 +155,7 @@ try:
     statistics_df=statistics_df.set_axis(['Média','Mediana','Volatilidade','Máximo','Mínimo'], axis=0)
     statistics_df=statistics_df.rename({0:'Retornos'}, axis=0)
     st.write(statistics_df.T)
+    quantstats.plots.distribution(returns_calc)
 except:
     pass
 
