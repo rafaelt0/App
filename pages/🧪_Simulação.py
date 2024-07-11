@@ -31,7 +31,7 @@ stocks = data['Ticker'].values
 ticker = st.multiselect('Escolha uma ação para simular', stocks)
 for _ in ticker:
     _+'.SA'
-ticker = yf.Tickers(ticker)
+ticker = yf.Tickers(ticker+'.SA')
 data = ticker.history(start=data_inicio, end=datetime.datetime.now(),rounding=True)
 data = data.Close
 returns= data.pct_change()
