@@ -154,13 +154,14 @@ try:
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
-    result=st.button('Generate report')
-    if result:
-        quantstats.reports.full(returns)
-    else:
-        print('Error')
-except:
-    pass
+
+
+result=st.button('Generate report')
+if result:
+    quantstats.reports.full(returns)
+else:
+    print('Error')
+
 
 
 
