@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
 
 st.set_page_config(
-    page_title="Stock Explorer",
+    page_title="Análise de Ações B3",
     page_icon="📈"
     )
 st.sidebar.success("Select Page")
@@ -34,15 +34,6 @@ st.write("""
  """)
 
 col1, col2, col3 = st.columns([1,3,1])
-
-with col1:
-    st.write("")
-
-with col2:
-    st.image('b3.webp', width=(400))
-
-with col3:
-    st.write("")
 
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
