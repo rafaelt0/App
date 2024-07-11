@@ -8,7 +8,7 @@ import fundamentus
 import yfinance as yf
 
 st.sidebar.header("Opções Simulação 👨‍🔬")
-n_simulations = st.sidebar.slider("Número de Simulações",10,1000,10)
+n_simulations = st.sidebar.slider("Número de Simulações",10,1000,100)
 valor = st.sidebar.number_input("Capital Inicial", min_value=100)
 periodos = int(st.sidebar.number_input("Meses", value=12, min_value=1))
 years = int(st.sidebar.number_input("Anos", min_value=1))         
