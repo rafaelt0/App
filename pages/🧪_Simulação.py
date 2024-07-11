@@ -40,7 +40,7 @@ ticker = yf.Tickers(tickers)
 
 
 
-data = ticker.history(start=data_inicio, end=datetime.datetime.now(),interval='1mo',rounding=True)
+data = ticker.history(start=data_inicio, end=datetime.datetime.now(),rounding=True)
 data = data.Close
 returns= data.pct_change()
 returns = returns.dropna()*100
