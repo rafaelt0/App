@@ -97,7 +97,7 @@ try:
     st.write("OBS:.Variância na diagonal e covariância das demais")
     st.write(data.cov())
     st.subheader("Heatmap")
-    st.pyplot(heatmap.figure)
+    st.pyplot(heatmap)
     st.dataframe(weights_string)
     weights=(weights*1_000_000).astype("int").T
     returns_calc=(returns*1000_000).astype("int")
