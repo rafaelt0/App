@@ -35,7 +35,7 @@ data = data.Close
 returns= data.pct_change()
 mean = returns.mean()
 sigma_selected = returns.std()
-st.write(mean)
+st.write(float(mean))
     
 
 
