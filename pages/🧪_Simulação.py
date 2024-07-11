@@ -12,7 +12,7 @@ n_simulations = st.sidebar.slider("Número de Simulações",10,1000,10)
 valor = st.sidebar.number_input("Capital Inicial", min_value=10)
 periodos = int(st.sidebar.number_input("Passos", value=12, min_value=1))
 years = int(st.sidebar.number_input("Anos", min_value=1))         
-data_inicio = st.sidebar.date_input("Data Inicial📅", datetime.date(2024,1,1),min_value=datetime.date(2000,1,1))
+data_inicio = st.sidebar.date_input("Data Inicial📅", value=datetime.date(2019,1,1),datetime.date(2024,1,1),min_value=datetime.date(2000,1,1))
 
 
 st.header("Simulação 🧪")
