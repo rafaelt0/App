@@ -146,50 +146,17 @@ try:
                         sharpe(returns_calc_non_pct, rf=float(taxa_selic)/100)/np.sqrt(2), 
                         sortino(returns_calc_non_pct, rf=float(taxa_selic)/100), 
                         max_drawdown(returns_calc_non_pct),
+                        var(returns_calc_non_pct),
                         cvar(returns_calc_non_pct),
                         tail_ratio(returns_calc_non_pct)])
     stats=stats.T
     stats=stats.rename({0:"Índice Sharpe", 1:"Índice Sortino Ajustado", 2:"Max Drawdown",
-                         3:"CVaR", 4:"Tail Ratio"}, axis=1)
+                         3:"VaR", 4:"CVaR", 5:"Tail Ratio"}, axis=1)
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
 except:
     pass
-
-
-
-data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
-                      ,interval=interval_dict[interval_selected],rounding=True)
-data = data.Close
-bench = yf.Ticker("^BVSP")
-bench_data = bench.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
-                      ,interval=interval_dict[interval_selected],rounding=True)
-bench_data = bench_data.Close
-bench_returns = bench_data.pct_change()
-returns= data.pct_change()
-mu = mean_historical_return(data)
-S = CovarianceShrinkage(data).ledoit_wolf()
-ef = EfficientFrontier(mu, S)
-ef.add_objective(objective_functions.L2_reg, gamma=2)
-w = ef.max_sharpe(risk_free_rate=taxa_selic/100)
-weights=pd.DataFrame(ef.clean_weights(), index=[0])
-weights=weights.rename({0:"Pesos"}, axis=0)
-weights=round(weights,4)
-weights_graph=np.array(weights).ravel()
-weights_string= (weights*100).astype("str")+"%"
-weights=(weights*1_000_000).astype("int").T
-returns_calc=(returns*1000_000).astype("int")
-returns_calc=np.dot(returns_calc,weights)
-returns.values = returns_calc.values
-
- 
-result=st.button('Generate report')
-if result:
-    st.write(returns)
-    st.pyplot(quantstats.plots.distribution(returns['PETR3.SA']))
-else:
-    print('Error')
 
 
 
