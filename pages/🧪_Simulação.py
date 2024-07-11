@@ -29,6 +29,7 @@ with col3:
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 ticker = list(st.multiselect('Escolha uma ação para simular', stocks))
+print(ticker)
 ticker = ticker+'.SA'
 ticker = yf.Tickers(ticker)
 data = ticker.history(start=data_inicio, end=datetime.datetime.now(),rounding=True)
