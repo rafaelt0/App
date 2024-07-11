@@ -155,12 +155,11 @@ try:
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
-    statistics = returns_calc.mean(), returns_calc.median(), returns_calc.std(), returns_calc.max(), returns_calc.min()
-    statistics= statistics.astype("str")+"%"
+    statistics = returns_calc.mean()/100, returns_calc.median()/100, returns_calc.std()/100, returns_calc.max()/100, returns_calc.min()/100
     statistics_df = pd.DataFrame(statistics)
     st.subheader("Outras Estatísticas Fundamentais")
     statistics_df=statistics_df.set_axis(['Média','Mediana','Volatilidade','Máximo','Mínimo'], axis=0)
-    st.write(statistics_df)
+    st.write(statistics_df.T)
 except:
     pass
 
