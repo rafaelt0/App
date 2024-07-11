@@ -159,9 +159,6 @@ try:
         quantstats.reports.full(returns)
     else:
         print('Error')
-except:
-    st.write("Portfolio inadequado, selecione outras ou mais ações.")
-    
 
 
 
