@@ -155,7 +155,9 @@ try:
     st.dataframe(stats)
     result=st.button('Generate report')
     if result:
-        st.write(quantstats.reports.html(returns))
+        quantstats.reports.html(returns)
+    else:
+        print('Error')
 except:
     st.write("Portfolio inadequado, selecione outras ou mais ações.")
     
