@@ -160,7 +160,7 @@ except:
     
 result=st.button('Generate report')
 if result:
-    quantstats.reports.html(returns_calc_non_pct)
+    quantstats.reports.html(returns_calc_non_pct, output='pdf')
 else:
     print('Error')
 
