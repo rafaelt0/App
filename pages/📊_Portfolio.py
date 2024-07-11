@@ -72,7 +72,7 @@ try:
         factors.append(yf.Ticker(_).info['longBusinessSummary'])
     df = pd.DataFrame(factors, index=lista)
     df = df.set_axis(["Descrição"], axis=1)
-        heatmap=sns.heatmap(data.corr(), annot=True)
+    heatmap=sns.heatmap(data.corr(), annot=True)
     st.subheader("Matrix de Correlação")
     st.write(data.corr())
     st.subheader("Matrix de Covariância")
