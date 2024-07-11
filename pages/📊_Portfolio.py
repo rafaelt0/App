@@ -178,7 +178,6 @@ weights=weights.rename({0:"Pesos"}, axis=0)
 weights=round(weights,4)
 weights_graph=np.array(weights).ravel()
 weights_string= (weights*100).astype("str")+"%"
-st.subheader("Porcentagem ótima no Portfolio")
 weights=(weights*1_000_000).astype("int").T
 returns_calc=(returns*1000_000).astype("int")
 returns_calc=np.dot(returns_calc,weights)
@@ -187,6 +186,7 @@ returns.values = returns_calc.values
  
 result=st.button('Generate report')
 if result:
+    st.write(returns)
     st.pyplot(quantstats.plots.distribution(returns['PETR3.SA']))
 else:
     print('Error')
