@@ -159,6 +159,7 @@ except:
 
 result=st.button('Generate report')
 if result:
+    st.write(returns)
     quantstats.reports.full(returns)
 else:
     print('Error')
