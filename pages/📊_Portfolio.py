@@ -161,7 +161,7 @@ except:
 result=st.button('Generate report')
 if result:
     st.write(returns_calc_non_pct)
-    quantstats.reports.full(returns_calc_non_pct, output='pdf')
+    quantstats.reports.plots(returns_calc_non_pct, output='pdf')
 else:
     print('Error')
 
