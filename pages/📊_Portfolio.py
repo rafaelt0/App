@@ -26,15 +26,6 @@ import plotly.express as px
 st.subheader("Análise de Portfolio")
 col1, col2, col3 = st.columns([1,3,1])
 
-with col1:
-    st.write("")
-
-with col2:
-    st.image('OIG3.jpeg', width=(400))
-
-with col3:
-    st.write("")
-
 
 
 st.sidebar.header('Configurações ⚙️')
