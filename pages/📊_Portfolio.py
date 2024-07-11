@@ -157,24 +157,29 @@ try:
 except:
     pass
 
-mu = mean_historical_return(data)
-S = CovarianceShrinkage(data).ledoit_wolf()
-ef = EfficientFrontier(mu, S)
-ef.add_objective(objective_functions.L2_reg, gamma=2)
-w = ef.max_sharpe(risk_free_rate=taxa_selic/100)
-weights=pd.DataFrame(ef.clean_weights(), index=[0])
-weights=weights.rename({0:"Pesos"}, axis=0)
-weights=round(weights,4)
-weights_graph=np.array(weights).ravel()
-weights_string= (weights*100).astype("str")+"%"
-st.dataframe(weights_string)
-weights=(weights*1_000_000).astype("int").T
-returns_calc=(returns*1000_000).astype("int")
-returns_calc=np.dot(returns_calc,weights)   
+
+
+df = fundamentus.get_papel(list(tickers)[0])
+i=1
+for i in range(len(tickers)):
+        df = pd.concat([df,fundamentus.get_papel(list(tickers)[i])])
+tickers = [ticker+".SA" for ticker in tickers]
+ticker = yf.Tickers(tickers)
+data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
+                      ,interval=interval_dict[interval_selected],rounding=True)
+data = data.Close
+bench = yf.Ticker("^BVSP")
+bench_data = bench.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
+                      ,interval=interval_dict[interval_selected],rounding=True)
+bench_data = bench_data.Close
+bench_returns = bench_data.pct_change()
+returns= data.pct_change()
+
+ 
 result=st.button('Generate report')
 if result:
-    st.write(returns_calc)
-    quantstats.reports.plots(returns_calc)
+    st.write(returns)
+    quantstats.reports.plots(returns)
 else:
     print('Error')
 
