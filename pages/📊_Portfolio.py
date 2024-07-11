@@ -153,6 +153,7 @@ try:
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
+    st.button('Generate report')
 except:
     st.write("Portfolio inadequado, selecione outras ou mais ações.")
     
