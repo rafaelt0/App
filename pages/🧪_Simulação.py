@@ -35,7 +35,7 @@ data = data.Close
 returns= data.pct_change()
 mu_selected = returns.mean()
 sigma_selected = returns.std()
-
+st.write(mu_selected)
     
 
 
