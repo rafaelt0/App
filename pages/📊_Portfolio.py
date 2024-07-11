@@ -168,6 +168,26 @@ bench_data = bench.history(start=data_inicio, end=datetime.datetime.now(),period
 bench_data = bench_data.Close
 bench_returns = bench_data.pct_change()
 returns= data.pct_change()
+mu = mean_historical_return(data)
+S = CovarianceShrinkage(data).ledoit_wolf()
+ef = EfficientFrontier(mu, S)
+ef.add_objective(objective_functions.L2_reg, gamma=2)
+w = ef.max_sharpe(risk_free_rate=taxa_selic/100)
+weights=pd.DataFrame(ef.clean_weights(), index=[0])
+weights=weights.rename({0:"Pesos"}, axis=0)
+weights=round(weights,4)
+weights_graph=np.array(weights).ravel()
+weights_string= (weights*100).astype("str")+"%"
+st.subheader("Porcentagem ótima no Portfolio")
+fig, ax = plt.subplots(figsize=(12,5))
+ax.pie(weights_graph,labels=weights.columns.values,autopct='%1.1f%%')
+fig = px.pie(weights_graph, values=weights_graph, names=weights.columns.values)
+st.plotly_chart(fig)
+st.dataframe(weights_string)
+weights=(weights*1_000_000).astype("int").T
+returns_calc=(returns*1000_000).astype("int")
+returns_calc=np.dot(returns_calc,weights)
+returns.values = returns_calc.values
 
  
 result=st.button('Generate report')
