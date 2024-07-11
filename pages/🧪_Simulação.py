@@ -33,10 +33,9 @@ ticker = yf.Ticker(ticker)
 data = ticker.history(start=data_inicio, end=datetime.datetime.now(),interval='1mo')
 data = data.Close
 returns= data.pct_change()
-mean = float(returns.mean())
-mu_selected = 1+mean^12-1
+mean = returns.mean()
 sigma_selected = returns.std()
-st.write(returns.std())
+st.write(mean)
     
 
 
