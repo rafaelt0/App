@@ -123,19 +123,8 @@ try:
     cum_returns=round(cum_return*100,3)
     cum_returns_string=cum_returns.astype("str")+"%"
     cum_returns_df=pd.DataFrame(cum_returns_string)
-
-
-    cum_return_bench=(1+bench_returns).cumprod()-1
-    cum_returns_bench=round(cum_return_bench*100,3)
-    cum_returns_string_bench=cum_returns_bench.astype("str")+"%"
-    cum_returns_bench_df=pd.DataFrame(cum_returns_string_bench)
-    cum_returns_bench_df.index=returns
-
-
-    
-    cum_returns_df.index=returns
     cum_returns_df=cum_returns_df.rename({0:"Retornos Acumulados Portfolio"}, axis=1)
-    st.dataframe(cum_returns_bench_df)
+    st.dataframe(cum_returns_df)
     valor=valor_inicial
     portfolio_value=(1+cum_return)*valor
     portfolio_value_df=pd.DataFrame(portfolio_value)
