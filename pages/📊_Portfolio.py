@@ -72,6 +72,11 @@ try:
         factors.append(yf.Ticker(_).info['longBusinessSummary'])
     df = pd.DataFrame(factors, index=lista)
     df = df.set_axis(["Descrição"], axis=1)
+    heatmap=sns.heatmap(data.corr(), annot=True)
+    st.subheader("Matrix de Correlação")
+    st.write(data.corr())
+    st.subheader("Heatmap")
+    st.pyplot(heatmap.figure)
 except:
      pass
 try:
@@ -90,14 +95,6 @@ try:
     ax.pie(weights_graph,labels=weights.columns.values,autopct='%1.1f%%')
     fig = px.pie(weights_graph, values=weights_graph, names=weights.columns.values)
     st.plotly_chart(fig)
-    heatmap=sns.heatmap(data.corr(), annot=True)
-    st.subheader("Matrix de Correlação")
-    st.write(data.corr())
-    st.subheader("Matrix de Covariância")
-    st.write("OBS:.Variância na diagonal e covariância das demais")
-    st.write(data.cov())
-    st.subheader("Heatmap")
-    st.pyplot(heatmap)
     st.dataframe(weights_string)
     weights=(weights*1_000_000).astype("int").T
     returns_calc=(returns*1000_000).astype("int")
