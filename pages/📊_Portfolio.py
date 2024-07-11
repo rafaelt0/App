@@ -125,7 +125,7 @@ try:
     cum_bench_returns_string=cum_bench_returns.astype("str")+"%"
     cum_returns=round(cum_return*100,3)
     cum_returns_string=cum_returns.astype("str")+"%"
-    cum_returns_df=pd.DataFrame(cum_returns_string)
+    cum_returns_df=pd.DataFrame(cum_bench_returns_string)
     cum_bench_returns_df=pd.DataFrame(cum_bench_returns_string)
     cum_returns_df.index=returns
     cum_returns_df=cum_returns_df.rename({0:"Retornos Acumulados Portfolio"}, axis=1)
