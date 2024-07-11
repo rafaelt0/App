@@ -179,11 +179,6 @@ weights=round(weights,4)
 weights_graph=np.array(weights).ravel()
 weights_string= (weights*100).astype("str")+"%"
 st.subheader("Porcentagem ótima no Portfolio")
-fig, ax = plt.subplots(figsize=(12,5))
-ax.pie(weights_graph,labels=weights.columns.values,autopct='%1.1f%%')
-fig = px.pie(weights_graph, values=weights_graph, names=weights.columns.values)
-st.plotly_chart(fig)
-st.dataframe(weights_string)
 weights=(weights*1_000_000).astype("int").T
 returns_calc=(returns*1000_000).astype("int")
 returns_calc=np.dot(returns_calc,weights)
