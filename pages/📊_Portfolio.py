@@ -155,6 +155,8 @@ try:
     stats=stats.rename({0:"Estatísticas"}, axis=0)
     returns_calc_non_pct.index=returns
     st.dataframe(stats)
+    statistics = returns_calc.mean(), returns_calc.median(), returns_calc.std(), returns_calc.max(), returns_calc.min()
+    st.write(statistics)
 except:
     pass
 
