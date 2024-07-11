@@ -173,7 +173,7 @@ returns= data.pct_change()
 result=st.button('Generate report')
 if result:
     st.write(returns)
-    quantstats.reports.plots(returns)
+    quantstats.reports.metrics(returns)
 else:
     print('Error')
 
