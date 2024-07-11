@@ -27,7 +27,7 @@ with col3:
     st.write("")
 
 data = pd.read_csv('acoes-listadas-b3.csv')
-stocks = list(data['Ticker'].values)
+stocks = data['Ticker'].values
 ticker = st.multiselect('Escolha uma ação para simular', stocks)
 ticker = str(ticker)+'.SA'
 ticker = yf.Tickers(ticker)
