@@ -55,7 +55,8 @@ try:
     st.dataframe(df_price.drop_duplicates(keep='last'))
     st.subheader("Indicadores")
     df_indicadores = df[['Marg_Liquida','Marg_EBIT','ROE', 'ROIC', 'Div_Yield', 'Cres_Rec_5a', 'PL', 'EV_EBITDA']]
-    df_indicadores.columns = ["Margem Líquida", "EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos", "EBITDA"]
+    df_indicadores.columns = ["Margem Líquida", "EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos", 
+                              "P/L","EBITDA"]
     st.dataframe(df_indicadores.drop_duplicates(keep='last'))
     tickers = [ticker+".SA" for ticker in tickers]
     ticker = yf.Tickers(tickers)
