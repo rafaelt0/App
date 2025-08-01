@@ -73,7 +73,7 @@ interval_selected = st.sidebar.selectbox('Intervalo 📊', ['dia','3 meses','mê
 interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m','semana':'1wk'}
 
 
-try:
+
     data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
                           ,interval=interval_dict[interval_selected],rounding=True)
     data = data.Close
@@ -95,8 +95,7 @@ try:
     df = df.set_axis(["Descrição"], axis=1)
     st.subheader("Descrição da Empresa")
     st.table(df)
-except:
-     pass
+
 
 
 
