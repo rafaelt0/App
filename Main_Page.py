@@ -49,7 +49,7 @@ try:
     st.subheader("Setor")
     st.write(df_basic.drop_duplicates(keep='last'))
     st.subheader("Informações")
-    df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 'Valor_de_mercado', 'Data_ult_cot']]
+    df_price = df[['Cotação', 'Mínimo em 52 semanas', 'Máximo em 52 semanas', 'Vol_med_2m', 'Valor de mercado', 'Data última cotação']]
     st.dataframe(df_price.drop_duplicates(keep='last'))
     st.subheader("Indicadores")
     df_indicadores = df[['Marg_Liquida','Marg_EBIT','ROE', 'ROIC', 'Div_Yield', 'Cres_Rec_5a', 'PL', 'EV_EBITDA']]
