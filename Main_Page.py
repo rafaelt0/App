@@ -73,28 +73,30 @@ interval_selected = st.sidebar.selectbox('Intervalo 📊', ['dia','3 meses','mê
 interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m','semana':'1wk'}
 
 
-
-data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
-                      ,interval=interval_dict[interval_selected],rounding=True)
-data = data.Close
-st.subheader("Cotação")
-st.write(data)
-returns= data.pct_change()
-returns = returns.dropna()*100
-returns_percentage = np.round(returns,2)
-returns_string = returns_percentage.astype(str)+'%'
-st.subheader("Retornos")
-st.write(returns_string)
-prices = data.plot()
-dictionary = dict(ticker.tickers)
-lista=list(dictionary.keys())
-factors=[]
-for _ in lista:
-    factors.append(yf.Ticker(_).info['longBusinessSummary'])
-df = pd.DataFrame(factors, index=lista)
-df = df.set_axis(["Descrição"], axis=1)
-st.subheader("Descrição da Empresa")
-st.table(df)
+try:
+    data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
+                          ,interval=interval_dict[interval_selected],rounding=True)
+    data = data.Close
+    st.subheader("Cotação")
+    st.write(data)
+    returns= data.pct_change()
+    returns = returns.dropna()*100
+    returns_percentage = np.round(returns,2)
+    returns_string = returns_percentage.astype(str)+'%'
+    st.subheader("Retornos")
+    st.write(returns_string)
+    prices = data.plot()
+    dictionary = dict(ticker.tickers)
+    lista=list(dictionary.keys())
+    factors=[]
+    for _ in lista:
+        factors.append(yf.Ticker(_).info['longBusinessSummary'])
+    df = pd.DataFrame(factors, index=lista)
+    df = df.set_axis(["Descrição"], axis=1)
+    st.subheader("Descrição da Empresa")
+    st.table(df)
+except:
+    pass
 
 
 
