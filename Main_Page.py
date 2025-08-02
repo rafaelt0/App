@@ -79,6 +79,7 @@ try:
     st.subheader("Cotação")
     st.write(data)
     returns= data.pct_change()
+    st.write(returns)
     returns = returns.dropna()*100
     st.write(returns)
     returns_percentage = np.round(returns,2)
