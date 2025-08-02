@@ -59,6 +59,9 @@ if tickers:
                              'Cres_Rec_5a', 'PL', 'EV_EBITDA']]
         df_indicadores.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
                                   "Dividend Yield", "Crescimento Receita 5 anos", "P/L","EV/EBITDA"]
+        df.style.format({'Preço': "R$ {:,.2f}".format}) \
+    .format_index(str.upper, axis=1)
+
         st.dataframe(df_indicadores.drop_duplicates(keep='last'))
 
         # Formato do yfinance
