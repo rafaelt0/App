@@ -77,7 +77,7 @@ try:
     data = yf.download(tickers, start=data_inicio, end=datetime.datetime.now()).Close  
     data = data.reset_index()
     st.subheader("Cotação")
-    st.write(data)
+    st.write(data.pct_change())
     returns= data.pct_change()
     st.write(returns)
     returns = returns.dropna()*100
