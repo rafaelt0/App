@@ -14,3 +14,9 @@ yfinance==0.2.65
 PyPortfolioOpt==1.5.5
 fpdf==1.7.2
 kaleido==0.2.1
+GoogleNews==1.6.8
+newspaper3k==0.2.8
+nltk==3.9
+lxml==5.2.2
+beautifulsoup4==4.12.3
+requests==2.32.3
