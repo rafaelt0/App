@@ -40,6 +40,22 @@ def clean_numeric(series):
               .astype(float)
     )
 
+def mostrar_indicadores_com_gradiente(df):
+    cmap = 'RdYlGn'
+
+    vmin = df.min().min()
+    vmax = df.max().max()
+
+    styler_interativo = df.style.background_gradient(cmap=cmap, vmin=vmin, vmax=vmax, axis=None)
+    styler_html = df.style.background_gradient(cmap=cmap, vmin=vmin, vmax=vmax, axis=None)
+    html = styler_html.render()
+
+    st.subheader("Tabela Interativa com st.dataframe() (gradiente básico)")
+    st.dataframe(styler_interativo, use_container_width=True)
+
+    st.subheader("Tabela com gradiente fiel (sem interação) via components.html")
+    components.html(html, height=400, scrolling=True)
+
 if tickers:
     try:
         df = pd.concat([fundamentus.get_papel(t) for t in tickers])
@@ -67,16 +83,7 @@ if tickers:
         df_indicadores.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
                                   "Dividend Yield", "Crescimento Receita 5 anos", "P/L","EV/EBITDA"]
 
-        cols_positive = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
-                         "Dividend Yield", "Crescimento Receita 5 anos"]
-        cols_negative = ["P/L","EV/EBITDA"]
-
-        df_style = df_indicadores.style
-        df_style = df_style.background_gradient(cmap='RdYlGn', subset=cols_positive)
-        df_style = df_style.background_gradient(cmap='RdYlGn_r', subset=cols_negative)
-
-        html = df_style.render()
-        components.html(html, height=400, scrolling=True)
+        mostrar_indicadores_com_gradiente(df_indicadores)
 
         tickers_yf = [t + ".SA" for t in tickers]
         data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2024,1,1),
@@ -116,5 +123,6 @@ if tickers:
         st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
+
 
 
