@@ -8,8 +8,6 @@ import seaborn as sns
 import datetime
 import warnings
 import plotly.express as px
-from sklearn.ensemble import IsolationForest
-from io import BytesIO
 from fpdf import FPDF
 
 from pypfopt.expected_returns import mean_historical_return
@@ -132,35 +130,33 @@ try:
     st.subheader("Informações do Portfólio")
     st.dataframe(portfolio_info.style.format("{:.2f}"))
 
-    # === Detecção de Anomalias com IsolationForest ===
-    st.subheader("Detecção de Anomalias nos Retornos")
-
-    iso = IsolationForest(contamination=0.01, random_state=42)
-    returns_np = portfolio_returns.values.reshape(-1,1)
-    iso.fit(returns_np)
-    preds = iso.predict(returns_np)  # 1 = normal, -1 = anomalia
-
-    anomalies = portfolio_returns[preds == -1]
-    st.write(f"Foram detectados {len(anomalies)} dias com comportamento anômalo nos retornos.")
-
-    if not anomalies.empty:
-        st.dataframe(anomalies)
-
-    # === Exportar dados CSV ===
-    csv = portfolio_value.to_frame().to_csv().encode('utf-8')
-    st.download_button(label="Baixar histórico do valor do portfólio (.csv)", data=csv, file_name='portfolio_value.csv', mime='text/csv')
-
-    # === Gerar relatório PDF simples ===
+    # === Relatório PDF ===
     def generate_pdf():
         pdf = FPDF()
         pdf.add_page()
-   
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(0, 10, "Relatório Resumido do Portfólio", 0, 1, 'C')
 
-        pdf_bytes = pdf.output(dest='S').encode('latin1')  
+        pdf.set_font("Arial", "", 12)
+        pdf.cell(0, 10, f"Período: {data_inicio} até {datetime.datetime.now().date()}", 0, 1)
+        pdf.cell(0, 10, f"Valor Inicial: R$ {valor_inicial:,.2f}", 0, 1)
+        pdf.cell(0, 10, f"Valor Final: R$ {portfolio_value.iloc[-1]:,.2f}", 0, 1)
+        pdf.cell(0, 10, f"Retorno Total: {portfolio_info['Retorno Total (%)'].values[0]:.2f} %", 0, 1)
+
+        pdf.cell(0, 10, f"Índice Sharpe: {stats['Índice Sharpe'].values[0]:.2f}", 0, 1)
+        pdf.cell(0, 10, f"Índice Sortino: {stats['Índice Sortino'].values[0]:.2f}", 0, 1)
+        pdf.cell(0, 10, f"Max Drawdown: {stats['Max Drawdown'].values[0]:.2f}", 0, 1)
+
+        pdf_bytes = pdf.output(dest='S').encode('latin1')
         return pdf_bytes
 
     pdf_bytes = generate_pdf()
-    st.download_button(label="Baixar relatório resumido (PDF)", data=pdf_bytes, file_name="relatorio_portfolio.pdf", mime="application/pdf")
+    st.download_button(
+        label="Baixar relatório resumido (PDF)",
+        data=pdf_bytes,
+        file_name="relatorio_portfolio.pdf",
+        mime="application/pdf"
+    )
 
 except Exception as e:
     st.error(f"Erro durante execução: {e}")
