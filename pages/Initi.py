@@ -63,7 +63,7 @@ if tickers:
 
         # Formato do yfinance
         tickers_yf = [t + ".SA" for t in tickers]
-        data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2024,1,1),
+        data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2025,1,1),
                                             min_value=datetime.date(2000,1,1))
         
         st.sidebar.header('Configurações ⚙️')
