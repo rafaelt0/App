@@ -53,11 +53,11 @@ if tickers:
         df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
                             "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
         # Formatar df para valor monetário
-        df_formatado["Cotação"] = df_formatado["Cotação"].map("R$ {:,.2f}".format)
-        df_formatado["Mínimo (52 semanas)"] = df_formatado["Mínimo (52 semanas)"].map("R$ {:,.2f}".format)
-        df_formatado["Máximo (52 semanas)"] = df_formatado["Máximo (52 semanas)"].map("R$ {:,.2f}".format)
-        df_formatado["Volume Médio (2 meses)"] = df_formatado["Volume Médio (2 meses)"].map("{:,.0f}".format)
-        df_formatado["Valor de Mercado"] = df_formatado["Valor de Mercado"].map("R$ {:,.0f}".format)
+        df_formatado["Cotação"] = df_price["Cotação"].map("R$ {:,.2f}".format)
+        df_formatado["Mínimo (52 semanas)"] = df_price["Mínimo (52 semanas)"].map("R$ {:,.2f}".format)
+        df_formatado["Máximo (52 semanas)"] = df_price["Máximo (52 semanas)"].map("R$ {:,.2f}".format)
+        df_formatado["Volume Médio (2 meses)"] = df_price["Volume Médio (2 meses)"].map("{:,.0f}".format)
+        df_formatado["Valor de Mercado"] = df_price["Valor de Mercado"].map("R$ {:,.0f}".format)
         st.dataframe(df_formatado.drop_duplicates(keep='last'))
 
         # Indicadores Fundamentalistas
