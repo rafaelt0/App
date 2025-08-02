@@ -59,8 +59,8 @@ try:
                               "P/L","EBITDA"]
     st.dataframe(df_indicadores.drop_duplicates(keep='last'))
     tickers = [ticker+".SA" for ticker in tickers]
-    st.write(tickers)
     ticker = yf.Tickers(tickers)
+    st.write(ticker.history())
 except:
      pass
 
