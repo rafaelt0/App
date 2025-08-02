@@ -18,7 +18,7 @@ from pypfopt import plotting
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
 
-# ---- Configuração do App ----
+# Configurações da página
 st.set_page_config(
     page_title="Análise de Ações B3",
     page_icon="📈",
@@ -31,7 +31,7 @@ with open("style.css") as f:
 
 st.title("**B3 Explorer 📈**")
 
-# ---- Carrega lista de ações ----
+# Carregando as ações
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 
@@ -40,7 +40,7 @@ tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', s
 
 if tickers:
     try:
-        # ---- Informações Fundamentais ----
+        # Análise Fundamentalitsta
         df = pd.concat([fundamentus.get_papel(t) for t in tickers])
         df['PL'] = pd.to_numeric(df['PL'], errors='coerce') / 100
 
@@ -61,7 +61,7 @@ if tickers:
                                   "Dividend Yield", "Crescimento Receita 5 anos", "P/L","EV/EBITDA"]
         st.dataframe(df_indicadores.drop_duplicates(keep='last'))
 
-        # ---- Yahoo Finance ----
+        # Formato do yfinance
         tickers_yf = [t + ".SA" for t in tickers]
         data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2024,1,1),
                                             min_value=datetime.date(2000,1,1))
@@ -70,24 +70,24 @@ if tickers:
         interval_selected = st.sidebar.selectbox('Intervalo 📊', 
                                                  ['1d','1wk','1mo','3mo','6mo','1y'])
         
-        # Download de preços
+        # Carregando os dados
         data_prices = yf.download(tickers_yf, start=data_inicio, end=datetime.datetime.now(), 
                                   interval=interval_selected)['Close']
         
-        # Ajusta MultiIndex se houver
+        # Corrigir erro de multi index
         if isinstance(data_prices.columns, pd.MultiIndex):
             data_prices = data_prices.droplevel(0, axis=1)
 
         st.subheader("Cotação Histórica")
         st.line_chart(data_prices)
 
-        # ---- Retornos ----
+        # Retornos **
         returns = data_prices.pct_change().dropna() * 100
         returns_pct = returns.round(2).astype(str) + '%'
         st.subheader("Retornos (%)")
         st.dataframe(returns_pct)
 
-        # ---- Descrição das Empresas ----
+        # Descrição Empresas
         descriptions = []
         for t in tickers_yf:
             try:
