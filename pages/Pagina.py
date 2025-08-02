@@ -166,7 +166,6 @@ n_simulations = st.sidebar.slider("Número de Simulações",10,1000,100)
 valor = st.sidebar.number_input("Capital Inicial", min_value=100)
 years = int(st.sidebar.number_input("Anos", min_value=1))         
 
-st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 
 # Separação na sidebar
 st.sidebar.markdown("---")
