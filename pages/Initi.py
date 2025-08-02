@@ -170,18 +170,6 @@ if tickers:
 
         st.dataframe(stats_df.style.format("{:.3f}"), use_container_width=True)
 
-        # Quartis, IQR e Limites
-        quartis_df = pd.DataFrame(index=returns.columns)
-        quartis_df['Q1'] = returns.quantile(0.25).round(4)
-        quartis_df['Mediana (Q2)'] = returns.quantile(0.5).round(4)
-        quartis_df['Q3'] = returns.quantile(0.75).round(4)
-        quartis_df['IQR (Q3 - Q1)'] = (quartis_df['Q3'] - quartis_df['Q1']).round(4)
-        quartis_df['Limite Inferior'] = (quartis_df['Q1'] - 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
-        quartis_df['Limite Superior'] = (quartis_df['Q3'] + 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
-
-        st.subheader("Tabela dos Quartis, IQR e Limites dos Retornos Diários (%)")
-        st.dataframe(quartis_df, use_container_width=True)
-
         # Boxplot
         st.subheader("Boxplot dos Retornos Diários (%) por Ação")
         fig_box = px.box(
@@ -193,6 +181,18 @@ if tickers:
         )
         fig_box.update_layout(height=450)
         st.plotly_chart(fig_box, use_container_width=True)
+
+        # Quartis, IQR e Limites
+        quartis_df = pd.DataFrame(index=returns.columns)
+        quartis_df['Q1'] = returns.quantile(0.25).round(4)
+        quartis_df['Mediana (Q2)'] = returns.quantile(0.5).round(4)
+        quartis_df['Q3'] = returns.quantile(0.75).round(4)
+        quartis_df['IQR (Q3 - Q1)'] = (quartis_df['Q3'] - quartis_df['Q1']).round(4)
+        quartis_df['Limite Inferior'] = (quartis_df['Q1'] - 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
+        quartis_df['Limite Superior'] = (quartis_df['Q3'] + 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
+
+        st.subheader("Tabela dos Quartis, IQR e Limites dos Retornos Diários (%)")
+        st.dataframe(quartis_df, use_container_width=True)
 
         # Gráfico Radar
         if not df_ind.empty and len(df_ind) > 1:
