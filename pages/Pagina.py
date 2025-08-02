@@ -8,7 +8,7 @@ import seaborn as sns
 import datetime
 import warnings
 import plotly.express as px
-from scipy.stats import kurtosis
+from scipy.stats import kurtosis, skew
 from fpdf import FPDF
 import tempfile
 
