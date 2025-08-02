@@ -12,5 +12,5 @@ seaborn==0.13.2
 streamlit==1.30.0
 yfinance==0.2.65
 PyPortfolioOpt==1.5.5
-fpdf
-scikit-learn
+fpdf==1.7.2
+scikit-learn==1.2.2
