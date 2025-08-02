@@ -117,20 +117,52 @@ if tickers:
             "Empresa": lambda x: x
         }
 
-        st.dataframe(df_ind.style.format(format_ind), use_container_width=True)
+        # --- FILTROS PERSONALIZADOS ---
+
+        st.sidebar.subheader("Filtros Personalizados")
+
+        min_ebit = st.sidebar.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
+        min_roe = st.sidebar.number_input("ROE mínimo (%)", value=0.0, step=0.1)
+        min_dividend = st.sidebar.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
+        max_pl = st.sidebar.number_input("P/L máximo", value=1000.0, step=0.1)
+
+        def highlight_val(val, min_val=None, max_val=None):
+            if pd.isna(val):
+                return ''
+            if min_val is not None and val < min_val:
+                return 'background-color: #fbb4ae; color: red;'  # vermelho claro
+            if max_val is not None and val > max_val:
+                return 'background-color: #fbb4ae; color: red;'
+            return 'background-color: #b6d7a8; color: green;'  # verde claro
+
+        def style_indicators(row):
+            styles = []
+            styles.append(highlight_val(row['Margem EBIT'], min_val=min_ebit))
+            styles.append(highlight_val(row['ROE'], min_val=min_roe))
+            styles.append(highlight_val(row['Dividend Yield'], min_val=min_dividend))
+            styles.append(highlight_val(row['P/L'], max_val=max_pl))
+            # Para outras colunas, sem destaque
+            styles += [''] * (len(row) - 4)
+            return styles
+
+        styled_ind = df_ind.style.format(format_ind).apply(style_indicators, axis=1)
+
+        st.dataframe(styled_ind, use_container_width=True)
+
+        # Seguimos com os gráficos e demais análises...
 
         tickers_yf = [t + ".SA" for t in tickers]
         data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2025,1,1),
                                             min_value=datetime.date(2000,1,1),
                                             max_value=datetime.date.today())
-        
+
         st.sidebar.header('Configurações ⚙️')
         interval_selected = st.sidebar.selectbox('Intervalo 📊', 
                                                  ['1d','1wk','1mo','3mo','6mo','1y'])
-        
+
         data_prices = yf.download(tickers_yf, start=data_inicio, end=datetime.datetime.now(), 
                                   interval=interval_selected)['Close']
-        
+
         if isinstance(data_prices.columns, pd.MultiIndex):
             data_prices = data_prices.droplevel(0, axis=1)
 
@@ -143,7 +175,6 @@ if tickers:
         st.subheader("Retornos (%)")
         st.dataframe(returns_pct)
 
-        # Histograma combinado
         st.subheader("Histograma Combinado dos Retornos Diários (%)")
         fig_hist_all = px.histogram(
             returns.melt(var_name='Ação', value_name='Retorno (%)'),
@@ -157,7 +188,6 @@ if tickers:
         fig_hist_all.update_layout(height=450)
         st.plotly_chart(fig_hist_all, use_container_width=True)
 
-        # Estatísticas descritivas
         st.subheader("Estatísticas Descritivas dos Retornos (%)")
         stats_df = pd.DataFrame(index=returns.columns)
         stats_df['Média (%)'] = returns.mean().round(3)
@@ -170,19 +200,6 @@ if tickers:
 
         st.dataframe(stats_df.style.format("{:.3f}"), use_container_width=True)
 
-        # Boxplot
-        st.subheader("Boxplot dos Retornos Diários (%) por Ação")
-        fig_box = px.box(
-            returns.melt(var_name='Ação', value_name='Retorno (%)'),
-            x='Ação',
-            y='Retorno (%)',
-            points="outliers",
-            title="Distribuição dos Retornos Diários (%)"
-        )
-        fig_box.update_layout(height=450)
-        st.plotly_chart(fig_box, use_container_width=True)
-
-        # Quartis, IQR e Limites
         quartis_df = pd.DataFrame(index=returns.columns)
         quartis_df['Q1'] = returns.quantile(0.25).round(4)
         quartis_df['Mediana (Q2)'] = returns.quantile(0.5).round(4)
@@ -194,7 +211,17 @@ if tickers:
         st.subheader("Tabela dos Quartis, IQR e Limites dos Retornos Diários (%)")
         st.dataframe(quartis_df, use_container_width=True)
 
-        # Gráfico Radar
+        st.subheader("Boxplot dos Retornos Diários (%) por Ação")
+        fig_box = px.box(
+            returns.melt(var_name='Ação', value_name='Retorno (%)'),
+            x='Ação',
+            y='Retorno (%)',
+            points="outliers",
+            title="Distribuição dos Retornos Diários (%)"
+        )
+        fig_box.update_layout(height=450)
+        st.plotly_chart(fig_box, use_container_width=True)
+
         if not df_ind.empty and len(df_ind) > 1:
             st.subheader("Comparação Radar dos Indicadores Fundamentalistas")
 
@@ -222,7 +249,6 @@ if tickers:
             )
             st.plotly_chart(fig, use_container_width=True)
 
-        # Descrição Empresas
         descriptions = []
         for t in tickers_yf:
             try:
@@ -239,6 +265,7 @@ if tickers:
         st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
+
 
 
 
