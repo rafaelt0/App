@@ -80,6 +80,7 @@ try:
     returns= data.pct_change()
     returns = returns.dropna()*100
     returns_percentage = np.round(returns,2)
+    st.write(returns_percentage)
     returns_string = returns_percentage.astype(str)+'%'
     st.write(returns_string)
     st.subheader("Retornos")
