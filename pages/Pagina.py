@@ -96,12 +96,12 @@ try:
     fig = px.pie(weights_df, values="Peso", names=weights_df.index, title="Composição do Portfólio")
     st.plotly_chart(fig)
 
-    # ================== Retorno do Portfólio ==================
+    # Retornos Portfolio
     weights_array = weights_df.values.flatten()
     portfolio_returns = returns.dot(weights_array)
     portfolio_returns.name = "Portfolio"
 
-    # Valor do portfólio ao longo do tempo
+    # Valor de portfolio
     cum_return = (1 + portfolio_returns).cumprod()
     portfolio_value = cum_return * valor_inicial
 
@@ -109,7 +109,20 @@ try:
     fig = px.line(portfolio_value, title="Valor do Portfólio")
     st.plotly_chart(fig)
 
-    # ================== Estatísticas ==================
+    portfolio_info = pd.DataFrame({
+    "Valor Inicial": [valor_inicial],
+    "Valor Máximo": [portfolio_value.max()],
+    "Valor Mínimo": [portfolio_value.min()],
+    "Valor Final": [portfolio_value.iloc[-1]],
+    "Retorno Total (%)": [(portfolio_value.iloc[-1]/valor_inicial - 1)*100],
+    "Retorno Médio Diário (%)": [portfolio_returns.mean()*100],
+    "Volatilidade Diária (%)": [portfolio_returns.std()*100]
+})
+
+st.subheader("Informações do Portfólio")
+st.dataframe(portfolio_info.style.format("{:.2f}"))
+
+    # Estatísticas portfolio
     stats = pd.DataFrame([[
         sharpe(portfolio_returns, rf=taxa_selic/100)/np.sqrt(2),
         sortino(portfolio_returns, rf=taxa_selic/100),
