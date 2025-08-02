@@ -76,27 +76,35 @@ try:
     # Otimização Portfólio
     mu = mean_historical_return(data_close)
     S = CovarianceShrinkage(data_close).ledoit_wolf()
-    ef = EfficientFrontier(mu, S)
+    # === Otimização Portfólio com restrições recomendadas ===
+# Pesos entre 2% e 30% para garantir diversificação
+    ef = EfficientFrontier(mu, S, weight_bounds=(0.02, 0.3))
+    
+    # Mantém regularização L2 para suavizar pesos
     ef.add_objective(objective_functions.L2_reg, gamma=2)
+    
+    # Maximiza índice Sharpe ajustado pelo risco livre
     weights = ef.max_sharpe(risk_free_rate=taxa_selic/100)
+    
+    # Limpa e organiza pesos em DataFrame
     weights_df = pd.DataFrame(ef.clean_weights(), index=["Peso"]).T
     weights_df = round(weights_df,4)
-
+    
     st.subheader("Pesos Ótimos do Portfólio (%)")
     st.dataframe(weights_df*100)
+    
+    # Gráfico de pizza dos pesos
     fig_pie = px.pie(weights_df, values="Peso", names=weights_df.index, title="Composição do Portfólio")
     st.plotly_chart(fig_pie)
-
-    # Retorno do portfólio
+    
+    # Calcula retorno do portfólio
     weights_array = weights_df.values.flatten()
     portfolio_returns = returns.dot(weights_array)
     portfolio_returns.name = "Portfolio"
+    
+    # Evolução do valor do portfólio
     cum_return = (1 + portfolio_returns).cumprod()
     portfolio_value = cum_return * valor_inicial
-
-    st.subheader("Evolução do Valor do Portfólio")
-    fig_val = px.line(portfolio_value, title="Valor do Portfólio")
-    st.plotly_chart(fig_val)
 
     # Informações do Portfólio
     portfolio_info = pd.DataFrame({
