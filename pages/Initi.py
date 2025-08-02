@@ -19,6 +19,10 @@ import plotly.graph_objects as go
 import plotly.express as px
 import scipy.stats as stats
 
+import requests
+from bs4 import BeautifulSoup
+import urllib.parse
+
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
 
@@ -27,6 +31,31 @@ def clean_numeric_column(col):
     col = col.str.replace(r'[^0-9,.\-]', '', regex=True)
     col = col.str.replace(',', '.')
     return pd.to_numeric(col, errors='coerce')
+
+def buscar_noticias_google(ticker, max_noticias=5):
+    query = f"{ticker} site:investing.com OR site:infomoney.com.br OR site:g1.globo.com"
+    url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&tbm=nws"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/114.0.0.0 Safari/537.36"
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=5)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        
+        resultados = soup.select('div.dbsr')
+        noticias = []
+        for r in resultados[:max_noticias]:
+            titulo = r.select_one('div.JheGif.nDgy9d').text
+            link = r.a['href']
+            resumo_tag = r.select_one('div.Y3v8qd')
+            resumo = resumo_tag.text if resumo_tag else ''
+            noticias.append({'titulo': titulo, 'link': link, 'resumo': resumo})
+        return noticias
+    except Exception as e:
+        return [{'titulo': 'Erro ao buscar notícias', 'link': '', 'resumo': str(e)}]
 
 st.set_page_config(
     page_title="Análise de Ações B3",
@@ -41,6 +70,7 @@ with open("style.css") as f:
 st.title("**B3 Explorer 📈**")
 
 data = pd.read_csv('acoes-listadas-b3.csv')
+data['Setor'] = data['Setor'].astype(str).str.strip()
 
 if 'Setor' not in data.columns:
     st.error("O arquivo CSV precisa conter a coluna 'Setor' para o filtro funcionar.")
@@ -64,7 +94,19 @@ tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', t
 
 if tickers:
     try:
-        df = pd.concat([fundamentus.get_papel(t) for t in tickers])
+        dfs = []
+        for t in tickers:
+            try:
+                df_t = fundamentus.get_papel(t)
+                dfs.append(df_t)
+            except Exception as e:
+                st.warning(f"Erro ao obter dados do papel {t}: {e}")
+        if dfs:
+            df = pd.concat(dfs)
+        else:
+            st.error("Nenhum dado válido retornado do Fundamentus.")
+            st.stop()
+
         df['PL'] = clean_numeric_column(df['PL'])
 
         st.subheader("Setor")
@@ -101,7 +143,7 @@ if tickers:
 
         pct_cols = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
         for col in pct_cols:
-            df_ind[col] = df_ind[col]
+            df_ind[col] = df_ind[col]  # Ajuste aqui caso queira multiplicar por 100
 
         df_ind = df_ind.fillna(0)
 
@@ -116,8 +158,6 @@ if tickers:
             "EV/EBITDA": "{:.2f}",
             "Empresa": lambda x: x
         }
-
-        # --- FILTROS PERSONALIZADOS ---
 
         st.sidebar.subheader("Filtros Personalizados")
 
@@ -150,19 +190,20 @@ if tickers:
 
         st.dataframe(styled_ind, use_container_width=True)
 
-        # Continuação do código com gráficos e estatísticas descritivas
-
         tickers_yf = [t + ".SA" for t in tickers]
-        data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2025,1,1),
+        hoje = datetime.date.today()
+        data_padrao = hoje - datetime.timedelta(days=365)
+        data_inicio = st.sidebar.date_input("Data Inicial 📅", data_padrao,
                                             min_value=datetime.date(2000,1,1),
-                                            max_value=datetime.date.today())
+                                            max_value=hoje)
 
         st.sidebar.header('Configurações ⚙️')
         interval_selected = st.sidebar.selectbox('Intervalo 📊', 
                                                  ['1d','1wk','1mo','3mo','6mo','1y'])
 
-        data_prices = yf.download(tickers_yf, start=data_inicio, end=datetime.datetime.now(), 
-                                  interval=interval_selected)['Close']
+        with st.spinner('Baixando dados históricos...'):
+            data_prices = yf.download(tickers_yf, start=data_inicio, end=datetime.datetime.now(), 
+                                      interval=interval_selected)['Close']
 
         if isinstance(data_prices.columns, pd.MultiIndex):
             data_prices = data_prices.droplevel(0, axis=1)
@@ -262,10 +303,23 @@ if tickers:
         st.subheader("Descrição da Empresa")
         st.table(df_desc)
 
+        # === NOVA SEÇÃO: Notícias ===
+        st.subheader("Últimas Notícias por Ação")
+        for ticker in tickers:
+            st.markdown(f"### Notícias para {ticker}")
+            with st.spinner(f"Buscando notícias para {ticker}..."):
+                noticias = buscar_noticias_google(ticker)
+                for noticia in noticias:
+                    st.markdown(f"**[{noticia['titulo']}]({noticia['link']})**")
+                    if noticia['resumo']:
+                        st.markdown(f"{noticia['resumo']}")
+                    st.markdown("---")
+
     except Exception as e:
         st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
+
 
 
 
