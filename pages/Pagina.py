@@ -140,16 +140,28 @@ st.dataframe(stats.round(4))
 import tempfile
 
 # Botão para gerar PDF via quantstats
-st.subheader("Relatório Completo do Portfolio (PDF)")
+st.subheader("Baixar Relatório Completo (QuantStats)")
 
-if st.button("Gerar e baixar relatório PDF"):
-    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmpfile:
-        # Gera o relatório no arquivo temporário
-        qs.reports.snapshot(portfolio_returns, output=tmpfile.name, benchmark=None, title="Relatório de Portfolio")
-        tmpfile.seek(0)
-        pdf_data = tmpfile.read()
-        # Cria botão para download com os dados do arquivo temporário
-        st.download_button(label="Download Relatório PDF", data=pdf_data, file_name="relatorio_portfolio.pdf", mime="application/pdf")
+# Converte para formato aceito pelo QuantStats
+portfolio_returns.index = pd.to_datetime(portfolio_returns.index)
+portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
+
+with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
+    qs.reports.html(
+        portfolio_returns,
+        output=tmpfile.name,
+        title="Relatório Completo do Portfólio",
+        download_filename="relatorio_portfolio.html"
+    )
+    st.download_button(
+        label="Baixar Relatório HTML Completo (QuantStats)",
+        data=open(tmpfile.name, "rb").read(),
+        file_name="relatorio_portfolio.html",
+        mime="text/html"
+    )
+
+except Exception as e:
+    st.error(f"Erro durante execução: {e}")
 
 
 
