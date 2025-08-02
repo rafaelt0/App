@@ -92,7 +92,7 @@ st.pyplot(heatmap.figure)
 # Cálculo do portfólio com os pesos escolhidos
 portfolio_returns = returns.dot(pesos_manuais_arr)
 cum_return = (1 + portfolio_returns).cumprod()
-bovespa_valor = cum_return * valor_inicial
+portfolio_value = cum_return * valor_inicial
 
 # Obter os dados de benchmark BOVESPA e calcular o retorno acumulado
 bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
