@@ -143,8 +143,6 @@ st.dataframe(stats.round(4))
 # Botão para gerar PDF via quantstats
 import tempfile
 
-st.subheader("Baixar Relatório Completo (QuantStats)")
-
 # Converte para formato aceito pelo QuantStats
 portfolio_returns.index = pd.to_datetime(portfolio_returns.index)
 portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
