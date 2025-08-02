@@ -8,6 +8,7 @@ import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis, skew
+import warnings
 
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
