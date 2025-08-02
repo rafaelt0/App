@@ -15,6 +15,8 @@ import datetime
 from scipy.stats import kurtosis, skew
 from pypfopt import plotting
 import re
+import plotly.graph_objects as go
+import plotly.express as px
 
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
@@ -48,16 +50,18 @@ if 'Setor' not in data.columns:
 
 stocks = list(data['Ticker'].values)
 
+# Filtro multi-setores com opção "Todos"
 setores = sorted(data['Setor'].dropna().unique())
-setores.insert(0, "Todos")  # adiciona opção "Todos" no começo da lista
+setores.insert(0, "Todos")
 
-# Filtro de setor via dropdown (selectbox) com opção "Todos"
-setor_selecionado = st.sidebar.selectbox('Escolha um Setor', setores)
+setores_selecionados = st.sidebar.multiselect(
+    'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
+)
 
-if setor_selecionado == "Todos":
+if "Todos" in setores_selecionados or not setores_selecionados:
     tickers_filtrados = data['Ticker'].tolist()
 else:
-    tickers_filtrados = data[data['Setor'] == setor_selecionado]['Ticker'].tolist()
+    tickers_filtrados = data[data['Setor'].isin(setores_selecionados)]['Ticker'].tolist()
 
 st.subheader("Explore ações da B3 🧭")
 tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', tickers_filtrados)
@@ -92,16 +96,17 @@ if tickers:
 
         st.subheader("Indicadores Financeiros")
         df_ind = df[['Marg_Liquida','Marg_EBIT','ROE','ROIC','Div_Yield',
-                     'Cres_Rec_5a','PL','EV_EBITDA']].drop_duplicates(keep='last')
+                     'Cres_Rec_5a','PL','EV_EBITDA','Empresa']].drop_duplicates(keep='last')
         df_ind.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC",
-                          "Dividend Yield", "Crescimento Receita 5 anos", "P/L", "EV/EBITDA"]
+                          "Dividend Yield", "Crescimento Receita 5 anos", "P/L", "EV/EBITDA", "Empresa"]
 
-        for col in df_ind.columns:
+        for col in df_ind.columns.drop('Empresa'):
             df_ind[col] = clean_numeric_column(df_ind[col])
 
+        # Aqui mantemos os valores percentuais no formato correto
         pct_cols = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
         for col in pct_cols:
-            df_ind[col] = df_ind[col]  # não multiplicar por 100 porque já está no formato correto
+            df_ind[col] = df_ind[col]  # já no formato decimal, não multiplica por 100
 
         df_ind = df_ind.fillna(0)
 
@@ -113,7 +118,8 @@ if tickers:
             "Dividend Yield": "{:.2f}%",
             "Crescimento Receita 5 anos": "{:.2f}%",
             "P/L": "{:.2f}",
-            "EV/EBITDA": "{:.2f}"
+            "EV/EBITDA": "{:.2f}",
+            "Empresa": lambda x: x
         }
 
         st.dataframe(df_ind.style.format(format_ind), use_container_width=True)
@@ -137,10 +143,46 @@ if tickers:
         st.line_chart(data_prices)
 
         returns = data_prices.pct_change().dropna() * 100
+
         returns_pct = returns.round(2).astype(str) + '%'
         st.subheader("Retornos (%)")
         st.dataframe(returns_pct)
 
+        # --- Gráfico Radar ---
+        if not df_ind.empty and len(df_ind) > 1:
+            st.subheader("Comparação Radar dos Indicadores Fundamentalistas")
+
+            indicadores_radar = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
+
+            fig = go.Figure()
+
+            for idx, row in df_ind.iterrows():
+                fig.add_trace(go.Scatterpolar(
+                    r=row[indicadores_radar].values,
+                    theta=indicadores_radar,
+                    fill='toself',
+                    name=row['Empresa']
+                ))
+
+            max_val = max(df_ind[indicadores_radar].max().max(), 100)
+            fig.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, max_val]
+                    )),
+                showlegend=True
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        # --- Histogramas dos retornos ---
+        if not data_prices.empty:
+            st.subheader("Histogramas dos Retornos Diários (%)")
+            for ticker in returns.columns:
+                fig_hist = px.histogram(returns[ticker], nbins=50, title=f"Retornos Diários: {ticker}")
+                st.plotly_chart(fig_hist, use_container_width=True)
+
+        # Descrição Empresas
         descriptions = []
         for t in tickers_yf:
             try:
@@ -157,7 +199,6 @@ if tickers:
         st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
-
 
 
 
