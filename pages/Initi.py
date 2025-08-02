@@ -278,9 +278,9 @@ if st.button("Gerar Relatório QuantStats"):
         port_returns = returns.mean(axis=1) / 100  # converte % pra decimal
         
         # Gerar relatório HTML e salvar na memória
-        html_buffer = io.StringIO()
+        html_buffer = io.BytesIO()
         qs.reports.html(port_returns, output=html_buffer, title="Relatório QuantStats B3 Explorer", download_filename=None)
-        html_bytes = html_buffer.getvalue().encode('utf-8')
+        html_bytes = html_buffer.getvalue()
         
         st.success("Relatório QuantStats gerado!")
 
