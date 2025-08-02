@@ -60,7 +60,7 @@ try:
     st.dataframe(df_indicadores.drop_duplicates(keep='last'))
     tickers = [ticker+".SA" for ticker in tickers]
     ticker = yf.Tickers(tickers)
-    st.write(ticker.history())
+    st.dataframe(ticker.history())
 except:
      pass
 
