@@ -22,7 +22,7 @@ st.title("Análise e Otimização de Portfólio - B3 Explorer")
 # Sidebar config
 st.sidebar.header("Configurações do Portfólio")
 
-data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2014, 1, 1), min_value=datetime.date(2000, 1, 1))
+data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
 valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
 taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.04, max_value=15.0)
 
