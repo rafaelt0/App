@@ -1,1 +1,130 @@
+import streamlit as st
+import yfinance as yf
+import matplotlib.pyplot as plt
+import numpy as np
+import fundamentus
+import pandas as pd
+import seaborn as sns
+import datetime
+import warnings
+import plotly.express as px
+
+from pypfopt.expected_returns import mean_historical_return
+from pypfopt.risk_models import CovarianceShrinkage
+from pypfopt.efficient_frontier import EfficientFrontier
+from pypfopt import objective_functions
+from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
+
+warnings.filterwarnings('ignore')
+
+st.subheader("Análise de Portfolio")
+col1, col2, col3 = st.columns([1,3,1])
+
+# ================== Sidebar ==================
+st.sidebar.header('Configurações ⚙️')
+period_selected = st.sidebar.selectbox('Período ⏰', ['diário','semanal','trimestral','semestral','mensal','anual'])
+period_dict = {'diário':'1d','semanal':'1wk','mensal':'1mo','trimestral':'3mo','semestral':'6mo','anual':'1y'}
+
+data_inicio = st.sidebar.date_input("Data Inicial📅", datetime.date(2014,1,1),min_value=datetime.date(2000,1,1))
+interval_selected = st.sidebar.selectbox('Intervalo 📊', ['dia','mês','3 meses','semana','hora','minuto'])
+interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m','semana':'1wk'}
+
+valor_inicial = st.sidebar.number_input("Valor Investido 💵", min_value=100, max_value=1_000_000)
+taxa_selic = st.sidebar.number_input("Taxa Selic 🪙 (%)", value=0.04, max_value=15.0)
+
+# ================== Seleção de ações ==================
+data = pd.read_csv('acoes-listadas-b3.csv')
+stocks = list(data['Ticker'].values)
+tickers = list(st.multiselect('Monte seu Portfolio (Escolha mais de uma ação)', stocks))
+
+if len(tickers) == 0:
+    st.warning("Selecione pelo menos uma ação para continuar.")
+    st.stop()
+
+# Ajusta para o Yahoo Finance
+tickers_yf = [t + ".SA" for t in tickers]
+
+# ================== Download de dados ==================
+st.subheader("Histórico de preços")
+
+try:
+    raw_data = yf.download(
+        tickers_yf,
+        start=data_inicio,
+        end=datetime.datetime.now(),
+        interval=interval_dict[interval_selected]
+    )
+
+    if raw_data.empty:
+        st.error("Nenhum dado retornado. Mercado fechado ou ticker inválido.")
+        st.stop()
+
+    # Extrair apenas 'Close'
+    if "Close" in raw_data:
+        data_close = raw_data["Close"]
+    else:
+        st.error("Coluna Close não encontrada nos dados do Yahoo.")
+        st.stop()
+
+    # Flatten colunas se houver MultiIndex
+    if isinstance(data_close.columns, pd.MultiIndex):
+        data_close.columns = ['_'.join(col).strip() for col in data_close.columns.values]
+
+    st.dataframe(data_close.tail())
+
+    # ================== Retornos ==================
+    returns = data_close.pct_change().dropna()  # fração decimal
+
+    # Heatmap de correlação
+    st.subheader("Matriz de Correlação entre Ativos")
+    fig, ax = plt.subplots(figsize=(8,6))
+    sns.heatmap(returns.corr(), annot=True, cmap='coolwarm', ax=ax)
+    st.pyplot(fig)
+
+    # ================== Otimização do Portfólio ==================
+    mu = mean_historical_return(data_close)  # esperado
+    S = CovarianceShrinkage(data_close).ledoit_wolf()  # covariância
+    ef = EfficientFrontier(mu, S)
+    ef.add_objective(objective_functions.L2_reg, gamma=2)
+    weights = ef.max_sharpe(risk_free_rate=taxa_selic/100)
+    weights_df = pd.DataFrame(ef.clean_weights(), index=["Peso"]).T
+    weights_df = round(weights_df,4)
+
+    st.subheader("Pesos Ótimos do Portfólio (%)")
+    st.dataframe(weights_df*100)
+
+    fig = px.pie(weights_df, values="Peso", names=weights_df.index, title="Composição do Portfólio")
+    st.plotly_chart(fig)
+
+    # ================== Retorno do Portfólio ==================
+    weights_array = weights_df.values.flatten()
+    portfolio_returns = returns.dot(weights_array)
+    portfolio_returns.name = "Portfolio"
+
+    # Valor do portfólio ao longo do tempo
+    cum_return = (1 + portfolio_returns).cumprod()
+    portfolio_value = cum_return * valor_inicial
+
+    st.subheader("Evolução do Valor do Portfólio")
+    fig = px.line(portfolio_value, title="Valor do Portfólio")
+    st.plotly_chart(fig)
+
+    # ================== Estatísticas ==================
+    stats = pd.DataFrame([[
+        sharpe(portfolio_returns, rf=taxa_selic/100)/np.sqrt(2),
+        sortino(portfolio_returns, rf=taxa_selic/100),
+        max_drawdown(portfolio_returns),
+        var(portfolio_returns),
+        cvar(portfolio_returns),
+        tail_ratio(portfolio_returns)
+    ]], columns=["Índice Sharpe", "Índice Sortino", "Max Drawdown", "VaR", "CVaR", "Tail Ratio"])
+    
+    st.subheader("Estatísticas do Portfólio")
+    st.dataframe(stats)
+
+    st.subheader("Retornos diários (%)")
+    st.line_chart(portfolio_returns*100)
+
+except Exception as e:
+    st.error(f"Erro durante execução: {e}")
 
