@@ -42,8 +42,7 @@ except:
     pass
 
 try:
-    data = yf.download(tickers,start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
-                          ,interval=interval_dict[interval_selected])
+    data = yf.download(tickers,start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected])
     data = data.Close
     returns= data.pct_change()
     returns = returns.dropna()*100
