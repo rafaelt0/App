@@ -93,11 +93,17 @@ try:
     fig = px.pie(weights_graph, values=weights_graph, names=weights.columns.values)
     st.plotly_chart(fig)
     st.dataframe(weights_string)
+    st.write("aqui")
     weights=(weights*1_000_000).astype("int").T
+    st.write("aqui")
     returns_calc=(returns*1000_000).astype("int")
+    st.write("aqui")
     returns_calc=np.dot(returns_calc,weights)
+    st.write("aqui")
     returns=returns.index
+    st.write("aqui")
     returns_calc=pd.DataFrame(returns_calc/1_000_000_000_000)
+    st.write("aqui")
     returns_calc_non_pct=returns_calc/100
     returns_calc.index=returns
     returns_calc=round(returns_calc,3)
