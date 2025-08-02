@@ -137,13 +137,20 @@ st.subheader("Estatísticas do Portfólio")
 st.dataframe(stats.round(4))
 
 # Botão para gerar PDF via quantstats
+import tempfile
+
+# Botão para gerar PDF via quantstats
 st.subheader("Relatório Completo do Portfolio (PDF)")
 
 if st.button("Gerar e baixar relatório PDF"):
-    pdf_buffer = io.BytesIO()
-    qs.reports.snapshot(portfolio_returns, output=pdf_buffer, benchmark=None, title="Relatório de Portfolio")
-    pdf_buffer.seek(0)
-    st.download_button(label="Download Relatório PDF", data=pdf_buffer, file_name="relatorio_portfolio.pdf", mime="application/pdf")
+    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmpfile:
+        # Gera o relatório no arquivo temporário
+        qs.reports.snapshot(portfolio_returns, output=tmpfile.name, benchmark=None, title="Relatório de Portfolio")
+        tmpfile.seek(0)
+        pdf_data = tmpfile.read()
+        # Cria botão para download com os dados do arquivo temporário
+        st.download_button(label="Download Relatório PDF", data=pdf_data, file_name="relatorio_portfolio.pdf", mime="application/pdf")
+
 
 
 
