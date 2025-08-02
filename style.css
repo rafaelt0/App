@@ -1,19 +1,115 @@
-body {
-    background-color: #131313;
-    background-image: '/home/rafael/Imagens/1200-480288054-binary-number-system-1.webp';
-    background-size: 8px;
-    color: rgb(57, 219, 57);
-    font-family: "Consolas", "Andale Mono", "Lucida Console", monospace;
-  }
+/* ======== Global ======== */
+body, .stApp {
+    background-color: #0e1117;  /* Fundo dark */
+    color: #ffffff;            /* Texto branco */
+    font-family: 'Inter', sans-serif;
+}
 
-  h2{
-    text-align: center;
-    color:limegreen;
-  }
-  
-  
-  h1 {
-    text-align: center;
-    color: rgb(57, 219, 57);
+/* Links e textos interativos */
+a, a:visited {
+    color: #00c8ff;
+}
+a:hover {
+    color: #0097cc;
+}
 
-  }
+/* ======== Títulos ======== */
+h1, h2, h3, h4, h5 {
+    color: #00c8ff;
+    font-weight: 600;
+}
+
+/* ======== Sidebar ======== */
+.css-1d391kg, .stSidebar {
+    background-color: #161a23 !important;
+    color: white !important;
+}
+
+.css-1d391kg .stSelectbox, .css-1d391kg .stTextInput {
+    background-color: #1f2533;
+    color: white;
+    border-radius: 8px;
+}
+
+/* ======== Botões ======== */
+.stButton > button {
+    background-color: #00c8ff;
+    color: white;
+    border-radius: 8px;
+    border: none;
+    font-weight: bold;
+    padding: 0.6rem 1.2rem;
+    transition: 0.3s;
+}
+.stButton > button:hover {
+    background-color: #0097cc;
+    transform: translateY(-2px);
+}
+
+/* ======== DataFrames e Tabelas ======== */
+.dataframe, .stDataFrame {
+    background-color: #161a23;
+    color: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #00c8ff20;
+    overflow: hidden;
+}
+
+.dataframe th, .stDataFrame th {
+    background-color: #1f2533 !important;
+    color: #00c8ff !important;
+    font-weight: bold;
+    text-align: center;
+}
+
+.dataframe td, .stDataFrame td {
+    text-align: center !important;
+    border-bottom: 1px solid #2c3344;
+    padding: 0.5rem;
+}
+
+.dataframe tr:nth-child(even) {
+    background-color: #1a1f2e;
+}
+
+/* ======== Cards de Métricas ======== */
+.metric-card {
+    background-color: #161a23;
+    padding: 20px;
+    border-radius: 12px;
+    margin: 10px 0;
+    text-align: center;
+    border: 1px solid #00c8ff40;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    transition: 0.3s;
+}
+.metric-card:hover {
+    transform: scale(1.02);
+}
+
+.metric-card h3 {
+    color: #00c8ff;
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+.metric-card h2 {
+    color: #ffffff;
+    font-size: 1.6rem;
+}
+
+/* ======== Plotly Charts ======== */
+.stPlotlyChart {
+    background-color: #161a23;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    transition: 0.3s;
+}
+.stPlotlyChart:hover {
+    transform: scale(1.01);
+}
+
+/* ======== Espaçamento ======== */
+.block-container {
+    padding: 2rem 2rem 2rem 2rem;
+}
