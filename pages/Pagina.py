@@ -29,7 +29,7 @@ taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.04, max_value=15.
 # Seleção de ações
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
-tickers = st.sidebar.multiselect("Selecione as ações do portfólio", stocks)
+tickers = st.multiselect("Selecione as ações do portfólio", stocks)
 
 if len(tickers) == 0:
     st.warning("Selecione pelo menos uma ação.")
