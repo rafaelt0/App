@@ -97,7 +97,7 @@ if tickers:
 
         pct_cols = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
         for col in pct_cols:
-            df_ind[col] = df_ind[col] * 100
+            df_ind[col] = df_ind[col] 
 
         df_ind = df_ind.fillna(0)
 
