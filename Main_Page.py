@@ -59,6 +59,7 @@ try:
                               "P/L","EBITDA"]
     st.dataframe(df_indicadores.drop_duplicates(keep='last'))
     tickers = [ticker+".SA" for ticker in tickers]
+    st.write(tickers)
     ticker = yf.Tickers(tickers)
 except:
      pass
@@ -74,7 +75,8 @@ interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m
 
 
 try:
-    data = ticker.history()
+    data = ticker.history(start=data_inicio, end=datetime.datetime.now()
+                          ,interval=interval_dict[interval_selected],rounding=True)
     data = data['Close']
     st.subheader("Cotação")
     st.write(data)
