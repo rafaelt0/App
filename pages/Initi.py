@@ -136,20 +136,21 @@ if tickers:
             return 'background-color: #b6d7a8; color: green;'  # verde claro
 
         def style_indicators(row):
-            styles = []
-            styles.append(highlight_val(row['Margem EBIT'], min_val=min_ebit))
-            styles.append(highlight_val(row['ROE'], min_val=min_roe))
-            styles.append(highlight_val(row['Dividend Yield'], min_val=min_dividend))
-            styles.append(highlight_val(row['P/L'], max_val=max_pl))
-            # Para outras colunas, sem destaque
-            styles += [''] * (len(row) - 4)
+            styles = [''] * len(row)
+            col_idx = {col: i for i, col in enumerate(row.index)}
+
+            styles[col_idx['Margem EBIT']] = highlight_val(row['Margem EBIT'], min_val=min_ebit)
+            styles[col_idx['ROE']] = highlight_val(row['ROE'], min_val=min_roe)
+            styles[col_idx['Dividend Yield']] = highlight_val(row['Dividend Yield'], min_val=min_dividend)
+            styles[col_idx['P/L']] = highlight_val(row['P/L'], max_val=max_pl)
+
             return styles
 
         styled_ind = df_ind.style.format(format_ind).apply(style_indicators, axis=1)
 
         st.dataframe(styled_ind, use_container_width=True)
 
-        # Seguimos com os gráficos e demais análises...
+        # Continuação do código com gráficos e estatísticas descritivas
 
         tickers_yf = [t + ".SA" for t in tickers]
         data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2025,1,1),
@@ -265,6 +266,7 @@ if tickers:
         st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
+
 
 
 
