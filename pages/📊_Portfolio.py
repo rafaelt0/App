@@ -93,8 +93,8 @@ try:
     fig = px.pie(weights_graph, values=weights_graph, names=weights.columns.values)
     st.plotly_chart(fig)
     st.dataframe(weights_string)
-    weights=(weights*1_000_000).astype("float").T
-    returns_calc=(returns*1000_000).astype("float") #Erro
+    weights=(weights*1_000_000).astype("int").T
+    returns_calc=(returns*1000_000) #Erro
     returns_calc=np.dot(returns_calc,weights)
     st.write("aqui")
     returns=returns.index
