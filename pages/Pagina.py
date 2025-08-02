@@ -154,10 +154,10 @@ try:
     def generate_pdf():
         pdf = FPDF()
         pdf.add_page()
-    # ... seu código para adicionar texto no pdf ...
+   
 
-    pdf_bytes = pdf.output(dest='S').encode('latin1')  # encode para bytes
-    return pdf_bytes
+        pdf_bytes = pdf.output(dest='S').encode('latin1')  
+        return pdf_bytes
 
     pdf_bytes = generate_pdf()
     st.download_button(label="Baixar relatório resumido (PDF)", data=pdf_bytes, file_name="relatorio_portfolio.pdf", mime="application/pdf")
