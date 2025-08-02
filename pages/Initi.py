@@ -17,6 +17,7 @@ from pypfopt import plotting
 import re
 import plotly.graph_objects as go
 import plotly.express as px
+import scipy.stats as stats
 
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
@@ -147,6 +148,45 @@ if tickers:
         st.subheader("Retornos (%)")
         st.dataframe(returns_pct)
 
+        # --- Histograma combinado ---
+        st.subheader("Histograma Combinado dos Retornos Diários (%)")
+        fig_hist_all = px.histogram(
+            returns.melt(var_name='Ação', value_name='Retorno (%)'),
+            x='Retorno (%)',
+            color='Ação',
+            barmode='overlay',
+            nbins=100,
+            opacity=0.6,
+            title='Distribuição dos Retornos Diários (%) - Todas as Ações'
+        )
+        fig_hist_all.update_layout(height=450)
+        st.plotly_chart(fig_hist_all, use_container_width=True)
+
+        # --- Estatísticas descritivas ---
+        st.subheader("Estatísticas Descritivas dos Retornos (%)")
+        stats_df = pd.DataFrame(index=returns.columns)
+        stats_df['Média (%)'] = returns.mean().round(3)
+        stats_df['Mediana (%)'] = returns.median().round(3)
+        stats_df['Desvio Padrão (%)'] = returns.std().round(3)
+        stats_df['Curtose'] = returns.apply(lambda x: kurtosis(x, fisher=True)).round(3)
+        stats_df['Assimetria (Skew)'] = returns.apply(lambda x: skew(x)).round(3)
+        stats_df['Mínimo (%)'] = returns.min().round(3)
+        stats_df['Máximo (%)'] = returns.max().round(3)
+
+        st.dataframe(stats_df.style.format("{:.3f}"), use_container_width=True)
+
+        # --- Boxplot ---
+        st.subheader("Boxplot dos Retornos Diários (%) por Ação")
+        fig_box = px.box(
+            returns.melt(var_name='Ação', value_name='Retorno (%)'),
+            x='Ação',
+            y='Retorno (%)',
+            points="outliers",
+            title="Distribuição dos Retornos Diários (%)"
+        )
+        fig_box.update_layout(height=450)
+        st.plotly_chart(fig_box, use_container_width=True)
+
         # --- Gráfico Radar ---
         if not df_ind.empty and len(df_ind) > 1:
             st.subheader("Comparação Radar dos Indicadores Fundamentalistas")
@@ -174,14 +214,6 @@ if tickers:
                 height=500  # altura aumentada para melhor visualização
             )
             st.plotly_chart(fig, use_container_width=True)
-
-        # --- Histogramas dos retornos ---
-        if not data_prices.empty:
-            st.subheader("Histogramas dos Retornos Diários (%)")
-            for ticker in returns.columns:
-                fig_hist = px.histogram(returns[ticker], nbins=50, title=f"Retornos Diários: {ticker}")
-                fig_hist.update_layout(height=400)  # altura aumentada para melhor visualização
-                st.plotly_chart(fig_hist, use_container_width=True)
 
         # Descrição Empresas
         descriptions = []
