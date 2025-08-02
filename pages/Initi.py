@@ -11,7 +11,7 @@ st.set_page_config(
 
 st.write("# **B3 Explorer 📈**")
 
-# Carregando lista de ações B3 (supondo CSV já na pasta)
+# Carregando lista de ações B3 (certifique-se que o CSV 'acoes-listadas-b3.csv' está no mesmo diretório)
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 
@@ -30,7 +30,6 @@ else:
     tickers_full = [t + ".SA" for t in tickers]
 
     try:
-        # Baixando dados para cada ticker individualmente (mais seguro)
         all_data = {}
         for t in tickers_full:
             df_temp = yf.download(t,
@@ -64,19 +63,24 @@ else:
             for t in tickers_full:
                 try:
                     info = yf.Ticker(t).get_info()
-                    descricoes.append(info.get('longBusinessSummary', 'Descrição indisponível'))
+                    desc = info.get('longBusinessSummary', 'Descrição indisponível')
                 except:
-                    descricoes.append('Descrição indisponível')
+                    desc = 'Descrição indisponível'
+                descricoes.append(desc)
 
-            df_descr = pd.DataFrame({
-                'Ticker': tickers_full,
-                'Descrição': descricoes
-            })
-            st.subheader("Descrição das Empresas")
-            st.table(df_descr)
+            if len(tickers_full) == len(descricoes) and len(tickers_full) > 0:
+                df_descr = pd.DataFrame({
+                    'Ticker': tickers_full,
+                    'Descrição': descricoes
+                })
+                st.subheader("Descrição das Empresas")
+                st.table(df_descr)
+            else:
+                st.warning("Não foi possível montar a tabela de descrições.")
 
         else:
             st.error("Nenhum dado válido foi baixado para os tickers selecionados.")
 
     except Exception as e:
         st.error(f"Erro ao buscar dados: {e}")
+
