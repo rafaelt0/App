@@ -84,7 +84,7 @@ st.plotly_chart(fig_pie)
 # Heatmap
 heatmap=sns.heatmap(data_yf.corr(), annot=True)
 st.subheader("Matrix de Correlação")
-st.write(data_yf())
+st.write(data_yf.corr())
 st.subheader("Matrix de Covariância")
 st.write("OBS:.Variância na diagonal e covariância das demais")
 st.write(data_yf.cov())
