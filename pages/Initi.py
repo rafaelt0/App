@@ -44,11 +44,11 @@ stocks = list(data['Ticker'].values)
 # Lista única de setores para filtro
 setores = sorted(data['Setor'].dropna().unique())
 
-# Sidebar: filtro por setor
-setores_selecionados = st.sidebar.multiselect('Filtrar por Setor', setores, default=setores)
+# Sidebar: filtro por setor (selectbox para escolher 1 setor)
+setor_selecionado = st.sidebar.selectbox('Escolha um Setor', setores)
 
 # Filtrar os tickers por setor selecionado
-tickers_filtrados = data[data['Setor'].isin(setores_selecionados)]['Ticker'].tolist()
+tickers_filtrados = data[data['Setor'] == setor_selecionado]['Ticker'].tolist()
 
 st.subheader("Explore ações da B3 🧭")
 tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', tickers_filtrados)
@@ -57,7 +57,8 @@ if tickers:
     try:
         # Análise Fundamentalitsta
         df = pd.concat([fundamentus.get_papel(t) for t in tickers])
-        df['PL'] = pd.to_numeric(df['PL'], errors='coerce') / 100
+        # Não dividir PL por 100
+        df['PL'] = pd.to_numeric(df['PL'], errors='coerce')
 
         st.subheader("Setor")
         st.write(df[['Empresa', 'Setor', 'Subsetor']].drop_duplicates(keep='last'))
@@ -91,9 +92,18 @@ if tickers:
         df_ind.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC",
                           "Dividend Yield", "Crescimento Receita 5 anos", "P/L", "EV/EBITDA"]
 
-        # Converter para numérico e preencher NaN antes de formatar
+        # Tratar vírgula decimal, converter para numérico
         for col in df_ind.columns:
-            df_ind[col] = pd.to_numeric(df_ind[col], errors='coerce').fillna(0)
+            df_ind[col] = df_ind[col].astype(str).str.replace(',', '.')
+            df_ind[col] = pd.to_numeric(df_ind[col], errors='coerce')
+
+        # Multiplicar por 100 os indicadores em decimal para mostrar %
+        pct_cols = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
+        for col in pct_cols:
+            df_ind[col] = df_ind[col] * 100
+
+        # Preencher NaN com zero para evitar erro na exibição
+        df_ind = df_ind.fillna(0)
 
         format_ind = {
             "Margem Líquida": "{:.2f}%",
