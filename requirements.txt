@@ -10,5 +10,5 @@ SciencePlots==2.1.0
 scipy==1.12.0
 seaborn==0.13.2
 streamlit==1.30.0
-yfinance==0.2.35
+yfinance==0.2.65
 PyPortfolioOpt==1.5.5
