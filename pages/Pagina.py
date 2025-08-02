@@ -146,6 +146,8 @@ import tempfile
 # Converte para formato aceito pelo QuantStats
 import tempfile
 
+import tempfile
+
 # Botão para gerar PDF via quantstats
 st.subheader("Relatório Completo do Portfolio (PDF)")
 
@@ -157,6 +159,7 @@ if st.button("Gerar e baixar relatório PDF"):
         pdf_data = tmpfile.read()
         # Cria botão para download com os dados do arquivo temporário
         st.download_button(label="Download Relatório PDF", data=pdf_data, file_name="relatorio_portfolio.pdf", mime="application/pdf")
+
 
 
 
