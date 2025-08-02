@@ -152,8 +152,8 @@ try:
 
     # === Gerar relatório PDF simples ===
     def generate_pdf():
-    pdf = FPDF()
-    pdf.add_page()
+        pdf = FPDF()
+        pdf.add_page()
     # ... seu código para adicionar texto no pdf ...
 
     pdf_bytes = pdf.output(dest='S').encode('latin1')  # encode para bytes
