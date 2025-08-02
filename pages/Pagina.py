@@ -212,11 +212,22 @@ fig = px.line(sim_df, title="Simulações de Monte Carlo para o Portfólio")
 st.plotly_chart(fig)
 
 # Exibir estatísticas finais
-st.subheader("Estatísticas das Simulações")
-st.write(f"Valor esperado final: R$ {sim_df.iloc[-1].mean():,.2f}")
-st.write(f"VaR 5% (1 ano): R$ {np.percentile(sim_df.iloc[-1], 5):,.2f}")
-st.write(f"Pior cenário simulado: R$ {sim_df.iloc[-1].min():,.2f}")
-st.write(f"Melhor cenário simulado: R$ {sim_df.iloc[-1].max():,.2f}")
+# Estatísticas finais da simulação
+valor_esperado = sim_df.iloc[-1].mean()
+var_5 = np.percentile(sim_df.iloc[-1], 5)
+pior_cenario = sim_df.iloc[-1].min()
+melhor_cenario = sim_df.iloc[-1].max()
+
+# Criar DataFrame para exibir como tabela
+sim_stats = pd.DataFrame({
+    "Valor Esperado Final (R$)": [valor_esperado],
+    "VaR 5% (R$)": [var_5],
+    "Pior Cenário (R$)": [pior_cenario],
+    "Melhor Cenário (R$)": [melhor_cenario]
+})
+
+st.subheader("📊 Estatísticas da Simulação Monte Carlo")
+st.dataframe(sim_stats.style.format("{:,.2f}"))
 
 
 
