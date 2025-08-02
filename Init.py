@@ -1,14 +1,24 @@
 import streamlit as st
 import yfinance as yf
+import matplotlib.pyplot as plt
+import numpy as np
 import fundamentus
 import pandas as pd
-import numpy as np
-import datetime
-import plotly.express as px
+import seaborn as sns
 import warnings
+import pypfopt
+from pypfopt.expected_returns import mean_historical_return
+from pypfopt.risk_models import CovarianceShrinkage
+from pypfopt.efficient_frontier import EfficientFrontier
+from pypfopt import objective_functions
+import datetime
 from scipy.stats import kurtosis, skew
+from pypfopt import plotting
 
 warnings.filterwarnings('ignore')
+plt.style.use('ggplot')
+
+# Configurações da página
 st.set_page_config(
     page_title="Análise de Ações B3",
     page_icon="📈",
@@ -16,161 +26,148 @@ st.set_page_config(
 )
 st.sidebar.success("Selecione uma página")
 
-# Aplicar CSS customizado
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 st.title("**B3 Explorer 📈**")
 
-# Carregar lista de ações com setores
+# Carregando as ações
 data = pd.read_csv('acoes-listadas-b3.csv')
-stocks = data[['Ticker','Setor']]
+stocks = list(data['Ticker'].values)
 
-# --- Filtro por setor na sidebar ---
-setores_unicos = stocks['Setor'].dropna().unique()
-setor_selecionado = st.sidebar.selectbox("Filtrar por Setor", options=["Todos"] + list(setores_unicos))
-
-if setor_selecionado != "Todos":
-    # Filtra ações pelo setor selecionado
-    stocks_filtradas = stocks[stocks['Setor'] == setor_selecionado]
-else:
-    stocks_filtradas = stocks
-
-# Multiseleção de ações para análise
-tickers = st.multiselect(
-    'Escolha ações para explorar! (2 ou mais ações)',
-    options=stocks_filtradas['Ticker'].tolist()
-)
+st.subheader("Explore ações da B3 🧭")
+tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', stocks)
 
 if tickers:
-    # Função com cache para evitar downloads repetidos do fundamentus
-    @st.cache_data(ttl=3600)
-    def get_fundamentus_data(tickers):
-        dfs = []
-        for t in tickers:
-            try:
-                df_temp = fundamentus.get_papel(t)
-                dfs.append(df_temp)
-            except Exception:
-                pass
-        return pd.concat(dfs) if dfs else pd.DataFrame()
-    
-    # Função com cache para baixar dados históricos do yfinance
-    @st.cache_data(ttl=3600)
-    def get_yf_data(tickers_yf, start, end, interval):
-        data_prices = yf.download(tickers_yf, start=start, end=end, interval=interval)['Close']
-        # Corrige problema de multiindex quando múltiplos tickers
-        if isinstance(data_prices.columns, pd.MultiIndex):
-            data_prices = data_prices.droplevel(0, axis=1)
-        return data_prices
-
-    # Spinner para feedback visual durante o download dos dados fundamentus
-    with st.spinner('Carregando dados fundamentalistas...'):
-        df = get_fundamentus_data(tickers)
-    
-    if df.empty:
-        st.warning("Não foi possível carregar dados fundamentus para as ações selecionadas.")
+    if len(tickers) < 2:
+        st.warning("Selecione pelo menos 2 ações para análise.")
     else:
-        # Converter colunas relevantes para numérico para evitar erros de formatação
-        cols_to_numeric = ['Marg_Liquida','Marg_EBIT','ROE','ROIC','Div_Yield',
-                           'Cres_Rec_5a','PL','EV_EBITDA','Cotacao','Min_52_sem',
-                           'Max_52_sem','Vol_med_2m','Valor_de_mercado']
-        for col in cols_to_numeric:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+        progress_text = st.empty()
+        progress_bar = st.progress(0)
 
-        # Exibir setores e subsetores das empresas selecionadas
-        st.subheader("Setor e Subsetor")
-        st.write(df[['Empresa','Setor','Subsetor']].drop_duplicates())
+        try:
+            # 1. Dados Fundamentus
+            progress_text.text("Carregando dados fundamentalistas...")
+            df_list = []
+            total = len(tickers)
+            for i, t in enumerate(tickers):
+                df_list.append(fundamentus.get_papel(t))
+                progress_bar.progress(int((i + 1) / total * 40))  # até 40%
 
-        # Preparar dados de mercado para exibição
-        df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 
-                       'Valor_de_mercado', 'Data_ult_cot']].drop_duplicates()
-        df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
-                            "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
+            df = pd.concat(df_list)
+            df['PL'] = pd.to_numeric(df['PL'], errors='coerce') / 100
 
-        # Formatação para exibição dos valores monetários e numéricos
-        format_dict = {
-            "Cotação": "R$ {:,.2f}",
-            "Mínimo (52 semanas)": "R$ {:,.2f}",
-            "Máximo (52 semanas)": "R$ {:,.2f}",
-            "Volume Médio (2 meses)": "{:,.0f}",
-            "Valor de Mercado": "R$ {:,.0f}"
-        }
+            # Mostra dados fundamentalistas
+            st.subheader("Setor")
+            st.write(df[['Empresa', 'Setor', 'Subsetor']].drop_duplicates(keep='last'))
 
-        # Layout com colunas para organizar melhor as informações
-        col1, col2 = st.columns([1,1])
-        with col1:
             st.subheader("Informações de Mercado")
+            df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m',
+                           'Valor_de_mercado', 'Data_ult_cot']]
+            df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
+                                "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
+
+            for col in ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
+                        "Volume Médio (2 meses)", "Valor de Mercado"]:
+                df_price[col] = pd.to_numeric(df_price[col], errors='coerce')
+
+            format_dict = {
+                "Cotação": "R$ {:,.2f}",
+                "Mínimo (52 semanas)": "R$ {:,.2f}",
+                "Máximo (52 semanas)": "R$ {:,.2f}",
+                "Volume Médio (2 meses)": "{:,.0f}",
+                "Valor de Mercado": "R$ {:,.0f}"
+            }
             st.dataframe(df_price.style.format(format_dict), use_container_width=True)
 
-        with col2:
-            # Exibir indicadores financeiro fundamentalistas
             st.subheader("Indicadores Financeiros")
-            df_ind = df[['Marg_Liquida','Marg_EBIT','ROE','ROIC','Div_Yield',
-                         'Cres_Rec_5a','PL','EV_EBITDA']].drop_duplicates()
+            df_ind = df[['Marg_Liquida', 'Marg_EBIT', 'ROE', 'ROIC', 'Div_Yield',
+                         'Cres_Rec_5a', 'PL', 'EV_EBITDA']].drop_duplicates(keep='last')
             df_ind.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC",
                               "Dividend Yield", "Crescimento Receita 5 anos", "P/L", "EV/EBITDA"]
             st.dataframe(df_ind, use_container_width=True)
 
-        # Configurações para download dos dados históricos do yfinance
-        tickers_yf = [t + ".SA" for t in tickers]
-        data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2025,1,1),
-                                            min_value=datetime.date(2000,1,1))
-        interval_selected = st.sidebar.selectbox('Intervalo 📊', 
-                                                 ['1d','1wk','1mo','3mo','6mo','1y'])
+            # 2. Dados yfinance
+            progress_text.text("Baixando cotações históricas...")
+            tickers_yf = [t + ".SA" for t in tickers]
+            data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2025, 1, 1),
+                                                min_value=datetime.date(2000, 1, 1))
+            interval_selected = st.sidebar.selectbox('Intervalo 📊',
+                                                     ['1d', '1wk', '1mo', '3mo', '6mo', '1y'])
 
-        # Spinner enquanto carrega os dados de preços históricos
-        with st.spinner('Carregando cotações históricas...'):
-            data_prices = get_yf_data(tickers_yf, data_inicio, datetime.datetime.now(), interval_selected)
+            data_fim = datetime.datetime.now() + datetime.timedelta(days=1)
+            data_prices = yf.download(tickers_yf, start=data_inicio, end=data_fim,
+                                      interval=interval_selected)['Close']
+            progress_bar.progress(80)
 
-        if data_prices.empty:
-            st.warning("Não foi possível carregar os dados históricos.")
-        else:
-            # Gráfico de linha com as cotações
+            if isinstance(data_prices.columns, pd.MultiIndex):
+                data_prices = data_prices.droplevel(0, axis=1)
+
+            progress_text.text("Finalizando carregamento dos dados...")
+            progress_bar.progress(100)
+
+            # Mostrar dados históricos
             st.subheader("Cotação Histórica")
             st.line_chart(data_prices)
 
-            # Calcular retornos percentuais diários/mensais etc.
+            # Retornos
             returns = data_prices.pct_change().dropna() * 100
-            returns_styled = returns.style.format("{:.2f}%")
+            returns_pct = returns.round(2).astype(str) + '%'
             st.subheader("Retornos (%)")
-            st.dataframe(returns_styled, use_container_width=True)
+            st.dataframe(returns_pct)
 
-            # Estatísticas descritivas dos retornos (média, desvio, skew, kurtosis)
+            # Estatísticas dos retornos
             st.subheader("Estatísticas dos Retornos")
             stats_df = pd.DataFrame({
                 'Média (%)': returns.mean(),
                 'Desvio Padrão (%)': returns.std(),
-                'Assimetria (Skew)': returns.apply(skew),
-                'Curtose (Kurtosis)': returns.apply(kurtosis)
-            })
-            st.dataframe(stats_df.style.format("{:.2f}"), use_container_width=True)
+                'Assimetria': returns.apply(skew),
+                'Curtose': returns.apply(kurtosis)
+            }).round(4)
+            st.dataframe(stats_df)
 
-            # Mapa de correlação dos retornos com Plotly para interatividade
-            st.subheader("Mapa de Correlação dos Retornos")
-            corr = returns.corr()
-            fig = px.imshow(corr, text_auto=True, aspect="auto", color_continuous_scale='RdYlGn')
-            st.plotly_chart(fig, use_container_width=True)
+            # Matriz de Correlação
+            st.subheader("Matriz de Correlação dos Retornos")
+            fig, ax = plt.subplots(figsize=(8, 6))
+            sns.heatmap(returns.corr(), annot=True, cmap='coolwarm', ax=ax)
+            st.pyplot(fig)
 
-        # Checkbox para mostrar/ocultar descrição das empresas para economizar processamento
-        if st.checkbox("Mostrar descrição das empresas"):
+            # Descrição das empresas
+            progress_text.text("Carregando descrições das empresas...")
             descriptions = []
-            with st.spinner("Carregando descrições..."):
-                for t in tickers_yf:
-                    try:
-                        info = yf.Ticker(t).get_info()
-                        descriptions.append(info.get('longBusinessSummary', 'Não disponível'))
-                    except:
-                        descriptions.append('Não disponível')
-
+            for i, t in enumerate(tickers_yf):
+                try:
+                    info = yf.Ticker(t).get_info()
+                    descriptions.append(info.get('longBusinessSummary', 'Não disponível'))
+                except:
+                    descriptions.append('Não disponível')
+                progress_bar.progress(80 + int((i + 1) / len(tickers_yf) * 20))  # final 20%
             df_desc = pd.DataFrame(descriptions, index=tickers, columns=["Descrição"])
             st.subheader("Descrição da Empresa")
             st.table(df_desc)
 
+            progress_text.empty()
+            progress_bar.empty()
+
+            # Otimização do portfólio
+            if st.checkbox("Otimizar Portfólio"):
+                mu = mean_historical_return(data_prices)
+                S = CovarianceShrinkage(data_prices).ledoit_wolf()
+                ef = EfficientFrontier(mu, S)
+                weights = ef.max_sharpe()
+                cleaned_weights = ef.clean_weights()
+                st.write("Pesos Otimizados da Carteira:")
+                st.write(cleaned_weights)
+                fig2, ax2 = plt.subplots()
+                plotting.plot_weights(cleaned_weights, ax=ax2)
+                st.pyplot(fig2)
+
+        except Exception as e:
+            progress_text.empty()
+            progress_bar.empty()
+            st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
-
 
 
 
