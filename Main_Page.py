@@ -52,7 +52,7 @@ if tickers:
                        'Valor_de_mercado', 'Data_ult_cot']]
         df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
                             "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
-        # Converter as colunas para numéricas, ignorando erros (convertendo para NaN quando não for possível)
+        # Converter as colunas para numéricas para evitar erro
         for col in ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)", 
                     "Volume Médio (2 meses)", "Valor de Mercado"]:
             df_price[col] = pd.to_numeric(df_price[col], errors='coerce')
