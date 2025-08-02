@@ -74,8 +74,7 @@ interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m
 
 
 try:
-    data = ticker.history(end=datetime.datetime.now()
-                          ,interval=interval_dict[interval_selected],rounding=True)
+    data = ticker.history()
     data = data['Close']
     st.subheader("Cotação")
     st.write(data)
