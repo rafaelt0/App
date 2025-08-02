@@ -53,9 +53,7 @@ except:
     pass
 
 try:
-    data = yf.download(tickers,start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
-                          ,interval=interval_dict[interval_selected],rounding=True)
-    data = data.Close
+    data = yf.download(tickers,start=data_inicio, end=datetime.datetime.now()).Close
     st.write(data)
     bench = yf.Ticker("^BVSP")
     bench_data = bench.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
