@@ -53,8 +53,7 @@ except:
     pass
 
 try:
-    data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected]\
-                          ,interval=interval_dict[interval_selected],rounding=True)
+    data = ticker.history(start=data_inicio, end=datetime.datetime.now(),period=period_dict[period_selected],rounding=True)
     data = data.Close
     st.write(data)
     bench = yf.Ticker("^BVSP")
