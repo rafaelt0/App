@@ -80,7 +80,7 @@ try:
     data = data['Close']
     data = data.reset_index()
     st.subheader("Cotação")
-    st.dataframe(data.values)
+    st.write(data)
     returns= data.pct_change()
     returns = returns.dropna()*100
     returns_percentage = np.round(returns,2)
