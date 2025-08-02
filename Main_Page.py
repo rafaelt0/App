@@ -78,6 +78,7 @@ try:
     data = ticker.history(start=data_inicio, end=datetime.datetime.now()
                           ,interval=interval_dict[interval_selected],rounding=True)
     data = data['Close']
+    data = data.reset_index()
     st.subheader("Cotação")
     st.write(data)
     returns= data.pct_change()
