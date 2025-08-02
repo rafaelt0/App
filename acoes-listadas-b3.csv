@@ -1,109 +1,106 @@
-Ticker
-PETR3
-PETR4
-VALE3
-ITUB3
-ITUB4
-BBDC3
-BBDC4
-BBAS3
-ABEV3
-MGLU3
-WEGE3
-GGBR4
-B3SA3
-BRFS3
-LREN3
-ELET3
-ELET6
-CSAN3
-JBSS3
-RAIL3
-SUZB3
-VVAR3
-TIMS3
-RENT3
-HYPE3
-YDUQ3
-CCRO3
-BEEF3
-TOTS3
-CVCB3
-RADL3
-MRVE3
-EGIE3
-ENBR3
-PRIO3
-CIEL3
-RDOR3
-EQTL3
-SAPR11
-SBSP3
-HGTX3
-MULT3
-RAPT4
-CSNA3
-ALPA4
-PCAR3
-IGTA3
-POSI3
-SULA11
-BRAP4
-VIVT4
-GOLL4
-COGN3
-BRML3
-MOVI3
-GRND3
-SMTO3
-TASA4
-UNIP6
-BPAC11
-BIDI11
-LWSA3
-PETZ3
-AZUL4
-LOGG3
-TRIS3
-BRDT3
-RDNI3
-QUAL3
-JHSF3
-ENEV3
-BRKM5
-HAPV3
-BTOW3
-COGN3
-TIMP3
-MYPK3
-RLOG3
-EZTC3
-JSLG3
-LIGT3
-MRFG3
-MXRF11
-PSSA3
-PCAR4
-SUZB3
-USIM5
-VALE5
-VIVT3
-YDUQ3
-ZENV3
-AGRO3
-ALSO3
-AMER3
-ARZZ3
-BIDI3
-BVMF3
-CAML3
-CESP6
-CLSC3
-CMIG4
-CPFE3
-CSMG3
-CYRE3
-ECOR3
-EMBR3
-ENGI11
-EZTC3
+Ticker,Setor
+PETR3,Petróleo e Gás
+PETR4,Petróleo e Gás
+VALE3,Mineração
+ITUB3,Financeiro
+ITUB4,Financeiro
+BBDC3,Financeiro
+BBDC4,Financeiro
+BBAS3,Financeiro
+ABEV3,Bebidas e Alimentos
+MGLU3,Varejo
+WEGE3,Máquinas e Equipamentos
+GGBR4,Siderurgia e Metalurgia
+B3SA3,Financeiro
+BRFS3,Bebidas e Alimentos
+LREN3,Varejo
+ELET3,Energia Elétrica
+ELET6,Energia Elétrica
+CSAN3,Energia e Combustíveis
+JBSS3,Bebidas e Alimentos
+RAIL3,Transporte e Logística
+SUZB3,Papel e Celulose
+VVAR3,Varejo
+TIMS3,Telecomunicações
+RENT3,Serviços
+HYPE3,Saúde e Farmacêutico
+YDUQ3,Educacional
+CCRO3,Transporte e Logística
+BEEF3,Bebidas e Alimentos
+TOTS3,Tecnologia
+CVCB3,Turismo e Lazer
+RADL3,Saúde e Farmacêutico
+MRVE3,Construção Civil
+EGIE3,Energia Elétrica
+ENBR3,Energia Elétrica
+PRIO3,Petróleo e Gás
+CIEL3,Financeiro
+RDOR3,Saúde e Farmacêutico
+EQTL3,Energia Elétrica
+SAPR11,Saneamento
+SBSP3,Saneamento
+HGTX3,Têxtil
+MULT3,Shoppings e Imobiliário
+RAPT4,Veículos e Autopeças
+CSNA3,Siderurgia e Metalurgia
+ALPA4,Calçados e Vestuário
+PCAR3,Varejo
+IGTA3,Shoppings e Imobiliário
+POSI3,Tecnologia
+SULA11,Seguros
+BRAP4,Mineração
+VIVT4,Telecomunicações
+GOLL4,Transporte Aéreo
+COGN3,Educacional
+BRML3,Shoppings e Imobiliário
+MOVI3,Transporte e Logística
+GRND3,Calçados e Vestuário
+SMTO3,Agronegócio
+TASA4,Veículos e Autopeças
+UNIP6,Química e Petroquímica
+BPAC11,Financeiro
+BIDI11,Financeiro
+LWSA3,Tecnologia
+PETZ3,Varejo
+AZUL4,Transporte Aéreo
+LOGG3,Logística e Imobiliário
+TRIS3,Construção Civil
+BRDT3,Petróleo e Gás
+RDNI3,Saúde e Farmacêutico
+QUAL3,Saúde e Farmacêutico
+JHSF3,Shoppings e Imobiliário
+ENEV3,Energia e Combustíveis
+BRKM5,Química e Petroquímica
+HAPV3,Saúde e Farmacêutico
+BTOW3,Varejo
+TIMP3,Telecomunicações
+MYPK3,Veículos e Autopeças
+RLOG3,Transporte e Logística
+EZTC3,Construção Civil
+JSLG3,Transporte e Logística
+LIGT3,Energia Elétrica
+MRFG3,Bebidas e Alimentos
+MXRF11,Fundos Imobiliários
+PSSA3,Seguros
+PCAR4,Varejo
+USIM5,Siderurgia e Metalurgia
+VALE5,Mineração
+VIVT3,Telecomunicações
+ZENV3,Tecnologia
+AGRO3,Agronegócio
+ALSO3,Shoppings e Imobiliário
+AMER3,Varejo
+ARZZ3,Calçados e Vestuário
+BIDI3,Financeiro
+BVMF3,Financeiro
+CAML3,Agronegócio
+CESP6,Energia Elétrica
+CLSC3,Energia Elétrica
+CMIG4,Energia Elétrica
+CPFE3,Energia Elétrica
+CSMG3,Saneamento
+CYRE3,Construção Civil
+ECOR3,Transporte e Logística
+EMBR3,Aeronáutica e Defesa
+ENGI11,Energia Elétrica
+
