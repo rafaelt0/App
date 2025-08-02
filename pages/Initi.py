@@ -11,7 +11,6 @@ st.set_page_config(
 
 st.write("# **B3 Explorer 📈**")
 
-# Carregando lista de ações B3 (certifique-se que o CSV 'acoes-listadas-b3.csv' está no mesmo diretório)
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 
@@ -48,39 +47,24 @@ else:
             st.subheader("Cotação (Fechamento)")
             st.dataframe(data.tail())
 
-            # Retornos em %
             returns = data.pct_change().dropna() * 100
             returns_rounded = returns.round(2)
             st.subheader("Retornos (%)")
             st.dataframe(returns_rounded.style.format("{:.2f}%"))
 
-            # Plot simples das cotações
             st.subheader("Gráfico das Cotações")
             st.line_chart(data)
 
-            # Buscando descrição das empresas
-            descricoes = []
-            for t in tickers_full:
-                try:
-                    info = yf.Ticker(t).get_info()
-                    desc = info.get('longBusinessSummary', 'Descrição indisponível')
-                except:
-                    desc = 'Descrição indisponível'
-                descricoes.append(desc)
-
-            if len(tickers_full) == len(descricoes) and len(tickers_full) > 0:
-                df_descr = pd.DataFrame({
-                    'Ticker': tickers_full,
-                    'Descrição': descricoes
-                })
-                st.subheader("Descrição das Empresas")
-                st.table(df_descr)
-            else:
-                st.warning("Não foi possível montar a tabela de descrições.")
+            # Só mostrar os tickers selecionados (sem descrição)
+            df_descr = pd.DataFrame({'Ticker': tickers_full})
+            st.subheader("Ações Selecionadas")
+            st.table(df_descr)
 
         else:
             st.error("Nenhum dado válido foi baixado para os tickers selecionados.")
 
     except Exception as e:
         st.error(f"Erro ao buscar dados: {e}")
+
+
 
