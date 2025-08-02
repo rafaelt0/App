@@ -7,7 +7,7 @@ import seaborn as sns
 import datetime
 import warnings
 import plotly.express as px
-from pypfopt.hierarchical_risk_parity import HRPOpt
+from pypfopt.hierarchical_portfolio import HRPOpt
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
 from scipy.stats import kurtosis, skew
 
