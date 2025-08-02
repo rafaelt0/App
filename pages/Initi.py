@@ -67,11 +67,12 @@ if tickers:
                        'Valor_de_mercado', 'Data_ult_cot']]
         df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
                             "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
-        # Converter as colunas para numéricas para evitar erro
+
+        # Converter as colunas para numéricas e preencher NaN
         for col in ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)", 
                     "Volume Médio (2 meses)", "Valor de Mercado"]:
             df_price[col] = pd.to_numeric(df_price[col], errors='coerce').fillna(0)
-        
+
         format_dict = {
             "Cotação": "R$ {:,.2f}",
             "Mínimo (52 semanas)": "R$ {:,.2f}",
@@ -90,6 +91,10 @@ if tickers:
         df_ind.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC",
                           "Dividend Yield", "Crescimento Receita 5 anos", "P/L", "EV/EBITDA"]
 
+        # Converter para numérico e preencher NaN antes de formatar
+        for col in df_ind.columns:
+            df_ind[col] = pd.to_numeric(df_ind[col], errors='coerce').fillna(0)
+
         format_ind = {
             "Margem Líquida": "{:.2f}%",
             "Margem EBIT": "{:.2f}%",
@@ -100,7 +105,7 @@ if tickers:
             "P/L": "{:.2f}",
             "EV/EBITDA": "{:.2f}"
         }
-        
+
         st.dataframe(df_ind.style.format(format_ind), use_container_width=True)
 
         # Formato do yfinance
@@ -147,5 +152,6 @@ if tickers:
         st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
+
 
 
