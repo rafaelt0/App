@@ -1,4 +1,3 @@
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -22,17 +21,21 @@ st.title("Análise e Otimização de Portfólio - B3 Explorer")
 # Sidebar config
 st.sidebar.header("Configurações do Portfólio")
 
-data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
+data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2014, 1, 1), min_value=datetime.date(2000, 1, 1))
 valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
 taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.04, max_value=15.0)
 
 # Seleção de ações
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
-tickers = st.multiselect("Selecione as ações do portfólio", stocks)
+tickers = st.sidebar.multiselect("Selecione as ações do portfólio", stocks)
 
 if len(tickers) == 0:
     st.warning("Selecione pelo menos uma ação.")
+    st.stop()
+
+if len(tickers) == 1:
+    st.warning("Selecione pelo menos dois ativos para montar o portfólio.")
     st.stop()
 
 tickers_yf = [t + ".SA" for t in tickers]
@@ -125,7 +128,7 @@ ax_hist.text(0.95, 0.95, stats_text, transform=ax_hist.transAxes,
 st.pyplot(fig_hist)
 
 # Estatísticas do portfólio
-stats = pd.DataFrame([[
+stats = pd.DataFrame([[ 
     sharpe(portfolio_returns, rf=taxa_selic/100),
     sortino(portfolio_returns, rf=taxa_selic/100),
     max_drawdown(portfolio_returns),
@@ -140,7 +143,6 @@ st.dataframe(stats.round(4))
 # Botão para gerar PDF via quantstats
 import tempfile
 
-# Botão para gerar PDF via quantstats
 st.subheader("Baixar Relatório Completo (QuantStats)")
 
 # Converte para formato aceito pelo QuantStats
@@ -160,7 +162,6 @@ with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
         file_name="relatorio_portfolio.html",
         mime="text/html"
     )
-
 
 
 
