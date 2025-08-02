@@ -168,6 +168,8 @@ years = int(st.sidebar.number_input("Anos", min_value=1))
 
 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 
+# Separação na sidebar
+st.sidebar.markdown("---")
 
 st.header("Simulação 🧪")
 
