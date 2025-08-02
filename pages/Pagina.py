@@ -155,9 +155,12 @@ st.subheader("Baixar Relatório Completo (QuantStats)")
 portfolio_returns.index = pd.to_datetime(portfolio_returns.index)
 portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
 
+# Obter os dados de benchmark BOVESPA
+bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close'].pct_change().dropna()
 with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
     qs.reports.html(
         portfolio_returns,
+        benchmark= bench,
         output=tmpfile.name,
         title="Relatório Completo do Portfólio",
         download_filename="relatorio_portfolio.html"
