@@ -33,6 +33,36 @@ tickers = st.sidebar.multiselect("Selecione as ações do portfólio", stocks)
 if len(tickers) == 0:
     st.warning("Selecione pelo menos uma ação.")
     st.stop()
+# Função para filtrar tickers com dados de preço válidos
+def filtrar_tickers_com_dados(tickers, start_date, end_date):
+    tickers_validos = []
+    for ticker in tickers:
+        data = yf.download(ticker + ".SA", start=start_date, end=end_date, progress=False)
+        if not data.empty and 'Close' in data.columns:
+            tickers_validos.append(ticker)
+    return tickers_validos
+
+# Carrega lista inicial
+data = pd.read_csv('acoes-listadas-b3.csv')
+tickers = list(data['Ticker'].values)
+
+# Sidebar com escolha de período e data inicial
+period_selected = st.sidebar.selectbox('Período ⏰', ['diário','semanal','trimestral','semestral','mensal','anual'])
+period_dict = {'diário':'1d','semanal':'1wk','mensal':'1mo','trimestral':'3mo','semestral':'6mo','anual':'1y'}
+
+data_inicio = st.sidebar.date_input("Data Inicial📅", datetime.date(2014,1,1), min_value=datetime.date(2000,1,1))
+data_fim = datetime.date.today()
+
+# Filtra os tickers válidos (isso pode demorar dependendo da quantidade)
+st.info('Filtrando ações com dados disponíveis, aguarde...')
+tickers_validos = filtrar_tickers_com_dados(tickers, data_inicio, data_fim)
+
+# Agora só mostra para o usuário os válidos
+tickers_selecionaveis = st.multiselect('Monte seu Portfolio (ações com dados)', tickers_validos)
+
+if not tickers_selecionaveis:
+    st.warning("Selecione pelo menos uma ação válida para continuar.")
+    st.stop()
 
 tickers_yf = [t + ".SA" for t in tickers]
 
