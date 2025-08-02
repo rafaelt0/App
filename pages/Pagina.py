@@ -7,9 +7,11 @@ import seaborn as sns
 import datetime
 import warnings
 import plotly.express as px
-from pypfopt.hierarchical_portfolio import HRPOpt
+from pypfopt.hierarchical_risk_parity import HRPOpt
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
 from scipy.stats import kurtosis, skew
+import quantstats as qs
+import io
 
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
@@ -69,6 +71,12 @@ st.subheader("Pesos do Portfólio (%)")
 peso_manual_df.index = peso_manual_df.index.str.replace(".SA","")
 st.dataframe((peso_manual_df*100).round(2))
 
+# Gráfico pizza das porcentagens
+fig_pie = px.pie(peso_manual_df.reset_index(), values="Peso", names="index",
+                 title="Composição do Portfólio (%)",
+                 labels={"index": "Ativo", "Peso": "Percentual"})
+st.plotly_chart(fig_pie)
+
 # Cálculo do portfólio com os pesos escolhidos
 portfolio_returns = returns.dot(pesos_manuais_arr)
 cum_return = (1 + portfolio_returns).cumprod()
@@ -127,6 +135,15 @@ stats = pd.DataFrame([[
 
 st.subheader("Estatísticas do Portfólio")
 st.dataframe(stats.round(4))
+
+# Botão para gerar PDF via quantstats
+st.subheader("Relatório Completo do Portfolio (PDF)")
+
+if st.button("Gerar e baixar relatório PDF"):
+    pdf_buffer = io.BytesIO()
+    qs.reports.snapshot(portfolio_returns, output=pdf_buffer, benchmark=None, title="Relatório de Portfolio")
+    pdf_buffer.seek(0)
+    st.download_button(label="Download Relatório PDF", data=pdf_buffer, file_name="relatorio_portfolio.pdf", mime="application/pdf")
 
 
 
