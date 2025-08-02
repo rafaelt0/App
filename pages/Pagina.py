@@ -81,6 +81,16 @@ fig_pie = px.pie(peso_manual_df.reset_index(), values="Peso", names="index",
                  labels={"index": "Ativo", "Peso": "Percentual"})
 st.plotly_chart(fig_pie)
 
+# Heatmap
+heatmap=sns.heatmap(data_yf.corr(), annot=True)
+st.subheader("Matrix de Correlação")
+st.write(data_yf())
+st.subheader("Matrix de Covariância")
+st.write("OBS:.Variância na diagonal e covariância das demais")
+st.write(data_yf.cov())
+st.subheader("Heatmap")
+st.pyplot(heatmap.figure)
+
 # Cálculo do portfólio com os pesos escolhidos
 portfolio_returns = returns.dot(pesos_manuais_arr)
 cum_return = (1 + portfolio_returns).cumprod()
