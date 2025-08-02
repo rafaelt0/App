@@ -13,3 +13,4 @@ streamlit==1.30.0
 yfinance==0.2.65
 PyPortfolioOpt==1.5.5
 fpdf==1.7.2
+kaleido==0.2.1
