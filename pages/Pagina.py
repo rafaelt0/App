@@ -182,54 +182,42 @@ with col1:
 with col3:
     st.write("")
      
-mean = float(portfolio_returns.mean())
-mu_selected = (1+mean)**12-1
 
-sigma_selected = portfolio_returns.std()*np.sqrt(12)
-    
+# Número de simulações e horizonte
+n_sim = n_simulations
+n_dias = years*365  # 1 ano
 
+# Valor inicial do portfólio
+valor_inicial = valor
 
+# Retornos históricos do portfólio
+portfolio_returns = returns.dot(weights_array)
+mu_p = portfolio_returns.mean()
+sigma_p = portfolio_returns.std()
 
+# Simulações Monte Carlo
+simulacoes = np.zeros((n_dias, n_sim))
+simulacoes[0] = valor_inicial
 
-mu = mu_selected
-n = periodos
-M = n_simulations
-S0 = valor
-sigma = sigma_selected
-T = years
+for sim in range(n_sim):
+    for t in range(1, n_dias):
+        z = np.random.normal()
+        simulacoes[t, sim] = simulacoes[t-1, sim] * np.exp((mu_p - 0.5*sigma_p**2) + sigma_p*z)
 
-dt = T/n
+# Criar DataFrame para visualização
+sim_df = pd.DataFrame(simulacoes)
+sim_df.index.name = "Dia"
 
-St = np.exp(
-    (mu - sigma**2/2)*dt
-    * sigma * np.random.normal(0, np.sqrt(dt), size=(M,n)).T
-)
-
-St = np.vstack([np.ones(M), St])
-
-St = S0 * St.cumprod(axis=0)
-
-time = np.linspace(0,T,n+1)
-
-tt = np.full(shape=(M,n+1), fill_value=time).T
-
-fig=px.line(St, title="Simulação por Movimento Browniano Geométrico")
-fig.update_layout(
-                  xaxis = dict(
-                    tickmode='array', #change 1
-                    tickvals = np.arange(0,n*years,2)))
-fig.update_yaxes(title="Portfolio/Ação")
-fig.update_xaxes(title="Período")
+# Plot interativo (fan chart)
+fig = px.line(sim_df, title="Simulações de Monte Carlo para o Portfólio")
 st.plotly_chart(fig)
-mean=St[-1][:].mean()
-max=St[-1][:].max()
-min=St[-1][:].min()
-array = np.array(St[-1][:])
-summary=pd.DataFrame([mean,max,min, np.percentile(array,25), np.median(array), np.percentile(array,75), np.std(array)])
-summary = summary.rename({0:"Média", 1:"Máximo", 2:"Mínimo", 3:"Primeiro Quartil", 4:"Mediana (Segundo Quartil)", 5:"Terceiro Quartil", 6:"Desvio Padrão"}, axis=0)
-summary = summary.rename({0:"Resultados"}, axis=1)
-st.subheader("Resultados 🔬")
-st.table(summary.T)
+
+# Exibir estatísticas finais
+st.subheader("Estatísticas das Simulações")
+st.write(f"Valor esperado final: R$ {sim_df.iloc[-1].mean():,.2f}")
+st.write(f"VaR 5% (1 ano): R$ {np.percentile(sim_df.iloc[-1], 5):,.2f}")
+st.write(f"Pior cenário simulado: R$ {sim_df.iloc[-1].min():,.2f}")
+st.write(f"Melhor cenário simulado: R$ {sim_df.iloc[-1].max():,.2f}")
 
 
 
