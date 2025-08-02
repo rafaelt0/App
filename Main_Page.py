@@ -74,8 +74,8 @@ interval_dict={'dia':'1d','3 meses':'3mo', 'mês':'1mo','hora':'1h','minuto':'1m
 
 
 try:
-    st.write(list(tickers))
     data = yf.download(tickers, start=data_inicio, end=datetime.datetime.now())
+    st.write(data)
     data = data['Close']
     data = data.reset_index()
     st.subheader("Cotação")
