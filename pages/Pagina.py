@@ -191,7 +191,6 @@ n_dias = years*365  # 1 ano
 valor_inicial = valor
 
 # Retornos históricos do portfólio
-portfolio_returns = returns.dot(weights_array)
 mu_p = portfolio_returns.mean()
 sigma_p = portfolio_returns.std()
 
