@@ -15,8 +15,9 @@ import datetime
 from scipy.stats import kurtosis, skew
 from pypfopt import plotting
 import re
-import quantstats as qs
-import io
+import plotly.graph_objects as go
+import plotly.express as px
+import scipy.stats as stats
 
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
@@ -129,10 +130,10 @@ if tickers:
             if pd.isna(val):
                 return ''
             if min_val is not None and val < min_val:
-                return 'background-color: #fbb4ae; color: red;'
+                return 'background-color: #fbb4ae; color: red;'  # vermelho claro
             if max_val is not None and val > max_val:
                 return 'background-color: #fbb4ae; color: red;'
-            return 'background-color: #b6d7a8; color: green;'
+            return 'background-color: #b6d7a8; color: green;'  # verde claro
 
         def style_indicators(row):
             styles = [''] * len(row)
@@ -148,6 +149,8 @@ if tickers:
         styled_ind = df_ind.style.format(format_ind).apply(style_indicators, axis=1)
 
         st.dataframe(styled_ind, use_container_width=True)
+
+        # Continuação do código com gráficos e estatísticas descritivas
 
         tickers_yf = [t + ".SA" for t in tickers]
         data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2025,1,1),
@@ -173,27 +176,79 @@ if tickers:
         st.subheader("Retornos (%)")
         st.dataframe(returns_pct)
 
-        # Relatório QuantStats - botão e download
-        st.subheader("Relatório Detalhado QuantStats")
+        st.subheader("Histograma Combinado dos Retornos Diários (%)")
+        fig_hist_all = px.histogram(
+            returns.melt(var_name='Ação', value_name='Retorno (%)'),
+            x='Retorno (%)',
+            color='Ação',
+            barmode='overlay',
+            nbins=100,
+            opacity=0.6,
+            title='Distribuição dos Retornos Diários (%) - Todas as Ações'
+        )
+        fig_hist_all.update_layout(height=450)
+        st.plotly_chart(fig_hist_all, use_container_width=True)
 
-        if st.button("Gerar Relatório QuantStats"):
-            with st.spinner("Gerando relatório QuantStats, aguarde..."):
-                port_returns = returns.mean(axis=1) / 100  # converte % para decimal
-                
-                html_buffer = io.StringIO()
-                qs.reports.html(port_returns, output=html_buffer, title="Relatório QuantStats B3 Explorer", download_filename=None)
-                html_bytes = html_buffer.getvalue().encode('utf-8')
-                
-                st.success("Relatório QuantStats gerado!")
+        st.subheader("Estatísticas Descritivas dos Retornos (%)")
+        stats_df = pd.DataFrame(index=returns.columns)
+        stats_df['Média (%)'] = returns.mean().round(3)
+        stats_df['Mediana (%)'] = returns.median().round(3)
+        stats_df['Desvio Padrão (%)'] = returns.std().round(3)
+        stats_df['Curtose'] = returns.apply(lambda x: kurtosis(x, fisher=True)).round(3)
+        stats_df['Assimetria (Skew)'] = returns.apply(lambda x: skew(x)).round(3)
+        stats_df['Mínimo (%)'] = returns.min().round(3)
+        stats_df['Máximo (%)'] = returns.max().round(3)
 
-                st.download_button(
-                    label="Clique para baixar o relatório HTML",
-                    data=html_bytes,
-                    file_name="relatorio_quantstats.html",
-                    mime="text/html"
-                )
+        st.dataframe(stats_df.style.format("{:.3f}"), use_container_width=True)
 
-        # ... resto do seu código, ex: descrições etc.
+        quartis_df = pd.DataFrame(index=returns.columns)
+        quartis_df['Q1'] = returns.quantile(0.25).round(4)
+        quartis_df['Mediana (Q2)'] = returns.quantile(0.5).round(4)
+        quartis_df['Q3'] = returns.quantile(0.75).round(4)
+        quartis_df['IQR (Q3 - Q1)'] = (quartis_df['Q3'] - quartis_df['Q1']).round(4)
+        quartis_df['Limite Inferior'] = (quartis_df['Q1'] - 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
+        quartis_df['Limite Superior'] = (quartis_df['Q3'] + 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
+
+        st.subheader("Tabela dos Quartis, IQR e Limites dos Retornos Diários (%)")
+        st.dataframe(quartis_df, use_container_width=True)
+
+        st.subheader("Boxplot dos Retornos Diários (%) por Ação")
+        fig_box = px.box(
+            returns.melt(var_name='Ação', value_name='Retorno (%)'),
+            x='Ação',
+            y='Retorno (%)',
+            points="outliers",
+            title="Distribuição dos Retornos Diários (%)"
+        )
+        fig_box.update_layout(height=450)
+        st.plotly_chart(fig_box, use_container_width=True)
+
+        if not df_ind.empty and len(df_ind) > 1:
+            st.subheader("Comparação Radar dos Indicadores Fundamentalistas")
+
+            indicadores_radar = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
+
+            fig = go.Figure()
+
+            for idx, row in df_ind.iterrows():
+                fig.add_trace(go.Scatterpolar(
+                    r=row[indicadores_radar].values,
+                    theta=indicadores_radar,
+                    fill='toself',
+                    name=row['Empresa']
+                ))
+
+            max_val = max(df_ind[indicadores_radar].max().max(), 100)
+            fig.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, max_val]
+                    )),
+                showlegend=True,
+                height=500
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
         descriptions = []
         for t in tickers_yf:
@@ -213,5 +268,27 @@ else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
 
 
+st.subheader("Relatório Completo")
+
+if st.button("Gerar Relatório QuantStats"):
+    with st.spinner("Gerando relatório QuantStats, aguarde..."):
+        # 'returns' deve ser DataFrame de retornos percentuais (não strings, nem %), só números
+        # Se quiser, pode agregar tudo num portfólio (ex: média)
+        # Aqui vamos usar média ponderada simples só pra exemplo:
+        port_returns = returns.mean(axis=1) / 100  # converte % pra decimal
+        
+        # Gerar relatório HTML e salvar na memória
+        html_buffer = io.StringIO()
+        qs.reports.html(port_returns, output=html_buffer, title="Relatório QuantStats B3 Explorer", download_filename=None)
+        html_bytes = html_buffer.getvalue().encode('utf-8')
+        
+        st.success("Relatório QuantStats gerado!")
+
+        st.download_button(
+            label="Clique para baixar o relatório HTML",
+            data=html_bytes,
+            file_name="relatorio_quantstats.html",
+            mime="text/html"
+        )
 
 
