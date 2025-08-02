@@ -168,6 +168,7 @@ periodos = int(st.sidebar.number_input("Meses", value=12, min_value=1))
 years = int(st.sidebar.number_input("Anos", min_value=1))         
 data_inicio = st.sidebar.date_input("Data Inicial📅", value=datetime.date(2019,1,1),min_value=datetime.date(2000,1,1))
 
+st.sidebar.markdown("""---""")
 
 st.header("Simulação 🧪")
 
