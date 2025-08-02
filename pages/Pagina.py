@@ -152,26 +152,12 @@ try:
 
     # === Gerar relatório PDF simples ===
     def generate_pdf():
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(0, 10, "Relatório Resumido do Portfólio", 0, 1, 'C')
+    pdf = FPDF()
+    pdf.add_page()
+    # ... seu código para adicionar texto no pdf ...
 
-        pdf.set_font("Arial", "", 12)
-        pdf.cell(0, 10, f"Período: {data_inicio} até {datetime.datetime.now().date()}", 0, 1)
-        pdf.cell(0, 10, f"Valor Inicial: R$ {valor_inicial:,.2f}", 0, 1)
-        pdf.cell(0, 10, f"Valor Final: R$ {portfolio_value.iloc[-1]:,.2f}", 0, 1)
-        pdf.cell(0, 10, f"Retorno Total: {portfolio_info['Retorno Total (%)'].values[0]:.2f} %", 0, 1)
-
-        # Estatísticas chave
-        pdf.cell(0, 10, f"Índice Sharpe: {stats['Índice Sharpe'].values[0]:.2f}", 0, 1)
-        pdf.cell(0, 10, f"Índice Sortino: {stats['Índice Sortino'].values[0]:.2f}", 0, 1)
-        pdf.cell(0, 10, f"Max Drawdown: {stats['Max Drawdown'].values[0]:.2f}", 0, 1)
-
-        # Exportar para bytes
-        pdf_output = BytesIO()
-        pdf.output(pdf_output)
-        return pdf_output.getvalue()
+    pdf_bytes = pdf.output(dest='S').encode('latin1')  # encode para bytes
+    return pdf_bytes
 
     pdf_bytes = generate_pdf()
     st.download_button(label="Baixar relatório resumido (PDF)", data=pdf_bytes, file_name="relatorio_portfolio.pdf", mime="application/pdf")
