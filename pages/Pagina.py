@@ -119,8 +119,8 @@ try:
     "Volatilidade Diária (%)": [portfolio_returns.std()*100]
 })
 
-st.subheader("Informações do Portfólio")
-st.dataframe(portfolio_info.style.format("{:.2f}"))
+    st.subheader("Informações do Portfólio")
+    st.dataframe(portfolio_info.style.format("{:.2f}"))
 
     # Estatísticas portfolio
     stats = pd.DataFrame([[
