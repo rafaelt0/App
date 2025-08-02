@@ -164,9 +164,7 @@ with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
 st.sidebar.header("Opções Simulação 👨‍🔬")
 n_simulations = st.sidebar.slider("Número de Simulações",10,1000,100)
 valor = st.sidebar.number_input("Capital Inicial", min_value=100)
-periodos = int(st.sidebar.number_input("Meses", value=12, min_value=1))
 years = int(st.sidebar.number_input("Anos", min_value=1))         
-data_inicio = st.sidebar.date_input("Data Inicial📅", value=datetime.date(2019,1,1),min_value=datetime.date(2000,1,1))
 
 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 
