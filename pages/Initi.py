@@ -1,18 +1,24 @@
 import streamlit as st
 import yfinance as yf
+import matplotlib.pyplot as plt
+import numpy as np
 import fundamentus
 import pandas as pd
-import numpy as np
-import datetime
-import plotly.express as px
 import seaborn as sns
-import matplotlib.pyplot as plt
-from scipy.stats import kurtosis, skew
 import warnings
+import pypfopt
+from pypfopt.expected_returns import mean_historical_return
+from pypfopt.risk_models import CovarianceShrinkage
+from pypfopt.efficient_frontier import EfficientFrontier
+from pypfopt import objective_functions
+import datetime
+from scipy.stats import kurtosis, skew
+from pypfopt import plotting
 
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
 
+# Configurações da página
 st.set_page_config(
     page_title="Análise de Ações B3",
     page_icon="📈",
@@ -25,67 +31,47 @@ with open("style.css") as f:
 
 st.title("**B3 Explorer 📈**")
 
-# Carregar lista de ações
+# Carregando as ações com setor
 data = pd.read_csv('acoes-listadas-b3.csv')
-stocks = data[['Ticker','Setor']]
 
-# --- Filtro por setor ---
-setores_unicos = stocks['Setor'].dropna().unique()
-setor_selecionado = st.sidebar.selectbox("Filtrar por Setor", options=["Todos"] + list(setores_unicos))
+# Verifique se seu CSV tem a coluna 'Setor'
+if 'Setor' not in data.columns:
+    st.error("O arquivo CSV precisa conter a coluna 'Setor' para o filtro funcionar.")
+    st.stop()
 
-if setor_selecionado != "Todos":
-    stocks_filtradas = stocks[stocks['Setor'] == setor_selecionado]
-else:
-    stocks_filtradas = stocks
+stocks = list(data['Ticker'].values)
 
-tickers = st.multiselect(
-    'Escolha ações para explorar! (2 ou mais ações)',
-    options=stocks_filtradas['Ticker'].tolist()
-)
+# Lista única de setores para filtro
+setores = sorted(data['Setor'].dropna().unique())
+
+# Sidebar: filtro por setor
+setores_selecionados = st.sidebar.multiselect('Filtrar por Setor', setores, default=setores)
+
+# Filtrar os tickers por setor selecionado
+tickers_filtrados = data[data['Setor'].isin(setores_selecionados)]['Ticker'].tolist()
+
+st.subheader("Explore ações da B3 🧭")
+tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', tickers_filtrados)
 
 if tickers:
-    @st.cache_data(ttl=3600)
-    def get_fundamentus_data(tickers):
-        dfs = []
-        for t in tickers:
-            try:
-                df_temp = fundamentus.get_papel(t)
-                dfs.append(df_temp)
-            except Exception:
-                pass
-        return pd.concat(dfs) if dfs else pd.DataFrame()
-    
-    @st.cache_data(ttl=3600)
-    def get_yf_data(tickers_yf, start, end, interval):
-        data_prices = yf.download(tickers_yf, start=start, end=end, interval=interval)['Close']
-        if isinstance(data_prices.columns, pd.MultiIndex):
-            data_prices = data_prices.droplevel(0, axis=1)
-        return data_prices
+    try:
+        # Análise Fundamentalitsta
+        df = pd.concat([fundamentus.get_papel(t) for t in tickers])
+        df['PL'] = pd.to_numeric(df['PL'], errors='coerce') / 100
 
-    with st.spinner('Carregando dados fundamentalistas...'):
-        df = get_fundamentus_data(tickers)
-    
-    if df.empty:
-        st.warning("Não foi possível carregar dados fundamentus para as ações selecionadas.")
-    else:
-        # Limpar e preparar dados fundamentalistas
-        cols_to_numeric = ['Marg_Liquida','Marg_EBIT','ROE','ROIC','Div_Yield',
-                           'Cres_Rec_5a','PL','EV_EBITDA','Cotacao','Min_52_sem',
-                           'Max_52_sem','Vol_med_2m','Valor_de_mercado']
-        for col in cols_to_numeric:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+        st.subheader("Setor")
+        st.write(df[['Empresa', 'Setor', 'Subsetor']].drop_duplicates(keep='last'))
 
-        st.subheader("Setor e Subsetor")
-        st.write(df[['Empresa','Setor','Subsetor']].drop_duplicates())
-
-        # Informações de mercado
+        st.subheader("Informações de Mercado")
         df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 
-                       'Valor_de_mercado', 'Data_ult_cot']].drop_duplicates()
+                       'Valor_de_mercado', 'Data_ult_cot']]
         df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
                             "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
-
-        # Formatação elegante
+        # Converter as colunas para numéricas para evitar erro
+        for col in ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)", 
+                    "Volume Médio (2 meses)", "Valor de Mercado"]:
+            df_price[col] = pd.to_numeric(df_price[col], errors='coerce').fillna(0)
+        
         format_dict = {
             "Cotação": "R$ {:,.2f}",
             "Mínimo (52 semanas)": "R$ {:,.2f}",
@@ -94,73 +80,71 @@ if tickers:
             "Valor de Mercado": "R$ {:,.0f}"
         }
 
-        # Layout com colunas
-        col1, col2 = st.columns([1,1])
-        with col1:
-            st.subheader("Informações de Mercado")
-            st.dataframe(df_price.style.format(format_dict), use_container_width=True)
+        st.dataframe(df_price.style.format(format_dict), use_container_width=True)
 
-        with col2:
-            st.subheader("Indicadores Financeiros")
-            df_ind = df[['Marg_Liquida','Marg_EBIT','ROE','ROIC','Div_Yield',
-                         'Cres_Rec_5a','PL','EV_EBITDA']].drop_duplicates()
-            df_ind.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC",
-                              "Dividend Yield", "Crescimento Receita 5 anos", "P/L", "EV/EBITDA"]
-            st.dataframe(df_ind, use_container_width=True)
+        # Indicadores Fundamentalistas
+        st.subheader("Indicadores Financeiros")
+        
+        df_ind = df[['Marg_Liquida','Marg_EBIT','ROE','ROIC','Div_Yield',
+                     'Cres_Rec_5a','PL','EV_EBITDA']].drop_duplicates(keep='last')
+        df_ind.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC",
+                          "Dividend Yield", "Crescimento Receita 5 anos", "P/L", "EV/EBITDA"]
 
-        # Configurações yfinance
+        format_ind = {
+            "Margem Líquida": "{:.2f}%",
+            "Margem EBIT": "{:.2f}%",
+            "ROE": "{:.2f}%",
+            "ROIC": "{:.2f}%",
+            "Dividend Yield": "{:.2f}%",
+            "Crescimento Receita 5 anos": "{:.2f}%",
+            "P/L": "{:.2f}",
+            "EV/EBITDA": "{:.2f}"
+        }
+        
+        st.dataframe(df_ind.style.format(format_ind), use_container_width=True)
+
+        # Formato do yfinance
         tickers_yf = [t + ".SA" for t in tickers]
         data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2025,1,1),
-                                            min_value=datetime.date(2000,1,1))
+                                            min_value=datetime.date(2000,1,1),
+                                            max_value=datetime.date.today())
+        
+        st.sidebar.header('Configurações ⚙️')
         interval_selected = st.sidebar.selectbox('Intervalo 📊', 
                                                  ['1d','1wk','1mo','3mo','6mo','1y'])
+        
+        # Carregando os dados
+        data_prices = yf.download(tickers_yf, start=data_inicio, end=datetime.datetime.now(), 
+                                  interval=interval_selected)['Close']
+        
+        # Corrigir erro de multi index
+        if isinstance(data_prices.columns, pd.MultiIndex):
+            data_prices = data_prices.droplevel(0, axis=1)
 
-        with st.spinner('Carregando cotações históricas...'):
-            data_prices = get_yf_data(tickers_yf, data_inicio, datetime.datetime.now(), interval_selected)
+        st.subheader("Cotação Histórica")
+        st.line_chart(data_prices)
 
-        if data_prices.empty:
-            st.warning("Não foi possível carregar os dados históricos.")
-        else:
-            st.subheader("Cotação Histórica")
-            st.line_chart(data_prices)
+        # Retornos
+        returns = data_prices.pct_change().dropna() * 100
+        returns_pct = returns.round(2).astype(str) + '%'
+        st.subheader("Retornos (%)")
+        st.dataframe(returns_pct)
 
-            # Retornos
-            returns = data_prices.pct_change().dropna() * 100
-            returns_styled = returns.style.format("{:.2f}%")
-            st.subheader("Retornos (%)")
-            st.dataframe(returns_styled, use_container_width=True)
+        # Descrição Empresas
+        descriptions = []
+        for t in tickers_yf:
+            try:
+                info = yf.Ticker(t).get_info()
+                descriptions.append(info.get('longBusinessSummary', 'Não disponível'))
+            except:
+                descriptions.append('Não disponível')
 
-            # Estatísticas dos retornos
-            st.subheader("Estatísticas dos Retornos")
-            stats_df = pd.DataFrame({
-                'Média (%)': returns.mean(),
-                'Desvio Padrão (%)': returns.std(),
-                'Assimetria (Skew)': returns.apply(skew),
-                'Curtose (Kurtosis)': returns.apply(kurtosis)
-            })
-            st.dataframe(stats_df.style.format("{:.2f}"), use_container_width=True)
+        df_desc = pd.DataFrame(descriptions, index=tickers, columns=["Descrição"])
+        st.subheader("Descrição da Empresa")
+        st.table(df_desc)
 
-            # Gráfico de correlação
-            st.subheader("Mapa de Correlação dos Retornos")
-            corr = returns.corr()
-            fig = px.imshow(corr, text_auto=True, aspect="auto", color_continuous_scale='RdYlGn')
-            st.plotly_chart(fig, use_container_width=True)
-
-        # Checkbox para descrição
-        if st.checkbox("Mostrar descrição das empresas"):
-            descriptions = []
-            with st.spinner("Carregando descrições..."):
-                for t in tickers_yf:
-                    try:
-                        info = yf.Ticker(t).get_info()
-                        descriptions.append(info.get('longBusinessSummary', 'Não disponível'))
-                    except:
-                        descriptions.append('Não disponível')
-
-            df_desc = pd.DataFrame(descriptions, index=tickers, columns=["Descrição"])
-            st.subheader("Descrição da Empresa")
-            st.table(df_desc)
-
+    except Exception as e:
+        st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
 
