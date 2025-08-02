@@ -54,17 +54,47 @@ if tickers:
                             "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
         st.dataframe(df_price.drop_duplicates(keep='last'))
 
-        st.subheader("Indicadores Financeiros")
-        df_indicadores = df[['Marg_Liquida','Marg_EBIT','ROE', 'ROIC', 'Div_Yield', 
-                             'Cres_Rec_5a', 'PL', 'EV_EBITDA']]
-        df_indicadores.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
-                                  "Dividend Yield", "Crescimento Receita 5 anos", "P/L","EV/EBITDA"]
-        # Gradiente de cor para indicadores (melhor verde, pior vermelho)                              
-        st.subheader("Indicadores Financeiros (com gradiente de cores)")
+        # ---- Função para limpar valores numéricos ----
+def clean_numeric(series):
+    return (
+        series.astype(str)
+              .str.replace('%','', regex=False)
+              .str.replace('.','', regex=False)
+              .str.replace(',','.', regex=False)
+              .replace('', np.nan)
+              .astype(float)
+    )
+
+if tickers:
+    try:
+        # ---- Informações Fundamentais ----
+        df = pd.concat([fundamentus.get_papel(t) for t in tickers])
+
+        # Colunas que precisam ser convertidas para numéricas
+        cols_to_clean = ['Marg_Liquida','Marg_EBIT','ROE','ROIC','Div_Yield',
+                         'Cres_Rec_5a','PL','EV_EBITDA','Cotacao','Min_52_sem',
+                         'Max_52_sem','Vol_med_2m','Valor_de_mercado']
+        
+        for col in cols_to_clean:
+            if col in df.columns:
+                df[col] = clean_numeric(df[col])
+
+        st.subheader("Setor")
+        st.write(df[['Empresa', 'Setor', 'Subsetor']].drop_duplicates(keep='last'))
+
+        st.subheader("Informações de Mercado")
+        df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 
+                       'Valor_de_mercado', 'Data_ult_cot']]
+        df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
+                            "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
+        st.dataframe(df_price.drop_duplicates(keep='last'))
+
+        # ---- Indicadores Financeiros com Gradiente de Cor ----
+        st.subheader("Indicadores Financeiros (com qualidade por cores)")
 
         df_indicadores = df[['Marg_Liquida','Marg_EBIT','ROE', 'ROIC', 'Div_Yield', 
                              'Cres_Rec_5a', 'PL', 'EV_EBITDA']].drop_duplicates(keep='last')
-                
+
         df_indicadores.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
                                   "Dividend Yield", "Crescimento Receita 5 anos", "P/L","EV/EBITDA"]
 
@@ -78,9 +108,8 @@ if tickers:
         df_style = df_style.background_gradient(cmap='RdYlGn', subset=cols_positive)
         df_style = df_style.background_gradient(cmap='RdYlGn_r', subset=cols_negative)
 
-        st.dataframe(df_style)
+        st.dataframe(df_style, use_container_width=True)
 
-        st.dataframe(df_indicadores.drop_duplicates(keep='last'))
 
         # Formato do yfinance
         tickers_yf = [t + ".SA" for t in tickers]
