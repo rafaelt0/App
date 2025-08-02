@@ -161,14 +161,18 @@ with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
         file_name="relatorio_portfolio.html",
         mime="text/html"
     )
+
+# Separação na sidebar
+st.sidebar.markdown("---")
+
+# Opções para usuário
 st.sidebar.header("Opções Simulação 👨‍🔬")
 n_simulations = st.sidebar.slider("Número de Simulações",10,1000,100)
 valor = st.sidebar.number_input("Capital Inicial", min_value=100)
 years = int(st.sidebar.number_input("Anos", min_value=1))         
 
 
-# Separação na sidebar
-st.sidebar.markdown("---")
+
 
 st.header("Simulação 🧪")
 
