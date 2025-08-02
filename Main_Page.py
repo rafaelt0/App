@@ -78,11 +78,10 @@ try:
     st.subheader("Cotação")
     st.write(data)
     returns= data.pct_change()
-    st.write(returns)
     returns = returns.dropna()*100
-    st.write(returns)
     returns_percentage = np.round(returns,2)
     returns_string = returns_percentage.astype(str)+'%'
+    st.write(returns_string)
     st.subheader("Retornos")
     st.write(returns_string)
     prices = data.plot()
