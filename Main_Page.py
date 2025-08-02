@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import yfinance as yf
 import matplotlib.pyplot as plt
 import numpy as np
@@ -52,7 +52,13 @@ if tickers:
                        'Valor_de_mercado', 'Data_ult_cot']]
         df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
                             "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
-        st.dataframe(df_price.drop_duplicates(keep='last'))
+        # Formatar df para valor monetário
+        df_formatado["Cotação"] = df_price_formatted["Cotação"].map("R$ {:,.2f}".format)
+        df_formatado["Mínimo (52 semanas)"] = df_price_formatted["Mínimo (52 semanas)"].map("R$ {:,.2f}".format)
+        df_formatado["Máximo (52 semanas)"] = df_price_formatted["Máximo (52 semanas)"].map("R$ {:,.2f}".format)
+        df_formatado["Volume Médio (2 meses)"] = df_price_formatted["Volume Médio (2 meses)"].map("{:,.0f}".format)
+        df_formatado["Valor de Mercado"] = df_price_formatted["Valor de Mercado"].map("R$ {:,.0f}".format)
+        st.dataframe(df_formatado.drop_duplicates(keep='last'))
 
         # Indicadores Fundamentalistas
         st.subheader("Indicadores Financeiros")
