@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import fundamentus
 import pandas as pd
-import seaborn as sns
 import warnings
 import datetime
 from scipy.stats import kurtosis, skew
@@ -76,17 +75,18 @@ if tickers:
         df_indicadores.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
                                   "Dividend Yield", "Crescimento Receita 5 anos", "P/L","EV/EBITDA"]
 
-        # Define colunas que quanto maior, melhor (verde)
+        # Colunas onde maior é melhor (verde)
         cols_positive = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
                          "Dividend Yield", "Crescimento Receita 5 anos"]
-        # Define colunas que quanto menor, melhor (verde)
+        # Colunas onde menor é melhor (verde)
         cols_negative = ["P/L","EV/EBITDA"]
 
         df_style = df_indicadores.style
         df_style = df_style.background_gradient(cmap='RdYlGn', subset=cols_positive)
         df_style = df_style.background_gradient(cmap='RdYlGn_r', subset=cols_negative)
 
-        st.dataframe(df_style, use_container_width=True)
+        # Renderiza gradiente como HTML para aparecer no Streamlit
+        st.write(df_style.to_html(), unsafe_allow_html=True)
 
         # ---- Yahoo Finance ----
         tickers_yf = [t + ".SA" for t in tickers]
@@ -131,4 +131,5 @@ if tickers:
         st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
+
 
