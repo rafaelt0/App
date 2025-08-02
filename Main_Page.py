@@ -52,16 +52,20 @@ if tickers:
                        'Valor_de_mercado', 'Data_ult_cot']]
         df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
                             "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
+        # Converter as colunas para numéricas, ignorando erros (convertendo para NaN quando não for possível)
+        for col in ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)", 
+                    "Volume Médio (2 meses)", "Valor de Mercado"]:
+            df_price[col] = pd.to_numeric(df_price[col], errors='coerce')
+        
         format_dict = {
-    "Cotação": "R$ {:,.2f}",
-    "Mínimo (52 semanas)": "R$ {:,.2f}",
-    "Máximo (52 semanas)": "R$ {:,.2f}",
-    "Volume Médio (2 meses)": "{:,.0f}",
-    "Valor de Mercado": "R$ {:,.0f}"
-}
+            "Cotação": "R$ {:,.2f}",
+            "Mínimo (52 semanas)": "R$ {:,.2f}",
+            "Máximo (52 semanas)": "R$ {:,.2f}",
+            "Volume Médio (2 meses)": "{:,.0f}",
+            "Valor de Mercado": "R$ {:,.0f}"
+        }
 
         st.dataframe(df_price.style.format(format_dict), use_container_width=True)
-        st.write(df_price)
         # Indicadores Fundamentalistas
         st.subheader("Indicadores Financeiros")
         
