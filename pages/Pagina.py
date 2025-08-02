@@ -21,14 +21,14 @@ st.title("Análise e Otimização de Portfólio - B3 Explorer")
 # Sidebar config
 st.sidebar.header("Configurações do Portfólio")
 
-data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2014, 1, 1), min_value=datetime.date(2000, 1, 1))
+data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
 valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
 taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.04, max_value=15.0)
 
 # Seleção de ações
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
-tickers = st.sidebar.multiselect("Selecione as ações do portfólio", stocks)
+tickers = st.multiselect("Selecione as ações do portfólio", stocks)
 
 if len(tickers) == 0:
     st.warning("Selecione pelo menos uma ação.")
