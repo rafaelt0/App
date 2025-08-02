@@ -49,11 +49,15 @@ if 'Setor' not in data.columns:
 stocks = list(data['Ticker'].values)
 
 setores = sorted(data['Setor'].dropna().unique())
+setores.insert(0, "Todos")  # adiciona opção "Todos" no começo da lista
 
-# Filtro de setor via dropdown (selectbox)
+# Filtro de setor via dropdown (selectbox) com opção "Todos"
 setor_selecionado = st.sidebar.selectbox('Escolha um Setor', setores)
 
-tickers_filtrados = data[data['Setor'] == setor_selecionado]['Ticker'].tolist()
+if setor_selecionado == "Todos":
+    tickers_filtrados = data['Ticker'].tolist()
+else:
+    tickers_filtrados = data[data['Setor'] == setor_selecionado]['Ticker'].tolist()
 
 st.subheader("Explore ações da B3 🧭")
 tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', tickers_filtrados)
@@ -97,7 +101,7 @@ if tickers:
 
         pct_cols = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
         for col in pct_cols:
-            df_ind[col] = df_ind[col] 
+            df_ind[col] = df_ind[col]  # não multiplicar por 100 porque já está no formato correto
 
         df_ind = df_ind.fillna(0)
 
@@ -153,6 +157,7 @@ if tickers:
         st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
+
 
 
 
