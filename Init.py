@@ -10,7 +10,6 @@ import pypfopt
 from pypfopt.expected_returns import mean_historical_return
 from pypfopt.risk_models import CovarianceShrinkage
 from pypfopt.efficient_frontier import EfficientFrontier
-from pypfopt import objective_functions
 import datetime
 from scipy.stats import kurtosis, skew
 from pypfopt import plotting
@@ -31,12 +30,21 @@ with open("style.css") as f:
 
 st.title("**B3 Explorer 📈**")
 
-# Carregando as ações
+# Carregando as ações com setor
 data = pd.read_csv('acoes-listadas-b3.csv')
-stocks = list(data['Ticker'].values)
+
+# Extraindo setores únicos para filtro
+setores_unicos = sorted(data['Setor'].dropna().unique())
+
+st.sidebar.header("Filtro por Setor")
+setores_selecionados = st.sidebar.multiselect("Selecione setores:", setores_unicos, default=setores_unicos)
+
+# Filtra ações pelo setor escolhido
+filtro_acoes = data[data['Setor'].isin(setores_selecionados)]
+stocks_filtrados = list(filtro_acoes['Ticker'].values)
 
 st.subheader("Explore ações da B3 🧭")
-tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', stocks)
+tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', stocks_filtrados)
 
 if tickers:
     if len(tickers) < 2:
@@ -131,20 +139,6 @@ if tickers:
             fig, ax = plt.subplots(figsize=(8, 6))
             sns.heatmap(returns.corr(), annot=True, cmap='coolwarm', ax=ax)
             st.pyplot(fig)
-
-            # Descrição das empresas
-            progress_text.text("Carregando descrições das empresas...")
-            descriptions = []
-            for i, t in enumerate(tickers_yf):
-                try:
-                    info = yf.Ticker(t).get_info()
-                    descriptions.append(info.get('longBusinessSummary', 'Não disponível'))
-                except:
-                    descriptions.append('Não disponível')
-                progress_bar.progress(80 + int((i + 1) / len(tickers_yf) * 20))  # final 20%
-            df_desc = pd.DataFrame(descriptions, index=tickers, columns=["Descrição"])
-            st.subheader("Descrição da Empresa")
-            st.table(df_desc)
 
             progress_text.empty()
             progress_bar.empty()
