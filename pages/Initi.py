@@ -103,7 +103,6 @@ if tickers:
         for col in df_ind.columns.drop('Empresa'):
             df_ind[col] = clean_numeric_column(df_ind[col])
 
-        # Aqui mantemos os valores percentuais no formato correto
         pct_cols = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
         for col in pct_cols:
             df_ind[col] = df_ind[col]  # já no formato decimal, não multiplica por 100
@@ -171,7 +170,8 @@ if tickers:
                         visible=True,
                         range=[0, max_val]
                     )),
-                showlegend=True
+                showlegend=True,
+                height=500  # altura aumentada para melhor visualização
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -180,6 +180,7 @@ if tickers:
             st.subheader("Histogramas dos Retornos Diários (%)")
             for ticker in returns.columns:
                 fig_hist = px.histogram(returns[ticker], nbins=50, title=f"Retornos Diários: {ticker}")
+                fig_hist.update_layout(height=400)  # altura aumentada para melhor visualização
                 st.plotly_chart(fig_hist, use_container_width=True)
 
         # Descrição Empresas
