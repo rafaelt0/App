@@ -7,6 +7,7 @@ import seaborn as sns
 import datetime
 import warnings
 import plotly.express as px
+import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
 from scipy.stats import kurtosis, skew
@@ -91,12 +92,25 @@ st.pyplot(heatmap.figure)
 # Cálculo do portfólio com os pesos escolhidos
 portfolio_returns = returns.dot(pesos_manuais_arr)
 cum_return = (1 + portfolio_returns).cumprod()
-portfolio_value = cum_return * valor_inicial
+bovespa_valor = cum_return * valor_inicial
 
-# Mostrar gráfico do valor do portfólio
-st.subheader("Evolução do Valor do Portfólio")
-fig_val = px.line(portfolio_value, title="Valor do Portfólio")
-st.plotly_chart(fig_val)
+# Obter os dados de benchmark BOVESPA e calcular o retorno acumulado
+bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
+retorno_bench = bench.pct_change().dropna()
+retorno_cum_bench = (1+retorno_bench).cumprod()
+
+# Mostrar gráfico do valor do portfólio x BOVESPA
+
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
+                         mode='lines', name='Portfólio'))
+fig.add_trace(go.Scatter(x=bench_value.index, y=bench_value, 
+                         mode='lines', name='IBOVESPA'))
+fig.update_layout(title='Comparação: Portfólio x Benchmark',
+                  xaxis_title='Data', yaxis_title='Valor (R$)')
+st.plotly_chart(fig)
+
 
 # Informações do portfólio
 portfolio_info = pd.DataFrame({
@@ -155,8 +169,7 @@ st.subheader("Baixar Relatório Completo (QuantStats)")
 portfolio_returns.index = pd.to_datetime(portfolio_returns.index)
 portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
 
-# Obter os dados de benchmark BOVESPA
-bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close'].pct_change().dropna()
+
 with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
     qs.reports.html(
         portfolio_returns,
