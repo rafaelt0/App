@@ -268,27 +268,3 @@ else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
 
 
-st.subheader("Relatório Completo")
-
-if st.button("Gerar Relatório QuantStats"):
-    with st.spinner("Gerando relatório QuantStats, aguarde..."):
-        # 'returns' deve ser DataFrame de retornos percentuais (não strings, nem %), só números
-        # Se quiser, pode agregar tudo num portfólio (ex: média)
-        # Aqui vamos usar média ponderada simples só pra exemplo:
-        port_returns = returns.mean(axis=1) / 100  # converte % pra decimal
-        
-        # Gerar relatório HTML e salvar na memória
-        html_buffer = io.BytesIO()
-        qs.reports.html(port_returns, output=html_buffer, title="Relatório QuantStats B3 Explorer", download_filename=None)
-        html_bytes = html_buffer.getvalue()
-        
-        st.success("Relatório QuantStats gerado!")
-
-        st.download_button(
-            label="Clique para baixar o relatório HTML",
-            data=html_bytes,
-            file_name="relatorio_quantstats.html",
-            mime="text/html"
-        )
-
-
