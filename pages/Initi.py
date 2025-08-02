@@ -22,14 +22,12 @@ import scipy.stats as stats
 warnings.filterwarnings('ignore')
 plt.style.use('ggplot')
 
-# Função para limpar colunas numéricas que podem ter caracteres indesejados
 def clean_numeric_column(col):
     col = col.astype(str).str.strip()
-    col = col.str.replace(r'[^0-9,.\-]', '', regex=True)  # remove tudo que não for número, vírgula, ponto, menos
+    col = col.str.replace(r'[^0-9,.\-]', '', regex=True)
     col = col.str.replace(',', '.')
     return pd.to_numeric(col, errors='coerce')
 
-# Configurações da página
 st.set_page_config(
     page_title="Análise de Ações B3",
     page_icon="📈",
@@ -42,7 +40,6 @@ with open("style.css") as f:
 
 st.title("**B3 Explorer 📈**")
 
-# Carregando as ações com setor
 data = pd.read_csv('acoes-listadas-b3.csv')
 
 if 'Setor' not in data.columns:
@@ -50,8 +47,6 @@ if 'Setor' not in data.columns:
     st.stop()
 
 stocks = list(data['Ticker'].values)
-
-# Filtro multi-setores com opção "Todos"
 setores = sorted(data['Setor'].dropna().unique())
 setores.insert(0, "Todos")
 
@@ -70,7 +65,7 @@ tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', t
 if tickers:
     try:
         df = pd.concat([fundamentus.get_papel(t) for t in tickers])
-        df['PL'] = clean_numeric_column(df['PL'])  # PL tratado
+        df['PL'] = clean_numeric_column(df['PL'])
 
         st.subheader("Setor")
         st.write(df[['Empresa', 'Setor', 'Subsetor']].drop_duplicates(keep='last'))
@@ -106,7 +101,7 @@ if tickers:
 
         pct_cols = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
         for col in pct_cols:
-            df_ind[col] = df_ind[col]  # já no formato decimal, não multiplica por 100
+            df_ind[col] = df_ind[col]
 
         df_ind = df_ind.fillna(0)
 
@@ -148,7 +143,7 @@ if tickers:
         st.subheader("Retornos (%)")
         st.dataframe(returns_pct)
 
-        # --- Histograma combinado ---
+        # Histograma combinado
         st.subheader("Histograma Combinado dos Retornos Diários (%)")
         fig_hist_all = px.histogram(
             returns.melt(var_name='Ação', value_name='Retorno (%)'),
@@ -162,7 +157,7 @@ if tickers:
         fig_hist_all.update_layout(height=450)
         st.plotly_chart(fig_hist_all, use_container_width=True)
 
-        # --- Estatísticas descritivas ---
+        # Estatísticas descritivas
         st.subheader("Estatísticas Descritivas dos Retornos (%)")
         stats_df = pd.DataFrame(index=returns.columns)
         stats_df['Média (%)'] = returns.mean().round(3)
@@ -175,7 +170,19 @@ if tickers:
 
         st.dataframe(stats_df.style.format("{:.3f}"), use_container_width=True)
 
-        # --- Boxplot ---
+        # Quartis, IQR e Limites
+        quartis_df = pd.DataFrame(index=returns.columns)
+        quartis_df['Q1'] = returns.quantile(0.25).round(4)
+        quartis_df['Mediana (Q2)'] = returns.quantile(0.5).round(4)
+        quartis_df['Q3'] = returns.quantile(0.75).round(4)
+        quartis_df['IQR (Q3 - Q1)'] = (quartis_df['Q3'] - quartis_df['Q1']).round(4)
+        quartis_df['Limite Inferior'] = (quartis_df['Q1'] - 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
+        quartis_df['Limite Superior'] = (quartis_df['Q3'] + 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
+
+        st.subheader("Tabela dos Quartis, IQR e Limites dos Retornos Diários (%)")
+        st.dataframe(quartis_df, use_container_width=True)
+
+        # Boxplot
         st.subheader("Boxplot dos Retornos Diários (%) por Ação")
         fig_box = px.box(
             returns.melt(var_name='Ação', value_name='Retorno (%)'),
@@ -187,7 +194,7 @@ if tickers:
         fig_box.update_layout(height=450)
         st.plotly_chart(fig_box, use_container_width=True)
 
-        # --- Gráfico Radar ---
+        # Gráfico Radar
         if not df_ind.empty and len(df_ind) > 1:
             st.subheader("Comparação Radar dos Indicadores Fundamentalistas")
 
@@ -211,7 +218,7 @@ if tickers:
                         range=[0, max_val]
                     )),
                 showlegend=True,
-                height=500  # altura aumentada para melhor visualização
+                height=500
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -232,6 +239,7 @@ if tickers:
         st.error(f"Erro ao buscar dados: {e}")
 else:
     st.info("Selecione pelo menos uma ação para iniciar a análise.")
+
 
 
 
