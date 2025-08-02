@@ -59,8 +59,26 @@ if tickers:
                              'Cres_Rec_5a', 'PL', 'EV_EBITDA']]
         df_indicadores.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
                                   "Dividend Yield", "Crescimento Receita 5 anos", "P/L","EV/EBITDA"]
-        df.style.format({'Preço': "R$ {:,.2f}".format}) \
-    .format_index(str.upper, axis=1)
+        # Gradiente de cor para indicadores (melhor verde, pior vermelho)                              
+        st.subheader("Indicadores Financeiros (com gradiente de cores)")
+
+        df_indicadores = df[['Marg_Liquida','Marg_EBIT','ROE', 'ROIC', 'Div_Yield', 
+                             'Cres_Rec_5a', 'PL', 'EV_EBITDA']].drop_duplicates(keep='last')
+                
+        df_indicadores.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
+                                  "Dividend Yield", "Crescimento Receita 5 anos", "P/L","EV/EBITDA"]
+
+        # Define colunas que quanto maior, melhor (verde)
+        cols_positive = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", 
+                         "Dividend Yield", "Crescimento Receita 5 anos"]
+        # Define colunas que quanto menor, melhor (verde)
+        cols_negative = ["P/L","EV/EBITDA"]
+
+        df_style = df_indicadores.style
+        df_style = df_style.background_gradient(cmap='RdYlGn', subset=cols_positive)
+        df_style = df_style.background_gradient(cmap='RdYlGn_r', subset=cols_negative)
+
+        st.dataframe(df_style)
 
         st.dataframe(df_indicadores.drop_duplicates(keep='last'))
 
