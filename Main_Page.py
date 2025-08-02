@@ -52,7 +52,7 @@ if tickers:
                        'Valor_de_mercado', 'Data_ult_cot']]
         df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
                             "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
-
+        st.write(df_price)
         # Indicadores Fundamentalistas
         st.subheader("Indicadores Financeiros")
         
