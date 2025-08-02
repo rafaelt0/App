@@ -8,7 +8,6 @@ import seaborn as sns
 import datetime
 import warnings
 import plotly.express as px
-from scipy.stats import kurtosis, skew
 from fpdf import FPDF
 import tempfile
 
@@ -17,6 +16,7 @@ from pypfopt.risk_models import CovarianceShrinkage
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import objective_functions
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
+from scipy.stats import kurtosis, skew
 
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
@@ -104,7 +104,7 @@ try:
     fig_val = px.line(portfolio_value, title="Valor do Portfólio")
     st.plotly_chart(fig_val)
 
-    # **Exibir tabela das informações do portfólio logo abaixo do gráfico**
+    # Exibir tabela das informações do portfólio logo abaixo do gráfico
     portfolio_info = pd.DataFrame({
         "Valor Inicial": [valor_inicial],
         "Valor Máximo": [portfolio_value.max()],
@@ -117,7 +117,7 @@ try:
     st.subheader("Informações do Portfólio")
     st.dataframe(portfolio_info.style.format("{:,.2f}"))
 
-    # **Gráfico de Distribuição dos Retornos com Estatísticas**
+    # Gráfico de Distribuição dos Retornos com Estatísticas
     st.subheader("Distribuição dos Retornos Diários (%) e Estatísticas")
     fig_hist, ax_hist = plt.subplots(figsize=(10,5))
     sns.histplot(portfolio_returns*100, bins=50, kde=True, color='skyblue', ax=ax_hist)
@@ -142,7 +142,7 @@ try:
 
     st.pyplot(fig_hist)
 
-    # Estatísticas do portfólio (mesmas já calculadas)
+    # Estatísticas do portfólio (Índice Sharpe, Sortino, etc)
     stats = pd.DataFrame([[
         sharpe(portfolio_returns, rf=taxa_selic/100)/np.sqrt(2),
         sortino(portfolio_returns, rf=taxa_selic/100),
@@ -155,23 +155,23 @@ try:
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats)
 
-    # === Relatório PDF ===
+    # === Função para gerar PDF bonitão ===
     def generate_pdf(portfolio_info, stats, fig_val, fig_hist, valor_inicial, data_inicio, portfolio_value):
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-    
+
         # Título Principal
         pdf.set_font("Helvetica", 'B', 20)
         pdf.set_text_color(30,30,30)
         pdf.cell(0, 15, "Relatório Resumido do Portfólio", ln=1, align='C')
-    
+
         # Linha divisória
         pdf.set_draw_color(180, 180, 180)
         pdf.set_line_width(0.8)
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(5)
-    
+
         # Informações gerais
         pdf.set_font("Helvetica", '', 12)
         pdf.set_text_color(50,50,50)
@@ -179,75 +179,57 @@ try:
         pdf.cell(0, 8, f"Valor Inicial: R$ {valor_inicial:,.2f}", ln=1)
         pdf.cell(0, 8, f"Valor Final: R$ {portfolio_value.iloc[-1]:,.2f}", ln=1)
         pdf.cell(0, 8, f"Retorno Total: {portfolio_info['Retorno Total (%)'].values[0]:.2f} %", ln=1)
-    
+
         pdf.ln(8)
-    
+
         # Estatísticas do Portfólio - título
         pdf.set_font("Helvetica", 'B', 14)
         pdf.set_text_color(30,30,30)
         pdf.cell(0, 10, "Estatísticas do Portfólio", ln=1)
-    
+
         # Tabela estatísticas
         pdf.set_font("Helvetica", '', 12)
         line_height = pdf.font_size * 1.8
         col_width = pdf.epw / 3  # largura da página menos margens dividida
-    
+
         # Cabeçalho da tabela
         pdf.set_fill_color(230,230,230)
         pdf.cell(col_width, line_height, "Métrica", border=1, fill=True)
         pdf.cell(col_width, line_height, "Valor", border=1, fill=True)
         pdf.ln(line_height)
-    
-        # Dados estatísticos (usar stats dataframe)
+
+        # Dados estatísticos
         for col in stats.columns:
             pdf.cell(col_width, line_height, col, border=1)
             val = stats[col].values[0]
             pdf.cell(col_width, line_height, f"{val:.4f}", border=1)
             pdf.ln(line_height)
-    
+
         pdf.ln(10)
-    
+
         # Inserção dos gráficos
-    
         # Evolução do portfólio (Plotly salva imagem via kaleido)
         with tempfile.NamedTemporaryFile(suffix=".png") as tmp_val:
             fig_val.write_image(tmp_val.name)
             pdf.image(tmp_val.name, x=15, w=180)
         pdf.ln(10)
-    
+
         # Histograma (matplotlib)
         with tempfile.NamedTemporaryFile(suffix=".png") as tmp_hist:
             fig_hist.savefig(tmp_hist.name, bbox_inches='tight')
             pdf.image(tmp_hist.name, x=15, w=180)
         pdf.ln(10)
-    
+
         # Rodapé discreto
         pdf.set_y(-20)
         pdf.set_font("Helvetica", 'I', 9)
         pdf.set_text_color(120, 120, 120)
         pdf.cell(0, 10, "Relatório gerado automaticamente pelo B3 Explorer", align='C')
-    
+
         return pdf.output(dest='S').encode('latin1')
 
-        # Salvar gráfico da evolução do portfólio temporariamente
-        with tempfile.NamedTemporaryFile(suffix=".png") as tmp_val:
-            fig_val.write_image(tmp_val.name)
-            pdf.image(tmp_val.name, x=15, w=180)
-            pdf.ln(10)
+    pdf_bytes = generate_pdf(portfolio_info, stats, fig_val, fig_hist, valor_inicial, data_inicio, portfolio_value)
 
-        # Salvar gráfico do histograma temporariamente
-        with tempfile.NamedTemporaryFile(suffix=".png") as tmp_hist:
-            fig_hist.savefig(tmp_hist.name, bbox_inches='tight')
-            pdf.image(tmp_hist.name, x=15, w=180)
-            pdf.ln(10)
-
-        pdf.set_font("Arial", "I", 10)
-        pdf.cell(0, 8, "Relatório gerado automaticamente pelo B3 Explorer", 0, 1, 'C')
-
-        pdf_bytes = pdf.output(dest='S').encode('latin1')
-        return pdf_bytes
-
-    pdf_bytes = generate_pdf()
     st.download_button(
         label="Baixar relatório resumido (PDF)",
         data=pdf_bytes,
@@ -257,5 +239,6 @@ try:
 
 except Exception as e:
     st.error(f"Erro durante execução: {e}")
+
 
 
