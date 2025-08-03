@@ -13,13 +13,12 @@ from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_rati
 from scipy.stats import kurtosis, skew
 import quantstats as qs
 import io
+import tempfile
 
 aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Carlo Portfolio"])
 
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
-
-
 
 with aba1:
     st.title("Análise e Otimização de Portfólio - B3 Explorer")
@@ -98,6 +97,28 @@ with aba1:
     cum_return = (1 + portfolio_returns).cumprod()
     portfolio_value = cum_return * valor_inicial
     
+    # Obter os dados de benchmark BOVESPA e calcular o retorno acumulado
+    bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
+    retorno_bench = bench.pct_change().dropna()
+    
+    # Alinhar índices
+    common_idx = portfolio_returns.index.intersection(retorno_bench.index)
+    portfolio_returns = portfolio_returns.loc[common_idx]
+    retorno_bench = retorno_bench.loc[common_idx]
+    portfolio_value = portfolio_value.loc[common_idx]
+    retorno_cum_bench = (1+retorno_bench).cumprod()
+    bench_value = retorno_cum_bench * valor_inicial
+    
+    # Mostrar gráfico do valor do portfólio x BOVESPA
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
+                             mode='lines', name='Portfólio'))
+    fig.add_trace(go.Scatter(x=bench_value.index, y=bench_value, 
+                             mode='lines', name='IBOVESPA'))
+    fig.update_layout(title='Comparação: Portfólio x Benchmark',
+                      xaxis_title='Data', yaxis_title='Valor (R$)')
+    st.plotly_chart(fig)
+    
     
     # Informações do portfólio
     portfolio_info = pd.DataFrame({
@@ -148,26 +169,28 @@ with aba1:
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
 
-    st.subheader("Rolling Beta")
-    fig2=qs.plots.rolling_beta(portfolio_returns, benchmark=retorno_bench, window=90, show=False)
-    st.pyplot(fig2.figure)
-    plt.close(fig2.figure)
+    # --- NOVO: Rolling Sharpe ---
+    st.subheader("Rolling Sharpe Ratio (90 dias)")
+    fig_sharpe = qs.plots.rolling_sharpe(portfolio_returns, window=90, show=False)
+    st.pyplot(fig_sharpe.figure)
+    plt.close(fig_sharpe.figure)
 
-
+    # --- NOVO: Rolling Beta ---
+    st.subheader("Rolling Beta do Portfólio (90 dias)")
+    fig_beta = qs.plots.rolling_beta(portfolio_returns, benchmark=retorno_bench, window=90, show=False)
+    st.pyplot(fig_beta.figure)
+    plt.close(fig_beta.figure)
     
-    # Botão para gerar PDF via quantstats
-    import tempfile
+    # Botão para gerar relatório completo
     st.subheader("Baixar Relatório Completo (QuantStats)")
     
-    # Converte para formato aceito pelo QuantStats
     portfolio_returns.index = pd.to_datetime(portfolio_returns.index)
-    portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
-    
+    portfolio_returns = portfolio_returns.tz_localize(None)
     
     with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
         qs.reports.html(
             portfolio_returns,
-            benchmark= retorno_bench,
+            benchmark=retorno_bench,
             output=tmpfile.name,
             title="Relatório Completo do Portfólio",
             download_filename="relatorio_portfolio.html"
@@ -179,12 +202,7 @@ with aba1:
             mime="text/html"
         )
 
-# Separação na sidebar
 st.sidebar.markdown("---")
-
-       
-
-
 
 with aba2:
     # Opções para usuário
@@ -194,24 +212,10 @@ with aba2:
     years = int(st.number_input("Anos", min_value=1))  
     st.header("Simulação 🧪")
     
-    col1, col2, col3 = st.columns([1,3,1])
-    
-    with col1:
-        st.write("")
-    
-    
-    with col3:
-        st.write("")
-         
-    
-    # Número de simulações e horizonte
     n_sim = n_simulations
-    n_dias = years*365  # 1 ano
-    
-    # Valor inicial do portfólio
+    n_dias = years*365
     valor_inicial = valor
     
-    # Retornos históricos do portfólio
     mu_p = portfolio_returns.mean()
     sigma_p = portfolio_returns.std()
     
@@ -224,46 +228,15 @@ with aba2:
             z = np.random.normal()
             simulacoes[t, sim] = simulacoes[t-1, sim] * np.exp((mu_p - 0.5*sigma_p**2) + sigma_p*z)
     
-    # Criar DataFrame para visualização
     sim_df = pd.DataFrame(simulacoes)
     sim_df.index.name = "Dia"
     
-    # Plot interativo (fan chart)
-    fig = px.line(sim_df, title="Simulações de Monte Carlo para o Portfólio")
-    st.plotly_chart(fig)
-    
-    # Exibir estatísticas finais
-    # Estatísticas finais da simulação
-    valor_esperado = sim_df.iloc[-1].mean()
-    var_5 = np.percentile(sim_df.iloc[-1], 5)
-    pior_cenario = sim_df.iloc[-1].min()
-    melhor_cenario = sim_df.iloc[-1].max()
-    
-    # Criar DataFrame para exibir como tabela
-    sim_stats = pd.DataFrame({
-        "Valor Esperado Final (R$)": [valor_esperado],
-        "VaR 5% (R$)": [var_5],
-        "Pior Cenário (R$)": [pior_cenario],
-        "Melhor Cenário (R$)": [melhor_cenario]
-    })
-    
-    st.subheader("📊 Estatísticas da Simulação Monte Carlo")
-    st.dataframe(sim_stats.style.format("{:,.2f}"))
-    
-  
-
-# Supondo que sim_df seja seu DataFrame com simulações
-# sim_df.index = dias, colunas = simulações
-
-# Calcula percentis para faixas
+    # Fan Chart
     percentis = [5, 25, 50, 75, 95]
     fan_chart = sim_df.quantile(q=np.array(percentis)/100, axis=1).T
     fan_chart.columns = [f"P{p}" for p in percentis]
     
-    # Cria figura do fan chart
     fig_fan = go.Figure()
-    
-    # Adiciona faixas sombreadas
     fig_fan.add_trace(go.Scatter(
         x=fan_chart.index, y=fan_chart["P95"],
         line=dict(color='rgba(0,100,200,0.1)'), showlegend=False
@@ -273,7 +246,6 @@ with aba2:
         fill='tonexty', fillcolor='rgba(0,100,200,0.2)',
         line=dict(color='rgba(0,100,200,0.1)'), name='Faixa 5%-95%'
     ))
-    
     fig_fan.add_trace(go.Scatter(
         x=fan_chart.index, y=fan_chart["P75"],
         line=dict(color='rgba(0,100,200,0.1)'), showlegend=False
@@ -283,22 +255,31 @@ with aba2:
         fill='tonexty', fillcolor='rgba(0,100,200,0.4)',
         line=dict(color='rgba(0,100,200,0.1)'), name='Faixa 25%-75%'
     ))
-    
-    # Linha mediana
     fig_fan.add_trace(go.Scatter(
         x=fan_chart.index, y=fan_chart["P50"],
         line=dict(color='blue', width=2), name='Mediana'
     ))
     
-    # Layout final
     fig_fan.update_layout(
-        title="Simulação Monte Carlo - Fan Chart com Faixas de Confiança",
+        title="Simulação Monte Carlo - Faixas de Confiança",
         xaxis_title="Dia",
         yaxis_title="Valor do Portfólio (R$)",
         template="plotly_white"
     )
+    st.plotly_chart(fig_fan)
     
-    st.plotly_chart(fig_fan, use_container_width=True)
+    # --- NOVA TABELA DETALHADA ---
+    percentis_detalhados = [5, 10, 25, 50, 75, 90, 95]
+    valores_percentis = np.percentile(sim_df.iloc[-1], percentis_detalhados)
+    
+    sim_stats_ampliado = pd.DataFrame({
+        "Estatística": [f"P{p}" for p in percentis_detalhados] + ["Média", "Volatilidade"],
+        "Valor (R$)": list(valores_percentis) + [sim_df.iloc[-1].mean(), sim_df.iloc[-1].std()]
+    })
+    
+    st.subheader("📊 Estatísticas Detalhadas da Simulação Monte Carlo")
+    st.dataframe(sim_stats_ampliado.style.format("{:,.2f}"))
+
     
     
 
