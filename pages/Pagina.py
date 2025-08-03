@@ -12,7 +12,6 @@ import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
 import sgs
-from sgs import sgs_series
 from scipy.stats import kurtosis, skew
 import quantstats as qs
 import matplotlib.ticker as mtick
