@@ -19,9 +19,10 @@ aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Car
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
-st.title("Análise e Otimização de Portfólio - B3 Explorer")
+
 
 with aba1:
+    st.title("Análise e Otimização de Portfólio - B3 Explorer")
     # Sidebar config
     st.sidebar.header("Configurações do Portfólio")
     
