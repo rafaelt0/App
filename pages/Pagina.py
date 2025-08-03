@@ -14,6 +14,8 @@ from scipy.stats import kurtosis, skew
 import quantstats as qs
 import io
 
+aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Carlo"])
+
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
