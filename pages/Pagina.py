@@ -30,7 +30,7 @@ with aba1:
     data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
     valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
     taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.0556, max_value=15.0)
-    bench = st.sidebar.multiselect("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"]
+    bench = st.sidebar.multiselect("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"])
     
     # Seleção de ações
     data = pd.read_csv('acoes-listadas-b3.csv')
