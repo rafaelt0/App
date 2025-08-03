@@ -166,13 +166,6 @@ with aba1:
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
 
-    st.title("Exemplo QuantStats plots no Streamlit")
-
-    # Criar figura matplotlib explicitamente
-    fig1, ax1 = plt.subplots(figsize=(10, 6))
-    qs.plots.drawdown(portfolio_returns, ax=ax1)
-    st.pyplot(fig1)
-
        
     # Botão para gerar PDF via quantstats
     import tempfile
