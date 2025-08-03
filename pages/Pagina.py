@@ -98,6 +98,7 @@ portfolio_value = cum_return * valor_inicial
 bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
 retorno_bench = bench.pct_change().dropna()
 retorno_cum_bench = (1+retorno_bench).cumprod()
+bench_value = retorno_cum_bench * valor_inicial
 
 # Mostrar gráfico do valor do portfólio x BOVESPA
 
@@ -105,7 +106,7 @@ retorno_cum_bench = (1+retorno_bench).cumprod()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
                          mode='lines', name='Portfólio'))
-fig.add_trace(go.Scatter(x=retorno_bench.index, y=retorno_bench, 
+fig.add_trace(go.Scatter(x=bench_value.index, y=bench_value), 
                          mode='lines', name='IBOVESPA'))
 fig.update_layout(title='Comparação: Portfólio x Benchmark',
                   xaxis_title='Data', yaxis_title='Valor (R$)')
