@@ -113,21 +113,32 @@ with aba1:
     st.write(portfolio_value)
     # Plotly
     fig = go.Figure()
+    
     fig.add_trace(go.Scatter(
-        x=portfolio_value.index, y=portfolio_value, 
-        mode='lines', name='Portfólio'
+        x=portfolio_value.index, 
+        y=portfolio_value.values,
+        mode='lines', 
+        name='Portfólio'
     ))
+    
     fig.add_trace(go.Scatter(
-        x=bench_value.index, y=bench_value, 
-        mode='lines', name='IBOVESPA'
+        x=bench_value.index, 
+        y=bench_value.values,
+        mode='lines', 
+        name='IBOVESPA',
+        line=dict(color='orange')  # cor diferente para destacar
     ))
     
     fig.update_layout(
         title='Comparação: Portfólio x IBOVESPA',
-        xaxis_title='Data', yaxis_title='Valor (R$)',
-        hovermode='x unified', template='plotly_white'
+        xaxis_title='Data', 
+        yaxis_title='Valor (R$)',
+        hovermode='x unified',
+        template='plotly_white'
     )
+    
     st.plotly_chart(fig, use_container_width=True)
+
     
     # Informações do portfólio
     portfolio_info = pd.DataFrame({
