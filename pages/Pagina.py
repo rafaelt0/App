@@ -184,12 +184,12 @@ with aba1:
     cum_returns = (1 + portfolio_returns).cumprod()
     rolling_max = cum_returns.cummax()
     drawdown = (cum_returns - rolling_max) / rolling_max
-    drawdown_pct = drawdown*100
 
     # Plot Drawdown
     fig1, ax1 = plt.subplots(figsize=(10,4))
-    ax.fill_between(drawdown_pct.index, drawdown_pct.values, 0, color='red', alpha=0.4)
+    ax.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.4)
     ax.set_title("Drawdown do Portfólio")
+    plt.gca().yaxis.set_major_formatter(PercentFormatter(1.0))
     ax.set_ylabel("Drawdown (em %)")
     ax.set_xlabel("Data")
     st.pyplot(fig1)
