@@ -189,8 +189,7 @@ with aba1:
     fig1, ax1 = plt.subplots(figsize=(10,4))
     ax.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.4)
     ax.set_title("Drawdown do Portfólio")
-    plt.gca().yaxis.set_major_formatter(PercentFormatter(1.0))
-    ax.set_ylabel("Drawdown (em %)")
+    ax.set_ylabel("Drawdown")
     ax.set_xlabel("Data")
     st.pyplot(fig1)
 
