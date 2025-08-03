@@ -19,16 +19,35 @@ aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Car
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
+import streamlit as st
 
+# Escolha da aba na sidebar
+aba = st.sidebar.radio("Navegação", ["Análise", "Simulação"])
 
-with aba1:
-    st.title("Análise e Otimização de Portfólio - B3 Explorer")
-    # Sidebar config
+if aba == "Análise":
+    # Sidebar configuração
     st.sidebar.header("Configurações do Portfólio")
     
     data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
     valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
     taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.0556, max_value=15.0)
+
+
+elif aba == "Simulação":
+    st.sidebar.header("Configurações da Simulação")
+    n_simulations = st.sidebar.slider("Número de Simulações", 10, 1000, 100)
+    valor = st.sidebar.number_input("Capital Inicial", min_value=100)
+    years = int(st.sidebar.number_input("Anos", min_value=1))
+
+    st.header("🧪 Simulação Monte Carlo")
+    # Conteúdo da aba Simulação
+    st.write(f"Simulando com {n_simulations} simulações, {valor} de capital e horizonte de {years} anos")
+
+
+
+
+with aba1:
+    st.title("Análise e Otimização de Portfólio - B3 Explorer")
     
     # Seleção de ações
     data = pd.read_csv('acoes-listadas-b3.csv')
@@ -201,13 +220,6 @@ st.sidebar.markdown("---")
 
 
 with aba2:
-    # Opções para usuário
-    st.sidebar.header("Opções Simulação 👨‍🔬")
-    n_simulations = st.sidebar.slider("Número de Simulações",10,1000,100)
-    valor = st.sidebar.number_input("Capital Inicial", min_value=100)
-    years = int(st.sidebar.number_input("Anos", min_value=1))  
-    st.header("Simulação 🧪")
-    
     col1, col2, col3 = st.columns([1,3,1])
     
     with col1:
