@@ -111,9 +111,10 @@ with aba1:
     bench_value = (1 + retorno_bench_alinhado).cumprod() * valor_inicial
     st.write(bench_value)
     st.write(portfolio_value)
+    
+    portfolio_value.index = pd.to_datetime(portfolio_value.index)
+    bench_value.index = pd.to_datetime(bench_value.index)
 
-    portfolio_value_df = portfolio_value.reset_index()
-    bench_value_df = bench_value.reset_index()
     # Plotly
     fig = go.Figure()
     
