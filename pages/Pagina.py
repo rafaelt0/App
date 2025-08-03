@@ -208,17 +208,19 @@ with aba1:
 
     # Gráfico Rolling Beta
     
-    st.subheader(f"Rolling Beta ({window} dias) vs IBOVESPA")
+    st.subheader(f"Beta Móvel ({window} dias) vs IBOVESPA")
     
-    fig_beta, ax_beta = plt.subplots(figsize=(10,4))
-    ax_beta.plot(rolling_beta.index, rolling_beta.values, color='blue')
-    ax_beta.axhline(1, color='gray', linestyle='--', alpha=0.7)
-    ax_beta.set_title(f"Rolling Beta {window} dias")
-    ax_beta.set_ylabel("Beta")
-    ax_beta.set_xlabel("Data")
-    ax_beta.grid(True)
+    fig2, ax2 = plt.subplots(figsize=(10,4))
+    ax2.plot(rolling_beta.index, rolling_beta.values, color='blue')
+    ax2.axhline(1, color='gray', linestyle='--', alpha=0.7)
+    ax2.set_title(f"Rolling Beta {window} dias")
+    ax2.set_ylabel("Beta")
+    ax2.set_xlabel("Data")
+    ax2.grid(True)
+
+    fig2.autofmt_xdate(rotation=15)
     
-    st.pyplot(fig_beta)
+    st.pyplot(fig2)
 
 
     
