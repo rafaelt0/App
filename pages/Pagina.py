@@ -198,6 +198,31 @@ with aba1:
     ax1.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     st.pyplot(fig1)
 
+    # Rolling Beta (60 dias)
+    window = 60
+
+    rolling_cov = portfolio_returns.rolling(window).cov(retorno_bench)
+    rolling_var = retorno_bench.rolling(window).var()
+    
+    rolling_beta = rolling_cov / rolling_var
+
+    # Gráfico Rolling Beta
+    
+    st.subheader(f"Rolling Beta ({window} dias) vs IBOVESPA")
+    
+    fig_beta, ax_beta = plt.subplots(figsize=(10,4))
+    ax_beta.plot(rolling_beta.index, rolling_beta.values, color='blue')
+    ax_beta.axhline(1, color='gray', linestyle='--', alpha=0.7)
+    ax_beta.set_title(f"Rolling Beta {window} dias")
+    ax_beta.set_ylabel("Beta")
+    ax_beta.set_xlabel("Data")
+    ax_beta.grid(True)
+    
+    st.pyplot(fig_beta)
+
+
+    
+
        
     # Botão para gerar PDF via quantstats
     import tempfile
