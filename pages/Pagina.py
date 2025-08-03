@@ -170,11 +170,7 @@ with aba1:
 
     # Criar figura matplotlib explicitamente
     fig1, ax1 = plt.subplots(figsize=(10, 6))
-    
-    # Plotar drawdown com QuantStats
-    qs.plots.drawdown(portfoliO_returns, ax=ax1)
-    
-    # Mostrar gráfico no Streamlit
+    qs.plots.drawdown(portfolio_returns, ax=ax1)
     st.pyplot(fig1)
 
        
