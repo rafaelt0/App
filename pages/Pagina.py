@@ -11,13 +11,13 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
-import sgs
-from sgs import SGS
+import bcb
+
 from scipy.stats import kurtosis, skew
 import quantstats as qs
 import matplotlib.ticker as mtick
 import io
-
+from bcb import sgs
 aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Carlo Portfolio"])
 
 warnings.filterwarnings('ignore')
