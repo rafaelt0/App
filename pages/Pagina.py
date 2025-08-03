@@ -167,7 +167,7 @@ with aba1:
     st.dataframe(stats.round(4))
 
     st.subheader("Rolling Sharpe")
-    fig2=qs.plots.rolling_sharpe(portfolio_returns, benchmark=retorno_bench, show=False)
+    fig2=qs.plots.rolling_sharpe(portfolio_returns, benchmark=retorno_bench, window=60, show=False)
     st.pyplot(fig2)
 
 
