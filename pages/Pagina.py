@@ -85,6 +85,20 @@ with aba1:
                      title="Composição do Portfólio (%)",
                      labels={"index": "Ativo", "Peso": "Percentual"})
     st.plotly_chart(fig_pie)
+
+    alloc_df = peso_manual_df.reset_index()
+    alloc_df.columns = ["Ativo", "Peso"]
+    
+    fig_treemap = px.treemap(
+        alloc_df,
+        path=['Ativo'],
+        values='Peso',
+        color='Peso',
+        color_continuous_scale='Blues',
+        title="Alocação do Portfólio (Treemap)"
+    )
+    st.plotly_chart(fig_treemap, use_container_width=True)
+    
     
     # Heatmap e Matriz de Correlação
     heatmap=sns.heatmap(data_yf.corr(), annot=True)
