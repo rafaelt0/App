@@ -133,17 +133,10 @@ with aba1:
         st.plotly_chart(fig)
 
         
-        if benchmark_opcao == "IBOVESPA":
-            benchmark = yf.download("^BVSP", start=data_inicio)["Close"]
-            benchmark_index = benchmark / benchmark.iloc[0]  # Normalizado
-        elif benchmark_opcao == "SELIC":
-            selic = pdr.DataReader("11", "sgs", start=data_inicio) / 100
-            selic_index = (1 + selic).cumprod()
-            benchmark_index = selic_index / selic_index.iloc[0]
-        elif benchmark_opcao == "CDI":
-            cdi = pdr.DataReader("12", "sgs", start=data_inicio) / 100
-            cdi_index = (1 + cdi).cumprod()
-            benchmark_index = cdi_index / cdi_index.iloc[0]
+    
+        benchmark = yf.download("^BVSP", start=data_inicio)["Close"]
+        benchmark_index = benchmark / benchmark.iloc[0]  # Normalizado
+  
         
         # === 4. Plotar comparação ===
         fig, ax = plt.subplots(figsize=(10, 5))
