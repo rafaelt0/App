@@ -101,14 +101,11 @@ with aba1:
     # Obter os dados de benchmark BOVESPA e calcular o retorno acumulado
     bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
     retorno_bench = bench.pct_change().dropna()
+    portfolio_returns = portfolio_returns.loc[retorno_bench.index]
+    retorno_bench = retorno_bench.loc[portfolio_returns.index]
     retorno_cum_bench = (1+retorno_bench).cumprod()
     bench_value = retorno_cum_bench * valor_inicial
     
-    # Alinhar índices de data para evitar erro
-    common_idx = portfolio_value.index.intersection(bench_value.index)
-    portfolio_value = portfolio_value.loc[common_idx]
-    bench_value = bench_value.loc[common_idx]
-
     # Mostrar gráfico do valor do portfólio x BOVESPA
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
