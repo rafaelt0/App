@@ -122,6 +122,7 @@ with aba1:
         retorno_cum_bench = (1+retorno_bench).cumprod()
         bench_value = retorno_cum_bench * valor_inicial
         
+        
         # Mostrar gráfico do valor do portfólio x BOVESPA
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
@@ -142,8 +143,8 @@ portfolio.iloc[0]
         
         
         fig, ax = plt.subplots(figsize=(10, 5))
-        portfolio_index.plot(ax=ax, label="Portfólio")
-        benchmark_index.plot(ax=ax, label=benchmark_option)
+        portfolio_value.plot(ax=ax, label="Portfólio")
+        benchmark_value.plot(ax=ax, label=benchmark_option)
         plt.title(f"Comparação Portfólio x {benchmark_option}")
         plt.legend()
         st.pyplot(fig)
