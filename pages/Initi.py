@@ -255,8 +255,8 @@ with aba1:
     ax.set_title("Drawdown do Portfólio")
     ax.set_ylabel("Drawdown")
     ax.set_xlabel("Data")
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     ax.grid(True)
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     st.pyplot(fig)
     
     # Botão para gerar PDF via quantstats
