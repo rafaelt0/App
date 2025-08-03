@@ -165,6 +165,8 @@ with aba1:
     
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
+
+    plt.close('all')
     
     qs.plots.drawdown(portfolio_returns, figsize=(10,3))
     fig_drawdown = plt.gcf()  # captura a figura atual
