@@ -224,7 +224,7 @@ with aba1:
 
     # Gráfico Sharpe Móvel
     rolling_sharpe = (
-    (portfolio_returns.rolling(window).mean() - rf_diario) /
+    (portfolio_returns.rolling(window).mean() - taxa_selic) /
     portfolio_returns.rolling(window).std())
     
     st.subheader(f"Índice de Sharpe Móvel ({window} dias)")
@@ -238,10 +238,10 @@ with aba1:
     ax_3.grid(True)
     ax_3.legend(loc='upper left')
     
-    fig_sharpe.autofmt_xdate(rotation=45)  # datas na diagonal
-    fig_sharpe.tight_layout()
+    fig_3.autofmt_xdate(rotation=45)  # datas na diagonal
+    fig_3.tight_layout()
     
-    st.pyplot(fig_sharpe)
+    st.pyplot(fig_3)
 
 
     
