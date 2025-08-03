@@ -222,6 +222,27 @@ with aba1:
     
     st.pyplot(fig2)
 
+    # Gráfico Sharpe Móvel
+    rolling_sharpe = (
+    (portfolio_returns.rolling(window).mean() - rf_diario) /
+    portfolio_returns.rolling(window).std())
+    
+    st.subheader(f"Índice de Sharpe Móvel ({window} dias)")
+    
+    fig_3, ax_3 = plt.subplots(figsize=(10,4))
+    ax_3.plot(rolling_sharpe.index, rolling_sharpe.values, color='green', label='Sharpe Móvel')
+    ax_3.axhline(0, color='gray', linestyle='--', alpha=0.7, label='Zero')
+    ax_3.set_title(f"Índice de Sharpe Móvel ({window} dias) do Portfólio")
+    ax_3.set_ylabel("Sharpe")
+    ax_3.set_xlabel("Data")
+    ax_3.grid(True)
+    ax_3.legend(loc='upper left')
+    
+    fig_sharpe.autofmt_xdate(rotation=45)  # datas na diagonal
+    fig_sharpe.tight_layout()
+    
+    st.pyplot(fig_sharpe)
+
 
     
 
