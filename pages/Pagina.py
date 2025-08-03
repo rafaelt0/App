@@ -165,6 +165,11 @@ with aba1:
     
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
+
+    # Drawdown
+    st.subheader("Drawdown")
+    fig1 = qs.plots.drawdown(portfolio_returns, figsize=(10, 3))
+    st.pyplot(fig1)
     
     # Botão para gerar PDF via quantstats
     import tempfile
