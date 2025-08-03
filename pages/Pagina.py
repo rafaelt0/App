@@ -187,10 +187,12 @@ with aba1:
 
     # Plot Drawdown
     fig1, ax1 = plt.subplots(figsize=(10,4))
-    ax.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.4)
-    ax.set_title("Drawdown do Portfólio")
-    ax.set_ylabel("Drawdown")
-    ax.set_xlabel("Data")
+    ax1.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.4)
+    ax1.set_title("Drawdown do Portfólio")
+    ax1.set_ylabel("Drawdown (em %)")
+    ax1.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    ax1.set_xlabel("Data")
+    ax1.grid(True)
     st.pyplot(fig1)
 
        
