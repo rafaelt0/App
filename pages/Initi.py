@@ -111,19 +111,22 @@ with aba1:
     bench_value = (1 + retorno_bench_alinhado).cumprod() * valor_inicial
     st.write(bench_value)
     st.write(portfolio_value)
+
+    portfolio_value_df = portfolio_value.reset_index()
+    bench_value_df = bench_value.reset_index()
     # Plotly
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
-        x=portfolio_value.index, 
-        y=portfolio_value.values,
+        x=portfolio_value_df.index, 
+        y=portfolio_value_df.values,
         mode='lines', 
         name='Portfólio'
     ))
     
     fig.add_trace(go.Scatter(
-        x=bench_value.index, 
-        y=bench_value.values,
+        x=bench_value_df.index, 
+        y=bench_value_df.values,
         mode='lines', 
         name='IBOVESPA',
         line=dict(color='orange')  # cor diferente para destacar
