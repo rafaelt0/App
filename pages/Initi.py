@@ -151,7 +151,7 @@ with aba1:
     ]], columns=["Índice Sharpe", "Índice Sortino", "Max Drawdown", "VaR", "CVaR", "Tail Ratio"])
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
-
+    portfolio_returns = returns.dot(pesos_manuais_arr)  # após definir os pesos
     # Drawdown
     cum_returns = (1 + portfolio_returns).cumprod()
     rolling_max = cum_returns.cummax()
