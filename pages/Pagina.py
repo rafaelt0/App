@@ -173,6 +173,8 @@ with aba1:
     st.pyplot(fig_drawdown)
     plt.clf()
 
+    st.write(portfolio_returns)
+
        
     # Botão para gerar PDF via quantstats
     import tempfile
