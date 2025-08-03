@@ -166,23 +166,9 @@ with aba1:
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
     
-    st.subheader("Cumulative Returns")
-    qs.plots.returns(portfolio_returns, benchmark=retorno_bench, figsize=(10, 4))
-    fig1 = plt.gcf()
-    st.pyplot(fig1)
-    plt.clf()  # limpa para o próximo gráfico
-    
-    st.subheader("Rolling Sharpe")
-    qs.plots.rolling_sharpe(portfolio_returns, figsize=(10, 4))
-    fig2 = plt.gcf()
-    st.pyplot(fig2)
-    plt.clf()
-    
-    st.subheader("Drawdown")
-    qs.plots.drawdown(portfolio_returns, figsize=(10, 3))
-    fig3 = plt.gcf()
-    st.pyplot(fig3)
-    plt.clf()
+    fig, ax = plt.subplots(figsize=(10, 4))
+    qs.plots.drawdown(portfolio_returns, benchmark=retorno_bench, ax=ax)
+    st.pyplot(fig)
 
        
     # Botão para gerar PDF via quantstats
