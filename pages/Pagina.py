@@ -135,11 +135,7 @@ with aba1:
                           xaxis_title='Data', yaxis_title='Valor (R$)')
         st.plotly_chart(fig)
 
-        from sgs import sgs_series
-
-        from sgs import sgs_series
-
-# ...
+        
 
         if "IBOVESPA" in benchmark_opcao:
             benchmark = yf.download("^BVSP", start=data_inicio)["Close"]
