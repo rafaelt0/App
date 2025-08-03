@@ -85,6 +85,89 @@ with aba1:
                      title="Composição do Portfólio (%)",
                      labels={"index": "Ativo", "Peso": "Percentual"})
     st.plotly_chart(fig_pie)
+
+    # --- Efficient Frontier Interativa ---
+
+    from pypfopt.efficient_frontier import EfficientFrontier
+    from pypfopt import risk_models, expected_returns
+    
+    st.subheader("Fronteira Eficiente (Efficient Frontier)")
+    
+    # Cálculo retorno esperado e matriz covariância dos preços (não dos retornos)
+    mu = expected_returns.mean_historical_return(data_yf)
+    S = risk_models.sample_cov(data_yf)
+    
+    ef = EfficientFrontier(mu, S)
+    
+    rets = []
+    risks = []
+    
+    for target_return in np.linspace(mu.min(), mu.max(), 50):
+        ef.efficient_return(target_return)
+        weights = ef.clean_weights()
+        weights_arr = np.array(list(weights.values()))
+        rets.append(target_return)
+        risks.append(np.sqrt(weights_arr.T @ S.values @ weights_arr))
+    
+    fig_ef = go.Figure()
+    fig_ef.add_trace(go.Scatter(x=risks, y=rets, mode='lines+markers', name='Fronteira Eficiente'))
+    fig_ef.update_layout(
+        xaxis_title="Risco (Volatilidade)",
+        yaxis_title="Retorno Esperado",
+        template='plotly_white'
+    )
+    st.plotly_chart(fig_ef, use_container_width=True)
+    
+    
+    # --- Treemap da Alocação ---
+    
+    import plotly.express as px
+    
+    st.subheader("Treemap da Alocação do Portfólio")
+    
+    alloc_df = peso_manual_df.reset_index()
+    alloc_df.columns = ["Ativo", "Peso"]
+    
+    fig_treemap = px.treemap(
+        alloc_df,
+        path=['Ativo'],
+        values='Peso',
+        color='Peso',
+        color_continuous_scale='Blues',
+        title="Alocação do Portfólio (Treemap)"
+    )
+    st.plotly_chart(fig_treemap, use_container_width=True)
+    
+    
+    # --- Correlação Dinâmica (Rolling Window 30 dias) ---
+    
+    st.subheader("Correlação Dinâmica - Rolling Window (30 dias)")
+    
+    rolling_corr = data_yf.pct_change().rolling(window=30).corr(pairwise=True)
+    
+    def mean_corr(df):
+        mask = np.triu(np.ones(df.shape), k=1).astype(bool)
+        vals = df.where(mask).stack()
+        return vals.mean()
+    
+    rolling_dates = []
+    rolling_means = []
+    for date, corr_mat in rolling_corr.groupby(level=0):
+        corr_matrix = corr_mat.droplevel(0)
+        rolling_dates.append(date)
+        rolling_means.append(mean_corr(corr_matrix))
+    
+    df_corr_rolling = pd.DataFrame({
+        "Data": rolling_dates,
+        "Média Correlação": rolling_means
+    })
+    
+    fig_corr = px.line(
+        df_corr_rolling, x='Data', y='Média Correlação',
+        title='Média da Correlação Dinâmica (Janela Móvel 30 dias)'
+    )
+    st.plotly_chart(fig_corr, use_container_width=True)
+
     
     # Heatmap e Matriz de Correlação
     heatmap=sns.heatmap(data_yf.corr(), annot=True)
