@@ -263,6 +263,52 @@ with aba2:
     
     st.subheader("📊 Estatísticas da Simulação Monte Carlo")
     st.dataframe(sim_stats.style.format("{:,.2f}"))
+    
+    # Calcula percentis para faixas
+    percentis = [5, 25, 50, 75, 95]
+    fan_chart = sim_df.quantile(q=np.array(percentis)/100, axis=1).T
+    fan_chart.columns = [f"P{p}" for p in percentis]
+    
+    # Cria figura do fan chart
+    fig_fan = go.Figure()
+    
+    # Adiciona faixas sombreadas
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P95"],
+        line=dict(color='rgba(0,100,200,0.1)'), showlegend=False
+    ))
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P5"],
+        fill='tonexty', fillcolor='rgba(0,100,200,0.2)',
+        line=dict(color='rgba(0,100,200,0.1)'), name='Faixa 5%-95%'
+    ))
+    
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P75"],
+        line=dict(color='rgba(0,100,200,0.1)'), showlegend=False
+    ))
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P25"],
+        fill='tonexty', fillcolor='rgba(0,100,200,0.4)',
+        line=dict(color='rgba(0,100,200,0.1)'), name='Faixa 25%-75%'
+    ))
+    
+    # Linha mediana
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P50"],
+        line=dict(color='blue', width=2), name='Mediana'
+    ))
+    
+    # Layout final
+    fig_fan.update_layout(
+        title="Simulação Monte Carlo - Fan Chart com Faixas de Confiança",
+        xaxis_title="Dia",
+        yaxis_title="Valor do Portfólio (R$)",
+        template="plotly_white"
+    )
+    
+    st.plotly_chart(fig_fan, use_container_width=True)
+
 
 
 
