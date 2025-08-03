@@ -105,7 +105,7 @@ retorno_cum_bench = (1+retorno_bench).cumprod()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
                          mode='lines', name='Portfólio'))
-fig.add_trace(go.Scatter(x=retorno_cum_bench.index, y=retorno_cum_bench, 
+fig.add_trace(go.Scatter(x=retorno_bench.index, y=retorno_bench, 
                          mode='lines', name='IBOVESPA'))
 fig.update_layout(title='Comparação: Portfólio x Benchmark',
                   xaxis_title='Data', yaxis_title='Valor (R$)')
