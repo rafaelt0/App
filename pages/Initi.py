@@ -102,8 +102,8 @@ with aba1:
     retorno_bench = bench.pct_change().dropna()
     
     # Valores port e bench
-    portfolio_value = (1 + portfolio_returns_alinhado).cumprod() * valor_inicial
-    bench_value = (1 + retorno_bench_alinhado).cumprod() * valor_inicial
+    portfolio_value = (1 + portfolio_returns).cumprod() * valor_inicial
+    bench_value = (1 + retorno_bench).cumprod() * valor_inicial
     
     portfolio_value.index = pd.to_datetime(portfolio_value.index)
     bench_value.index = pd.to_datetime(bench_value.index)
