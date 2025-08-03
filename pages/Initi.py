@@ -101,19 +101,15 @@ with aba1:
     bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close'].dropna()
     retorno_bench = bench.pct_change().dropna()
     
-    # Alinhar datas
-    datas_comuns = portfolio_returns.index.intersection(retorno_bench.index)
-    portfolio_returns_alinhado = portfolio_returns.loc[datas_comuns]
-    retorno_bench_alinhado = retorno_bench.loc[datas_comuns]
-    
     # Valores port e bench
     portfolio_value = (1 + portfolio_returns_alinhado).cumprod() * valor_inicial
     bench_value = (1 + retorno_bench_alinhado).cumprod() * valor_inicial
-    st.write(bench_value)
-    st.write(portfolio_value)
     
     portfolio_value.index = pd.to_datetime(portfolio_value.index)
     bench_value.index = pd.to_datetime(bench_value.index)
+
+    st.write(bench_value)
+    st.write(portfolio_value)
 
     # Plotly
     fig = go.Figure()
