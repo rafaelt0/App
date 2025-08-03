@@ -181,6 +181,7 @@ with aba1:
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
 
+    st.subheader("Drawdown do Portfólio")
     # Drawdown
     cum_returns = (1 + portfolio_returns).cumprod()
     rolling_max = cum_returns.cummax()
