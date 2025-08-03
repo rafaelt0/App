@@ -110,6 +110,7 @@ with aba1:
     portfolio_value = (1 + portfolio_returns_alinhado).cumprod() * valor_inicial
     bench_value = (1 + retorno_bench_alinhado).cumprod() * valor_inicial
     st.write(bench_value)
+    st.write(portfolio_returns)
     # Plotly
     fig = go.Figure()
     fig.add_trace(go.Scatter(
