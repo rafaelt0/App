@@ -251,12 +251,10 @@ with aba1:
 
     # Plot Drawdown
     fig, ax = plt.subplots(figsize=(10,4))
-    ax.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.4)
-    ax.set_title("Drawdown do Portfólio")
+    ax.fill_between(drawdown.index, (drawdown.values)*100, 0, color='red', alpha=0.4)
+    ax.set_title("Drawdown do Portfólio em (%)")
     ax.set_ylabel("Drawdown")
     ax.set_xlabel("Data")
-    ax.grid(True)
-    plt.gca().yaxis.set_major_formatter(PercentFormatter(1.0))
     st.pyplot(fig)
     
     # Botão para gerar PDF via quantstats
