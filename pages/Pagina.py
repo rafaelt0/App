@@ -148,7 +148,7 @@ with aba1:
             cdi = sgs_series([12], start=data_inicio)["12"] / 100
             cdi_index = (1 + cdi).cumprod()
             benchmark_index = cdi_index / cdi_index.iloc[0]
-         else:
+        else:
             benchmark_index = None  # Caso nenhum benchmark selecionado
 
          if benchmark_index is not None:
