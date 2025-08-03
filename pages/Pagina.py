@@ -150,7 +150,7 @@ with aba1:
         fig, ax = plt.subplots(figsize=(10, 5))
         portfolio_value.plot(ax=ax, label="Portfólio")
         benchmark_index.plot(ax=ax, label=benchmark_opcao[0])
-        plt.title(f"Comparação Portfólio x {benchmark_option}")
+        plt.title(f"Comparação Portfólio x {benchmark_opcao}")
         plt.legend()
         st.pyplot(fig)
         
