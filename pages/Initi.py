@@ -1,269 +1,322 @@
 import streamlit as st
 import yfinance as yf
-import matplotlib.pyplot as plt
-import numpy as np
-import fundamentus
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
-import warnings
-import pypfopt
-from pypfopt.expected_returns import mean_historical_return
-from pypfopt.risk_models import CovarianceShrinkage
-from pypfopt.efficient_frontier import EfficientFrontier
-from pypfopt import objective_functions
 import datetime
-from scipy.stats import kurtosis, skew
-from pypfopt import plotting
-import re
-import plotly.graph_objects as go
+import warnings
 import plotly.express as px
-import scipy.stats as stats
+import plotly.graph_objects as go
+from pypfopt.hierarchical_portfolio import HRPOpt
+from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
+from scipy.stats import kurtosis, skew
+import quantstats as qs
+import io
+
+aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Carlo Portfolio"])
 
 warnings.filterwarnings('ignore')
-plt.style.use('ggplot')
+st.set_option('deprecation.showPyplotGlobalUse', False)
 
-def clean_numeric_column(col):
-    col = col.astype(str).str.strip()
-    col = col.str.replace(r'[^0-9,.\-]', '', regex=True)
-    col = col.str.replace(',', '.')
-    return pd.to_numeric(col, errors='coerce')
 
-st.set_page_config(
-    page_title="Análise de Ações B3",
-    page_icon="📈",
-    layout="wide"
-)
-st.sidebar.success("Selecione uma página")
 
-with open("style.css") as f:
-    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-
-st.title("**B3 Explorer 📈**")
-
-data = pd.read_csv('acoes-listadas-b3.csv')
-
-if 'Setor' not in data.columns:
-    st.error("O arquivo CSV precisa conter a coluna 'Setor' para o filtro funcionar.")
-    st.stop()
-
-stocks = list(data['Ticker'].values)
-setores = sorted(data['Setor'].dropna().unique())
-setores.insert(0, "Todos")
-
-setores_selecionados = st.sidebar.multiselect(
-    'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
-)
-
-if "Todos" in setores_selecionados or not setores_selecionados:
-    tickers_filtrados = data['Ticker'].tolist()
-else:
-    tickers_filtrados = data[data['Setor'].isin(setores_selecionados)]['Ticker'].tolist()
-
-st.subheader("Explore ações da B3 🧭")
-tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', tickers_filtrados)
-
-if tickers:
-    try:
-        df = pd.concat([fundamentus.get_papel(t) for t in tickers])
-        df['PL'] = clean_numeric_column(df['PL'])
-
-        st.subheader("Setor")
-        st.write(df[['Empresa', 'Setor', 'Subsetor']].drop_duplicates(keep='last'))
-
-        st.subheader("Informações de Mercado")
-        df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 
-                       'Valor_de_mercado', 'Data_ult_cot']]
-        df_price.columns = ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)",
-                            "Volume Médio (2 meses)", "Valor de Mercado", "Data Última Cotação"]
-
-        for col in ["Cotação", "Mínimo (52 semanas)", "Máximo (52 semanas)", 
-                    "Volume Médio (2 meses)", "Valor de Mercado"]:
-            df_price[col] = clean_numeric_column(df_price[col]).fillna(0)
-
-        format_dict = {
-            "Cotação": "R$ {:,.2f}",
-            "Mínimo (52 semanas)": "R$ {:,.2f}",
-            "Máximo (52 semanas)": "R$ {:,.2f}",
-            "Volume Médio (2 meses)": "{:,.0f}",
-            "Valor de Mercado": "R$ {:,.0f}"
-        }
-
-        st.dataframe(df_price.style.format(format_dict), use_container_width=True)
-
-        st.subheader("Indicadores Financeiros")
-        df_ind = df[['Marg_Liquida','Marg_EBIT','ROE','ROIC','Div_Yield',
-                     'Cres_Rec_5a','PL','EV_EBITDA','Empresa']].drop_duplicates(keep='last')
-        df_ind.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC",
-                          "Dividend Yield", "Crescimento Receita 5 anos", "P/L", "EV/EBITDA", "Empresa"]
-
-        for col in df_ind.columns.drop('Empresa'):
-            df_ind[col] = clean_numeric_column(df_ind[col])
-
-        pct_cols = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
-        for col in pct_cols:
-            df_ind[col] = df_ind[col]
-
-        df_ind = df_ind.fillna(0)
-
-        format_ind = {
-            "Margem Líquida": "{:.2f}%",
-            "Margem EBIT": "{:.2f}%",
-            "ROE": "{:.2f}%",
-            "ROIC": "{:.2f}%",
-            "Dividend Yield": "{:.2f}%",
-            "Crescimento Receita 5 anos": "{:.2f}%",
-            "P/L": "{:.2f}",
-            "EV/EBITDA": "{:.2f}",
-            "Empresa": lambda x: x
-        }
-
-        # --- FILTROS PERSONALIZADOS ---
-
-        st.sidebar.subheader("Filtros Personalizados")
-
-        min_ebit = st.sidebar.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
-        min_roe = st.sidebar.number_input("ROE mínimo (%)", value=0.0, step=0.1)
-        min_dividend = st.sidebar.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
-        max_pl = st.sidebar.number_input("P/L máximo", value=1000.0, step=0.1)
-
-        def highlight_val(val, min_val=None, max_val=None):
-            if pd.isna(val):
-                return ''
-            if min_val is not None and val < min_val:
-                return 'background-color: #fbb4ae; color: red;'  # vermelho claro
-            if max_val is not None and val > max_val:
-                return 'background-color: #fbb4ae; color: red;'
-            return 'background-color: #b6d7a8; color: green;'  # verde claro
-
-        def style_indicators(row):
-            styles = [''] * len(row)
-            col_idx = {col: i for i, col in enumerate(row.index)}
-
-            styles[col_idx['Margem EBIT']] = highlight_val(row['Margem EBIT'], min_val=min_ebit)
-            styles[col_idx['ROE']] = highlight_val(row['ROE'], min_val=min_roe)
-            styles[col_idx['Dividend Yield']] = highlight_val(row['Dividend Yield'], min_val=min_dividend)
-            styles[col_idx['P/L']] = highlight_val(row['P/L'], max_val=max_pl)
-
-            return styles
-
-        styled_ind = df_ind.style.format(format_ind).apply(style_indicators, axis=1)
-
-        st.dataframe(styled_ind, use_container_width=True)
-
-        # Continuação do código com gráficos e estatísticas descritivas
-
-        tickers_yf = [t + ".SA" for t in tickers]
-        data_inicio = st.sidebar.date_input("Data Inicial 📅", datetime.date(2025,1,1),
-                                            min_value=datetime.date(2000,1,1),
-                                            max_value=datetime.date.today())
-
-        st.sidebar.header('Configurações ⚙️')
-        interval_selected = st.sidebar.selectbox('Intervalo 📊', 
-                                                 ['1d','1wk','1mo','3mo','6mo','1y'])
-
-        data_prices = yf.download(tickers_yf, start=data_inicio, end=datetime.datetime.now(), 
-                                  interval=interval_selected)['Close']
-
-        if isinstance(data_prices.columns, pd.MultiIndex):
-            data_prices = data_prices.droplevel(0, axis=1)
-
-        st.subheader("Cotação Histórica")
-        st.line_chart(data_prices)
-
-        returns = data_prices.pct_change().dropna() * 100
-
-        returns_pct = returns.round(2).astype(str) + '%'
-        st.subheader("Retornos (%)")
-        st.dataframe(returns_pct)
-
-        st.subheader("Histograma Combinado dos Retornos Diários (%)")
-        fig_hist_all = px.histogram(
-            returns.melt(var_name='Ação', value_name='Retorno (%)'),
-            x='Retorno (%)',
-            color='Ação',
-            barmode='overlay',
-            nbins=100,
-            opacity=0.6,
-            title='Distribuição dos Retornos Diários (%) - Todas as Ações'
+with aba1:
+    st.title("Análise e Otimização de Portfólio - B3 Explorer")
+    # Sidebar config
+    st.sidebar.header("Configurações do Portfólio")
+    
+    data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
+    valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
+    taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.0556, max_value=15.0)
+    
+    # Seleção de ações
+    data = pd.read_csv('acoes-listadas-b3.csv')
+    stocks = list(data['Ticker'].values)
+    tickers = st.multiselect("Selecione as ações do portfólio", stocks)
+    
+    if len(tickers) == 0:
+        st.warning("Selecione pelo menos uma ação.")
+        st.stop()
+    
+    if len(tickers) == 1:
+        st.warning("Selecione pelo menos dois ativos para montar o portfólio.")
+        st.stop()
+    
+    tickers_yf = [t + ".SA" for t in tickers]
+    
+    # Baixa dados
+    data_yf = yf.download(tickers_yf, start=data_inicio, progress=False)['Close']
+    if isinstance(data_yf.columns, pd.MultiIndex):
+        data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
+    
+    returns = data_yf.pct_change().dropna()
+    
+    # Escolha modo: manual ou otimizado
+    modo = st.sidebar.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Alocação Manual"))
+    
+    if modo == "Alocação Manual":
+        st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
+        pesos_manuais = {}
+        total = 0.0
+        for ticker in tickers:
+            p = st.number_input(f"Peso % de {ticker}", min_value=0.0, max_value=100.0, value=round(100/len(tickers),2), step=0.01)
+            pesos_manuais[ticker + ".SA"] = p / 100
+            total += p
+        if abs(total - 100) > 0.01:
+            st.error(f"A soma dos pesos é {total:.2f}%, deve ser 100%")
+            st.stop()
+        pesos_manuais_arr = np.array(list(pesos_manuais.values()))
+        peso_manual_df = pd.DataFrame.from_dict(pesos_manuais, orient='index', columns=["Peso"])
+    else:
+        st.subheader("Otimização Hierarchical Risk Parity (HRP)")
+        hrp = HRPOpt(returns)
+        weights_hrp = hrp.optimize()
+        peso_manual_df = pd.DataFrame.from_dict(weights_hrp, orient='index', columns=["Peso"])
+        pesos_manuais_arr = peso_manual_df["Peso"].values
+    
+    # Mostrar pesos
+    st.subheader("Pesos do Portfólio (%)")
+    peso_manual_df.index = peso_manual_df.index.str.replace(".SA","")
+    st.dataframe((peso_manual_df*100).round(2).T)
+    
+    # Gráfico pizza das porcentagens
+    fig_pie = px.pie(peso_manual_df.reset_index(), values="Peso", names="index",
+                     title="Composição do Portfólio (%)",
+                     labels={"index": "Ativo", "Peso": "Percentual"})
+    st.plotly_chart(fig_pie)
+    
+    # Heatmap e Matriz de Correlação
+    heatmap=sns.heatmap(data_yf.corr(), annot=True)
+    st.subheader("Matrix de Correlação")
+    st.write(data_yf.corr())
+    st.subheader("Heatmap")
+    st.pyplot(heatmap.figure)
+    
+    # Cálculo do portfólio com os pesos escolhidos
+    portfolio_returns = returns.dot(pesos_manuais_arr)
+    cum_return = (1 + portfolio_returns).cumprod()
+    portfolio_value = cum_return * valor_inicial
+    
+    bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close'].dropna()
+    retorno_bench = bench.pct_change().dropna()
+    
+    # Alinhar datas
+    datas_comuns = portfolio_returns.index.intersection(retorno_bench.index)
+    portfolio_returns_alinhado = portfolio_returns.loc[datas_comuns]
+    retorno_bench_alinhado = retorno_bench.loc[datas_comuns]
+    
+    # Valores port e bench
+    portfolio_value = (1 + portfolio_returns_alinhado).cumprod() * valor_inicial
+    bench_value = (1 + retorno_bench_alinhado).cumprod() * valor_inicial
+    
+    # Plotly
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=portfolio_value.index, y=portfolio_value, 
+        mode='lines', name='Portfólio'
+    ))
+    fig.add_trace(go.Scatter(
+        x=bench_value.index, y=bench_value, 
+        mode='lines', name='IBOVESPA'
+    ))
+    
+    fig.update_layout(
+        title='Comparação: Portfólio x IBOVESPA',
+        xaxis_title='Data', yaxis_title='Valor (R$)',
+        hovermode='x unified', template='plotly_white'
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Informações do portfólio
+    portfolio_info = pd.DataFrame({
+        "Valor Inicial": [valor_inicial],
+        "Valor Máximo": [portfolio_value.max()],
+        "Valor Mínimo": [portfolio_value.min()],
+        "Valor Final": [portfolio_value.iloc[-1]],
+        "Retorno Total (%)": [(portfolio_value.iloc[-1]/valor_inicial - 1)*100],
+        "Retorno Médio Diário (%)": [portfolio_returns.mean()*100],
+        "Volatilidade Diária (%)": [portfolio_returns.std()*100]
+    })
+    st.subheader("Informações do Portfólio")
+    st.dataframe(portfolio_info.style.format("{:,.2f}"))
+    
+    # Distribuição de retornos com estatísticas
+    st.subheader("Distribuição dos Retornos Diários (%) e Estatísticas")
+    fig_hist, ax_hist = plt.subplots(figsize=(10,5))
+    sns.histplot(portfolio_returns*100, bins=50, kde=True, color='skyblue', ax=ax_hist)
+    ax_hist.set_xlabel("Retornos Diários (%)")
+    ax_hist.set_ylabel("Frequência")
+    
+    media = portfolio_returns.mean()*100
+    desvio = portfolio_returns.std()*100
+    curtose_val = kurtosis(portfolio_returns, fisher=True)
+    assimetria_val = skew(portfolio_returns)
+    
+    stats_text = (f"Média: {media:.4f}%\n"
+                  f"Desvio Padrão: {desvio:.4f}%\n"
+                  f"Curtose (Fisher): {curtose_val:.4f}\n"
+                  f"Assimetria: {assimetria_val:.4f}")
+    
+    props = dict(boxstyle='round', facecolor='white', alpha=0.8)
+    ax_hist.text(0.95, 0.95, stats_text, transform=ax_hist.transAxes,
+                 fontsize=10, verticalalignment='top', horizontalalignment='right', bbox=props)
+    
+    st.pyplot(fig_hist)
+    
+    # Estatísticas do portfólio
+    stats = pd.DataFrame([[ 
+        sharpe(portfolio_returns, rf=taxa_selic/100),
+        sortino(portfolio_returns, rf=taxa_selic/100),
+        max_drawdown(portfolio_returns),
+        var(portfolio_returns),
+        cvar(portfolio_returns),
+        tail_ratio(portfolio_returns)
+    ]], columns=["Índice Sharpe", "Índice Sortino", "Max Drawdown", "VaR", "CVaR", "Tail Ratio"])
+    
+    st.subheader("Estatísticas do Portfólio")
+    st.dataframe(stats.round(4))
+    
+    # Botão para gerar PDF via quantstats
+    import tempfile
+    st.subheader("Baixar Relatório Completo (QuantStats)")
+    
+    # Converte para formato aceito pelo QuantStats
+    portfolio_returns.index = pd.to_datetime(portfolio_returns.index)
+    portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
+    
+    
+    with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
+        qs.reports.html(
+            portfolio_returns,
+            benchmark= retorno_bench,
+            output=tmpfile.name,
+            title="Relatório Completo do Portfólio",
+            download_filename="relatorio_portfolio.html"
         )
-        fig_hist_all.update_layout(height=450)
-        st.plotly_chart(fig_hist_all, use_container_width=True)
-
-        st.subheader("Estatísticas Descritivas dos Retornos (%)")
-        stats_df = pd.DataFrame(index=returns.columns)
-        stats_df['Média (%)'] = returns.mean().round(3)
-        stats_df['Mediana (%)'] = returns.median().round(3)
-        stats_df['Desvio Padrão (%)'] = returns.std().round(3)
-        stats_df['Curtose'] = returns.apply(lambda x: kurtosis(x, fisher=True)).round(3)
-        stats_df['Assimetria (Skew)'] = returns.apply(lambda x: skew(x)).round(3)
-        stats_df['Mínimo (%)'] = returns.min().round(3)
-        stats_df['Máximo (%)'] = returns.max().round(3)
-
-        st.dataframe(stats_df.style.format("{:.3f}"), use_container_width=True)
-
-        quartis_df = pd.DataFrame(index=returns.columns)
-        quartis_df['Q1'] = returns.quantile(0.25).round(4)
-        quartis_df['Mediana (Q2)'] = returns.quantile(0.5).round(4)
-        quartis_df['Q3'] = returns.quantile(0.75).round(4)
-        quartis_df['IQR (Q3 - Q1)'] = (quartis_df['Q3'] - quartis_df['Q1']).round(4)
-        quartis_df['Limite Inferior'] = (quartis_df['Q1'] - 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
-        quartis_df['Limite Superior'] = (quartis_df['Q3'] + 1.5 * quartis_df['IQR (Q3 - Q1)']).round(4)
-
-        st.subheader("Tabela dos Quartis, IQR e Limites dos Retornos Diários (%)")
-        st.dataframe(quartis_df, use_container_width=True)
-
-        st.subheader("Boxplot dos Retornos Diários (%) por Ação")
-        fig_box = px.box(
-            returns.melt(var_name='Ação', value_name='Retorno (%)'),
-            x='Ação',
-            y='Retorno (%)',
-            points="outliers",
-            title="Distribuição dos Retornos Diários (%)"
+        st.download_button(
+            label="Baixar Relatório HTML Completo (QuantStats)",
+            data=open(tmpfile.name, "rb").read(),
+            file_name="relatorio_portfolio.html",
+            mime="text/html"
         )
-        fig_box.update_layout(height=450)
-        st.plotly_chart(fig_box, use_container_width=True)
 
-        if not df_ind.empty and len(df_ind) > 1:
-            st.subheader("Comparação Radar dos Indicadores Fundamentalistas")
+# Separação na sidebar
+st.sidebar.markdown("---")
 
-            indicadores_radar = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC", "Dividend Yield", "Crescimento Receita 5 anos"]
+       
 
-            fig = go.Figure()
 
-            for idx, row in df_ind.iterrows():
-                fig.add_trace(go.Scatterpolar(
-                    r=row[indicadores_radar].values,
-                    theta=indicadores_radar,
-                    fill='toself',
-                    name=row['Empresa']
-                ))
 
-            max_val = max(df_ind[indicadores_radar].max().max(), 100)
-            fig.update_layout(
-                polar=dict(
-                    radialaxis=dict(
-                        visible=True,
-                        range=[0, max_val]
-                    )),
-                showlegend=True,
-                height=500
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        descriptions = []
-        for t in tickers_yf:
-            try:
-                info = yf.Ticker(t).get_info()
-                descriptions.append(info.get('longBusinessSummary', 'Não disponível'))
-            except:
-                descriptions.append('Não disponível')
-
-        df_desc = pd.DataFrame(descriptions, index=tickers, columns=["Descrição"])
-        st.subheader("Descrição da Empresa")
-        st.table(df_desc)
-
-    except Exception as e:
-        st.error(f"Erro ao buscar dados: {e}")
-else:
-    st.info("Selecione pelo menos uma ação para iniciar a análise.")
+with aba2:
+    # Opções para usuário
+    st.header("Opções Simulação 👨‍🔬")
+    n_simulations = st.slider("Número de Simulações",10,1000,100)
+    valor = st.number_input("Capital Inicial", min_value=100)
+    years = int(st.number_input("Anos", min_value=1))  
+    st.header("Simulação 🧪")
+    
+    col1, col2, col3 = st.columns([1,3,1])
+    
+    with col1:
+        st.write("")
+    
+    
+    with col3:
+        st.write("")
+         
+    
+    # Número de simulações e horizonte
+    n_sim = n_simulations
+    n_dias = years*365  # 1 ano
+    
+    # Valor inicial do portfólio
+    valor_inicial = valor
+    
+    # Retornos históricos do portfólio
+    mu_p = portfolio_returns.mean()
+    sigma_p = portfolio_returns.std()
+    
+    # Simulações Monte Carlo
+    simulacoes = np.zeros((n_dias, n_sim))
+    simulacoes[0] = valor_inicial
+    
+    for sim in range(n_sim):
+        for t in range(1, n_dias):
+            z = np.random.normal()
+            simulacoes[t, sim] = simulacoes[t-1, sim] * np.exp((mu_p - 0.5*sigma_p**2) + sigma_p*z)
+    
+    # Criar DataFrame para visualização
+    sim_df = pd.DataFrame(simulacoes)
+    sim_df.index.name = "Dia"
+    
+    # Plot interativo (fan chart)
+    fig = px.line(sim_df, title="Simulações de Monte Carlo para o Portfólio")
+    st.plotly_chart(fig)
+    
+    # Exibir estatísticas finais
+    # Estatísticas finais da simulação
+    valor_esperado = sim_df.iloc[-1].mean()
+    var_5 = np.percentile(sim_df.iloc[-1], 5)
+    pior_cenario = sim_df.iloc[-1].min()
+    melhor_cenario = sim_df.iloc[-1].max()
+    
+    # Criar DataFrame para exibir como tabela
+    sim_stats = pd.DataFrame({
+        "Valor Esperado Final (R$)": [valor_esperado],
+        "VaR 5% (R$)": [var_5],
+        "Pior Cenário (R$)": [pior_cenario],
+        "Melhor Cenário (R$)": [melhor_cenario]
+    })
+    
+    st.subheader("📊 Estatísticas da Simulação Monte Carlo")
+    st.dataframe(sim_stats.style.format("{:,.2f}"))
+    
+    # Supondo que sim_df seja seu DataFrame com simulações
+    # sim_df.index = dias, colunas = simulações
+    
+    # Calcula percentis para faixas
+    percentis = [5, 25, 50, 75, 95]
+    fan_chart = sim_df.quantile(q=np.array(percentis)/100, axis=1).T
+    fan_chart.columns = [f"P{p}" for p in percentis]
+    
+    # Cria figura do fan chart
+    fig_fan = go.Figure()
+    
+    # Adiciona faixas sombreadas
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P95"],
+        line=dict(color='rgba(0,100,200,0.1)'), showlegend=False
+    ))
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P5"],
+        fill='tonexty', fillcolor='rgba(0,100,200,0.2)',
+        line=dict(color='rgba(0,100,200,0.1)'), name='Faixa 5%-95%'
+    ))
+    
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P75"],
+        line=dict(color='rgba(0,100,200,0.1)'), showlegend=False
+    ))
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P25"],
+        fill='tonexty', fillcolor='rgba(0,100,200,0.4)',
+        line=dict(color='rgba(0,100,200,0.1)'), name='Faixa 25%-75%'
+    ))
+    
+    # Linha mediana
+    fig_fan.add_trace(go.Scatter(
+        x=fan_chart.index, y=fan_chart["P50"],
+        line=dict(color='blue', width=2), name='Mediana'
+    ))
+    
+    # Layout final
+    fig_fan.update_layout(
+        title="Simulação Monte Carlo - Fan Chart com Faixas de Confiança",
+        xaxis_title="Dia",
+        yaxis_title="Valor do Portfólio (R$)",
+        template="plotly_white"
+    )
+    
+    st.plotly_chart(fig_fan, use_container_width=True)
 
