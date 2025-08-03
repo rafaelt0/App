@@ -136,6 +136,8 @@ with aba1:
     
         benchmark = yf.download("^BVSP", start=data_inicio)["Close"]
         benchmark_index = benchmark / benchmark.iloc[0]  # Normalizado
+        portfolio_index = portfolio / 
+portfolio.iloc[0]
   
         
         # === 4. Plotar comparação ===
