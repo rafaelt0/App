@@ -165,6 +165,12 @@ with aba1:
     
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
+
+    st.subheader("Rolling Sharpe")
+    fig2=qs.plots.rolling_sharpe(portfolio_returns, benchmark=retorno_bench, show=False)
+    st.pyplot(fig2)
+
+
     
     # Botão para gerar PDF via quantstats
     import tempfile
