@@ -88,35 +88,7 @@ with aba1:
 
     # --- Efficient Frontier Interativa ---
 
-    from pypfopt.efficient_frontier import EfficientFrontier
-    from pypfopt import risk_models, expected_returns
-    
-    st.subheader("Fronteira Eficiente (Efficient Frontier)")
-    
-    # Cálculo retorno esperado e matriz covariância dos preços (não dos retornos)
-    mu = expected_returns.mean_historical_return(data_yf)
-    S = risk_models.sample_cov(data_yf)
-    
-    ef = EfficientFrontier(mu, S)
-    
-    rets = []
-    risks = []
-    
-    for target_return in np.linspace(mu.min(), mu.max(), 50):
-        ef.efficient_return(target_return)
-        weights = ef.clean_weights()
-        weights_arr = np.array(list(weights.values()))
-        rets.append(target_return)
-        risks.append(np.sqrt(weights_arr.T @ S.values @ weights_arr))
-    
-    fig_ef = go.Figure()
-    fig_ef.add_trace(go.Scatter(x=risks, y=rets, mode='lines+markers', name='Fronteira Eficiente'))
-    fig_ef.update_layout(
-        xaxis_title="Risco (Volatilidade)",
-        yaxis_title="Retorno Esperado",
-        template='plotly_white'
-    )
-    st.plotly_chart(fig_ef, use_container_width=True)
+
     
     
     # --- Treemap da Alocação ---
