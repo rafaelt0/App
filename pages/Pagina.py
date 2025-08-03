@@ -103,6 +103,7 @@ with aba1:
     retorno_bench = bench.pct_change().dropna()
     retorno_cum_bench = (1+retorno_bench).cumprod()
     bench_value = retorno_cum_bench * valor_inicial
+    st.write(bench_value)
     
     # Mostrar gráfico do valor do portfólio x BOVESPA
     
