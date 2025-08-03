@@ -261,7 +261,12 @@ with aba2:
     st.subheader("📊 Estatísticas da Simulação Monte Carlo")
     st.dataframe(sim_stats.style.format("{:,.2f}"))
     
-    # Calcula percentis para faixas
+  
+
+# Supondo que sim_df seja seu DataFrame com simulações
+# sim_df.index = dias, colunas = simulações
+
+# Calcula percentis para faixas
     percentis = [5, 25, 50, 75, 95]
     fan_chart = sim_df.quantile(q=np.array(percentis)/100, axis=1).T
     fan_chart.columns = [f"P{p}" for p in percentis]
@@ -296,12 +301,15 @@ with aba2:
         line=dict(color='blue', width=2), name='Mediana'
     ))
     
-    # Layout 
+    # Layout final
     fig_fan.update_layout(
-        title="Simulação Monte Carlo - Faixas de Confiança",
+        title="Simulação Monte Carlo - Fan Chart com Faixas de Confiança",
         xaxis_title="Dia",
         yaxis_title="Valor do Portfólio (R$)",
         template="plotly_white"
     )
-
+    
+    st.plotly_chart(fig_fan, use_container_width=True)
+    
+    
 
