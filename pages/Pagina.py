@@ -78,7 +78,7 @@ with aba1:
     # Mostrar pesos
     st.subheader("Pesos do Portfólio (%)")
     peso_manual_df.index = peso_manual_df.index.str.replace(".SA","")
-    st.dataframe((peso_manual_df*100).round(2))
+    st.dataframe((peso_manual_df*100).round(2).T)
     
     # Gráfico pizza das porcentagens
     fig_pie = px.pie(peso_manual_df.reset_index(), values="Peso", names="index",
