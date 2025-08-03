@@ -151,7 +151,7 @@ with aba1:
         else:
             benchmark_index = None  # Caso nenhum benchmark selecionado
 
-         if benchmark_index is not None:
+        if benchmark_index is not None:
             fig, ax = plt.subplots(figsize=(10, 5))
             portfolio_value.plot(ax=ax, label="Portfólio")
             benchmark_index.plot(ax=ax, label=benchmark_opcao[0])
