@@ -136,21 +136,22 @@ with aba1:
         st.plotly_chart(fig)
 
         
-
         if benchmark_opcao == "IBOVESPA":
-            benchmark = yf.download("^BVSP", start=data_inicio)["Close"]
-            benchmark_index = benchmark / benchmark.iloc[0]  # Normalizado
-        elif benchmark_opcao == "SELIC":
-            selic = sgs_series([11], start=data_inicio)["11"] / 100  # divide por 100 para ficar em decimal
-            selic_index = (1 + selic).cumprod()
-            benchmark_index = selic_index /        selic_index.iloc[0]
-        elif benchmark_opcao=="CDI":
-            cdi = sgs_series([12], start=data_inicio)["12"] / 100
-            cdi_index = (1 + cdi).cumprod()
-            benchmark_index = cdi_index / cdi_index.iloc[0]
-        else:
-            benchmark_index = None  # Caso nenhum benchmark selecionado
-
+           benchmark = yf.download("^BVSP", start=data_inicio)["Close"]
+           benchmark_index = benchmark / benchmark.iloc[0]  # Normalizado
+       elif benchmark_opcao == "SELIC":
+           selic_df = sgs.get({'selic': 11},        start=data_inicio)
+           selic = selic_df['selic'] / 100  # em decimal
+           selic_index = (1 + selic).cumprod()
+    benchmark_index = selic_index /      selic_index.iloc[0]
+       elif benchmark_opcao == "CDI":
+           cdi_df = sgs.get({'cdi': 12},       start=data_inicio)
+       cdi = cdi_df['cdi'] / 100
+       cdi_index = (1 + cdi).cumprod()
+       benchmark_index = cdi_index / cdi_index.iloc[0]
+       else:
+           benchmark_index = None  # Caso nenhum benchmark selecionado
+        
         if benchmark_index is not None:
             fig, ax = plt.subplots(figsize=(10, 5))
             portfolio_value.plot(ax=ax, label="Portfólio")
