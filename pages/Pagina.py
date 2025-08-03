@@ -107,14 +107,8 @@ with aba1:
     bench_value = retorno_cum_bench * valor_inicial
     
     # Mostrar gráfico do valor do portfólio x BOVESPA
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
-                             mode='lines', name='Portfólio'))
-    fig.add_trace(go.Scatter(x=bench_value.index, y=bench_value, 
-                             mode='lines', name='IBOVESPA'))
-    fig.update_layout(title='Comparação: Portfólio x Benchmark',
-                      xaxis_title='Data', yaxis_title='Valor (R$)')
-    st.plotly_chart(fig)
+    st.subheader("Retorno Acumulado (QuantStats)")
+    st.pyplot(qs.plots.returns(portfolio_returns, benchmark=retorno_bench))
     
     
     # Informações do portfólio
