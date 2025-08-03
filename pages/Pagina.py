@@ -202,10 +202,10 @@ st.sidebar.markdown("---")
 
 with aba2:
     # Opções para usuário
-    st.sidebar.header("Opções Simulação 👨‍🔬")
-    n_simulations = st.sidebar.slider("Número de Simulações",10,1000,100)
-    valor = st.sidebar.number_input("Capital Inicial", min_value=100)
-    years = int(st.sidebar.number_input("Anos", min_value=1))  
+    st.header("Opções Simulação 👨‍🔬")
+    n_simulations = st.slider("Número de Simulações",10,1000,100)
+    valor = st.number_input("Capital Inicial", min_value=100)
+    years = int(st.number_input("Anos", min_value=1))  
     st.header("Simulação 🧪")
     
     col1, col2, col3 = st.columns([1,3,1])
