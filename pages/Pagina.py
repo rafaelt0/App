@@ -139,12 +139,12 @@ with aba1:
         if benchmark_opcao == "IBOVESPA":
            benchmark = yf.download("^BVSP", start=data_inicio)["Close"]
            benchmark_index = benchmark / benchmark.iloc[0]  # Normalizado
-       elif benchmark_opcao == "SELIC":
+        elif benchmark_opcao == "SELIC":
            selic_df = sgs.get({'selic': 11},        start=data_inicio)
            selic = selic_df['selic'] / 100  # em decimal
            selic_index = (1 + selic).cumprod()
     benchmark_index = selic_index /      selic_index.iloc[0]
-       elif benchmark_opcao == "CDI":
+        elif benchmark_opcao == "CDI":
            cdi_df = sgs.get({'cdi': 12},       start=data_inicio)
        cdi = cdi_df['cdi'] / 100
        cdi_index = (1 + cdi).cumprod()
