@@ -109,6 +109,14 @@ with aba1:
     # Mostrar gráfico do valor do portfólio x BOVESPA
     st.subheader("Retorno Acumulado (QuantStats)")
     fig1=qs.plots.returns(portfolio_returns, benchmark=retorno_bench, show=False)
+    fig1.suptitle("Retorno Acumulado Portfólio X BOVESPA", fontsize=16)
+    ax = fig1.axes[0]
+    leg = ax.get_legend()
+    if leg:
+        for text in leg.get_texts():
+            text.set_text(text.get_text().replace("BOVESPA", "Portfólio"))
+    # Atualizar a legenda no gráfico
+    ax.legend()
     st.pyplot(fig1.figure)
     plt.close(fig1.figure)
     
