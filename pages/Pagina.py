@@ -199,64 +199,64 @@ years = int(st.sidebar.number_input("Anos", min_value=1))
 
 
 
-
-st.header("Simulação 🧪")
-
-col1, col2, col3 = st.columns([1,3,1])
-
-with col1:
-    st.write("")
-
-
-with col3:
-    st.write("")
-     
-
-# Número de simulações e horizonte
-n_sim = n_simulations
-n_dias = years*365  # 1 ano
-
-# Valor inicial do portfólio
-valor_inicial = valor
-
-# Retornos históricos do portfólio
-mu_p = portfolio_returns.mean()
-sigma_p = portfolio_returns.std()
-
-# Simulações Monte Carlo
-simulacoes = np.zeros((n_dias, n_sim))
-simulacoes[0] = valor_inicial
-
-for sim in range(n_sim):
-    for t in range(1, n_dias):
-        z = np.random.normal()
-        simulacoes[t, sim] = simulacoes[t-1, sim] * np.exp((mu_p - 0.5*sigma_p**2) + sigma_p*z)
-
-# Criar DataFrame para visualização
-sim_df = pd.DataFrame(simulacoes)
-sim_df.index.name = "Dia"
-
-# Plot interativo (fan chart)
-fig = px.line(sim_df, title="Simulações de Monte Carlo para o Portfólio")
-st.plotly_chart(fig)
-
-# Exibir estatísticas finais
-# Estatísticas finais da simulação
-valor_esperado = sim_df.iloc[-1].mean()
-var_5 = np.percentile(sim_df.iloc[-1], 5)
-pior_cenario = sim_df.iloc[-1].min()
-melhor_cenario = sim_df.iloc[-1].max()
-
-# Criar DataFrame para exibir como tabela
-sim_stats = pd.DataFrame({
-    "Valor Esperado Final (R$)": [valor_esperado],
-    "VaR 5% (R$)": [var_5],
-    "Pior Cenário (R$)": [pior_cenario],
-    "Melhor Cenário (R$)": [melhor_cenario]
-})
-
-st.subheader("📊 Estatísticas da Simulação Monte Carlo")
-st.dataframe(sim_stats.style.format("{:,.2f}"))
+with aba2:
+    st.header("Simulação 🧪")
+    
+    col1, col2, col3 = st.columns([1,3,1])
+    
+    with col1:
+        st.write("")
+    
+    
+    with col3:
+        st.write("")
+         
+    
+    # Número de simulações e horizonte
+    n_sim = n_simulations
+    n_dias = years*365  # 1 ano
+    
+    # Valor inicial do portfólio
+    valor_inicial = valor
+    
+    # Retornos históricos do portfólio
+    mu_p = portfolio_returns.mean()
+    sigma_p = portfolio_returns.std()
+    
+    # Simulações Monte Carlo
+    simulacoes = np.zeros((n_dias, n_sim))
+    simulacoes[0] = valor_inicial
+    
+    for sim in range(n_sim):
+        for t in range(1, n_dias):
+            z = np.random.normal()
+            simulacoes[t, sim] = simulacoes[t-1, sim] * np.exp((mu_p - 0.5*sigma_p**2) + sigma_p*z)
+    
+    # Criar DataFrame para visualização
+    sim_df = pd.DataFrame(simulacoes)
+    sim_df.index.name = "Dia"
+    
+    # Plot interativo (fan chart)
+    fig = px.line(sim_df, title="Simulações de Monte Carlo para o Portfólio")
+    st.plotly_chart(fig)
+    
+    # Exibir estatísticas finais
+    # Estatísticas finais da simulação
+    valor_esperado = sim_df.iloc[-1].mean()
+    var_5 = np.percentile(sim_df.iloc[-1], 5)
+    pior_cenario = sim_df.iloc[-1].min()
+    melhor_cenario = sim_df.iloc[-1].max()
+    
+    # Criar DataFrame para exibir como tabela
+    sim_stats = pd.DataFrame({
+        "Valor Esperado Final (R$)": [valor_esperado],
+        "VaR 5% (R$)": [var_5],
+        "Pior Cenário (R$)": [pior_cenario],
+        "Melhor Cenário (R$)": [melhor_cenario]
+    })
+    
+    st.subheader("📊 Estatísticas da Simulação Monte Carlo")
+    st.dataframe(sim_stats.style.format("{:,.2f}"))
 
 
 
