@@ -144,7 +144,7 @@ with aba1:
            selic = selic_df['selic'] / 100  # em decimal
            selic_index = (1 + selic).cumprod()
     benchmark_index = selic_index /      selic_index.iloc[0]
-        elif benchmark_opcao == "CDI":
+       elif benchmark_opcao == "CDI":
            cdi_df = sgs.get({'cdi': 12},       start=data_inicio)
        cdi = cdi_df['cdi'] / 100
        cdi_index = (1 + cdi).cumprod()
