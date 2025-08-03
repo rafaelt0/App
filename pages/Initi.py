@@ -149,12 +149,12 @@ with aba1:
     st.pyplot(heatmap.figure)
     
 
+    
+    
+    cum_return = (1 + portfolio_returns).cumprod()
+    portfolio_value = cum_return * valor_inicial
 
-1️⃣ Retorno acumulado do portfólio
-cum_return = (1 + portfolio_returns).cumprod()
-portfolio_value = cum_return * valor_inicial
-
-    # 2️⃣ Baixar dados do benchmark (IBOVESPA)
+    
     bench = yf.download("^BVSP", start=portfolio_returns.index[0], progress=False)['Close']
     bench = bench.reindex(portfolio_returns.index).fillna(method='ffill')  # alinhar datas
     
@@ -162,7 +162,7 @@ portfolio_value = cum_return * valor_inicial
     retorno_cum_bench = (1 + retorno_bench).cumprod()
     bench_value = retorno_cum_bench * valor_inicial
     
-    # 3️⃣ Gráfico interativo com Plotly
+    
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=portfolio_value.index, 
