@@ -108,7 +108,9 @@ with aba1:
     
     # Mostrar gráfico do valor do portfólio x BOVESPA
     st.subheader("Retorno Acumulado (QuantStats)")
-    st.pyplot(qs.plots.returns(portfolio_returns, benchmark=retorno_bench))
+    fig1=st.pyplot(qs.plots.returns(portfolio_returns, benchmark=retorno_bench))
+    st.pyplot(fig1.figure)
+    plt.close(fig1.figure)
     
     
     # Informações do portfólio
