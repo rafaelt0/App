@@ -299,9 +299,9 @@ with aba2:
         line=dict(color='blue', width=2), name='Mediana'
     ))
     
-    # Layout final
+    # Layout 
     fig_fan.update_layout(
-        title="Simulação Monte Carlo - Fan Chart com Faixas de Confiança",
+        title="Simulação Monte Carlo - Faixas de Confiança",
         xaxis_title="Dia",
         yaxis_title="Valor do Portfólio (R$)",
         template="plotly_white"
