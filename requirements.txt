@@ -20,4 +20,4 @@ nltk==3.9
 lxml==5.2.2
 beautifulsoup4==4.12.3
 requests==2.32.3
-pandas_datareaser==0.10
+pandas_datareader==0.10
