@@ -107,7 +107,7 @@ fig = go.Figure()
 fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
                          mode='lines', name='Portfólio'))
 fig.add_trace(go.Scatter(x=bench_value.index, y=bench_value, 
-                         mode='lines', name='IBOVESPA')
+                         mode='lines', name='IBOVESPA'))
 fig.update_layout(title='Comparação: Portfólio x Benchmark',
                   xaxis_title='Data', yaxis_title='Valor (R$)')
 st.plotly_chart(fig)
