@@ -167,7 +167,7 @@ with aba1:
     st.dataframe(stats.round(4))
     
     fig1, ax1 = plt.subplots(figsize=(10, 4))
-    qs.plots.drawdown(portfolio_returns, benchmark=retorno_bench, figsize=(10,3))
+    qs.plots.drawdown(portfolio_returns, figsize=(10,3))
     st.pyplot(fig1)
 
        
