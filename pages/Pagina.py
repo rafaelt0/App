@@ -12,6 +12,7 @@ from pypfopt.hierarchical_portfolio import HRPOpt
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
 from scipy.stats import kurtosis, skew
 import quantstats as qs
+import matplotlib.ticker as mtick
 import io
 
 aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Carlo Portfolio"])
