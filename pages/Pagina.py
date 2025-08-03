@@ -105,10 +105,7 @@ with aba1:
     retorno_bench = retorno_bench.loc[portfolio_returns.index]
     retorno_cum_bench = (1+retorno_bench).cumprod()
     bench_value = retorno_cum_bench * valor_inicial
-
-    common_index = portfolio_value.index.intersection(bench_value.index)
-    portfolio_value = portfolio_value.loc[common_index]
-    bench_value = bench_value.loc[common_index]
+    
     # Mostrar gráfico do valor do portfólio x BOVESPA
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
@@ -134,12 +131,11 @@ with aba1:
     st.dataframe(portfolio_info.style.format("{:,.2f}"))
     
     # Distribuição de retornos com estatísticas
-    sns.histplot(portfolio_returns*100, bins=50, kde=True, color='skyblue', ax=ax_hist, label='Portfólio')
-    sns.histplot(retorno_bench*100, bins=50, kde=True, color='orange', ax=ax_hist, label='IBOVESPA', alpha=0.6)
-    
+    st.subheader("Distribuição dos Retornos Diários (%) e Estatísticas")
+    fig_hist, ax_hist = plt.subplots(figsize=(10,5))
+    sns.histplot(portfolio_returns*100, bins=50, kde=True, color='skyblue', ax=ax_hist)
     ax_hist.set_xlabel("Retornos Diários (%)")
     ax_hist.set_ylabel("Frequência")
-    ax_hist.legend()
     
     media = portfolio_returns.mean()*100
     desvio = portfolio_returns.std()*100
@@ -307,9 +303,5 @@ with aba2:
         yaxis_title="Valor do Portfólio (R$)",
         template="plotly_white"
     )
-    
-    st.plotly_chart(fig_fan, use_container_width=True)
-
-
 
 
