@@ -105,7 +105,10 @@ with aba1:
     retorno_bench = retorno_bench.loc[portfolio_returns.index]
     retorno_cum_bench = (1+retorno_bench).cumprod()
     bench_value = retorno_cum_bench * valor_inicial
-    
+
+    common_index = portfolio_value.index.intersection(bench_value.index)
+    portfolio_value = portfolio_value.loc[common_index]
+    bench_value = bench_value.loc[common_index]
     # Mostrar gráfico do valor do portfólio x BOVESPA
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
