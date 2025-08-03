@@ -16,7 +16,6 @@ from scipy.stats import kurtosis, skew
 import quantstats as qs
 import matplotlib.ticker as mtick
 import io
-from bcb import sgs
 aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Carlo Portfolio"])
 
 warnings.filterwarnings('ignore')
