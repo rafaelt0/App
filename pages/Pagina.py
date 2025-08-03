@@ -11,6 +11,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
+import sgs
+from sgs import sgs_series
 from scipy.stats import kurtosis, skew
 import quantstats as qs
 import matplotlib.ticker as mtick
@@ -133,26 +135,33 @@ with aba1:
                           xaxis_title='Data', yaxis_title='Valor (R$)')
         st.plotly_chart(fig)
 
-        
-        if benchmark_opcao == "IBOVESPA":
+        from sgs import sgs_series
+
+        from sgs import sgs_series
+
+# ...
+
+        if "IBOVESPA" in benchmark_opcao:
             benchmark = yf.download("^BVSP", start=data_inicio)["Close"]
             benchmark_index = benchmark / benchmark.iloc[0]  # Normalizado
-        elif benchmark_opcao == "SELIC":
-            selic = pdr.DataReader("11", "sgs", start=data_inicio) / 100
+        elif "SELIC" in benchmark_opcao:
+            selic = sgs_series([11], start=data_inicio)["11"] / 100  # divide por 100 para ficar em decimal
             selic_index = (1 + selic).cumprod()
-            benchmark_index = selic_index / selic_index.iloc[0]
-        elif benchmark_opcao == "CDI":
-            cdi = pdr.DataReader("12", "sgs", start=data_inicio) / 100
+            benchmark_index = selic_index /        selic_index.iloc[0]
+        elif "CDI" in benchmark_opcao:
+            cdi = sgs_series([12], start=data_inicio)["12"] / 100
             cdi_index = (1 + cdi).cumprod()
             benchmark_index = cdi_index / cdi_index.iloc[0]
-        
-        # === 4. Plotar comparação ===
-        fig, ax = plt.subplots(figsize=(10, 5))
-        portfolio_value.plot(ax=ax, label="Portfólio")
-        benchmark_index.plot(ax=ax, label=benchmark_opcao[0])
-        plt.title(f"Comparação Portfólio x {benchmark_opcao}")
-        plt.legend()
-        st.pyplot(fig)
+         else:
+            benchmark_index = None  # Caso nenhum benchmark selecionado
+
+         if benchmark_index is not None:
+            fig, ax = plt.subplots(figsize=(10, 5))
+            portfolio_value.plot(ax=ax, label="Portfólio")
+            benchmark_index.plot(ax=ax, label=benchmark_opcao[0])
+            plt.title(f"Comparação Portfólio x {benchmark_opcao[0]}")
+            plt.legend()
+            st.pyplot(fig)
         
         
         # Informações do portfólio
