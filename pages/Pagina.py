@@ -98,24 +98,6 @@ with aba1:
     cum_return = (1 + portfolio_returns).cumprod()
     portfolio_value = cum_return * valor_inicial
     
-    # Obter os dados de benchmark BOVESPA e calcular o retorno acumulado
-    bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
-    retorno_bench = bench.pct_change().dropna()
-    portfolio_returns = portfolio_returns.loc[retorno_bench.index]
-    retorno_bench = retorno_bench.loc[portfolio_returns.index]
-    retorno_cum_bench = (1+retorno_bench).cumprod()
-    bench_value = retorno_cum_bench * valor_inicial
-    
-    # Mostrar gráfico do valor do portfólio x BOVESPA
-    st.subheader("Retorno Acumulado Portfólio X BOVESPA")
-    fig1=qs.plots.returns(portfolio_returns, benchmark=retorno_bench, show=False)
-    fig1.suptitle("Retorno Acumulado Portfólio X BOVESPA", fontsize=16)
-    ax = fig1.axes[0]
-    leg = ax.get_legend()
-    ax.legend()
-    st.pyplot(fig1.figure)
-    plt.close(fig1.figure)
-    
     
     # Informações do portfólio
     portfolio_info = pd.DataFrame({
