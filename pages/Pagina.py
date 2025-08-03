@@ -166,9 +166,10 @@ with aba1:
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
     
-    fig1, ax1 = plt.subplots(figsize=(10, 4))
-    qs.plots.drawdown(portfolio_returns, ax=ax1)
-    st.pyplot(fig1)
+    qs.plots.drawdown(portfolio_returns, figsize=(10,3))
+    fig_drawdown = plt.gcf()  # captura a figura atual
+    st.pyplot(fig_drawdown)
+    plt.clf()
 
        
     # Botão para gerar PDF via quantstats
