@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import pandas_datareader.data as pdr
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -11,11 +10,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
-
 from scipy.stats import kurtosis, skew
 import quantstats as qs
 import matplotlib.ticker as mtick
 import io
+
 aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Carlo Portfolio"])
 
 warnings.filterwarnings('ignore')
@@ -31,7 +30,7 @@ with aba1:
     data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
     valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
     taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.0556, max_value=15.0)
-    benchmark_opcao = st.sidebar.selectbox("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"])
+    benchmark_opcao = st.sidebar.multiselect("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"])
     
     # Seleção de ações
     data = pd.read_csv('acoes-listadas-b3.csv')
@@ -134,7 +133,25 @@ with aba1:
         st.plotly_chart(fig)
 
         
+        if benchmark_opcao == "IBOVESPA":
+            benchmark = yf.download("^BVSP", start=data_inicio)["Close"]
+            benchmark_index = benchmark / benchmark.iloc[0]  # Normalizado
+        elif benchmark_opcao == "SELIC":
+            selic = pdr.DataReader("11", "sgs", start=data_inicio) / 100
+            selic_index = (1 + selic).cumprod()
+            benchmark_index = selic_index / selic_index.iloc[0]
+        elif benchmark_opcao == "CDI":
+            cdi = pdr.DataReader("12", "sgs", start=data_inicio) / 100
+            cdi_index = (1 + cdi).cumprod()
+            benchmark_index = cdi_index / cdi_index.iloc[0]
         
+        # === 4. Plotar comparação ===
+        fig, ax = plt.subplots(figsize=(10, 5))
+        portfolio_index.plot(ax=ax, label="Portfólio")
+        benchmark_index.plot(ax=ax, label=benchmark_option)
+        plt.title(f"Comparação Portfólio x {benchmark_option}")
+        plt.legend()
+        st.pyplot(fig)
         
         
         # Informações do portfólio
