@@ -256,7 +256,7 @@ with aba1:
     ax.set_ylabel("Drawdown")
     ax.set_xlabel("Data")
     ax.grid(True)
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    plt.gca().yaxis.set_major_formatter(PercentFormatter(1.0))
     st.pyplot(fig)
     
     # Botão para gerar PDF via quantstats
