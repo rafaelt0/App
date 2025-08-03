@@ -168,7 +168,8 @@ with aba1:
 
     st.subheader("Rolling Beta")
     fig2=qs.plots.rolling_beta(portfolio_returns, benchmark=retorno_bench, window=90, show=False)
-    st.pyplot(fig2)
+    st.pyplot(fig2.figure)
+    plt.close(fig2.figure)
 
 
     
