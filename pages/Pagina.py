@@ -180,6 +180,19 @@ with aba1:
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
 
+    # Drawdown
+    cum_returns = (1 + portfolio_returns).cumprod()
+    rolling_max = cum_returns.cummax()
+    drawdown = (cum_returns - rolling_max) / rolling_max
+
+    # Plot Drawdown
+    fig1, ax1 = plt.subplots(figsize=(10,4))
+    ax.fill_between(drawdown.index, (drawdown.values)*100, 0, color='red', alpha=0.4)
+    ax.set_title("Drawdown do Portfólio")
+    ax.set_ylabel("Drawdown (em %)")
+    ax.set_xlabel("Data")
+    st.pyplot(fig1)
+
        
     # Botão para gerar PDF via quantstats
     import tempfile
