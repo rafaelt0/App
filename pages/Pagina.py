@@ -134,11 +134,12 @@ with aba1:
     st.dataframe(portfolio_info.style.format("{:,.2f}"))
     
     # Distribuição de retornos com estatísticas
-    st.subheader("Distribuição dos Retornos Diários (%) e Estatísticas")
-    fig_hist, ax_hist = plt.subplots(figsize=(10,5))
-    sns.histplot(portfolio_returns*100, bins=50, kde=True, color='skyblue', ax=ax_hist)
+    sns.histplot(portfolio_returns*100, bins=50, kde=True, color='skyblue', ax=ax_hist, label='Portfólio')
+    sns.histplot(retorno_bench*100, bins=50, kde=True, color='orange', ax=ax_hist, label='IBOVESPA', alpha=0.6)
+    
     ax_hist.set_xlabel("Retornos Diários (%)")
     ax_hist.set_ylabel("Frequência")
+    ax_hist.legend()
     
     media = portfolio_returns.mean()*100
     desvio = portfolio_returns.std()*100
