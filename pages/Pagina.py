@@ -194,7 +194,7 @@ with aba1:
     ax1.set_xlabel("Data")
     ax1.grid(True)
 
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    ax1.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     st.pyplot(fig1)
 
        
