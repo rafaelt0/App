@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import pandas_datareader.data as pdr
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -148,7 +149,7 @@ with aba1:
         # === 4. Plotar comparação ===
         fig, ax = plt.subplots(figsize=(10, 5))
         portfolio_value.plot(ax=ax, label="Portfólio")
-        benchmark_index.plot(ax=ax, label=benchmark_option)
+        benchmark_index.plot(ax=ax, label=benchmark_opcao)
         plt.title(f"Comparação Portfólio x {benchmark_option}")
         plt.legend()
         st.pyplot(fig)
