@@ -148,14 +148,6 @@ with aba1:
     st.subheader("Heatmap")
     st.pyplot(heatmap.figure)
     
-    # Cálculo do portfólio com os pesos escolhidos
-    portfolio_returns = returns.dot(pesos_manuais_arr)
-    cum_return = (1 + portfolio_returns).cumprod()
-    portfolio_value = cum_return * valor_inicial
-    
-    bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close'].dropna()
-    retorno_bench = bench.pct_change().dropna()
-    
     # Valores port e bench
     portfolio_value = (1 + portfolio_returns).cumprod() * valor_inicial
     bench_value = (1 + retorno_bench).cumprod() * valor_inicial
@@ -166,33 +158,43 @@ with aba1:
     st.write(bench_value)
     st.write(portfolio_value)
 
-    # Plotly
-    fig = go.Figure()
-    
-    fig.add_trace(go.Scatter(
-        x=portfolio_value.index, 
-        y=portfolio_value.values,
-        mode='lines', 
-        name='Portfólio'
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=bench_value.index, 
-        y=bench_value.values,
-        mode='lines', 
-        name='IBOVESPA',
-        line=dict(color='orange')  # cor diferente para destacar
-    ))
-    
-    fig.update_layout(
-        title='Comparação: Portfólio x IBOVESPA',
-        xaxis_title='Data', 
-        yaxis_title='Valor (R$)',
-        hovermode='x unified',
-        template='plotly_white'
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
+1️⃣ Retorno acumulado do portfólio
+cum_return = (1 + portfolio_returns).cumprod()
+portfolio_value = cum_return * valor_inicial
+
+# 2️⃣ Baixar dados do benchmark (IBOVESPA)
+bench = yf.download("^BVSP", start=portfolio_returns.index[0], progress=False)['Close']
+bench = bench.reindex(portfolio_returns.index).fillna(method='ffill')  # alinhar datas
+
+retorno_bench = bench.pct_change().dropna()
+retorno_cum_bench = (1 + retorno_bench).cumprod()
+bench_value = retorno_cum_bench * valor_inicial
+
+# 3️⃣ Gráfico interativo com Plotly
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=portfolio_value.index, 
+    y=portfolio_value, 
+    mode='lines', 
+    name='Portfólio'
+))
+fig.add_trace(go.Scatter(
+    x=bench_value.index, 
+    y=bench_value, 
+    mode='lines', 
+    name='IBOVESPA'
+))
+
+fig.update_layout(
+    title='Comparação: Portfólio x Benchmark',
+    xaxis_title='Data',
+    yaxis_title='Valor (R$)',
+    template='plotly_white'
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+    l
 
     
     # Informações do portfólio
