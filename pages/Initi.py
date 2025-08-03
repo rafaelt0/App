@@ -115,15 +115,15 @@ with aba1:
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
-        x=portfolio_value_df.index, 
-        y=portfolio_value_df.values,
+        x=portfolio_value.index, 
+        y=portfolio_value.values,
         mode='lines', 
         name='Portfólio'
     ))
     
     fig.add_trace(go.Scatter(
-        x=bench_value_df.index, 
-        y=bench_value_df.values,
+        x=bench_value.index, 
+        y=bench_value.values,
         mode='lines', 
         name='IBOVESPA',
         line=dict(color='orange')  # cor diferente para destacar
