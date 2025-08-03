@@ -140,7 +140,7 @@ with aba1:
 portfolio.iloc[0]
   
         
-        # === 4. Plotar comparação ===
+        
         fig, ax = plt.subplots(figsize=(10, 5))
         portfolio_index.plot(ax=ax, label="Portfólio")
         benchmark_index.plot(ax=ax, label=benchmark_option)
