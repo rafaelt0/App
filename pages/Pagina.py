@@ -137,13 +137,7 @@ with aba1:
     
     
         
-        
-        fig, ax = plt.subplots(figsize=(10, 5))
-        portfolio_value.plot(ax=ax, label="Portfólio")
-        benchmark_value.plot(ax=ax, label=benchmark_option)
-        plt.title(f"Comparação Portfólio x {benchmark_option}")
-        plt.legend()
-        st.pyplot(fig)
+   
         
         
         # Informações do portfólio
