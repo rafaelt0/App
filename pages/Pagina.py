@@ -129,9 +129,14 @@ with aba1:
                              mode='lines', name='Portfólio'))
     fig.add_trace(go.Scatter(x=bench_value.index, y=bench_value, 
                              mode='lines', name='IBOVESPA'))
-    fig.update_layout(title='Comparação: Portfólio x Benchmark',
+    fig.update_layout(title='Valor do Portfólio',
                       xaxis_title='Data', yaxis_title='Valor (R$)')
     st.plotly_chart(fig)
+    # Retornos mensais
+    st.subheader("Retornos Mensais do Portfólio")
+
+    fig = qs.plots.monthly_returns(portfolio_returns, show=False)
+    st.pyplot(fig)
 
     
 
