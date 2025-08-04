@@ -327,6 +327,18 @@ with aba1:
             mime="text/html"
         )
 
+    # Salva variáveis  para uso na aba Simulação
+    st.session_state["modo"] = modo
+    st.session_state["returns"] = returns
+    st.session_state["peso_manual_df"] = peso_manual_df
+    
+    # Garante que pesos manuais ficam disponíveis como dicionário
+    if modo == "Alocação Manual":
+        st.session_state["pesos_manuais"] = pesos_manuais
+    else:
+        st.session_state["pesos_manuais"] = peso_manual_df["Peso"].to_dict()
+
+
 # Separação na sidebar
 st.sidebar.markdown("---")
 
