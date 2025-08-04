@@ -387,7 +387,7 @@ with aba2:
     import matplotlib.pyplot as plt
 
     fig_hist, ax_hist = plt.subplots(figsize=(10, 5))
-    sns.histplot(sim_df.iloc[-1], bins=50, kde=True, color='skyblue', ax=ax_hist)
+    sns.histplot(sim_df.iloc[-1], bins=50, kde=True, color='#1f77b4', ax=ax_hist)
     ax_hist.set_xlabel("Valor Final do Portfólio (R$)")
     ax_hist.set_ylabel("Frequência")
     st.pyplot(fig_hist)
