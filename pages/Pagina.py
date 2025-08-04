@@ -381,6 +381,12 @@ with aba2:
 
     st.plotly_chart(fig_fan, use_container_width=True)
 
+
+    valores_finais = sim_df.iloc[-1]
+    q1 = valores_finais.quantile(0.25)
+    q2 = valores_finais.quantile(0.50)
+    q3 = valores_finais.quantile(0.75)
+    
     # Histograma do valor final do portfólio
     st.subheader("Distribuição do Valor Final do Portfólio")
     fig, ax = plt.subplots(figsize=(10,6))
