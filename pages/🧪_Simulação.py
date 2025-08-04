@@ -24,6 +24,21 @@ import io
 
 st.header("Simulação Monte Carlo por Ativos (Multivariada) 👨‍🔬")
 
+
+
+# Verifica se as variáveis necessárias já estão no session_state
+required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
+for key in required_keys:
+    if key not in st.session_state:
+        st.warning("⚠️ Configure primeiro seu portfólio na aba 1 para liberar a simulação Monte Carlo.")
+        st.stop()
+
+# Recupera as variáveis da aba 1
+modo = st.session_state["modo"]
+returns = st.session_state["returns"]
+pesos_manuais = st.session_state["pesos_manuais"]
+peso_manual_df = st.session_state["peso_manual_df"]
+
 with st.form("form_simulacao"):
     n_simulations = st.slider("Número de Simulações", 10, 500, 200,
                               help="Quantidade de trajetórias simuladas para o portfólio.")
