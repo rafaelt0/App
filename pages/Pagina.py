@@ -199,7 +199,7 @@ with aba1:
     bench_returns = bench
     cov_matrix = np.cov(portfolio_returns.squeeze(), bench_returns.squeeze())  # matriz de covariância 2x2
     beta = cov_matrix[0,1] / cov_matrix[1,1]
-    alpha = portfolio_returns.mean() - beta * bench_returns.mean()
+    alfa = portfolio_returns.mean() - beta * bench_returns.mean()
     r_quadrado = qs.stats.r_squared(portfolio_returns, bench)
     information_ratio = qs.stats.information_ratio(portfolio_returns, bench)
 
