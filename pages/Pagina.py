@@ -414,6 +414,6 @@ with aba2:
         "Desvio Padrão": valores_finais.std()
     }
     
-    df_estatisticas = pd.DataFrame(estatisticas, index=["Valores (R$)"]).T
+    df_estatisticas = pd.DataFrame(estatisticas, index=["Valores (R$)"])
     st.subheader("Estatísticas da Distribuição Final da Simulação Monte Carlo")
     st.dataframe(df_estatisticas.style.format("{:,.2f}"))
