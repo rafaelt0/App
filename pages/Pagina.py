@@ -305,7 +305,15 @@ with aba2:
     
     mu = aligned_returns.mean().values  # vetor média de retorno diário
     cov = aligned_returns.cov().values  # matriz covariância diária
-    pesos = np.array([pesos_manuais[ticker] for ticker in aligned_returns.columns])
+    # Garante que temos um dicionário de pesos, independente do modo escolhido
+    if modo == "Alocação Manual":
+        pesos_dict = pesos_manuais
+    else:
+        pesos_dict = dict(zip(peso_manual_df.index + ".SA", peso_manual_df["Peso"].values))
+    
+    aligned_returns = returns.loc[:, pesos_dict.keys()].dropna()
+    pesos = np.array(list(pesos_dict.values()))
+
     
     np.random.seed(42)  # para reprodutibilidade
     
