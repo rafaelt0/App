@@ -196,11 +196,19 @@ with aba1:
     st.pyplot(fig)
 
     # Métricas vs bench
+    # Garante que só uma coluna (Series)
+    portfolio_returns_metrics = portfolio_returns.squeeze()
+    retorno_bench_metrics = retorno_bench.squeeze()
+    
+    # Alinha os índices
+    aligned = pd.concat([portfolio_returns_metrics, retorno_bench_metrics], axis=1).dropna()
+    port_ret_aligned = aligned.iloc[:, 0]
+    bench_ret_aligned = aligned.iloc[:, 1]
     qs_metricas_bench = {
-    "Beta": qs.stats.beta(portfolio_returns, retorno_bench),
-    "Alpha (%)": qs.stats.alpha(portfolio_returns, retorno_bench) * 100,
-    "R²": qs.stats.r_squared(portfolio_returns, retorno_bench),
-    "Correlação": qs.stats.correlation(portfolio_returns, retorno_bench)
+    "Beta": qs.stats.beta(port_ret_aligned, bench_ret_aligned),
+    "Alpha (%)": qs.stats.alpha(port_ret_aligned, bench_ret_aligned) * 100,
+    "R²": qs.stats.r_squared(port_ret_aligned, bench_ret_aligned),
+    "Correlação": qs.stats.correlation(port_ret_aligned, bench_ret_aligned)
 }
 
 
