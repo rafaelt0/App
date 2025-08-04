@@ -402,3 +402,18 @@ with aba2:
     ax.legend()
     
     st.pyplot(fig)
+
+    # Estatísticas da distribuição final
+    estatisticas = {
+        "Mínimo": valores_finais.min(),
+        "Q1 (25%)": q1,
+        "Mediana (50%)": q2,
+        "Q3 (75%)": q3,
+        "Máximo": valores_finais.max(),
+        "Média": valores_finais.mean(),
+        "Desvio Padrão": valores_finais.std()
+    }
+    
+    df_estatisticas = pd.DataFrame(estatisticas, index=["Valores (R$)"]).T
+    st.subheader("Estatísticas da Distribuição Final da Simulação Monte Carlo")
+    st.dataframe(df_estatisticas.style.format("{:,.2f}"))
