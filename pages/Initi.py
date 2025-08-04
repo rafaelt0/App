@@ -68,8 +68,9 @@ with aba1:
         peso_df = pd.DataFrame.from_dict(weights, orient='index', columns=["Peso"])
         pesos_manuais_arr = peso_df["Peso"].values
     else:  # MVP
-        mu = mean_historical_return(returns)
-        S = CovarianceShrinkage(returns).ledoit_wolf()
+        returns_clean = returns.dropna(axis=0, how='any')
+        mu = mean_historical_return(returns_clean)
+        S = CovarianceShrinkage(returns_clean).ledoit_wolf()
         ef = EfficientFrontier(mu, S)
         weights = ef.min_volatility()
         peso_df = pd.DataFrame.from_dict(weights, orient='index', columns=["Peso"])
