@@ -201,18 +201,20 @@ with aba1:
     beta = cov_matrix[0,1] / cov_matrix[1,1]
     alpha = portfolio_returns.mean() - beta * bench_returns.mean()
     r_quadrado = qs.stats.r_squared(portfolio_returns, bench)
-    
+    information_ratio = qs.stats.information_ratio(portfolio_returns, bench)
 
     
-    df_qs_bench = pd.DataFrame(qs_metricas_bench, index=["Portfólio"]).T
+metricas = pd.DataFrame({
+    "Alfa": [alfa],
+    "Beta": [beta],
+    "R Quadrado": [r_quadrado],
+    "Information Ratio": [information_ratio]
+})
+
+st.subheader("📊 Métricas do Portfólio em relação ao Benchmark")
+st.dataframe(metricas.round(4))
+
     
-    st.subheader("📊 Métricas em Relação ao Benchmark (IBOVESPA)")
-    st.dataframe(metrics.style.format({
-    "Alpha (diário)": "{:.4%}",
-    "Beta": "{:.4f}",
-    "R²": "{:.4f}",
-    "Information Ratio": "{:.4f}"
-}))
     
 
 
