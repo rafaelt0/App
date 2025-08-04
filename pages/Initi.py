@@ -23,7 +23,6 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 
 
 with aba1:
-    with aba1:
     st.title("Análise e Otimização de Portfólio - B3 Explorer")
     st.sidebar.header("Configurações do Portfólio")
     
