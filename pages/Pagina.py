@@ -224,6 +224,11 @@ with aba1:
     "R Quadrado (%)": "{:,.2f}%",
     "Information Ratio": "{:,.2f}"
 }))
+    # Retornos Anuais
+    st.subheader("Retornos Anuais do Portfólio")
+
+    fig_yearly = qs.plots.yearly_returns(portfolio_returns, show=False)
+    st.pyplot(fig_yearly)
 
     
     
