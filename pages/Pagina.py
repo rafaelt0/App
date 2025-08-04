@@ -1,4 +1,19 @@
-
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import datetime
+import warnings
+import plotly.express as px
+import plotly.graph_objects as go
+from pypfopt.hierarchical_portfolio import HRPOpt
+from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
+from scipy.stats import kurtosis, skew
+import quantstats as qs
+import matplotlib.ticker as mtick
+import io
 st.header("Opções Simulação 👨‍🔬")
 n_simulations = st.slider("Número de Simulações", 10, 500, 200)  # Limite para performance
 valor = st.number_input("Capital Inicial (R$)", min_value=100)
