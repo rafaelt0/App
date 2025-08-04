@@ -195,6 +195,20 @@ with aba1:
     fig = qs.plots.returns(portfolio_returns, benchmark=bench, show=False)
     st.pyplot(fig)
 
+    # Métricas vs bench
+    qs_metricas_bench = {
+    "Beta": qs.stats.beta(portfolio_returns, retorno_bench),
+    "Alpha (%)": qs.stats.alpha(portfolio_returns, retorno_bench) * 100,
+    "R²": qs.stats.r_squared(portfolio_returns, retorno_bench),
+    "Correlação": qs.stats.correlation(portfolio_returns, retorno_bench)
+}
+
+
+    df_qs_bench = pd.DataFrame(qs_metricas_bench, index=["Portfólio"]).T
+    
+    st.subheader("📊 Métricas em Relação ao Benchmark (IBOVESPA)")
+    st.dataframe(df_qs_bench.style.format("{:,.4f}"))
+
 
     st.subheader("Drawdown do Portfólio")
     # Drawdown
