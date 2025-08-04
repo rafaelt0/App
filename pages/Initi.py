@@ -9,10 +9,6 @@ import warnings
 import plotly.express as px
 import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
-from pypfopt.expected_returns import mean_historical_return
-from pypfopt.risk_models import CovarianceShrinkage
-from pypfopt.efficient_frontier import EfficientFrontier
-
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
 from scipy.stats import kurtosis, skew
 import quantstats as qs
@@ -28,6 +24,7 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 
 with aba1:
     st.title("Análise e Otimização de Portfólio - B3 Explorer")
+    # Sidebar config
     st.sidebar.header("Configurações do Portfólio")
     
     data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
@@ -35,20 +32,31 @@ with aba1:
     taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.0556, max_value=15.0)
     benchmark_opcao = st.sidebar.multiselect("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"])
     
+    # Seleção de ações
     data = pd.read_csv('acoes-listadas-b3.csv')
     stocks = list(data['Ticker'].values)
     tickers = st.multiselect("Selecione as ações do portfólio", stocks)
     
-    if len(tickers) < 2:
-        st.warning("Selecione pelo menos duas ações para montar o portfólio.")
+    if len(tickers) == 0:
+        st.warning("Selecione pelo menos uma ação.")
+        st.stop()
+    
+    if len(tickers) == 1:
+        st.warning("Selecione pelo menos dois ativos para montar o portfólio.")
         st.stop()
     
     tickers_yf = [t + ".SA" for t in tickers]
+    
+    # Baixa dados
     data_yf = yf.download(tickers_yf, start=data_inicio, progress=False)['Close']
+    if isinstance(data_yf.columns, pd.MultiIndex):
+        data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
+    
     returns = data_yf.pct_change().dropna()
     
-    modo = st.sidebar.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Otimização Minimum Variance Portfolio (MVP)", "Alocação Manual"))
-
+    # Escolha modo: manual ou otimizado
+    modo = st.sidebar.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Alocação Manual"))
+    
     if modo == "Alocação Manual":
         st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
         pesos_manuais = {}
@@ -61,31 +69,24 @@ with aba1:
             st.error(f"A soma dos pesos é {total:.2f}%, deve ser 100%")
             st.stop()
         pesos_manuais_arr = np.array(list(pesos_manuais.values()))
-        peso_df = pd.DataFrame.from_dict(pesos_manuais, orient='index', columns=["Peso"])
-    elif modo == "Otimização Hierarchical Risk Parity (HRP)":
+        peso_manual_df = pd.DataFrame.from_dict(pesos_manuais, orient='index', columns=["Peso"])
+    else:
+        st.subheader("Otimização Hierarchical Risk Parity (HRP)")
         hrp = HRPOpt(returns)
-        weights = hrp.optimize()
-        peso_df = pd.DataFrame.from_dict(weights, orient='index', columns=["Peso"])
-        pesos_manuais_arr = peso_df["Peso"].values
-    else:  # MVP
-        returns_clean = returns.dropna(axis=0, how='any')
-        mu = mean_historical_return(returns_clean)
-        S = CovarianceShrinkage(returns_clean).ledoit_wolf()
-        ef = EfficientFrontier(mu, S)
-        weights = ef.min_volatility()
-        peso_df = pd.DataFrame.from_dict(weights, orient='index', columns=["Peso"])
-        pesos_manuais_arr = peso_df["Peso"].values
-
-    peso_df.index = peso_df.index.str.replace(".SA", "")
+        weights_hrp = hrp.optimize()
+        peso_manual_df = pd.DataFrame.from_dict(weights_hrp, orient='index', columns=["Peso"])
+        pesos_manuais_arr = peso_manual_df["Peso"].values
     
-    st.subheader(f"Pesos do Portfólio ({modo})")
-    st.dataframe((peso_df * 100).round(2).T)
+        # Mostrar pesos
+    st.subheader("Pesos do Portfólio (%)")
+    peso_manual_df.index = peso_manual_df.index.str.replace(".SA","")
+    st.dataframe((peso_manual_df*100).round(2).T)
     
-    fig_pie = px.pie(peso_df.reset_index(), values="Peso", names="index",
+    # Gráfico pizza das porcentagens
+    fig_pie = px.pie(peso_manual_df.reset_index(), values="Peso", names="index",
                      title="Composição do Portfólio (%)",
                      labels={"index": "Ativo", "Peso": "Percentual"})
     st.plotly_chart(fig_pie)
-
 
     alloc_df = peso_manual_df.reset_index()
     alloc_df.columns = ["Ativo", "Peso"]
@@ -328,13 +329,23 @@ with aba1:
 
 # Separação na sidebar
 st.sidebar.markdown("---")
-
-           
 with aba2:
     st.header("Simulação Monte Carlo por Ativos (Multivariada) 👨‍🔬")
-    n_simulations = st.slider("Número de Simulações", 10, 500, 200)  # Limite para performance
-    valor = st.number_input("Capital Inicial (R$)", min_value=100)
-    years = int(st.number_input("Anos", min_value=1))
+
+    with st.form("form_simulacao"):
+        n_simulations = st.slider("Número de Simulações", 10, 500, 200,
+                                  help="Quantidade de trajetórias simuladas para o portfólio.")
+        valor = st.number_input("Capital Inicial (R$)", min_value=100,
+                                help="Valor inicial investido no portfólio.")
+        years = int(st.number_input("Anos", min_value=1,
+                                    help="Horizonte da simulação em anos."))
+        
+        submitted = st.form_submit_button("Rodar Simulação")
+    
+    if not submitted:
+        st.info("Configure os parâmetros acima e clique em 'Rodar Simulação' para ver os resultados.")
+        st.stop()
+
     st.header("Simulação 🧪")
 
     n_dias = years * 252  # 252 dias úteis no ano
@@ -346,39 +357,30 @@ with aba2:
     else:
         pesos_dict = dict(zip(peso_manual_df.index + ".SA", peso_manual_df["Peso"].values))
     
+    # Remove ativos com peso zero (se houver)
+    pesos_dict = {k: v for k, v in pesos_dict.items() if v > 1e-6}
+    
     aligned_returns = returns.loc[:, pesos_dict.keys()].dropna()
 
     pesos = np.array(list(pesos_dict.values()))
-   
     
     mu = aligned_returns.mean().values  # vetor média de retorno diário
     cov = aligned_returns.cov().values  # matriz covariância diária
-    # Garante que temos um dicionário de pesos, independente do modo escolhido
-    
-    
-
     
     np.random.seed(42)  # para reprodutibilidade
     
     # Simular retornos multivariados normais correlacionados
-    # shape: (n_dias, n_simulations, n_ativos)
     retornos_simulados = np.random.multivariate_normal(mu, cov, size=(n_dias, n_simulations))
     
     # Calcular trajetórias para cada ativo em cada simulação
-    # Aplicando GBM: S_t = S_(t-1) * exp(retorno)
-    # Inicializamos preços em 1 (valor relativo)
     precos_simulados = np.exp(retornos_simulados.cumsum(axis=0))
-    # precos_simulados shape = (n_dias, n_simulations, n_ativos)
     
     # Calcular valor do portfólio: soma ponderada dos ativos para cada dia e simulação
-    # Multiplica os preços simulados pelos pesos (broadcast)
     valor_portfolio = (precos_simulados * pesos).sum(axis=2) * valor_inicial
     
     # Criar DataFrame para facilitar manipulação e plotagem
-    datas = pd.date_range(start=datetime.date.today(), periods=n_dias+1, freq='B')  # dias úteis
-    # Adiciona dia zero com valor_inicial (antes do primeiro dia)
+    datas = pd.date_range(start=datetime.date.today(), periods=n_dias+1, freq='B')
     valor_portfolio = np.vstack([np.ones(n_simulations)*valor_inicial, valor_portfolio])
-    
     sim_df = pd.DataFrame(valor_portfolio, index=datas)
     
     # Estatísticas finais da simulação
@@ -399,7 +401,35 @@ with aba2:
     
     st.subheader("📊 Estatísticas da Simulação Monte Carlo por Ativos")
     st.dataframe(sim_stats.style.format("{:,.2f}"))
-    
+
+    st.markdown("""
+    <small><b>VaR 5%</b>: Valor máximo esperado que você pode perder em 5% dos piores casos.<br>
+    <b>CVaR 5%</b>: Média das perdas nos piores 5% dos casos, mostrando um risco mais extremo.</small>
+    """, unsafe_allow_html=True)
+
+    # Gráfico com algumas trajetórias individuais para ilustrar a dispersão
+    st.subheader("Trajetórias Individuais das Simulações (Exemplos)")
+
+    fig_individual = go.Figure()
+    n_plot = min(20, n_simulations)  # limitar para 20 linhas para visualização limpa
+
+    for i in range(n_plot):
+        fig_individual.add_trace(go.Scatter(
+            x=sim_df.index,
+            y=sim_df.iloc[:, i],
+            mode='lines',
+            name=f'Simulação {i+1}',
+            line=dict(width=1),
+            opacity=0.6
+        ))
+    fig_individual.update_layout(
+        title="Exemplos de Trajetórias Simuladas do Valor do Portfólio",
+        xaxis_title="Data",
+        yaxis_title="Valor do Portfólio (R$)",
+        template="plotly_white"
+    )
+    st.plotly_chart(fig_individual, use_container_width=True)
+
     # Fan chart com percentis
     percentis = [5, 25, 50, 75, 95]
     fan_chart = sim_df.quantile(q=np.array(percentis) / 100, axis=1).T
@@ -435,12 +465,12 @@ with aba2:
         template="plotly_white"
     )
     st.plotly_chart(fig_fan, use_container_width=True)
-    
+
     # Histograma valor final
     q1 = valores_finais.quantile(0.25)
     q2 = valores_finais.quantile(0.50)
     q3 = valores_finais.quantile(0.75)
-    
+
     st.subheader("Distribuição do Valor Final do Portfólio")
     fig, ax = plt.subplots(figsize=(10,6))
     sns.histplot(valores_finais, bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax)
@@ -452,7 +482,7 @@ with aba2:
     ax.set_ylabel('Frequência')
     ax.legend()
     st.pyplot(fig)
-    
+
     # Estatísticas da distribuição final
     estatisticas = {
         "Mínimo": valores_finais.min(),
@@ -466,3 +496,4 @@ with aba2:
     df_estatisticas = pd.DataFrame(estatisticas, index=["Valores (R$)"])
     st.subheader("Estatísticas da Distribuição Final da Simulação Monte Carlo")
     st.dataframe(df_estatisticas.style.format("{:,.2f}"))
+
