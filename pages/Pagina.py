@@ -196,26 +196,24 @@ with aba1:
     st.pyplot(fig)
 
     # Métricas vs bench
-    # Garante que só uma coluna (Series)
-    portfolio_returns_metrics = portfolio_returns.squeeze()
-    retorno_bench_metrics = retorno_bench.squeeze()
+    bench_returns = bench
+    cov_matrix = np.cov(portfolio_returns, bench_returns)  # matriz de covariância 2x2
+    beta = cov_matrix[0,1] / cov_matrix[1,1]
+    alpha = portfolio_returns.mean() - beta * bench_returns.mean()
+    r_quadrado = qs.stats.r_squared(portfolio_returns, bench)
     
-    # Alinha os índices
-    aligned = pd.concat([portfolio_returns_metrics, retorno_bench_metrics], axis=1).dropna()
-    port_ret_aligned = aligned.iloc[:, 0]
-    bench_ret_aligned = aligned.iloc[:, 1]
-    qs_metricas_bench = {
-    "Beta": qs.stats.beta(port_ret_aligned, bench_ret_aligned),
-    "Alpha (%)": qs.stats.alpha(port_ret_aligned, bench_ret_aligned) * 100,
-    "R²": qs.stats.r_squared(port_ret_aligned, bench_ret_aligned),
-    "Correlação": qs.stats.correlation(port_ret_aligned, bench_ret_aligned)
-}
 
-
+    
     df_qs_bench = pd.DataFrame(qs_metricas_bench, index=["Portfólio"]).T
     
     st.subheader("📊 Métricas em Relação ao Benchmark (IBOVESPA)")
-    st.dataframe(df_qs_bench.style.format("{:,.4f}"))
+    st.dataframe(metrics.style.format({
+    "Alpha (diário)": "{:.4%}",
+    "Beta": "{:.4f}",
+    "R²": "{:.4f}",
+    "Information Ratio": "{:.4f}"
+}))
+    
 
 
     st.subheader("Drawdown do Portfólio")
