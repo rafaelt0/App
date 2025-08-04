@@ -23,8 +23,8 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 
 
 with aba1:
+    with aba1:
     st.title("Análise e Otimização de Portfólio - B3 Explorer")
-    # Sidebar config
     st.sidebar.header("Configurações do Portfólio")
     
     data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
@@ -32,31 +32,20 @@ with aba1:
     taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.0556, max_value=15.0)
     benchmark_opcao = st.sidebar.multiselect("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"])
     
-    # Seleção de ações
     data = pd.read_csv('acoes-listadas-b3.csv')
     stocks = list(data['Ticker'].values)
     tickers = st.multiselect("Selecione as ações do portfólio", stocks)
     
-    if len(tickers) == 0:
-        st.warning("Selecione pelo menos uma ação.")
-        st.stop()
-    
-    if len(tickers) == 1:
-        st.warning("Selecione pelo menos dois ativos para montar o portfólio.")
+    if len(tickers) < 2:
+        st.warning("Selecione pelo menos duas ações para montar o portfólio.")
         st.stop()
     
     tickers_yf = [t + ".SA" for t in tickers]
-    
-    # Baixa dados
     data_yf = yf.download(tickers_yf, start=data_inicio, progress=False)['Close']
-    if isinstance(data_yf.columns, pd.MultiIndex):
-        data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
-    
     returns = data_yf.pct_change().dropna()
     
-    # Escolha modo: manual ou otimizado
-    modo = st.sidebar.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Alocação Manual"))
-    
+    modo = st.sidebar.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Otimização Minimum Variance Portfolio (MVP)", "Alocação Manual"))
+
     if modo == "Alocação Manual":
         st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
         pesos_manuais = {}
@@ -69,24 +58,30 @@ with aba1:
             st.error(f"A soma dos pesos é {total:.2f}%, deve ser 100%")
             st.stop()
         pesos_manuais_arr = np.array(list(pesos_manuais.values()))
-        peso_manual_df = pd.DataFrame.from_dict(pesos_manuais, orient='index', columns=["Peso"])
-    else:
-        st.subheader("Otimização Hierarchical Risk Parity (HRP)")
+        peso_df = pd.DataFrame.from_dict(pesos_manuais, orient='index', columns=["Peso"])
+    elif modo == "Otimização Hierarchical Risk Parity (HRP)":
         hrp = HRPOpt(returns)
-        weights_hrp = hrp.optimize()
-        peso_manual_df = pd.DataFrame.from_dict(weights_hrp, orient='index', columns=["Peso"])
-        pesos_manuais_arr = peso_manual_df["Peso"].values
+        weights = hrp.optimize()
+        peso_df = pd.DataFrame.from_dict(weights, orient='index', columns=["Peso"])
+        pesos_manuais_arr = peso_df["Peso"].values
+    else:  # MVP
+        mu = mean_historical_return(data_yf)
+        S = CovarianceShrinkage(data_yf).ledoit_wolf()
+        ef = EfficientFrontier(mu, S)
+        weights = ef.min_volatility()
+        peso_df = pd.DataFrame.from_dict(weights, orient='index', columns=["Peso"])
+        pesos_manuais_arr = peso_df["Peso"].values
+
+    peso_df.index = peso_df.index.str.replace(".SA", "")
     
-        # Mostrar pesos
-    st.subheader("Pesos do Portfólio (%)")
-    peso_manual_df.index = peso_manual_df.index.str.replace(".SA","")
-    st.dataframe((peso_manual_df*100).round(2).T)
+    st.subheader(f"Pesos do Portfólio ({modo})")
+    st.dataframe((peso_df * 100).round(2).T)
     
-    # Gráfico pizza das porcentagens
-    fig_pie = px.pie(peso_manual_df.reset_index(), values="Peso", names="index",
+    fig_pie = px.pie(peso_df.reset_index(), values="Peso", names="index",
                      title="Composição do Portfólio (%)",
                      labels={"index": "Ativo", "Peso": "Percentual"})
     st.plotly_chart(fig_pie)
+
 
     alloc_df = peso_manual_df.reset_index()
     alloc_df.columns = ["Ativo", "Peso"]
