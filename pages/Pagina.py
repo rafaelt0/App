@@ -290,41 +290,54 @@ with aba1:
     st.sidebar.markdown("---")
     
            
-    
-    
-
 with aba2:
-    st.header("Opções Simulação 👨‍🔬")
+    st.header("Simulação Monte Carlo por Ativos (Multivariada) 👨‍🔬")
     n_simulations = st.slider("Número de Simulações", 10, 500, 200)  # Limite para performance
     valor = st.number_input("Capital Inicial (R$)", min_value=100)
     years = int(st.number_input("Anos", min_value=1))
     st.header("Simulação 🧪")
 
-    n_dias = years * 252  # Usar 252 dias úteis para ser mais realista
+    n_dias = years * 252  # 252 dias úteis no ano
     valor_inicial = valor
-
-    # Retornos históricos do portfólio alinhados
-    aligned = portfolio_returns.dropna()
-    mu_p = aligned.mean()
-    sigma_p = aligned.std()
-
-    # Simulação vetorizada GBM (Geometric Brownian Motion)
+    
+    # Retornos históricos dos ativos e pesos do portfólio
+    aligned_returns = returns.loc[:, pesos_manuais.keys()].dropna()
+    
+    mu = aligned_returns.mean().values  # vetor média de retorno diário
+    cov = aligned_returns.cov().values  # matriz covariância diária
+    pesos = np.array([pesos_manuais[ticker] for ticker in aligned_returns.columns])
+    
     np.random.seed(42)  # para reprodutibilidade
-    rand = np.random.normal(size=(n_dias, n_simulations))
-    growth_factors = np.exp((mu_p - 0.5 * sigma_p ** 2) + sigma_p * rand)
-    simulacoes = np.vstack([np.ones(n_simulations) * valor_inicial, valor_inicial * growth_factors.cumprod(axis=0)])
-
-    # DataFrame para facilitar manipulação
-    sim_df = pd.DataFrame(simulacoes)
-    sim_df.index.name = "Dia"
-
+    
+    # Simular retornos multivariados normais correlacionados
+    # shape: (n_dias, n_simulations, n_ativos)
+    retornos_simulados = np.random.multivariate_normal(mu, cov, size=(n_dias, n_simulations))
+    
+    # Calcular trajetórias para cada ativo em cada simulação
+    # Aplicando GBM: S_t = S_(t-1) * exp(retorno)
+    # Inicializamos preços em 1 (valor relativo)
+    precos_simulados = np.exp(retornos_simulados.cumsum(axis=0))
+    # precos_simulados shape = (n_dias, n_simulations, n_ativos)
+    
+    # Calcular valor do portfólio: soma ponderada dos ativos para cada dia e simulação
+    # Multiplica os preços simulados pelos pesos (broadcast)
+    valor_portfolio = (precos_simulados * pesos).sum(axis=2) * valor_inicial
+    
+    # Criar DataFrame para facilitar manipulação e plotagem
+    datas = pd.date_range(start=datetime.date.today(), periods=n_dias+1, freq='B')  # dias úteis
+    # Adiciona dia zero com valor_inicial (antes do primeiro dia)
+    valor_portfolio = np.vstack([np.ones(n_simulations)*valor_inicial, valor_portfolio])
+    
+    sim_df = pd.DataFrame(valor_portfolio, index=datas)
+    
     # Estatísticas finais da simulação
-    valor_esperado = sim_df.iloc[-1].mean()
-    var_5 = np.percentile(sim_df.iloc[-1], 5)
-    cvar_5 = sim_df.iloc[-1][sim_df.iloc[-1] <= var_5].mean()
-    pior_cenario = sim_df.iloc[-1].min()
-    melhor_cenario = sim_df.iloc[-1].max()
-
+    valores_finais = sim_df.iloc[-1]
+    valor_esperado = valores_finais.mean()
+    var_5 = np.percentile(valores_finais, 5)
+    cvar_5 = valores_finais[valores_finais <= var_5].mean()
+    pior_cenario = valores_finais.min()
+    melhor_cenario = valores_finais.max()
+    
     sim_stats = pd.DataFrame({
         "Valor Esperado Final (R$)": [valor_esperado],
         "VaR 5% (R$)": [var_5],
@@ -332,18 +345,16 @@ with aba2:
         "Pior Cenário (R$)": [pior_cenario],
         "Melhor Cenário (R$)": [melhor_cenario]
     })
-
-    st.subheader("📊 Estatísticas da Simulação Monte Carlo")
+    
+    st.subheader("📊 Estatísticas da Simulação Monte Carlo por Ativos")
     st.dataframe(sim_stats.style.format("{:,.2f}"))
-
-    # Fan chart com faixas de confiança
+    
+    # Fan chart com percentis
     percentis = [5, 25, 50, 75, 95]
     fan_chart = sim_df.quantile(q=np.array(percentis) / 100, axis=1).T
     fan_chart.columns = [f"P{p}" for p in percentis]
 
     fig_fan = go.Figure()
-
-    # Faixa 5%-95%
     fig_fan.add_trace(go.Scatter(
         x=fan_chart.index, y=fan_chart["P95"],
         line=dict(color='rgba(0,100,200,0.1)'), showlegend=False
@@ -353,8 +364,6 @@ with aba2:
         fill='tonexty', fillcolor='rgba(0,100,200,0.2)',
         line=dict(color='rgba(0,100,200,0.1)'), name='Faixa 5%-95%'
     ))
-
-    # Faixa 25%-75%
     fig_fan.add_trace(go.Scatter(
         x=fan_chart.index, y=fan_chart["P75"],
         line=dict(color='rgba(0,100,200,0.1)'), showlegend=False
@@ -364,45 +373,35 @@ with aba2:
         fill='tonexty', fillcolor='rgba(0,100,200,0.4)',
         line=dict(color='rgba(0,100,200,0.1)'), name='Faixa 25%-75%'
     ))
-
-    # Linha mediana
     fig_fan.add_trace(go.Scatter(
         x=fan_chart.index, y=fan_chart["P50"],
         line=dict(color='blue', width=2), name='Mediana'
     ))
-
-    # Layout final
     fig_fan.update_layout(
-        title="Simulação Monte Carlo - Fan Chart com Faixas de Confiança",
-        xaxis_title="Dia",
+        title="Simulação Monte Carlo por Ativos - Fan Chart com Faixas de Confiança",
+        xaxis_title="Data",
         yaxis_title="Valor do Portfólio (R$)",
         template="plotly_white"
     )
-
     st.plotly_chart(fig_fan, use_container_width=True)
-
-
-    valores_finais = sim_df.iloc[-1]
+    
+    # Histograma valor final
     q1 = valores_finais.quantile(0.25)
     q2 = valores_finais.quantile(0.50)
     q3 = valores_finais.quantile(0.75)
     
-    # Histograma do valor final do portfólio
     st.subheader("Distribuição do Valor Final do Portfólio")
     fig, ax = plt.subplots(figsize=(10,6))
     sns.histplot(valores_finais, bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax)
-    
     ax.axvline(q1, color='red', linestyle='--', label='Q1 (25%)')
     ax.axvline(q2, color='green', linestyle='-', label='Mediana (50%)')
     ax.axvline(q3, color='orange', linestyle='--', label='Q3 (75%)')
-    
     ax.set_title('Distribuição dos Valores Finais da Simulação Monte Carlo')
     ax.set_xlabel('Valor Final do Portfólio (R$)')
     ax.set_ylabel('Frequência')
     ax.legend()
-    
     st.pyplot(fig)
-
+    
     # Estatísticas da distribuição final
     estatisticas = {
         "Mínimo": valores_finais.min(),
@@ -413,7 +412,7 @@ with aba2:
         "Média": valores_finais.mean(),
         "Desvio Padrão": valores_finais.std()
     }
-    
     df_estatisticas = pd.DataFrame(estatisticas, index=["Valores (R$)"])
     st.subheader("Estatísticas da Distribuição Final da Simulação Monte Carlo")
     st.dataframe(df_estatisticas.style.format("{:,.2f}"))
+
