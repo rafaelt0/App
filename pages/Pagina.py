@@ -205,7 +205,7 @@ with aba1:
 
     
     metricas = pd.DataFrame({
-        "Alfa": [alfa],
+        "Alfa": [alfa.values*252],
         "Beta": [beta],
         "R Quadrado": [r_quadrado],
         "Information Ratio": [information_ratio]
