@@ -226,16 +226,12 @@ with aba1:
 }))
     # Retornos Anuais
    
-    portfolio_yearly = qs.stats.yearly_returns(portfolio_returns) * 100
-    benchmark_yearly = qs.stats.yearly_returns(retorno_bench) * 100
+    fig = qs.plots.yearly_returns(portfolio_returns, benchmark=retorno_bench, compounded=True, show=False)
+    ax = plt.gca()
     
-    fig, ax = plt.subplots(figsize=(10,5))
-    portfolio_yearly.plot(kind='bar', color='blue', alpha=0.7, label='Portfólio', ax=ax)
-    benchmark_yearly.plot(kind='bar', color='orange', alpha=0.7, label='IBOVESPA', ax=ax)
-    
-    ax.set_title('Retornos Anuais - Portfólio vs Benchmark')
-    ax.set_ylabel('Retorno (%)')
-    ax.legend()
+    # Alterar legenda
+    ax.legend(['Portfólio', 'IBOVESPA'])  # renomeia
+    ax.set_title('Retornos Anuais (Portfólio vs IBOVESPA)')
     
     st.pyplot(fig)
         
