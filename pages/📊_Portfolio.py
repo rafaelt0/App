@@ -190,6 +190,7 @@ with aba1:
         st.dataframe(stats.round(4))
 
         # Gráfico Portfolio vs IBOVESPA
+        st.subheader("Retorno Acumulado Portfólio vs IBOVESPA")
         bench = yf.download("^BVSP", start=data_inicio)['Close'].pct_change().dropna()
         fig = qs.plots.returns(portfolio_returns, benchmark=bench, show=False)
         st.pyplot(fig)
