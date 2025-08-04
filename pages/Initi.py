@@ -9,6 +9,10 @@ import warnings
 import plotly.express as px
 import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
+from pypfopt.expected_returns import mean_historical_return
+from pypfopt.risk_models import CovarianceShrinkage
+from pypfopt.efficient_frontier import EfficientFrontier
+
 from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
 from scipy.stats import kurtosis, skew
 import quantstats as qs
