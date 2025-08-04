@@ -227,7 +227,7 @@ with aba1:
     # Retornos Anuais
     st.subheader("Retornos Anuais do Portfólio")
 
-    fig_yearly = qs.plots.yearly_returns(portfolio_returns, show=False)
+    fig_yearly = qs.plots.yearly_returns(portfolio_returns,bench=bench, show=False)
     st.pyplot(fig_yearly)
 
     
