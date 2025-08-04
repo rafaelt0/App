@@ -386,9 +386,21 @@ with aba2:
     import seaborn as sns
     import matplotlib.pyplot as plt
 
+    
     fig_hist, ax_hist = plt.subplots(figsize=(10, 5))
-    sns.histplot(sim_df.iloc[-1], bins=50, kde=True, color='#1f77b4', ax=ax_hist)
-    ax_hist.set_xlabel("Valor Final do Portfólio (R$)")
+    sns.histplot(portfolio_returns * 100, bins=50, kde=True, color='#1f77b4', edgecolor='black', linewidth=0.7, alpha=0.9, ax=ax_hist)
+    ax_hist.set_xlabel("Retornos Diários (%)")
     ax_hist.set_ylabel("Frequência")
-    st.pyplot(fig_hist)
-
+    
+    # Calcula quartis
+    q1 = portfolio_returns.quantile(0.25) * 100
+    q2 = portfolio_returns.quantile(0.5) * 100  # mediana
+    q3 = portfolio_returns.quantile(0.75) * 100
+    
+    # Adiciona linhas verticais para quartis
+    ax_hist.axvline(q1, color='red', linestyle='--', label='Q1 (25%)')
+    ax_hist.axvline(q2, color='green', linestyle='-', label='Mediana (50%)')
+    ax_hist.axvline(q3, color='orange', linestyle='--', label='Q3 (75%)')
+    
+    ax_hist.legend()
+    plt.show()
