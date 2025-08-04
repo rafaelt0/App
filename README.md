@@ -1,8 +1,3 @@
-# B3 Explorer
-Claro! Aqui está um exemplo de README profissional e completo para seu projeto de análise e simulação de portfólio com Streamlit e Python:
-
----
-
 # B3 Explorer - Análise e Simulação de Portfólio
 
 ## 📈 Descrição
@@ -49,54 +44,9 @@ O projeto integra dados históricos do Yahoo Finance, indicadores financeiros e 
 
 ---
 
-## 📥 Como usar
-
-1. Clone o repositório:
-
-   ```bash
-   git clone https://github.com/seu_usuario/b3-explorer.git
-   cd b3-explorer
-   ```
-
-2. Instale as dependências (recomenda-se ambiente virtual):
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Execute o app:
-
-   ```bash
-   streamlit run app.py
-   ```
-
-4. No menu lateral, escolha a data inicial, o capital inicial, selecione os ativos do portfólio, defina o modo de alocação (manual ou otimizado) e explore os resultados nas abas.
-
----
-
-## 📊 Dados
-
-* Lista de ações e setores está em `acoes-listadas-b3.csv` (arquivo necessário).
-* Dados históricos obtidos via API do Yahoo Finance.
-
----
-
-## 🤝 Contribuições
-
-Contribuições são bem-vindas! Por favor, abra issues para bugs ou solicitações de funcionalidades.
-
----
-
-## 📄 Licença
-
-Este projeto está licenciado sob a Licença MIT — veja o arquivo [LICENSE](LICENSE) para detalhes.
-
----
-
 ## 📞 Contato
 
-Desenvolvido por \[Seu Nome] — [seu.email@exemplo.com](mailto:seu.email@exemplo.com)
+Desenvolvido por Rafael Eiki Teruya — [rafael_teruya@usp.br]
 
 ---
 
-Se desejar, posso ajudar a criar também o arquivo `requirements.txt` com as bibliotecas usadas. Quer?
