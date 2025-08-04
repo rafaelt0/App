@@ -15,7 +15,7 @@ import quantstats as qs
 import matplotlib.ticker as mtick
 import io
 
-aba1, aba2 = st.tabs(["📊 Análise do Portfólio", "🧪 Simulação Monte Carlo Portfolio"])
+
 
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
