@@ -225,16 +225,20 @@ with aba1:
     "Information Ratio": "{:,.2f}"
 }))
     # Retornos Anuais
-    st.subheader("Retornos Anuais do Portfólio")
-
-    fig_yearly = qs.plots.yearly_returns(portfolio_returns,benchmark=bench, show=False)
-    ax = plt.gca()
-    ax.legend(['Portfólio', 'IBOVESPA'])  
-    ax.set_title('Retornos Anuais (Portfólio vs IBOVESPA)')
-    st.pyplot(fig_yearly)
-
+   
+    portfolio_yearly = qs.stats.yearly_returns(portfolio_returns) * 100
+    benchmark_yearly = qs.stats.yearly_returns(retorno_bench) * 100
     
+    fig, ax = plt.subplots(figsize=(10,5))
+    portfolio_yearly.plot(kind='bar', color='blue', alpha=0.7, label='Portfólio', ax=ax)
+    benchmark_yearly.plot(kind='bar', color='orange', alpha=0.7, label='IBOVESPA', ax=ax)
     
+    ax.set_title('Retornos Anuais - Portfólio vs Benchmark')
+    ax.set_ylabel('Retorno (%)')
+    ax.legend()
+    
+    st.pyplot(fig)
+        
 
 
     st.subheader("Drawdown do Portfólio")
