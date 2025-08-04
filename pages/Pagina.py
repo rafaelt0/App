@@ -212,7 +212,7 @@ with aba1:
     })
     
     st.subheader("📊 Métricas do Portfólio em relação ao Benchmark")
-    st.dataframe(metricas_df.style.format("{:,.2f}%"))
+    st.dataframe(metricas.style.format("{:,.2f}%"))
 
     
     
