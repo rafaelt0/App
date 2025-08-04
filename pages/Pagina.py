@@ -228,6 +228,8 @@ with aba1:
     st.subheader("Retornos Anuais do Portfólio")
 
     fig_yearly = qs.plots.yearly_returns(portfolio_returns,benchmark=bench, show=False)
+    ax.legend(['Portfólio', 'IBOVESPA'])  
+    ax.set_title('Retornos Anuais (Portfólio vs IBOVESPA)')
     st.pyplot(fig_yearly)
 
     
