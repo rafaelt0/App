@@ -204,15 +204,15 @@ with aba1:
     information_ratio = qs.stats.information_ratio(portfolio_returns, bench)
 
     
-metricas = pd.DataFrame({
-    "Alfa": [alfa],
-    "Beta": [beta],
-    "R Quadrado": [r_quadrado],
-    "Information Ratio": [information_ratio]
-})
-
-st.subheader("📊 Métricas do Portfólio em relação ao Benchmark")
-st.dataframe(metricas.round(4))
+    metricas = pd.DataFrame({
+        "Alfa": [alfa],
+        "Beta": [beta],
+        "R Quadrado": [r_quadrado],
+        "Information Ratio": [information_ratio]
+    })
+    
+    st.subheader("📊 Métricas do Portfólio em relação ao Benchmark")
+    st.dataframe(metricas.round(4))
 
     
     
