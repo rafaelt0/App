@@ -205,14 +205,20 @@ with aba1:
 
     
     metricas = pd.DataFrame({
-        "Alfa": [alfa.values*252*100],
-        "Beta": [beta*100],
+        "Alfa": [alfa.values[0]*252*100],
+        "Beta": [beta],
         "R Quadrado": [r_quadrado*100],
-        "Information Ratio": [information_ratio*100]
+        "Information Ratio": [information_ratio]
     })
     
+    
     st.subheader("📊 Métricas do Portfólio em relação ao Benchmark")
-    st.dataframe(metricas.style.format("{:,.2f}"))
+    st.dataframe(metricas.style.format({
+    "Alfa Anual (%)": "{:,.4f}%",
+    "Beta": "{:,.4f}",
+    "R² (%)": "{:,.2f}%",
+    "Information Ratio": "{:,.4f}"
+}))
 
     
     
