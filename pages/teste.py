@@ -59,10 +59,10 @@ modo = st.sidebar.selectbox(
     "Método de Alocação",
     [
         "Alocação Manual",
-        "Hierarchical Risk Parity (HRP)",
-        "Minimum Volatility",
-        "Maximum Sharpe Ratio",
-        "Equal Weight (EW)"
+        "Minimizar Volatilidade",
+        "Maximizar Índice Sharpe",
+        "Pesos Iguais",
+        "Hierarchical Risk Parity"
     ]
 )
 
