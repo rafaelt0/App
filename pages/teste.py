@@ -118,7 +118,7 @@ elif modo == "Equal Weight (EW)":
 
     # Mostrar pesos
 st.subheader("Pesos do Portfólio (%)")
-peso_manual_df.index = peso_manual_df.index.str.replace(".SA","")
+peso_manual_df.index = peso_manual_df.index.astype(str).str.replace(".SA", "", regex=False)
 st.dataframe((peso_manual_df*100).round(2).T)
 
 # Gráfico pizza das porcentagens
