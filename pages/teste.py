@@ -55,7 +55,7 @@ if isinstance(data_yf.columns, pd.MultiIndex):
 returns = data_yf.pct_change().dropna()
 
 # Escolha modo: manual ou otimizado
-modo = st.sidebar.selectbox(
+modo = st.selectbox(
     "Método de Alocação",
     [
         "Alocação Manual",
