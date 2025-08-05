@@ -69,7 +69,7 @@ else:
     tickers_filtrados = data[data['Setor'].isin(setores_selecionados)]['Ticker'].tolist()
 
 st.subheader("Explore ações da B3 🧭")
-tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações)', tickers_filtrados)
+tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações). Selecione a página e as configurações na aba lateral ', tickers_filtrados)
 
 # Só executa análise se houver pelo menos uma ação selecionada
 if tickers:
