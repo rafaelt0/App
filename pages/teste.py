@@ -1,4 +1,5 @@
 from bcb import sgs
+import streamlit as st
 
 # Buscar dados da Selic a partir de 2010-01-01
 selic = sgs.get({'selic': 432}, start='2022-01-01')
