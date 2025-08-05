@@ -276,8 +276,8 @@ st.dataframe(df_drawdowns.style.format({
 }))
 
 cum_returns = (1 + portfolio_returns).cumprod()
-        rolling_max = cum_returns.cummax()
-        drawdown = (cum_returns - rolling_max) / rolling_max
+rolling_max = cum_returns.cummax()
+drawdown = (cum_returns - rolling_max) / rolling_max
     
         # Plot Drawdown
 fig1, ax1 = plt.subplots(figsize=(10,4))
