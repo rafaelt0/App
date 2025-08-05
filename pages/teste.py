@@ -13,177 +13,135 @@ from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_rati
 from scipy.stats import kurtosis, skew
 import quantstats as qs
 import matplotlib.ticker as mtick
-import io
-
-
+import tempfile
 
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
-
-
-
 st.title("Análise e Otimização de Portfólio - B3 Explorer")
-# Sidebar config
+
+# ---------------------------
+# Sidebar
+# ---------------------------
 st.sidebar.header("Configurações do Portfólio")
 
 data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
 valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
-taxa_selic = st.sidebar.number_input("Taxa Selic (%)", value=0.0556, max_value=15.0)
-benchmark_opcao = st.sidebar.multiselect("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"])
+taxa_selic = st.sidebar.number_input("Taxa Selic Anual (%)", value=5.56, max_value=15.0)
+benchmark_opcao = st.sidebar.selectbox("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"])
 
 # Seleção de ações
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 tickers = st.multiselect("Selecione as ações do portfólio", stocks)
 
-if len(tickers) == 0:
-    st.warning("Selecione pelo menos uma ação.")
-    st.stop()
-
-if len(tickers) == 1:
+if len(tickers) < 2:
     st.warning("Selecione pelo menos dois ativos para montar o portfólio.")
     st.stop()
 
 tickers_yf = [t + ".SA" for t in tickers]
 
-# Baixa dados
+# ---------------------------
+# Função para carregar benchmark
+# ---------------------------
+def get_benchmark(benchmark_opcao, data_inicio, taxa_selic):
+    if benchmark_opcao == "IBOVESPA":
+        bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close'].pct_change().dropna()
+    else:
+        # Calcula taxa diária
+        if benchmark_opcao == "SELIC":
+            taxa_diaria = (1 + taxa_selic/100)**(1/252) - 1
+        else:  # CDI - assumindo igual à Selic para simplificação
+            taxa_diaria = (1 + taxa_selic/100)**(1/252) - 1
+        datas = pd.date_range(data_inicio, datetime.date.today(), freq='B')
+        bench = pd.Series(taxa_diaria, index=datas, name=benchmark_opcao)
+    return bench
+
+# ---------------------------
+# Baixar dados das ações
+# ---------------------------
 data_yf = yf.download(tickers_yf, start=data_inicio, progress=False)['Close']
 if isinstance(data_yf.columns, pd.MultiIndex):
     data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
 
 returns = data_yf.pct_change().dropna()
 
-# Escolha modo: manual ou otimizado
-modo = st.selectbox(
-    "Método de Alocação",
-    [
-        "Alocação Manual",
-        "Minimizar Volatilidade",
-        "Maximizar Índice Sharpe",
-        "Pesos Iguais",
-        "Hierarchical Risk Parity"
-    ]
-)
-
-from pypfopt.efficient_frontier import EfficientFrontier
-from pypfopt.risk_models import CovarianceShrinkage
-from pypfopt.expected_returns import mean_historical_return
+# ---------------------------
+# Modo de alocação
+# ---------------------------
+modo = st.sidebar.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Alocação Manual"))
 
 if modo == "Alocação Manual":
     st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
     pesos_manuais = {}
     total = 0.0
     for ticker in tickers:
-        p = st.number_input(f"Peso % de {ticker}", min_value=0.0, max_value=100.0,
-                            value=round(100/len(tickers),2), step=0.01)
+        p = st.number_input(f"Peso % de {ticker}", min_value=0.0, max_value=100.0, value=round(100/len(tickers),2), step=0.01)
         pesos_manuais[ticker + ".SA"] = p / 100
         total += p
     if abs(total - 100) > 0.01:
         st.error(f"A soma dos pesos é {total:.2f}%, deve ser 100%")
         st.stop()
-    pesos_manuais_arr = np.array(list(pesos_manuais.values()))
-    peso_manual_df = pd.DataFrame.from_dict(pesos_manuais, orient='index', columns=["Peso"])
-
-elif modo == "Hierarchical Risk Parity (HRP)":
+    pesos_array = np.array(list(pesos_manuais.values()))
+    peso_df = pd.DataFrame.from_dict(pesos_manuais, orient='index', columns=["Peso"])
+else:
     st.subheader("Otimização Hierarchical Risk Parity (HRP)")
     hrp = HRPOpt(returns)
     weights_hrp = hrp.optimize()
-    peso_manual_df = pd.DataFrame.from_dict(weights_hrp, orient='index', columns=["Peso"])
-    pesos_manuais_arr = peso_manual_df["Peso"].values
+    peso_df = pd.DataFrame.from_dict(weights_hrp, orient='index', columns=["Peso"])
+    pesos_array = peso_df["Peso"].values
 
-elif modo == "Minimum Volatility":
-    st.subheader("Otimização por Mínima Volatilidade")
-    mu = mean_historical_return(data_yf)
-    S = CovarianceShrinkage(data_yf).ledoit_wolf()
-    ef = EfficientFrontier(mu, S)
-    weights_minvol = ef.min_volatility()
-    peso_manual_df = pd.DataFrame.from_dict(weights_minvol, orient='index', columns=["Peso"])
-    pesos_manuais_arr = peso_manual_df["Peso"].values
-
-elif modo == "Maximum Sharpe Ratio":
-    st.subheader("Otimização por Máximo Índice de Sharpe")
-    mu = mean_historical_return(data_yf)
-    S = CovarianceShrinkage(data_yf).ledoit_wolf()
-    ef = EfficientFrontier(mu, S)
-    weights_sharpe = ef.max_sharpe(risk_free_rate=taxa_selic/100)
-    peso_manual_df = pd.DataFrame.from_dict(weights_sharpe, orient='index', columns=["Peso"])
-    pesos_manuais_arr = peso_manual_df["Peso"].values
-
-elif modo == "Equal Weight (EW)":
-    st.subheader("Alocação Equilibrada (Equal Weight)")
-    peso_equal = np.repeat(1/len(tickers), len(tickers))
-    peso_manual_df = pd.DataFrame(peso_equal, index=tickers_yf, columns=["Peso"])
-    pesos_manuais_arr = peso_equal
-
-    # Mostrar pesos
+# ---------------------------
+# Exibir pesos
+# ---------------------------
 st.subheader("Pesos do Portfólio (%)")
-st.dataframe((peso_manual_df*100).round(2).T)
+peso_df.index = peso_df.index.str.replace(".SA","")
+st.dataframe((peso_df*100).round(2).T)
 
-# Gráfico pizza das porcentagens
-fig_pie = px.pie(peso_manual_df.reset_index(), values="Peso", names="index",
-                 title="Composição do Portfólio (%)",
-                 labels={"index": "Ativo", "Peso": "Percentual"})
+# Gráfico Pizza
+fig_pie = px.pie(peso_df.reset_index(), values="Peso", names="index", title="Composição do Portfólio (%)")
 st.plotly_chart(fig_pie)
 
-alloc_df = peso_manual_df.reset_index()
+# Treemap
+alloc_df = peso_df.reset_index()
 alloc_df.columns = ["Ativo", "Peso"]
-
-fig_treemap = px.treemap(
-    alloc_df,
-    path=['Ativo'],
-    values='Peso',
-    color='Peso',
-    color_continuous_scale='Blues',
-    title="Alocação do Portfólio (Treemap)"
-)
+fig_treemap = px.treemap(alloc_df, path=['Ativo'], values='Peso', color='Peso', color_continuous_scale='Blues')
 st.plotly_chart(fig_treemap, use_container_width=True)
 
-
-# Heatmap e Matriz de Correlação
-heatmap=sns.heatmap(data_yf.corr(), annot=True)
-st.subheader("Matrix de Correlação")
-st.write(data_yf.corr())
-st.subheader("Heatmap")
+# Heatmap de Correlação
+st.subheader("Matriz de Correlação e Heatmap")
+corr = returns.corr()
+st.dataframe(corr)
+heatmap = sns.heatmap(corr, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
 st.pyplot(heatmap.figure)
 
-# Cálculo do portfólio com os pesos escolhidos
-portfolio_returns = returns.dot(pesos_manuais_arr)
+# ---------------------------
+# Cálculo do portfólio
+# ---------------------------
+portfolio_returns = returns.dot(pesos_array)
 cum_return = (1 + portfolio_returns).cumprod()
 portfolio_value = cum_return * valor_inicial
 
-# Obter os dados de benchmark BOVESPA e calcular o retorno acumulado
-bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
-retorno_bench = bench.pct_change().dropna()
-portfolio_returns = portfolio_returns.loc[retorno_bench.index]
-retorno_bench = retorno_bench.loc[portfolio_returns.index]
-retorno_cum_bench = (1+retorno_bench).cumprod()
-bench_value = retorno_cum_bench * valor_inicial
+# ---------------------------
+# Benchmark dinâmico
+# ---------------------------
+bench_returns = get_benchmark(benchmark_opcao, data_inicio, taxa_selic)
+portfolio_returns = portfolio_returns.loc[bench_returns.index.intersection(portfolio_returns.index)]
+bench_returns = bench_returns.loc[portfolio_returns.index]
 
+# Valores acumulados
+ret_cum_port = (1 + portfolio_returns).cumprod()
+ret_cum_bench = (1 + bench_returns).cumprod()
 
-# Mostrar gráfico do valor do portfólio x BOVESPA
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, 
-                         mode='lines', name='Portfólio'))
-fig.add_trace(go.Scatter(x=bench_value.index, y=bench_value, 
-                         mode='lines', name='IBOVESPA'))
-fig.update_layout(title='Valor do Portfólio',
-                  xaxis_title='Data', yaxis_title='Valor (R$)')
+fig.add_trace(go.Scatter(x=ret_cum_port.index, y=ret_cum_port*valor_inicial, name='Portfólio'))
+fig.add_trace(go.Scatter(x=ret_cum_bench.index, y=ret_cum_bench*valor_inicial, name=benchmark_opcao))
+fig.update_layout(title='Valor do Portfólio vs Benchmark', xaxis_title='Data', yaxis_title='Valor (R$)')
 st.plotly_chart(fig)
-# Retornos mensais
-st.subheader("Retornos Mensais do Portfólio")
 
-fig = qs.plots.monthly_returns(portfolio_returns, show=False)
-st.pyplot(fig)
-
-
-
-
-
-
-
-
-# Informações do portfólio
+# ---------------------------
+# Estatísticas básicas
+# ---------------------------
 portfolio_info = pd.DataFrame({
     "Valor Inicial": [valor_inicial],
     "Valor Máximo": [portfolio_value.max()],
@@ -196,207 +154,30 @@ portfolio_info = pd.DataFrame({
 st.subheader("Informações do Portfólio")
 st.dataframe(portfolio_info.style.format("{:,.2f}"))
 
-# Distribuição de retornos com estatísticas
-st.subheader("Distribuição dos Retornos Diários (%) e Estatísticas")
-fig_hist, ax_hist = plt.subplots(figsize=(10,5))
-sns.histplot(portfolio_returns*100, bins=50, kde=True, color='skyblue', ax=ax_hist)
-ax_hist.set_xlabel("Retornos Diários (%)")
-ax_hist.set_ylabel("Frequência")
-
-media = portfolio_returns.mean()*100
-desvio = portfolio_returns.std()*100
-curtose_val = kurtosis(portfolio_returns, fisher=True)
-assimetria_val = skew(portfolio_returns)
-
-stats_text = (f"Média: {media:.4f}%\n"
-              f"Desvio Padrão: {desvio:.4f}%\n"
-              f"Curtose (Fisher): {curtose_val:.4f}\n"
-              f"Assimetria: {assimetria_val:.4f}")
-
-props = dict(boxstyle='round', facecolor='white', alpha=0.8)
-ax_hist.text(0.95, 0.95, stats_text, transform=ax_hist.transAxes,
-             fontsize=10, verticalalignment='top', horizontalalignment='right', bbox=props)
-
-st.pyplot(fig_hist)
-
-# Estatísticas do portfólio
-stats = pd.DataFrame([[ 
-    sharpe(portfolio_returns, rf=taxa_selic/100),
-    sortino(portfolio_returns, rf=taxa_selic/100),
-    max_drawdown(portfolio_returns),
-    var(portfolio_returns),
-    cvar(portfolio_returns),
-    tail_ratio(portfolio_returns)
-]], columns=["Índice Sharpe", "Índice Sortino", "Max Drawdown", "VaR", "CVaR", "Tail Ratio"])
-
-st.subheader("Estatísticas do Portfólio")
-st.dataframe(stats.round(4))
-
-# Gráfico Portfolio vs IBOVESPA
-st.subheader("Retorno Acumulado Portfólio vs IBOVESPA")
-bench = yf.download("^BVSP", start=data_inicio)['Close'].pct_change().dropna()
-fig = qs.plots.returns(portfolio_returns, benchmark=bench, show=False)
-st.pyplot(fig)
-
-# Métricas vs bench
-bench_returns = bench
-cov_matrix = np.cov(portfolio_returns.squeeze(), bench_returns.squeeze())  # matriz de covariância 2x2
-beta = cov_matrix[0,1] / cov_matrix[1,1]
-alfa = portfolio_returns.mean() - beta * bench_returns.mean()
-r_quadrado = qs.stats.r_squared(portfolio_returns, bench)
-information_ratio = qs.stats.information_ratio(portfolio_returns, bench)
-
-
-metricas = pd.DataFrame({
-    "Alfa Anual (%)": [alfa.values[0]*252*100],
-    "Beta": [beta],
-    "R Quadrado (%)": [r_quadrado*100],
-    "Information Ratio": [information_ratio]
-})
-
-
-st.subheader("📊 Métricas do Portfólio em relação ao Benchmark")
-st.dataframe(metricas.style.format({
-"Alfa Anual (%)": "{:,.2f}%",
-"Beta": "{:,.2f}",
-"R Quadrado (%)": "{:,.2f}%",
-"Information Ratio": "{:,.2f}"
-}))
-# Retornos Anuais
-
-fig = qs.plots.yearly_returns(portfolio_returns, benchmark=retorno_bench, compounded=True, show=False)
-ax = plt.gca()
-
-# Alterar legenda
-ax.legend(['Portfólio', 'IBOVESPA'])  # renomeia
-ax.set_title('Retornos Anuais (Portfólio vs IBOVESPA)')
-
-st.pyplot(fig)
-    
-
-
-st.subheader("Drawdown do Portfólio")
-# Drawdown
-cum_returns = (1 + portfolio_returns).cumprod()
-rolling_max = cum_returns.cummax()
-drawdown = (cum_returns - rolling_max) / rolling_max
-
-# Plot Drawdown
-fig1, ax1 = plt.subplots(figsize=(10,4))
-ax1.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.4)
-ax1.set_title("Drawdown do Portfólio")
-ax1.set_ylabel("Drawdown")
-ax1.set_xlabel("Data")
-ax1.grid(True)
-
-ax1.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-st.pyplot(fig1)
-
-# Rolling Beta (60 dias)
+# ---------------------------
+# Sharpe Móvel Corrigido
+# ---------------------------
 window = 60
-
-rolling_cov = portfolio_returns.rolling(window).cov(retorno_bench)
-rolling_var = retorno_bench.rolling(window).var()
-
-rolling_beta = rolling_cov / rolling_var
-
-# Gráfico Rolling Beta
-
-st.subheader(f"Beta Móvel ({window} dias) vs IBOVESPA")
-
-fig2, ax2 = plt.subplots(figsize=(10,4))
-ax2.plot(rolling_beta.index, rolling_beta.values, color='blue')
-ax2.axhline(1, color='gray', linestyle='--', alpha=0.7)
-ax2.set_title(f"Rolling Beta {window} dias")
-ax2.set_ylabel("Beta")
-ax2.set_xlabel("Data")
-ax2.grid(True)
-
-fig2.autofmt_xdate(rotation=15)
-
-st.pyplot(fig2)
-
-# Gráfico Sharpe Móvel
-rolling_sharpe = (
-(portfolio_returns.rolling(window).mean() - taxa_selic) /
-portfolio_returns.rolling(window).std())
+rf_daily = (taxa_selic/100)/252
+rolling_sharpe = (portfolio_returns.rolling(window).mean() - rf_daily) / portfolio_returns.rolling(window).std()
 
 st.subheader(f"Índice de Sharpe Móvel ({window} dias)")
+fig_sharpe, ax_sharpe = plt.subplots(figsize=(10,4))
+ax_sharpe.plot(rolling_sharpe.index, rolling_sharpe.values, color='green')
+ax_sharpe.axhline(0, color='gray', linestyle='--', alpha=0.7)
+st.pyplot(fig_sharpe)
 
-fig_3, ax_3 = plt.subplots(figsize=(10,4))
-ax_3.plot(rolling_sharpe.index, rolling_sharpe.values, color='green', label='Sharpe Móvel')
-ax_3.axhline(0, color='gray', linestyle='--', alpha=0.7, label='Zero')
-ax_3.set_title(f"Índice de Sharpe Móvel ({window} dias) do Portfólio")
-ax_3.set_ylabel("Sharpe")
-ax_3.set_xlabel("Data")
-ax_3.grid(True)
-ax_3.legend(loc='upper left')
-
-fig_3.autofmt_xdate(rotation=45)  # datas na diagonal
-fig_3.tight_layout()
-
-st.pyplot(fig_3)
-
-
-
-
-
-
-
-# Salva variáveis  para uso na aba Simulação
-st.session_state["modo"] = modo
-st.session_state["returns"] = returns
-st.session_state["peso_manual_df"] = peso_manual_df
-
-# Garante que pesos manuais ficam disponíveis como dicionário
-if modo == "Alocação Manual":
-    st.session_state["pesos_manuais"] = pesos_manuais
-else:
-    st.session_state["pesos_manuais"] = peso_manual_df["Peso"].to_dict()
-
-
-st.subheader("📊 Análise de Contribuição de Risco")
-
-
-cov_matrix = returns.cov()
-port_vol = np.sqrt(np.dot(pesos_manuais_arr.T, np.dot(cov_matrix, pesos_manuais_arr)))
-marginal_contrib = np.dot(cov_matrix, pesos_manuais_arr) / port_vol
-risk_contribution = pesos_manuais_arr * marginal_contrib  # risco absoluto de cada ativo
-risk_contribution_pct = risk_contribution / risk_contribution.sum() * 100
-
-
-risk_df = pd.DataFrame({
-    "Ativo": peso_manual_df.index,
-    "Peso (%)": (pesos_manuais_arr*100).round(2),
-    "RC (%)": risk_contribution_pct.round(2)
-})
-
-st.dataframe(risk_df.style.format({"Peso (%)": "{:,.2f}%", "RC (%)": "{:,.2f}%"}))
-
-
-fig_rc = px.bar(
-    risk_df,
-    x="Ativo",
-    y="RC (%)",
-    color="RC (%)",
-    color_continuous_scale="Reds",
-    title="Contribuição de Risco por Ativo (%)"
-)
-st.plotly_chart(fig_rc, use_container_width=True)
-
-# Botão para gerar PDF via quantstats
-import tempfile
+# ---------------------------
+# Relatório QuantStats
+# ---------------------------
 st.subheader("Baixar Relatório Completo (QuantStats)")
-
-# Converte para formato aceito pelo QuantStats
-portfolio_returns.index = pd.to_datetime(portfolio_returns.index)
-portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
-
+portfolio_returns.index = pd.to_datetime(portfolio_returns.index).tz_localize(None)
+bench_returns.index = pd.to_datetime(bench_returns.index).tz_localize(None)
 
 with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
     qs.reports.html(
         portfolio_returns,
-        benchmark= retorno_bench,
+        benchmark=bench_returns,
         output=tmpfile.name,
         title="Relatório Completo do Portfólio",
         download_filename="relatorio_portfolio.html"
@@ -407,9 +188,4 @@ with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
         file_name="relatorio_portfolio.html",
         mime="text/html"
     )
-
-
-
-# Separação na sidebar
-st.sidebar.markdown("---")
 
