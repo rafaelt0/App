@@ -85,6 +85,51 @@ st.subheader("Pesos do Portfólio (%)")
 peso_manual_df.index = peso_manual_df.index.str.replace(".SA","")
 st.dataframe((peso_manual_df*100).round(2).T)
 
+st.subheader("Perfil de Risco vs Retorno dos Ativos Selecionados")
+
+# Calcular retorno anualizado e volatilidade anualizada para cada ativo
+retorno_anual = returns.mean() * 252
+volatilidade_anual = returns.std() * np.sqrt(252)
+
+# Criar dataframe para plotagem, só dos ativos selecionados
+df_risco_retorno = pd.DataFrame({
+    'Retorno Anual (%)': retorno_anual * 100,
+    'Volatilidade Anual (%)': volatilidade_anual * 100,
+    'Peso (%)': peso_manual_df['Peso'] * 100
+})
+
+# Ajustar índice (remover ".SA") para ficar legível
+df_risco_retorno.index = df_risco_retorno.index.str.replace(".SA", "", regex=False)
+
+# Filtrar somente ativos selecionados (garantia)
+df_risco_retorno = df_risco_retorno.loc[peso_manual_df.index.str.replace(".SA", "", regex=False)]
+
+# Plot com Plotly Express - scatter plot
+fig_risco_retorno = px.scatter(
+    df_risco_retorno,
+    x='Volatilidade Anual (%)',
+    y='Retorno Anual (%)',
+    size='Peso (%)',
+    color='Peso (%)',
+    hover_name=df_risco_retorno.index,
+    color_continuous_scale='Viridis',
+    title='Retorno Anualizado vs Volatilidade Anualizada dos Ativos',
+    labels={
+        'Volatilidade Anual (%)': 'Volatilidade Anual (%)',
+        'Retorno Anual (%)': 'Retorno Anual (%)',
+        'Peso (%)': 'Peso (%)'
+    },
+    size_max=40
+)
+
+fig_risco_retorno.update_layout(
+    xaxis=dict(range=[0, df_risco_retorno['Volatilidade Anual (%)'].max() * 1.2]),
+    yaxis=dict(range=[df_risco_retorno['Retorno Anual (%)'].min() * 0.8, df_risco_retorno['Retorno Anual (%)'].max() * 1.2])
+)
+
+st.plotly_chart(fig_risco_retorno, use_container_width=True)
+
+
 # Gráfico pizza das porcentagens
 fig_pie = px.pie(peso_manual_df.reset_index(), values="Peso", names="index",
                  title="Composição do Portfólio (%)",
