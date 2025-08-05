@@ -21,7 +21,7 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 st.title("Análise e Otimização de Portfólio - B3 Explorer")
 
 # ---------------------------
-# Sidebar
+# Sidebar - configurações
 # ---------------------------
 st.sidebar.header("Configurações do Portfólio")
 
@@ -44,16 +44,15 @@ tickers_yf = [t + ".SA" for t in tickers]
 # ---------------------------
 # Função para carregar benchmark
 # ---------------------------
-def get_benchmark(benchmark_opcao, data_inicio, taxa_selic):
+def get_benchmark(benchmark_opcao, data_inicio, taxa_selic, last_date):
     if benchmark_opcao == "IBOVESPA":
         bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close'].pct_change().dropna()
     else:
-        # Calcula taxa diária
         if benchmark_opcao == "SELIC":
             taxa_diaria = (1 + taxa_selic/100)**(1/252) - 1
-        else:  # CDI - assumindo igual à Selic para simplificação
+        else:  # CDI - simplificado igual SELIC
             taxa_diaria = (1 + taxa_selic/100)**(1/252) - 1
-        datas = pd.date_range(data_inicio, datetime.date.today(), freq='B')
+        datas = pd.date_range(data_inicio, last_date, freq='B')
         bench = pd.Series(taxa_diaria, index=datas, name=benchmark_opcao)
     return bench
 
@@ -119,28 +118,39 @@ st.pyplot(heatmap.figure)
 # Cálculo do portfólio
 # ---------------------------
 portfolio_returns = returns.dot(pesos_array)
-cum_return = (1 + portfolio_returns).cumprod()
-portfolio_value = cum_return * valor_inicial
 
-# ---------------------------
-# Benchmark dinâmico
-# ---------------------------
-bench_returns = get_benchmark(benchmark_opcao, data_inicio, taxa_selic)
-portfolio_returns = portfolio_returns.loc[bench_returns.index.intersection(portfolio_returns.index)]
-bench_returns = bench_returns.loc[portfolio_returns.index]
+# Última data disponível no portfólio
+last_date = portfolio_returns.index[-1]
+
+# Obter benchmark com índice alinhado
+bench_returns = get_benchmark(benchmark_opcao, data_inicio, taxa_selic, last_date)
+
+# Alinhar índices para evitar erros
+common_index = portfolio_returns.index.intersection(bench_returns.index)
+portfolio_returns = portfolio_returns.loc[common_index]
+bench_returns = bench_returns.loc[common_index]
+
+if portfolio_returns.empty or bench_returns.empty:
+    st.error("Dados insuficientes para análise com o benchmark selecionado.")
+    st.stop()
 
 # Valores acumulados
 ret_cum_port = (1 + portfolio_returns).cumprod()
 ret_cum_bench = (1 + bench_returns).cumprod()
+portfolio_value = ret_cum_port * valor_inicial
+bench_value = ret_cum_bench * valor_inicial
 
+# ---------------------------
+# Plot Valor do Portfólio vs Benchmark
+# ---------------------------
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=ret_cum_port.index, y=ret_cum_port*valor_inicial, name='Portfólio'))
-fig.add_trace(go.Scatter(x=ret_cum_bench.index, y=ret_cum_bench*valor_inicial, name=benchmark_opcao))
+fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, mode='lines', name='Portfólio'))
+fig.add_trace(go.Scatter(x=bench_value.index, y=bench_value, mode='lines', name=benchmark_opcao))
 fig.update_layout(title='Valor do Portfólio vs Benchmark', xaxis_title='Data', yaxis_title='Valor (R$)')
 st.plotly_chart(fig)
 
 # ---------------------------
-# Estatísticas básicas
+# Estatísticas básicas do portfólio
 # ---------------------------
 portfolio_info = pd.DataFrame({
     "Valor Inicial": [valor_inicial],
@@ -155,24 +165,144 @@ st.subheader("Informações do Portfólio")
 st.dataframe(portfolio_info.style.format("{:,.2f}"))
 
 # ---------------------------
-# Sharpe Móvel Corrigido
+# Distribuição dos retornos
+# ---------------------------
+st.subheader("Distribuição dos Retornos Diários (%) e Estatísticas")
+fig_hist, ax_hist = plt.subplots(figsize=(10,5))
+sns.histplot(portfolio_returns*100, bins=50, kde=True, color='skyblue', ax=ax_hist)
+ax_hist.set_xlabel("Retornos Diários (%)")
+ax_hist.set_ylabel("Frequência")
+
+media = portfolio_returns.mean()*100
+desvio = portfolio_returns.std()*100
+curtose_val = kurtosis(portfolio_returns, fisher=True)
+assimetria_val = skew(portfolio_returns)
+
+stats_text = (f"Média: {media:.4f}%\n"
+              f"Desvio Padrão: {desvio:.4f}%\n"
+              f"Curtose (Fisher): {curtose_val:.4f}\n"
+              f"Assimetria: {assimetria_val:.4f}")
+
+props = dict(boxstyle='round', facecolor='white', alpha=0.8)
+ax_hist.text(0.95, 0.95, stats_text, transform=ax_hist.transAxes,
+             fontsize=10, verticalalignment='top', horizontalalignment='right', bbox=props)
+
+st.pyplot(fig_hist)
+
+# ---------------------------
+# Estatísticas do portfólio (Sharpe, Sortino etc)
+# ---------------------------
+stats = pd.DataFrame([[
+    sharpe(portfolio_returns, rf=taxa_selic/100/252),
+    sortino(portfolio_returns, rf=taxa_selic/100/252),
+    max_drawdown(portfolio_returns),
+    var(portfolio_returns),
+    cvar(portfolio_returns),
+    tail_ratio(portfolio_returns)
+]], columns=["Índice Sharpe", "Índice Sortino", "Max Drawdown", "VaR", "CVaR", "Tail Ratio"])
+
+st.subheader("Estatísticas do Portfólio")
+st.dataframe(stats.round(4))
+
+# ---------------------------
+# Retorno acumulado vs Benchmark com QuantStats
+# ---------------------------
+st.subheader("Retorno Acumulado Portfólio vs Benchmark")
+fig_qs = qs.plots.returns(portfolio_returns, benchmark=bench_returns, show=False)
+st.pyplot(fig_qs)
+
+# ---------------------------
+# Métricas Alfa, Beta, R², Information Ratio
+# ---------------------------
+cov_matrix = np.cov(portfolio_returns, bench_returns)
+beta = cov_matrix[0,1] / cov_matrix[1,1]
+alfa = portfolio_returns.mean() - beta * bench_returns.mean()
+r_quadrado = qs.stats.r_squared(portfolio_returns, bench_returns)
+information_ratio = qs.stats.information_ratio(portfolio_returns, bench_returns)
+
+metricas = pd.DataFrame({
+    "Alfa Anual (%)": [float(alfa)*252*100],
+    "Beta": [beta],
+    "R Quadrado (%)": [r_quadrado*100],
+    "Information Ratio": [information_ratio]
+})
+
+st.subheader("📊 Métricas do Portfólio em relação ao Benchmark")
+st.dataframe(metricas.style.format({
+    "Alfa Anual (%)": "{:,.2f}%",
+    "Beta": "{:,.2f}",
+    "R Quadrado (%)": "{:,.2f}%",
+    "Information Ratio": "{:,.2f}"
+}))
+
+# ---------------------------
+# Drawdown do portfólio
+# ---------------------------
+st.subheader("Drawdown do Portfólio")
+cum_returns = (1 + portfolio_returns).cumprod()
+rolling_max = cum_returns.cummax()
+drawdown = (cum_returns - rolling_max) / rolling_max
+
+fig_drawdown, ax_drawdown = plt.subplots(figsize=(10,4))
+ax_drawdown.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.4)
+ax_drawdown.set_title("Drawdown do Portfólio")
+ax_drawdown.set_ylabel("Drawdown")
+ax_drawdown.set_xlabel("Data")
+ax_drawdown.grid(True)
+ax_drawdown.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+
+st.pyplot(fig_drawdown)
+
+# ---------------------------
+# Rolling Beta (60 dias)
 # ---------------------------
 window = 60
-rf_daily = (taxa_selic/100)/252
+rolling_cov = portfolio_returns.rolling(window).cov(bench_returns)
+rolling_var = bench_returns.rolling(window).var()
+rolling_beta = rolling_cov / rolling_var
+
+st.subheader(f"Beta Móvel ({window} dias) vs {benchmark_opcao}")
+
+fig_beta, ax_beta = plt.subplots(figsize=(10,4))
+ax_beta.plot(rolling_beta.index, rolling_beta.values, color='blue')
+ax_beta.axhline(1, color='gray', linestyle='--', alpha=0.7)
+ax_beta.set_title(f"Rolling Beta {window} dias")
+ax_beta.set_ylabel("Beta")
+ax_beta.set_xlabel("Data")
+ax_beta.grid(True)
+fig_beta.autofmt_xdate(rotation=15)
+
+st.pyplot(fig_beta)
+
+# ---------------------------
+# Sharpe Móvel (corrigido)
+# ---------------------------
+rf_daily = taxa_selic/100/252
 rolling_sharpe = (portfolio_returns.rolling(window).mean() - rf_daily) / portfolio_returns.rolling(window).std()
 
 st.subheader(f"Índice de Sharpe Móvel ({window} dias)")
+
 fig_sharpe, ax_sharpe = plt.subplots(figsize=(10,4))
-ax_sharpe.plot(rolling_sharpe.index, rolling_sharpe.values, color='green')
-ax_sharpe.axhline(0, color='gray', linestyle='--', alpha=0.7)
+ax_sharpe.plot(rolling_sharpe.index, rolling_sharpe.values, color='green', label='Sharpe Móvel')
+ax_sharpe.axhline(0, color='gray', linestyle='--', alpha=0.7, label='Zero')
+ax_sharpe.set_title(f"Índice de Sharpe Móvel ({window} dias) do Portfólio")
+ax_sharpe.set_ylabel("Sharpe")
+ax_sharpe.set_xlabel("Data")
+ax_sharpe.grid(True)
+ax_sharpe.legend(loc='upper left')
+fig_sharpe.autofmt_xdate(rotation=45)
+fig_sharpe.tight_layout()
+
 st.pyplot(fig_sharpe)
 
 # ---------------------------
-# Relatório QuantStats
+# Relatório QuantStats completo - botão download
 # ---------------------------
 st.subheader("Baixar Relatório Completo (QuantStats)")
-portfolio_returns.index = pd.to_datetime(portfolio_returns.index).tz_localize(None)
-bench_returns.index = pd.to_datetime(bench_returns.index).tz_localize(None)
+
+# Remover timezone para evitar erro
+portfolio_returns = portfolio_returns.tz_localize(None)
+bench_returns = bench_returns.tz_localize(None)
 
 with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
     qs.reports.html(
@@ -188,4 +318,5 @@ with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
         file_name="relatorio_portfolio.html",
         mime="text/html"
     )
+
 
