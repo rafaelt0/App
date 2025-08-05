@@ -46,7 +46,7 @@ if benchmark_opcao == "IBOVESPA":
   bench_value = bench_cum * valor_inicial
 elif benchmark_opcao == "SELIC":
   bench = sgs.get({'selic': 432}, start=data_inicio)
-  retorno_bench = (1+bench)**(1/30)-1
+  retorno_bench = (1+bench/100)**(1/30)-1
   st.write(retorno_bench)
   bench_cum = (1+retorno_bench).cumprod()
   bench_value = bench_cum*valor_inicial
