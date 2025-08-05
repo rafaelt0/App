@@ -39,22 +39,29 @@ stocks = list(data['Ticker'].values)
 tickers = st.multiselect("Selecione as ações do portfólio", stocks)
 
 if benchmark_opcao == "IBOVESPA":
-  bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
-  st.write(bench)
-  retorno_bench = bench.pct_change().dropna()
-  bench_cum = (1+retorno_bench).cumprod()-1
-  bench_value = bench_cum * valor_inicial
+    bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
+    st.write(bench)
+    retorno_bench = bench.pct_change().dropna()
+    bench_cum = (1 + retorno_bench).cumprod() - 1
+    bench_value = bench_cum * valor_inicial
+
 elif benchmark_opcao == "SELIC":
-  bench = sgs.get({'selic': 432}, start=data_inicio)
-  retorno_bench = (1+bench/100)**(1/30)-1
-  st.write(retorno_bench)
-  bench_cum = (1+retorno_bench).cumprod()
-  bench_value = bench_cum*valor_inicial
-else:
-  bench = sgs.get({'CDI': 12}, start=data_inicio)
-  retorno_bench = bench/100
-  bench_cum = (1+retorno_bench).cumprod()
-  bench_value = bench_cum*valor_inicial
+    bench = sgs.get({'selic': 432}, start=data_inicio)
+    selic_ano = bench['selic']
+    # Converter taxa anual (%) para retorno diário (252 dias úteis)
+    retorno_bench = (1 + selic_ano / 100) ** (1 / 252) - 1
+    st.write(retorno_bench)
+    bench_cum = (1 + retorno_bench).cumprod() - 1
+    bench_value = (bench_cum + 1) * valor_inicial
+
+else:  # CDI
+    bench = sgs.get({'CDI': 12}, start=data_inicio)
+    cdi_ano = bench['CDI']
+    # Converter taxa anual (%) para retorno diário (252 dias úteis)
+    retorno_bench = (1 + cdi_ano / 100) ** (1 / 252) - 1
+    st.write(retorno_bench)
+    bench_cum = (1 + retorno_bench).cumprod() - 1
+    bench_value = (bench_cum + 1) * valor_inicial
   
   
 
