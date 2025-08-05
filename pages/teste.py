@@ -209,7 +209,7 @@ st.dataframe(stats.round(4))
 
 # Gráfico Portfolio vs IBOVESPA
 st.subheader("Retorno Acumulado Portfólio vs IBOVESPA")
-fig = qs.plots.returns(portfolio_returns, benchmark=bench, show=False)
+fig = qs.plots.returns(portfolio_returns, benchmark=retorno_bench, show=False)
 st.pyplot(fig)
 
 # Métricas vs bench
