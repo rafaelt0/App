@@ -213,7 +213,6 @@ fig = qs.plots.returns(portfolio_returns, benchmark=retorno_bench, show=False)
 st.pyplot(fig)
 
 # Métricas vs bench
-bench_returns = bench
 cov_matrix = np.cov(portfolio_returns.squeeze(), retorno_bench.squeeze())  # matriz de covariância 2x2
 beta = cov_matrix[0,1] / cov_matrix[1,1]
 alfa = portfolio_returns.mean() - beta * retorno_bench.mean()
