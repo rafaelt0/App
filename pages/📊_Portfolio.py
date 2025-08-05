@@ -33,7 +33,7 @@ valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 
 taxa_selic =  sgs.get(432, start=data_inicio)
 taxa_selic = taxa_selic.iloc[-1,0]
 taxa_selic = (1+taxa_selic)**(1/252)-1
-benchmark_opcao = st.sidebar.multiselect("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"])
+
 
 # Seleção de ações
 data = pd.read_csv('acoes-listadas-b3.csv')
