@@ -52,6 +52,7 @@ elif benchmark_opcao == "SELIC":
   bench_value = bench_cum*valor_inicial
 else:
   bench = sgs.get({'CDI': 12}, start=data_inicio)
+  st.write(bench)
   retorno_bench = bench.pct_change().dropna()
   bench_cum = (1+bench).cumprod()
   bench_value = bench_cum*valor_inicial
