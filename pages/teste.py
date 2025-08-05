@@ -2,68 +2,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import datetime
-import warnings
-import plotly.express as px
-import plotly.graph_objects as go
-from pypfopt.hierarchical_portfolio import HRPOpt
-from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
-from scipy.stats import kurtosis, skew
-import quantstats as qs
-from bcb import sgs
-import matplotlib.ticker as mtick
-import io
-
-
-
-warnings.filterwarnings('ignore')
-st.set_option('deprecation.showPyplotGlobalUse', False)
-
-
-
-
-st.title("Análise e Otimização de Portfólio - B3 Explorer")
-# Sidebar config
-st.sidebar.header("Configurações do Portfólio")
-
-data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
-valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
-taxa_selic =  sgs.get(432, start=data_inicio)
-taxa_selic = taxa_selic.iloc[-1,0]
-taxa_selic = (1+taxa_selic)**(1/252)-1
-
-
-# Seleção de ações
-data = pd.read_csv('acoes-listadas-b3.csv')
-stocks = list(data['Ticker'].values)
-tickers = st.multiselect("Selecione as ações do portfólio", stocks)
-
-if len(tickers) == 0:
-    st.warning("Selecione pelo menos uma ação.")
-    st.stop()
-
-if len(tickers) == 1:
-    st.warning("Selecione pelo menos dois ativos para montar o portfólio.")
-    st.stop()
-
-tickers_yf = [t + ".SA" for t in tickers]
-
-# Baixa dados
-data_yf = yf.download(tickers_yf, start=data_inicio, progress=False)['Close']
-if isinstance(data_yf.columns, pd.MultiIndex):
-    data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
-
-returns = data_yf.pct_change().dropna()
-
-# Escolha modo: manual ou otimizado
-modo = st.sidebar.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Alocação Manual"))
-
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-import numpy as np
 import datetime
 import warnings
 from pypfopt.hierarchical_portfolio import HRPOpt
