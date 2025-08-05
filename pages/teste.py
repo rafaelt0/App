@@ -44,13 +44,13 @@ if benchmark_opcao == "IBOVESPA":
   bench_cum = (1+retorno_bench).cumprod()-1
   bench_value = bench_cum * valor_inicial
 elif benchmark_opcao == "SELIC":
-  bench = sgs.get({'selic': 432}, start=data_inicio)
+  bench = sgs.get({'selic': 432}, start=data_inicio)/100
   selic_diario = (1 + bench/100) ** (1/252) - 1
   retorno_bench = selic_diario.pct_change().dropna()
   bench_cum = (1+selic_diario).cumprod()
   bench_value = bench_cum*valor_inicial
 else:
-  bench = sgs.get({'CDI': 12}, start=data_inicio)
+  bench = sgs.get({'CDI': 12}, start=data_inicio)/100
   st.write(bench)
   cdi_diario = (1+bench/100) ** (1/252)-1
   retorno_bench = bench.pct_change().dropna()
