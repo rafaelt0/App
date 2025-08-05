@@ -275,16 +275,17 @@ st.dataframe(df_drawdowns.style.format({
     'Data do Máximo Drawdown': lambda x: x.strftime('%Y-%m-%d')
 }))
 
-# Plot Drawdown
+cum_returns = (1 + portfolio_returns).cumprod()
+        rolling_max = cum_returns.cummax()
+        drawdown = (cum_returns - rolling_max) / rolling_max
+    
+        # Plot Drawdown
 fig1, ax1 = plt.subplots(figsize=(10,4))
 ax1.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.4)
 ax1.set_title("Drawdown do Portfólio")
 ax1.set_ylabel("Drawdown")
 ax1.set_xlabel("Data")
 ax1.grid(True)
-
-ax1.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-st.pyplot(fig1)
 
 # Rolling Beta (60 dias)
 window = 60
