@@ -339,6 +339,37 @@ else:
     st.session_state["pesos_manuais"] = peso_manual_df["Peso"].to_dict()
 
 
+st.subheader("📊 Análise de Contribuição de Risco")
+
+
+cov_matrix = returns.cov()
+port_vol = np.sqrt(np.dot(pesos_manuais_arr.T, np.dot(cov_matrix, pesos_manuais_arr)))
+marginal_contrib = np.dot(cov_matrix, pesos_manuais_arr) / port_vol
+risk_contribution = pesos_manuais_arr * marginal_contrib  # risco absoluto de cada ativo
+risk_contribution_pct = risk_contribution / risk_contribution.sum() * 100
+
+
+risk_df = pd.DataFrame({
+    "Ativo": peso_manual_df.index,
+    "Peso (%)": (pesos_manuais_arr*100).round(2),
+    "RC (%)": risk_contribution_pct.round(2)
+})
+
+st.dataframe(risk_df.style.format({"Peso (%)": "{:,.2f}%", "RC (%)": "{:,.2f}%"}))
+
+
+fig_rc = px.bar(
+    risk_df,
+    x="Ativo",
+    y="RC (%)",
+    color="RC (%)",
+    color_continuous_scale="Reds",
+    title="Contribuição de Risco por Ativo (%)"
+)
+st.plotly_chart(fig_rc, use_container_width=True)
+
+
+
 # Separação na sidebar
 st.sidebar.markdown("---")
 
