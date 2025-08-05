@@ -275,17 +275,6 @@ st.dataframe(df_drawdowns.style.format({
     'Data do Máximo Drawdown': lambda x: x.strftime('%Y-%m-%d')
 }))
 
-# Gráfico heatmap dos drawdowns dos ativos no tempo
-st.subheader("Mapa de Calor: Drawdown por Ativo ao Longo do Tempo")
-fig, ax = plt.subplots(figsize=(12,6))
-sns.heatmap(drawdowns_ativos.T, cmap="Reds", cbar_kws={'label': 'Drawdown'}, ax=ax)
-ax.set_xlabel('Data')
-ax.set_ylabel('Ativo')
-st.pyplot(fig)
-cum_returns = (1 + portfolio_returns).cumprod()
-rolling_max = cum_returns.cummax()
-drawdown = (cum_returns - rolling_max) / rolling_max
-
 # Plot Drawdown
 fig1, ax1 = plt.subplots(figsize=(10,4))
 ax1.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.4)
