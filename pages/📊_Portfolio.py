@@ -186,8 +186,8 @@ st.pyplot(fig_hist)
 
 # Estatísticas do portfólio
 stats = pd.DataFrame([[ 
-    sharpe(portfolio_returns, rf=taxa_selic/100),
-    sortino(portfolio_returns, rf=taxa_selic/100),
+    sharpe(portfolio_returns, rf=taxa_selic),
+    sortino(portfolio_returns, rf=taxa_selic),
     max_drawdown(portfolio_returns),
     var(portfolio_returns),
     cvar(portfolio_returns),
