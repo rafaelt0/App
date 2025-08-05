@@ -31,7 +31,7 @@ st.sidebar.header("Configurações do Portfólio")
 data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
 valor_inicial = st.sidebar.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
 taxa_selic =  sgs.get(432, start=data_inicio)
-st.write(taxa_selic)
+st.write(taxa_selic.iloc[-1,:])
 benchmark_opcao = st.sidebar.multiselect("Selecione seu Benchmark", ["SELIC", "CDI", "IBOVESPA"])
 
 # Seleção de ações
