@@ -246,6 +246,42 @@ st.pyplot(fig)
 
 st.subheader("Drawdown do Portfólio")
 # Drawdown
+st.subheader("Análise de Drawdown por Ativo")
+
+# Função para calcular drawdown
+def calcular_drawdown(series):
+    cum_returns = (1 + series).cumprod()
+    rolling_max = cum_returns.cummax()
+    drawdown = (cum_returns - rolling_max) / rolling_max
+    return drawdown
+
+# Calcula drawdown para cada ativo
+drawdowns_ativos = returns.apply(calcular_drawdown)
+
+# Calcula máximo drawdown e a data que ocorreu para cada ativo
+max_drawdowns = drawdowns_ativos.min()
+data_max_drawdowns = drawdowns_ativos.idxmin()
+
+df_drawdowns = pd.DataFrame({
+    'Máximo Drawdown (%)': max_drawdowns * 100,
+    'Data do Máximo Drawdown': data_max_drawdowns
+}).sort_values(by='Máximo Drawdown (%)')
+
+# Ajusta índice para mostrar ticker sem ".SA"
+df_drawdowns.index = df_drawdowns.index.str.replace(".SA", "", regex=False)
+
+st.dataframe(df_drawdowns.style.format({
+    'Máximo Drawdown (%)': '{:.2f}%',
+    'Data do Máximo Drawdown': lambda x: x.strftime('%Y-%m-%d')
+}))
+
+# Gráfico heatmap dos drawdowns dos ativos no tempo
+st.subheader("Mapa de Calor: Drawdown por Ativo ao Longo do Tempo")
+fig, ax = plt.subplots(figsize=(12,6))
+sns.heatmap(drawdowns_ativos.T, cmap="Reds", cbar_kws={'label': 'Drawdown'}, ax=ax)
+ax.set_xlabel('Data')
+ax.set_ylabel('Ativo')
+st.pyplot(fig)
 cum_returns = (1 + portfolio_returns).cumprod()
 rolling_max = cum_returns.cummax()
 drawdown = (cum_returns - rolling_max) / rolling_max
