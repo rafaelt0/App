@@ -40,19 +40,18 @@ tickers = st.multiselect("Selecione as ações do portfólio", stocks)
 
 if benchmark_opcao == "IBOVESPA":
   bench = yf.download("^BVSP", start=data_inicio, progress=False)['Close']
+  st.write(bench)
   retorno_bench = bench.pct_change().dropna()
   bench_cum = (1+retorno_bench).cumprod()-1
   bench_value = bench_cum * valor_inicial
 elif benchmark_opcao == "SELIC":
   bench = sgs.get({'selic': 432}, start=data_inicio)
-  selic_diario = bench/100
-  st.write(selic_diario)
+  selic_diario = (1+bench)**(1/252)-1
   retorno_bench = selic_diario.pct_change().dropna()
   bench_cum = (1+selic_diario).cumprod()
   bench_value = bench_cum*valor_inicial
 else:
-  bench = sgs.get({'CDI': 12}, start=data_inicio)/100
-  st.write(bench)
+  bench = sgs.get({'CDI': 12}, start=data_inicio)
   cdi_diario = bench/100
   retorno_bench = bench.pct_change().dropna()
   bench_cum = (1+cdi_diario).cumprod()
