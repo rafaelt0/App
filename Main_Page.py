@@ -132,13 +132,19 @@ if tickers:
             "EV/EBITDA": "{:.2f}",
             "Empresa": lambda x: x
         }
-
+        
         # Filtro de indicadores
         st.markdown("### Filtros")
-        min_ebit = st.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
-        min_roe = st.number_input("ROE mínimo (%)", value=0.0, step=0.1)
-        min_dividend = st.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
-        max_pl = st.number_input("P/L máximo", value=1000.0, step=0.1)
+
+        # Organização das colunas
+        col1, col2 = st.columns(2)
+
+        with col1:
+            min_ebit = st.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
+            min_roe = st.number_input("ROE mínimo (%)", value=0.0, step=0.1)
+        with col2:
+            min_dividend = st.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
+            max_pl = st.number_input("P/L máximo", value=1000.0, step=0.1)
 
         # Formatação Condicional
         def highlight_val(val, min_val=None, max_val=None):
