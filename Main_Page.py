@@ -34,7 +34,7 @@ st.set_page_config(
     page_icon="📈",
     layout="wide"
 )
-st.image("logo.jpg", caption="Imagem do GitHub", width=400)
+
 # Sidebar Principal
 st.sidebar.success("Selecione uma página")  
 
@@ -44,7 +44,8 @@ with open("style.css") as f:
 
 # Título da página
 st.title("**B3 Explorer 📈**")  
-
+st.markdown("<h2 style='text-align: center;'>B3Explorer</h2>", unsafe_allow_html=True)
+st.image("logo.jpg", width=400)
 # Carrega lista de ações da B3 com setores para filtragem inicial
 data = pd.read_csv('acoes-listadas-b3.csv')
 
