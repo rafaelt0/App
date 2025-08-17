@@ -34,7 +34,7 @@ st.set_page_config(
     page_icon="📈",
     layout="wide"
 )
-st.image("OIG1.jpeg", caption="Imagem do GitHub", use_column_width=True)
+st.image("OIG1.jpeg", caption="Imagem do GitHub", width=400)
 # Sidebar Principal
 st.sidebar.success("Selecione uma página")  
 
