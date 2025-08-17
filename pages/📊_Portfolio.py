@@ -39,7 +39,10 @@ taxa_selic = (1+taxa_selic)**(1/252)-1
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 tickers = st.multiselect("Selecione as ações do portfólio", stocks)
+# Valor inicial
 valor_inicial = st.number_input("Valor Investido (R$) 💵", 100, 1_000_000, 10_000)
+
+# Escolha modo: manual ou otimizado
 modo = st.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Alocação Manual"))
 
 if len(tickers) == 0:
@@ -59,8 +62,8 @@ if isinstance(data_yf.columns, pd.MultiIndex):
 
 returns = data_yf.pct_change().dropna()
 
-# Escolha modo: manual ou otimizado
-modo = st.sidebar.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Alocação Manual"))
+
+
 
 if modo == "Alocação Manual":
     st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
