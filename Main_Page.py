@@ -44,7 +44,8 @@ with open("style.css") as f:
 
 # Título da página
 st.title("**B3 Explorer 📈**")  
-st.markdown("<h2 style='text-align: center;'>B3Explorer</h2>", unsafe_allow_html=True)
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
 st.image("logo.jpg", width=400)
 # Carrega lista de ações da B3 com setores para filtragem inicial
 data = pd.read_csv('acoes-listadas-b3.csv')
