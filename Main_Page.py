@@ -135,10 +135,10 @@ if tickers:
 
         # Filtro de indicadores
         st.sidebar.subheader("Filtros Personalizados")
-        min_ebit = st.sidebar.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
-        min_roe = st.sidebar.number_input("ROE mínimo (%)", value=0.0, step=0.1)
-        min_dividend = st.sidebar.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
-        max_pl = st.sidebar.number_input("P/L máximo", value=1000.0, step=0.1)
+        min_ebit = st.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
+        min_roe = st.number_input("ROE mínimo (%)", value=0.0, step=0.1)
+        min_dividend = st.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
+        max_pl = st.number_input("P/L máximo", value=1000.0, step=0.1)
 
         # Formatação Condicional
         def highlight_val(val, min_val=None, max_val=None):
