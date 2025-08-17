@@ -142,9 +142,15 @@ if tickers:
         with col1:
             min_ebit = st.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
             min_roe = st.number_input("ROE mínimo (%)", value=0.0, step=0.1)
+            min_margem_liq = st.number_input("Margem Líquida Mínima (%)", value=0.0, step=0.1)
+            min_cresc_5a = st.number_input("Crescimento Receita 5 Anos Mínima", value=0.0, step=0.1)
+            
         with col2:
             min_dividend = st.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
             max_pl = st.number_input("P/L máximo", value=1000.0, step=0.1)
+            min_roic = st.number_input("ROIC mínimo (%)", value=0.0, step=0.1)
+            max_ev_ebitda = st.number_input("EV/EBITDA Máximo (%)", value=1000.0, step=0.1)
+            
 
         # Formatação Condicional
         def highlight_val(val, min_val=None, max_val=None):
@@ -163,8 +169,13 @@ if tickers:
 
             styles[col_idx['Margem EBIT']] = highlight_val(row['Margem EBIT'], min_val=min_ebit)
             styles[col_idx['ROE']] = highlight_val(row['ROE'], min_val=min_roe)
+            styles[col_idx['Margem Líquida']] = highlight_val(row['Margem Líquida'], min_val=min_margem_liq)
+            styles[col_idx['Crescimento Receita 5 anos']] = highlight_val(row['Crescimento Receita 5 anos'], min_val=min_cresc_5a)
             styles[col_idx['Dividend Yield']] = highlight_val(row['Dividend Yield'], min_val=min_dividend)
+            styles[col_idx['EV/EBITDA']] = highlight_val(row['EV/EBITDA'], max_val=max_ev_ebitda)
             styles[col_idx['P/L']] = highlight_val(row['P/L'], max_val=max_pl)
+            styles[col_idx['ROIC']] = highlight_val(row['ROIC'], min_val=min_roic)
+            
 
             return styles
 
