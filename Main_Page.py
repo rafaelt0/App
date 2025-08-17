@@ -134,7 +134,7 @@ if tickers:
         }
 
         # Filtro de indicadores
-        st.subheader("Filtros Personalizados Indicadores Fundamentalistas")
+        st.subheader("Filtros")
         min_ebit = st.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
         min_roe = st.number_input("ROE mínimo (%)", value=0.0, step=0.1)
         min_dividend = st.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
