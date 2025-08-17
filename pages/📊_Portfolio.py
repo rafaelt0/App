@@ -40,6 +40,7 @@ data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 tickers = st.multiselect("Selecione as ações do portfólio", stocks)
 valor_inicial = st.number_input("Valor Investido (R$) 💵", 100, 1_000_000, 10_000)
+modo = st.radio("Modo de alocação", ("Otimização Hierarchical Risk Parity (HRP)", "Alocação Manual"))
 
 if len(tickers) == 0:
     st.warning("Selecione pelo menos uma ação.")
