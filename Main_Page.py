@@ -104,7 +104,7 @@ if tickers:
         st.dataframe(df_price.style.format(format_dict), use_container_width=True)
 
         # Indicadores Fundamentalistas
-        st.markdown("###Indicadores Financeiros")
+        st.subheader("Indicadores Financeiros")
         df_ind = df[['Marg_Liquida','Marg_EBIT','ROE','ROIC','Div_Yield',
                      'Cres_Rec_5a','PL','EV_EBITDA','Empresa']].drop_duplicates(keep='last')
         df_ind.columns = ["Margem Líquida", "Margem EBIT", "ROE", "ROIC",
@@ -134,7 +134,7 @@ if tickers:
         }
 
         # Filtro de indicadores
-        st.subheader("Filtros")
+        st.markdown("###Filtros")
         min_ebit = st.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
         min_roe = st.number_input("ROE mínimo (%)", value=0.0, step=0.1)
         min_dividend = st.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
