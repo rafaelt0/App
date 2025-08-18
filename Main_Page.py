@@ -49,7 +49,7 @@ with col2:
     st.title("**B3 Explorer App 📈**")  
     st.markdown("""
 <div style='text-align: center;'>
-    <img src='b3explorer.png' width='300'>
+    <img src='App/b3explorer.png' width='300'>
 </div>
 """, unsafe_allow_html=True)
 
