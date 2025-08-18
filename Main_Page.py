@@ -235,8 +235,15 @@ if tickers:
 
 
         st.subheader("Cotação Histórica")
-        # Plot preço histórico
-        st.line_chart(data_prices) 
+
+        fig = px.line(
+        data_prices,
+        x="Data",
+        y=data_prices.columns[1:],  # todas as colunas de preço
+        title="📈 Cotação Histórica",
+        labels={"value": "Preço (R$)", "variable": "Ativo"})
+
+        st.plotly_chart(fig, use_container_width=True)
 
         # Cálculo retornos pct
         returns = data_prices.pct_change().dropna() * 100
