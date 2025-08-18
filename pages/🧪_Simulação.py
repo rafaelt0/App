@@ -24,10 +24,22 @@ import io
 
 st.header("Simulação Monte Carlo por Ativos (Multivariada) 👨‍🔬")
 
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    st.image("simulação.png", width=400)
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
 
+# converte a imagem para base64
+img_base64 = get_base64_of_bin_file("b3explorer.png")
+
+st.markdown(
+    f"""
+    <div style="text-align: center;">
+        <img src="data:image/png;base64,{img_base64}" width="250">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # Verifica se as variáveis necessárias já estão no session_state
 required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
