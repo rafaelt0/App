@@ -1,115 +1,51 @@
-/* ======== Global ======== */
-body, .stApp {
-    background-color: #0e1117;  /* Fundo dark */
-    color: #ffffff;            /* Texto branco */
-    font-family: 'Inter', sans-serif;
+body {
+    background-color: #f5f7fa;
+    color: #0f111a;
+    font-family: 'Roboto', sans-serif;
 }
 
-/* Links e textos interativos */
-a, a:visited {
-    color: #00c8ff;
-}
-a:hover {
-    color: #0097cc;
-}
-
-/* ======== Títulos ======== */
-h1, h2, h3, h4, h5 {
-    color: #00c8ff;
-    font-weight: 600;
-}
-
-/* ======== Sidebar ======== */
-.css-1d391kg, .stSidebar {
-    background-color: #161a23 !important;
-    color: white !important;
-}
-
-.css-1d391kg .stSelectbox, .css-1d391kg .stTextInput {
-    background-color: #1f2533;
-    color: white;
-    border-radius: 8px;
-}
-
-/* ======== Botões ======== */
-.stButton > button {
-    background-color: #00c8ff;
-    color: white;
-    border-radius: 8px;
-    border: none;
-    font-weight: bold;
-    padding: 0.6rem 1.2rem;
-    transition: 0.3s;
-}
-.stButton > button:hover {
-    background-color: #0097cc;
-    transform: translateY(-2px);
-}
-
-/* ======== DataFrames e Tabelas ======== */
-.dataframe, .stDataFrame {
-    background-color: #161a23;
-    color: #ffffff;
-    border-radius: 10px;
-    border: 1px solid #00c8ff20;
-    overflow: hidden;
-}
-
-.dataframe th, .stDataFrame th {
-    background-color: #1f2533 !important;
-    color: #00c8ff !important;
-    font-weight: bold;
+h1, h2, h3 {
     text-align: center;
+    color: #1f3b70;
 }
 
-.dataframe td, .stDataFrame td {
-    text-align: center !important;
-    border-bottom: 1px solid #2c3344;
-    padding: 0.5rem;
-}
+h1 { font-size: 48px; font-weight: bold; margin-bottom: 5px; }
+h2 { font-size: 32px; margin-top: 30px; margin-bottom: 15px; }
+h3 { font-size: 20px; font-weight: normal; margin-bottom: 25px; }
 
-.dataframe tr:nth-child(even) {
-    background-color: #1a1f2e;
-}
+img { display: block; margin-left: auto; margin-right: auto; margin-bottom: 20px; }
 
-/* ======== Cards de Métricas ======== */
-.metric-card {
-    background-color: #161a23;
-    padding: 20px;
+.stButton>button {
+    background-color: #28a745;
+    color: white;
+    font-weight: bold;
+    border-radius: 10px;
+    padding: 12px 25px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.stButton>button:hover { background-color: #1e7e34; transform: scale(1.05); }
+
+.stMarkdown {
+    background-color: #ffffff;
     border-radius: 12px;
-    margin: 10px 0;
-    text-align: center;
-    border: 1px solid #00c8ff40;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    transition: 0.3s;
-}
-.metric-card:hover {
-    transform: scale(1.02);
+    padding: 20px;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    margin-bottom: 25px;
 }
 
-.metric-card h3 {
-    color: #00c8ff;
-    font-size: 1.2rem;
-    margin-bottom: 0.5rem;
-}
-.metric-card h2 {
-    color: #ffffff;
-    font-size: 1.6rem;
+.stColumns>div { padding: 10px; }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: center; padding: 10px; border-bottom: 1px solid #ddd; }
+th { background-color: #1f3b70; color: white; }
+
+.stTextInput>div>input, .stSlider>div>input {
+    border-radius: 6px; padding: 6px; border: 1px solid #ccc;
 }
 
-/* ======== Plotly Charts ======== */
-.stPlotlyChart {
-    background-color: #161a23;
-    border-radius: 10px;
-    padding: 10px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    transition: 0.3s;
-}
-.stPlotlyChart:hover {
-    transform: scale(1.01);
-}
+footer { text-align: center; color: #6c757d; margin-top: 40px; font-size: 14px; }
 
-/* ======== Espaçamento ======== */
-.block-container {
-    padding: 2rem 2rem 2rem 2rem;
-}
+.stAppViewContainer { padding: 25px 40px; }
+
