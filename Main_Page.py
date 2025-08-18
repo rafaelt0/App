@@ -44,7 +44,7 @@ with open("style.css") as f:
 
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
-    st.image("b3explorer.png", width=200)
+    st.image("b3explorer.png", width=300)
 
 # Carrega lista de ações da B3 com setores para filtragem inicial
 
