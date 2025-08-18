@@ -234,12 +234,11 @@ if tickers:
 
         # Ajustando índice
         data_prices = pd.to_datetime(data_prices.index)
-        data_prices = data_prices.rename_axis("Data").reset_index()
 
 
         st.subheader("Cotação Histórica")
 
-        st.line_chart(data_prices.set_index("Data"))
+        st.line_chart(data_prices)
 
         # Cálculo retornos pct
         returns = data_prices.pct_change().dropna() * 100
