@@ -42,7 +42,17 @@ st.sidebar.success("Selecione uma página")
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-st.image("b3explorer.png", width=200)
+
+
+st.markdown(
+    """
+    <div style="text-align: center;">
+        <img src="b3explorer.png" width="250">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # Carrega lista de ações da B3 com setores para filtragem inicial
 
