@@ -233,12 +233,11 @@ if tickers:
             data_prices = data_prices.droplevel(0, axis=1)
 
 
-
         st.subheader("Cotação Histórica")
 
         fig = px.line(
         data_prices,
-        x=tickers_yf[0:],
+        x="Date",
         y=data_prices.columns[1:],  # todas as colunas de preço
         title="📈 Cotação Histórica",
         labels={"value": "Preço (R$)", "variable": "Ativo"})
