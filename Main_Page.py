@@ -48,6 +48,12 @@ with col2:
     
     st.title("**B3 Explorer App 📈**")  
     st.image("b3explorer.png", width=300)
+    st.markdown("""
+<div style='text-align: center;'>
+    <img src='b3explorer.png' width='300'>
+</div>
+""", unsafe_allow_html=True)
+
 # Carrega lista de ações da B3 com setores para filtragem inicial
 data = pd.read_csv('acoes-listadas-b3.csv')
 
