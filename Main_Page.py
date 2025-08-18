@@ -43,15 +43,14 @@ with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 
+
+# Título da página
 st.markdown("<h1 style='text-align: center;'>B3 Explorer App 📈</h1>", unsafe_allow_html=True)
-st.markdown(
-    """
-    <div style="text-align: center;">
-        <img src="b3explorer.png" width="250">
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+
+# Centralizar a imagem
+col1, col2, col3 = st.columns([1,2,1])
+with col2:
+    st.image("b3explorer.png", width=250)
 
 
 # Carrega lista de ações da B3 com setores para filtragem inicial
