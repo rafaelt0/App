@@ -233,7 +233,7 @@ if tickers:
             data_prices = data_prices.droplevel(0, axis=1)
 
         # Ajustando índice
-        data_prices = pd.to_datetime(data_prices.index)
+        data_prices.index = pd.to_datetime(data_prices.index)
 
 
         st.subheader("Cotação Histórica")
