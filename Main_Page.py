@@ -48,6 +48,10 @@ st.image("b3explorer.png", width=400)
 
 data = pd.read_csv('acoes-listadas-b3.csv')
 
+# Cria listas de tickers e setores para seleção
+stocks = list(data['Ticker'].values)
+setores = sorted(data['Setor'].dropna().unique())
+setores.insert(0, "Todos")
 
 # Permite filtro por setor na barra lateral
 setores_selecionados = st.multiselect(
@@ -68,10 +72,7 @@ if 'Setor' not in data.columns:
 st.subheader("Explore ações da B3 🧭")
 tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações). Selecione a página e as configurações na aba lateral ', tickers_filtrados)
 
-# Cria listas de tickers e setores para seleção
-stocks = list(data['Ticker'].values)
-setores = sorted(data['Setor'].dropna().unique())
-setores.insert(0, "Todos")
+
 
 
 
