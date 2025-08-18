@@ -1,23 +1,32 @@
+/* ===== Fundo e cores gerais ===== */
 body {
-    background-color: #f5f7fa;
-    color: #0f111a;
+    background-color: #121212; /* Fundo escuro */
+    color: #e0e0e0;            /* Texto claro */
     font-family: 'Roboto', sans-serif;
 }
 
+/* ===== Títulos ===== */
 h1, h2, h3 {
     text-align: center;
-    color: #1f3b70;
+    color: #bb86fc; /* Títulos em lilás */
 }
 
 h1 { font-size: 48px; font-weight: bold; margin-bottom: 5px; }
 h2 { font-size: 32px; margin-top: 30px; margin-bottom: 15px; }
 h3 { font-size: 20px; font-weight: normal; margin-bottom: 25px; }
 
-img { display: block; margin-left: auto; margin-right: auto; margin-bottom: 20px; }
+/* ===== Logo centralizada ===== */
+img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 20px;
+}
 
+/* ===== Botões ===== */
 .stButton>button {
-    background-color: #28a745;
-    color: white;
+    background-color: #03dac6;
+    color: #121212;
     font-weight: bold;
     border-radius: 10px;
     padding: 12px 25px;
@@ -25,27 +34,43 @@ img { display: block; margin-left: auto; margin-right: auto; margin-bottom: 20px
     transition: all 0.3s ease;
     cursor: pointer;
 }
-.stButton>button:hover { background-color: #1e7e34; transform: scale(1.05); }
 
+.stButton>button:hover {
+    background-color: #018786;
+    transform: scale(1.05);
+}
+
+/* ===== Cards / boxes ===== */
 .stMarkdown {
-    background-color: #ffffff;
+    background-color: #1e1e1e;
     border-radius: 12px;
     padding: 20px;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.5);
     margin-bottom: 25px;
+    color: #e0e0e0;
 }
 
+/* ===== Colunas ===== */
 .stColumns>div { padding: 10px; }
 
+/* ===== Tabelas ===== */
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
-th, td { text-align: center; padding: 10px; border-bottom: 1px solid #ddd; }
-th { background-color: #1f3b70; color: white; }
+th, td { text-align: center; padding: 10px; border-bottom: 1px solid #444; color: #e0e0e0; }
+th { background-color: #bb86fc; color: #121212; }
 
+/* ===== Inputs e sliders ===== */
 .stTextInput>div>input, .stSlider>div>input {
-    border-radius: 6px; padding: 6px; border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 6px;
+    border: 1px solid #555;
+    background-color: #2c2c2c;
+    color: #e0e0e0;
 }
 
-footer { text-align: center; color: #6c757d; margin-top: 40px; font-size: 14px; }
+/* ===== Rodapé ===== */
+footer { text-align: center; color: #888; margin-top: 40px; font-size: 14px; }
 
+/* ===== Ajuste de padding ===== */
 .stAppViewContainer { padding: 25px 40px; }
+
 
