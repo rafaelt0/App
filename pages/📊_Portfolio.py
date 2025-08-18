@@ -28,7 +28,7 @@ st.title("Análise e Otimização de Portfólio - B3 Explorer")
 
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    st.image("logo.jpg", width=400)
+    st.image("portfolio.png", width=400)
 # Configurações
 
 data_inicio = st.date_input("Data Inicial 🗓️", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
