@@ -52,6 +52,11 @@ data = pd.read_csv('acoes-listadas-b3.csv')
 st.subheader("Explore ações da B3 🧭")
 tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações). Selecione a página e as configurações na aba lateral ', tickers_filtrados)
 
+# Permite filtro por setor na barra lateral
+setores_selecionados = st.multiselect(
+    'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
+)
+
 #Se selecionar Todos ou nada, mostra todos os tickers
 if "Todos" in setores_selecionados or not setores_selecionados:
     tickers_filtrados = data['Ticker'].tolist()
@@ -67,10 +72,7 @@ stocks = list(data['Ticker'].values)
 setores = sorted(data['Setor'].dropna().unique())
 setores.insert(0, "Todos")
 
-# Permite filtro por setor na barra lateral
-setores_selecionados = st.multiselect(
-    'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
-)
+
 
 
 
