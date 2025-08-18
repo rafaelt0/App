@@ -15,6 +15,7 @@ import quantstats as qs
 from bcb import sgs
 import matplotlib.ticker as mtick
 import io
+import base64
 
 
 
