@@ -25,10 +25,9 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 
 
 st.title("Análise e Otimização de Portfólio - B3 Explorer")
-# Sidebar config
-st.sidebar.header("Configurações do Portfólio")
+# Configurações
 
-data_inicio = st.date_input("Data Inicial", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
+data_inicio = st.date_input("Data Inicial 🗓️", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
 taxa_selic =  sgs.get(432, start=data_inicio)
 taxa_selic = taxa_selic.iloc[-1,0]
 taxa_selic = (1+taxa_selic)**(1/252)-1
@@ -412,7 +411,6 @@ else:
 
 
 
-# Separação na sidebar
-st.sidebar.markdown("---")
+
 
        
