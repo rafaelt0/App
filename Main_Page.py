@@ -224,9 +224,9 @@ if tickers:
         data_prices = yf.download(tickers_yf, start=data_inicio, end=datetime.datetime.now(), 
                                   interval=interval_selected)['Close']
 
-        # Garantir df caso seja series
+        # Garantir DataFrame caso seja Series
         if isinstance(data_prices, pd.Series):
-            data_prices = data_prices.to_frame()
+            data_prices = data_prices.to_frame(name=tickers_yf if isinstance(tickers_yf, str) else tickers_yf[0])
 
         # Ajusta caso o DataFrame venha com MultiIndex de colunas
         if isinstance(data_prices.columns, pd.MultiIndex):
