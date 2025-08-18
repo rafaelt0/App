@@ -20,7 +20,8 @@ import base64
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-st.header("Simulação Monte Carlo por Ativos (Multivariada) 👨‍🔬")
+# Título da página
+st.markdown("<h1 style='text-align: center;'>Simulação Monte Carlo por Ativos (Multivariada) 👨‍🔬</h1>", unsafe_allow_html=True)
 
 def get_base64_of_bin_file(bin_file):
     with open(bin_file, "rb") as f:
