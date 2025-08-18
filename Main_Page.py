@@ -48,15 +48,27 @@ with open("style.css") as f:
 st.markdown("<h1 style='text-align: center;'>B3 Explorer App 📈</h1>", unsafe_allow_html=True)
 
 # Centralizar a imagem
+import base64
+import streamlit as st
+
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+# converte a imagem para base64
+img_base64 = get_base64_of_bin_file("b3explorer.png")
+
 st.markdown(
-    """
+    f"""
     <div style="text-align: center;">
         <h1 style="color:#3b5998;">B3 Explorer App 📈</h1>
-        <img src="b3explorer.png" width="250">
+        <img src="data:image/png;base64,{img_base64}" width="250">
     </div>
     """,
     unsafe_allow_html=True
 )
+
 
 
 # Carrega lista de ações da B3 com setores para filtragem inicial
