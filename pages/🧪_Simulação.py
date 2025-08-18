@@ -53,6 +53,11 @@ returns = st.session_state["returns"]
 pesos_manuais = st.session_state["pesos_manuais"]
 peso_manual_df = st.session_state["peso_manual_df"]
 
+# Adiciona espaço vertical
+st.markdown("<br><br>", unsafe_allow_html=True)
+
+
+
 with st.form("form_simulacao"):
     n_simulations = st.slider("Número de Simulações", 10, 500, 200,
                               help="Quantidade de trajetórias simuladas para o portfólio.")
