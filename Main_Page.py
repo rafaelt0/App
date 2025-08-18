@@ -42,12 +42,11 @@ st.sidebar.success("Selecione uma página")
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-# Título da página
-col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
-with col4:
-    
-    st.title("**B3 Explorer App 📈**")  
-    st.image("b3explorer.png", width=300)
+st.markdown("""
+<div style="text-align:center;">
+    <img src="App/b3explorer.png" width="200" style="border-radius:12px;"/>
+</div>
+""", unsafe_allow_html=True)
 
 # Carrega lista de ações da B3 com setores para filtragem inicial
 data = pd.read_csv('acoes-listadas-b3.csv')
