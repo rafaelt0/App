@@ -42,10 +42,12 @@ st.sidebar.success("Selecione uma página")
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-st.image("b3explorer.png", width=350)
+st.image("b3explorer.png", width=400)
 
 # Carrega lista de ações da B3 com setores para filtragem inicial
+
 data = pd.read_csv('acoes-listadas-b3.csv')
+
 st.subheader("Explore ações da B3 🧭")
 tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações). Selecione a página e as configurações na aba lateral ', tickers_filtrados)
 
