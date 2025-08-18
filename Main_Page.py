@@ -44,7 +44,7 @@ with open("style.css") as f:
 
 # Título da página
 col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
-with col3:
+with col4:
     
     st.title("**B3 Explorer App 📈**")  
     st.image("b3explorer.png", width=300)
