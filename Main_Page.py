@@ -69,10 +69,7 @@ setores.insert(0, "Todos")
 
 st.subheader("Escolha o setor.")
 
-# Permite filtro por setor na barra lateral
-setores_selecionados = st.multiselect(
-    'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
-)
+
 
 #selecionar Todos ou nada, mostra todos os tickers
 if "Todos" in setores_selecionados or not setores_selecionados:
@@ -84,17 +81,10 @@ else:
 st.subheader("Explore ações da B3 🧭")
 tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações). Selecione a página e as configurações na aba lateral ', tickers_filtrados)
 
-
-
-
-
-
-
-
-
-
-
-
+# Permite filtro por setor na barra lateral
+setores_selecionados = st.multiselect(
+    'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
+)
 
 
 # Só executa análise se houver pelo menos uma ação selecionada
