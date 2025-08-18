@@ -32,7 +32,7 @@ def get_base64_of_bin_file(bin_file):
     return base64.b64encode(data).decode()
 
 # converte a imagem para base64
-img_base64 = get_base64_of_bin_file("carteira.png")
+img_base64 = get_base64_of_bin_file("portfolio.png")
 
 st.markdown(
     f"""
