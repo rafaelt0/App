@@ -61,7 +61,7 @@ setores = sorted(data['Setor'].dropna().unique())
 setores.insert(0, "Todos")
 
 # Permite filtro por setor na barra lateral
-setores_selecionados = st.sidebar.multiselect(
+setores_selecionados = st.multiselect(
     'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
 )
 
