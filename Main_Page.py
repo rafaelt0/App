@@ -162,7 +162,7 @@ if tickers:
         }
         
         # Filtro de indicadores
-        st.markdown("### Filtros")
+        st.markdown("#### Filtros 🔎")
 
         # Organização das colunas
         col1, col2 = st.columns(2)
