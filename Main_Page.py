@@ -234,7 +234,7 @@ if tickers:
         
         st.subheader("Cotação Histórica")
         st.write(data_prices)
-        st.line_chart(data_prices, y='ITUB4.SA')
+        st.line_chart(data_prices)
         # Histograma de distribuição de retornos
         st.subheader("Histograma Combinado dos Retornos Diários (%)")
         fig_hist_all = px.histogram(
