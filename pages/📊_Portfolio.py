@@ -21,10 +21,8 @@ import io
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
-
-
-
-st.title("Análise e Otimização de Portfólio - B3 Explorer")
+# Título da página
+st.markdown("<h1 style='text-align: center;'>Análise e Otimização de Portfólio 💼</h1>", unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
