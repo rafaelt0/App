@@ -84,7 +84,7 @@ st.sidebar.subheader("Escolha o setor.")
 
 # Permite filtro por setor na barra lateral
 setores_selecionados = st.sidebar.multiselect(
-    'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=[]
+    'Escolha um ou mais setores 📊:', setores, default=[]
 )
 
 
@@ -95,8 +95,8 @@ else:
     tickers_filtrados = data[data['Setor'].isin(setores_selecionados)]['Ticker'].tolist()
 
 
-st.subheader("Escolha ações para explorar! 🧭. Selecione a página desejada e as configurações na página lateral 📄.")
-tickers = st.multiselect('Escolha sua ação', tickers_filtrados)
+st.subheader("Escolha ações para explorar! 🧭")
+tickers = st.multiselect('Escolha sua ação. Selecione a página desejada e as configurações na página lateral 📄.', tickers_filtrados)
 
 
 # Só executa análise se houver pelo menos uma ação selecionada
