@@ -17,7 +17,9 @@ import matplotlib.ticker as mtick
 import io
 import base64
 
-
+# CSS customizado
+with open("style.css") as f:
+    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 warnings.filterwarnings('ignore')
 st.set_option('deprecation.showPyplotGlobalUse', False)
