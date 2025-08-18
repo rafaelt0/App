@@ -57,6 +57,8 @@ stocks = list(data['Ticker'].values)
 setores = sorted(data['Setor'].dropna().unique())
 setores.insert(0, "Todos")
 
+st.subheader("Escolha o setor.")
+
 # Permite filtro por setor na barra lateral
 setores_selecionados = st.multiselect(
     'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
