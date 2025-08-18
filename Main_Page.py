@@ -224,16 +224,15 @@ if tickers:
         data_prices = yf.download(tickers_yf, start=data_inicio, end=datetime.datetime.now(), 
                                   interval=interval_selected)['Close']
 
-        # Garantir DataFrame caso seja Series
+      # Se for Series (ticker único), converte para DataFrame e renomeia a coluna para o ticker
         if isinstance(data_prices, pd.Series):
-            data_prices = data_prices.to_frame(name='tickers_yf')
-
-        # Ajusta caso o DataFrame venha com MultiIndex de colunas
-        if isinstance(data_prices.columns, pd.MultiIndex):
-            data_prices = data_prices.droplevel(0, axis=1)
-
+            data_prices = data_prices.to_frame(name=tickers_yf)
+        
+        # Se for MultiIndex nas colunas (vários tickers), "desnivele" a coluna
+        elif isinstance(data_prices.columns, pd.MultiIndex):
+            data_prices.columns = data_prices.columns.get_level_values(-1)
+        
         st.subheader("Cotação Histórica")
-
         st.line_chart(data_prices)
 
         # Cálculo retornos pct
