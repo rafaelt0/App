@@ -238,7 +238,7 @@ if tickers:
 
         fig = px.line(
         data_prices,
-        x=tickers_yf.columns,
+        x=tickers_yf.values,
         y=data_prices.columns[1:],  # todas as colunas de preço
         title="📈 Cotação Histórica",
         labels={"value": "Preço (R$)", "variable": "Ativo"})
