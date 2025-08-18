@@ -47,7 +47,7 @@ col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     
     st.title("**B3 Explorer App 📈**")  
-    st.image("b3explorer.png", width=400)
+    st.image("b3explorer.png", width=200)
 # Carrega lista de ações da B3 com setores para filtragem inicial
 data = pd.read_csv('acoes-listadas-b3.csv')
 
