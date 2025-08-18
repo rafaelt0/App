@@ -234,7 +234,7 @@ if tickers:
         
         st.subheader("Cotação Histórica")
         st.write(data_prices)
-        st.line_chart(data_prices)
+        st.line_chart(data_prices, x='Date')
 
         # Cálculo retornos pct
         returns = data_prices.pct_change().dropna() * 100
