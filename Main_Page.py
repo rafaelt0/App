@@ -228,9 +228,6 @@ if tickers:
         if isinstance(data_prices, pd.Series):
             data_prices = data_prices.to_frame(name=tickers_yf if isinstance(tickers_yf, str) else tickers_yf[0])
 
-        # Ajusta caso o DataFrame venha com MultiIndex de colunas
-        if isinstance(data_prices.columns, pd.MultiIndex):
-            data_prices = data_prices.droplevel(0, axis=1)
 
 
         st.subheader("Cotação Histórica")
