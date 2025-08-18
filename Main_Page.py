@@ -44,7 +44,7 @@ with open("style.css") as f:
 
 st.markdown("""
 <div style="text-align:center;">
-    <img src="App/b3explorer.png" width="200" style="border-radius:12px;"/>
+    <img src="b3explorer.png" width="200" style="border-radius:12px;"/>
 </div>
 """, unsafe_allow_html=True)
 
