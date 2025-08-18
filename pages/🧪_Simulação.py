@@ -14,6 +14,7 @@ from scipy.stats import kurtosis, skew
 import quantstats as qs
 import matplotlib.ticker as mtick
 import io
+import base64
 
 
 
