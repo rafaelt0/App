@@ -49,14 +49,14 @@ st.image("b3explorer.png", width=400)
 data = pd.read_csv('acoes-listadas-b3.csv')
 
 
+st.subheader("Explore ações da B3 🧭")
+tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações). Selecione a página e as configurações na aba lateral ', tickers_filtrados)
+
 #Se selecionar Todos ou nada, mostra todos os tickers
 if "Todos" in setores_selecionados or not setores_selecionados:
     tickers_filtrados = data['Ticker'].tolist()
 else:
     tickers_filtrados = data[data['Setor'].isin(setores_selecionados)]['Ticker'].tolist()
-
-st.subheader("Explore ações da B3 🧭")
-tickers = st.multiselect('Escolha ações para explorar! (2 ou mais ações). Selecione a página e as configurações na aba lateral ', tickers_filtrados)
 
 if 'Setor' not in data.columns:
     st.error("O arquivo CSV precisa conter a coluna 'Setor' para o filtro funcionar.")
