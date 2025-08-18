@@ -232,17 +232,14 @@ if tickers:
         if isinstance(data_prices.columns, pd.MultiIndex):
             data_prices = data_prices.droplevel(0, axis=1)
 
+        # Ajustando índice
+        data_prices = pd.to_datetime(data_prices.index)
+        data_prices = data_prices.rename_axis("Data").reset_index()
+
 
         st.subheader("Cotação Histórica")
 
-        fig = px.line(
-        data_prices,
-        x=data_prices.index,
-        y=data_prices.columns[1:],  # todas as colunas de preço
-        title="📈 Cotação Histórica",
-        labels={"value": "Preço (R$)", "variable": "Ativo"})
-
-        st.plotly_chart(fig, use_container_width=True)
+        st.line_chart(data_prices.set_index("Data")
 
         # Cálculo retornos pct
         returns = data_prices.pct_change().dropna() * 100
