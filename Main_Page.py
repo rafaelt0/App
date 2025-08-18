@@ -233,6 +233,7 @@ if tickers:
             data_prices.columns = data_prices.columns.get_level_values(-1)
         
         st.subheader("Cotação Histórica")
+        st.write(data_prices)
         st.line_chart(data_prices)
 
         # Cálculo retornos pct
