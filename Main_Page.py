@@ -239,7 +239,7 @@ if tickers:
 
         st.subheader("Cotação Histórica")
 
-        st.line_chart(data_prices.set_index("Data")
+        st.line_chart(data_prices.set_index("Data"))
 
         # Cálculo retornos pct
         returns = data_prices.pct_change().dropna() * 100
