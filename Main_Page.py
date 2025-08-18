@@ -234,14 +234,7 @@ if tickers:
         
         st.subheader("Cotação Histórica")
         st.write(data_prices)
-        st.line_chart(data_prices, x='Date')
-
-        # Cálculo retornos pct
-        returns = data_prices.pct_change().dropna() * 100
-        returns_pct = returns.round(2).astype(str) + '%'
-        st.subheader("Retornos (%)")
-        st.dataframe(returns_pct)
-
+        st.line_chart(data_prices, x=data_prices.index)
         # Histograma de distribuição de retornos
         st.subheader("Histograma Combinado dos Retornos Diários (%)")
         fig_hist_all = px.histogram(
