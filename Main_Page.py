@@ -226,7 +226,7 @@ if tickers:
 
         # Garantir DataFrame caso seja Series
         if isinstance(data_prices, pd.Series):
-            data_prices = data_prices.to_frame()
+            data_prices = data_prices.to_frame(name='Close')
 
         # Ajusta caso o DataFrame venha com MultiIndex de colunas
         if isinstance(data_prices.columns, pd.MultiIndex):
