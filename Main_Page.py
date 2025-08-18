@@ -48,6 +48,11 @@ st.image("b3explorer.png", width=400)
 
 data = pd.read_csv('acoes-listadas-b3.csv')
 
+# Permite filtro por setor na barra lateral
+setores_selecionados = st.multiselect(
+    'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
+)
+
 #Se selecionar Todos ou nada, mostra todos os tickers
 if "Todos" in setores_selecionados or not setores_selecionados:
     tickers_filtrados = data['Ticker'].tolist()
@@ -67,10 +72,6 @@ setores = sorted(data['Setor'].dropna().unique())
 setores.insert(0, "Todos")
 
 
-# Permite filtro por setor na barra lateral
-setores_selecionados = st.multiselect(
-    'Escolha um ou mais setores (deixe vazio ou "Todos" para todos):', setores, default=["Todos"]
-)
 
 
 
