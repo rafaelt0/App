@@ -234,7 +234,7 @@ if tickers:
         fig, ax = plt.subplots()
         sns.lineplot(data=data_prices, ax=ax)
         plt.xlabel("Período")
-        plt.ylabel("Cotação")
+        plt.ylabel("Cotação (R$)")
         plt.title("Cotação do(s) Ativo(s)")
         st.pyplot(fig)
 
