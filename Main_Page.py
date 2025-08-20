@@ -243,7 +243,7 @@ if tickers:
         st.pyplot(fig)
 
         returns = data_prices.pct_change()
-        st.write(returns)
+        
         
         # Histograma de distribuição de retornos
         
