@@ -25,6 +25,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Adiciona espaço vertical
+st.markdown("<br><br>", unsafe_allow_html=True)
+
 # Verifica se as variáveis necessárias já estão no session_state
 required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
 for key in required_keys:
