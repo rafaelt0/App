@@ -26,6 +26,9 @@ retorno_bench = st.session_state["retorno_bench"]
 portfolio_returns.index = pd.to_datetime(portfolio_returns.index, errors='coerce')
 portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
 
+# Cria arquivo temporário
+with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
+    tmp_path = tmpfile.name
 
 # Carregamento página
 with st.spinner("Gerando relatório... Isso pode levar alguns segundos. ⏳"):
