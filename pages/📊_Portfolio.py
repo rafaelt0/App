@@ -392,6 +392,7 @@ st.session_state["modo"] = modo
 st.session_state["returns"] = returns
 st.session_state["peso_manual_df"] = peso_manual_df
 st.session_state["portfolio_returns"] = portfolio_returns
+st.session_state["retorno_bench"] = retorno_bench
 
 # Garante que pesos manuais ficam disponíveis como dicionário
 if modo == "Alocação Manual":
