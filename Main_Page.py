@@ -247,6 +247,8 @@ if tickers:
         q1 = np.quantile(returns_hist,0.25)
         q2 = np.quantile(returns_hist,0.50)
         q3 = np.quantile(returns_hist,0.75)
+
+        st.write(q1, q2, q3)
         
         st.subheader("Histograma Combinado dos Retornos Diários (%")
         fig, ax = plt.subplots(figsize=(10,6))
