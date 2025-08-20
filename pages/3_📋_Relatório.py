@@ -30,17 +30,16 @@ portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
 # Carregamento página
 with st.spinner("Gerando relatório... Isso pode levar alguns segundos. ⏳"):
     qs.reports.html(
-        portfolio_returns,
-        benchmark=retorno_bench,
-        output=tmp_path,
-        title="Relatório Completo do Portfólio",
-        download_filename="relatorio_portfolio.html"
-    )
+    portfolio_returns,
+    benchmark=retorno_bench,
+    output=tmp_path,
+    title="Relatório Completo do Portfólio",
+    download_filename="relatorio_portfolio.html")
     
-      st.download_button(
-      label="Baixar Relatório HTML Completo (QuantStats)",
-      data=open(tmpfile.name, "rb").read(),
-      file_name="relatorio_portfolio.html",
-      mime="text/html")
+st.download_button(
+label="Baixar Relatório HTML Completo (QuantStats)",
+data=open(tmpfile.name, "rb").read(),
+file_name="relatorio_portfolio.html",
+mime="text/html")
 
     
