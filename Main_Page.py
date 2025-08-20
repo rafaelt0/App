@@ -243,14 +243,13 @@ if tickers:
         st.pyplot(fig)
 
         returns = data_prices.pct_change()
-        st.write(type(returns))
         
         # Histograma de distribuição de retornos
         # Calcular quartis
         returns_hist = returns.dropna(axis=0)
-        q1 = returns_hist.quantile(q=0.25, axis=1)
-        q2 = returns_hist.quantile(q=0.5, axis=1)
-        q3 = returns_hist.quantile(q=0.75, axis=1)
+        q1 = returns_hist.quantile(0.25)
+        q2 = returns_hist.quantile(0.5)
+        q3 = returns_hist.quantile(0.75)
 
         st.write(q1)
         
