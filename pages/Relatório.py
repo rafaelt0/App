@@ -5,6 +5,12 @@ import pandas as pd
 import tempfile
 st.subheader("Baixar Relatório Completo (QuantStats)")
 
+modo = st.session_state["modo"]
+returns = st.session_state["returns"]
+pesos_manuais = st.session_state["pesos_manuais"]
+peso_manual_df = st.session_state["peso_manual_df"]
+portfolio_returns = st.session_state["portfolio_returns"]
+
 # Converte para formato aceito pelo QuantStats
 portfolio_returns.index = pd.to_datetime(portfolio_returns.index, errors='coerce')
 portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
