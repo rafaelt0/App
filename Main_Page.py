@@ -231,7 +231,9 @@ if tickers:
         
         st.subheader("Cotação Histórica")
         st.write(data_prices)
-        sns.lineplot(data=data_prices)
+        fig, ax = plt.subplots()
+        sns.lineplot(data=data_prices, ax=ax)
+        st.pyplot(fig)
 
         returns = data_prices.pct_change()
         # Histograma de distribuição de retornos
