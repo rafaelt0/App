@@ -44,6 +44,7 @@ st.markdown(
 required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
 for key in required_keys:
     if key not in st.session_state:
+        st.markdown("<br><br>", unsafe_allow_html=True)
         st.warning("⚠️ Configure primeiro seu portfólio na aba 1 para liberar a simulação Monte Carlo.")
         st.stop()
 
