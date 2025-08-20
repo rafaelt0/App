@@ -248,12 +248,12 @@ if tickers:
         # Histograma de distribuição de retornos
         
         # Calcular quartis
-        returns_hist = np.array(returns)
-        returns_hist = returns_hist[~np.isnan(returns_hist)]
-        q1 = np.quantile(returns_hist,0.25)
-        q2 = np.quantile(returns_hist,0.50)
-        q3 = np.quantile(returns_hist,0.75)
-
+        returns_hist = returns
+        q1 = returns_hist.quantile(0.25)
+        q2 = returns_hist.quantile(0.25)
+        q3 = returns_hist.quantile(0.25)
+       
+        
         
         st.subheader("Histograma Combinado dos Retornos Diários (%)")
         fig, ax = plt.subplots(figsize=(10,6))
