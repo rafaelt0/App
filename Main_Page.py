@@ -244,9 +244,9 @@ if tickers:
         # Calcular quartis
         returns = np.array(returns)
         
-        q1 = returns.quantile(0.25)
-        q2 = returns.quantile(0.50)
-        q3 = returns.quantile(0.75)
+        q1 = np.quantile(returns,0.25)
+        q2 = np.quantile(returns,0.50)
+        q3 = np.quantile(returns,0.75)
         
         st.subheader("Histograma Combinado dos Retornos Diários (%")
         fig, ax = plt.subplots(figsize=(10,6))
