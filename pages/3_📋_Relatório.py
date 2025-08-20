@@ -7,6 +7,23 @@ import tempfile
 # Título da página
 st.markdown("<h1 style='text-align: center;'>Baixar Relatório do Portfolio (Quantstats) 📝</h1>", unsafe_allow_html=True)
 
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+# converte a imagem para base64
+img_base64 = get_base64_of_bin_file("Relatorio.png")
+
+st.markdown(
+    f"""
+    <div style="text-align: center;">
+        <img src="data:image/png;base64,{img_base64}" width="250">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 # Verifica se as variáveis necessárias já estão no session_state
 required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
 for key in required_keys:
