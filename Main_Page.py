@@ -21,7 +21,7 @@ import scipy.stats as stats
 import base64
 
 warnings.filterwarnings('ignore')
-plt.style.use('ggplot')
+plt.style.use('seaborn-v0_8-whitegrid')
 
 # "Função para limpar colunas numéricas que vêm em formato de texto do Fundamentus"
 def clean_numeric_column(col):
