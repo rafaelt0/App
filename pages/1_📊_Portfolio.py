@@ -45,6 +45,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Adiciona espaço vertical
+st.markdown("<br><br>", unsafe_allow_html=True)
+
 # Configurações
 data_inicio = st.date_input("Data Inicial 🗓️", datetime.date(2025, 1, 1), min_value=datetime.date(2000, 1, 1))
 taxa_selic =  sgs.get(432, start=data_inicio)
