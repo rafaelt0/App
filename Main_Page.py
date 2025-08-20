@@ -293,7 +293,7 @@ if tickers:
 
         # Boxplot para visualizar a dispersão e outliers
         st.subheader("Boxplot dos Retornos Diários (%) por Ação")
-        fig_box = px.box(
+        fig_box = seaborn.boxplot(
             returns.melt(var_name='Ação', value_name='Retorno (%)'),
             x='Ação',
             y='Retorno (%)',
