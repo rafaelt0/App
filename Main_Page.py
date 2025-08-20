@@ -247,29 +247,26 @@ if tickers:
         # Histograma de distribuição de retornos
         # Calcular quartis
         returns_hist = returns.dropna(axis=0)
-
-        # Melt no df
-        returns_melted = returns_hist.melt(var_name='Ação', value_name='Retorno (%)')
+    
+        for coluna in returns_hist.columns:
+            q1 = returns_hist[coluna].quantile(0.25)
+            q2 = returns_hist[coluna].quantile(0.5)
+            q3 = returns_hist[coluna].quantile(0.75)
         
-        # Calcular quantis
-        q1 = returns_melted['Retorno (%)'].quantile(0.25)
-        q2 = returns_melted['Retorno (%)'].quantile(0.5)
-        q3 = returns_melted['Retorno (%)'].quantile(0.75)
+            fig, ax = plt.subplots(figsize=(8,4))
+            sns.histplot(returns_hist[coluna], bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax)
         
-        st.subheader("Histograma dos Retornos Diários (%)")
-        fig, ax = plt.subplots(figsize=(10,6))
-        sns.histplot(returns_melted, bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax, hue='Ação')
+            ax.axvline(q1, color='red', linestyle='--', label='Q1 (25%)')
+            ax.axvline(q2, color='green', linestyle='-', label='Mediana (50%)')
+            ax.axvline(q3, color='orange', linestyle='--', label='Q3 (75%)')
         
-        ax.axvline(q1, color='red', linestyle='--', label='Q1 (25%)')
-        ax.axvline(q2, color='green', linestyle='-', label='Mediana (50%)')
-        ax.axvline(q3, color='orange', linestyle='--', label='Q3 (75%)')
+            ax.set_title(f'Distribuição dos Retornos Diários - {coluna}')
+            ax.set_xlabel('Retorno Diário')
+            ax.set_ylabel('Frequência')
+            ax.legend()
         
-        ax.set_title('Distribuição dos Retornos Diários')
-        ax.set_xlabel('Retorno Diário')
-        ax.set_ylabel('Frequência')
-        ax.legend()
-        
-        st.pyplot(fig)
+            st.pyplot(fig)
+       
 
         
         # Estatísticas descritivas importantes para análise de risco
