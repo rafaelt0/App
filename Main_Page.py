@@ -247,26 +247,6 @@ if tickers:
         
         # Histograma de distribuição de retornos
         
-        # Calcular quartis
-        returns_hist = returns.dropna(axis=0)
-        q1 = returns_hist.quantile(q=0.25, axis=1)
-        q2 = returns_hist.quantile(q=0.5, axis=1)
-        q3 = returns_hist.quantile(q=0.75, axis=1)
-
-        st.write(q1)
-        
-        
-        st.subheader("Histograma Combinado dos Retornos Diários (%)")
-        fig, ax = plt.subplots(figsize=(10,6))
-        sns.histplot(returns_hist, bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax)
-        ax.axvline(q1, color='red', linestyle='--', label='Q1 (25%)')
-        ax.axvline(q2, color='green', linestyle='-', label='Mediana (50%)')
-        ax.axvline(q3, color='orange', linestyle='--', label='Q3 (75%)')
-        ax.set_title('Distribuição dos Retornos Diários')
-        ax.set_xlabel('Retorno Diário')
-        ax.set_ylabel('Frequência')
-        ax.legend()
-        st.pyplot(fig)
         
         # Estatísticas descritivas importantes para análise de risco
         st.subheader("Estatísticas Descritivas dos Retornos (%)")
