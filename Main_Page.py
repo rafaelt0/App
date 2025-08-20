@@ -67,6 +67,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Adiciona espaço vertical
+st.markdown("<br><br>", unsafe_allow_html=True)
+
+
 # Carrega lista de ações da B3 com setores para filtragem inicial
 
 data = pd.read_csv('acoes-listadas-b3.csv')
