@@ -278,7 +278,6 @@ if tickers:
             x='Ação',
             y='Retorno (%)'
         )
-        fig_box.update_layout(height=450)
         st.plotly_chart(fig_box, use_container_width=True)
 
         # Radar chart para comparar indicadores fundamentalistas
