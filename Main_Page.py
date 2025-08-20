@@ -249,9 +249,9 @@ if tickers:
         
         # Calcular quartis
         returns_hist = returns.dropna(axis=0)
-        q1 = returns_hist.quantile(0.25)
-        q2 = returns_hist.quantile(0.25)
-        q3 = returns_hist.quantile(0.25)
+        q1 = returns_hist.quantile(q=0.25, axis=1)
+        q2 = returns_hist.quantile(q=0.5, axis=1)
+        q3 = returns_hist.quantile(q=0.75, axis=1)
        
         
         
