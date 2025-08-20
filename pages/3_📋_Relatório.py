@@ -4,7 +4,7 @@ import quantstats as qs
 
 # Botão para gerar PDF via quantstats
 import tempfile
-st.subheader("Baixar Relatório Completo (QuantStats)")
+st.header("Baixar Relatório Completo (QuantStats)")
 
 # Verifica se as variáveis necessárias já estão no session_state
 required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
