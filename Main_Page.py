@@ -252,7 +252,8 @@ if tickers:
         q1 = returns_hist.quantile(q=0.25, axis=1)
         q2 = returns_hist.quantile(q=0.5, axis=1)
         q3 = returns_hist.quantile(q=0.75, axis=1)
-       
+
+        st.write(q1)
         
         
         st.subheader("Histograma Combinado dos Retornos Diários (%)")
