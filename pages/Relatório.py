@@ -1,4 +1,4 @@
-
+import streamlit as st
 
 # Botão para gerar PDF via quantstats
 import tempfile
