@@ -276,8 +276,7 @@ if tickers:
         fig_box = sns.boxplot(
             returns.melt(var_name='Ação', value_name='Retorno (%)'),
             x='Ação',
-            y='Retorno (%)',
-            title="Distribuição dos Retornos Diários (%)"
+            y='Retorno (%)'
         )
         fig_box.update_layout(height=450)
         st.plotly_chart(fig_box, use_container_width=True)
