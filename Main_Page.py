@@ -226,7 +226,7 @@ if tickers:
 
       # Se for Series (ticker único), converte para DataFrame e renomeia a coluna para o ticker
         if isinstance(data_prices, pd.Series):
-            data_prices = data_prices.to_frame(name=tickers_yf)
+            data_prices = data_prices.to_frame(name=tickers[0])
         
         # Se for MultiIndex nas colunas (vários tickers), "desnivele" a coluna
         elif isinstance(data_prices.columns, pd.MultiIndex):
