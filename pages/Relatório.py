@@ -24,12 +24,10 @@ with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
         benchmark= retorno_bench,
         output=tmpfile.name,
         title="Relatório Completo do Portfólio",
-        download_filename="relatorio_portfolio.html"
-    )
+        download_filename="relatorio_portfolio.html")
    
      st.download_button(
         label="Baixar Relatório HTML Completo (QuantStats)",
         data=open(tmpfile.name, "rb").read(),
         file_name="relatorio_portfolio.html",
-        mime="text/html"
-    )
+        mime="text/html")
