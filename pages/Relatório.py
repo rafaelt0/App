@@ -11,6 +11,7 @@ returns = st.session_state["returns"]
 pesos_manuais = st.session_state["pesos_manuais"]
 peso_manual_df = st.session_state["peso_manual_df"]
 portfolio_returns = st.session_state["portfolio_returns"]
+retorno_bench = st.session_state["retorno_bench"]
 
 # Converte para formato aceito pelo QuantStats
 portfolio_returns.index = pd.to_datetime(portfolio_returns.index, errors='coerce')
