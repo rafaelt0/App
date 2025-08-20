@@ -242,6 +242,8 @@ if tickers:
         
         # Histograma de distribuição de retornos
         # Calcular quartis
+        returns = np.array(returns)
+        
         q1 = returns.quantile(0.25)
         q2 = returns.quantile(0.50)
         q3 = returns.quantile(0.75)
