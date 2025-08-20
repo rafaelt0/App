@@ -259,20 +259,7 @@ if tickers:
         ax.set_ylabel('Frequência')
         ax.legend()
         st.pyplot(fig)
-
-        st.subheader("Histograma Combinado dos Retornos Diários (%)")
-        fig_hist_all = px.histogram(
-            returns.melt(var_name='Ação', value_name='Retorno (%)'),
-            x='Retorno (%)',
-            color='Ação',
-            barmode='overlay',
-            nbins=100,
-            opacity=0.6,
-            title='Distribuição dos Retornos Diários (%) - Todas as Ações'
-        )
-        fig_hist_all.update_layout(height=450)
-        st.plotly_chart(fig_hist_all, use_container_width=True)
-
+        
         # Estatísticas descritivas importantes para análise de risco
         st.subheader("Estatísticas Descritivas dos Retornos (%)")
         stats_df = pd.DataFrame(index=returns.columns)
