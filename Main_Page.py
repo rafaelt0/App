@@ -277,7 +277,6 @@ if tickers:
             returns.melt(var_name='Ação', value_name='Retorno (%)'),
             x='Ação',
             y='Retorno (%)',
-            points="outliers",
             title="Distribuição dos Retornos Diários (%)"
         )
         fig_box.update_layout(height=450)
