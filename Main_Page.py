@@ -233,6 +233,9 @@ if tickers:
         st.write(data_prices)
         fig, ax = plt.subplots()
         sns.lineplot(data=data_prices, ax=ax)
+        plt.xlabel("Período")
+        ply.ylabel("Cotação)
+        plt.title("Cotação do(s) Ativo(s)")
         st.pyplot(fig)
 
         returns = data_prices.pct_change()
