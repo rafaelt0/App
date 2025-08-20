@@ -36,10 +36,12 @@ with st.spinner("Gerando relatório... Isso pode levar alguns segundos. ⏳"):
     title="Relatório Completo do Portfólio",
     download_filename="relatorio_portfolio.html")
     
-st.download_button(
-label="Baixar Relatório HTML Completo (QuantStats)",
-data=open(tmpfile.name, "rb").read(),
-file_name="relatorio_portfolio.html",
-mime="text/html")
+# Botão para download
+with open(tmp_path, "rb") as f:
+    st.download_button(
+    label="Baixar Relatório HTML Completo (QuantStats)",
+    data=f.read(),
+    file_name="relatorio_portfolio.html",
+    mime="text/html")
 
     
