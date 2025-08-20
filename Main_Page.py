@@ -228,10 +228,6 @@ if tickers:
         if isinstance(data_prices, pd.Series):
             data_prices = data_prices.to_frame(name=tickers[0])
         
-        # Se for MultiIndex nas colunas (vários tickers), "desnivele" a coluna
-        elif isinstance(data_prices.columns, pd.MultiIndex):
-            data_prices.columns = data_prices.columns.get_level_values(-1)
-        
         st.subheader("Cotação Histórica")
         st.write(data_prices)
         st.line_chart(data_prices)
