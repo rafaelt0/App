@@ -72,22 +72,12 @@ if len(tickers) == 1:
 
 tickers_yf = [t + ".SA" for t in tickers]
 
-st.subheader("Baixando dados das ações...")
-progress_bar = st.progress(0)
-data_yf = None
-try:
-    # Simula progresso em 3 etapas
-    progress_bar.progress(10)
-    data_yf = yf.download(tickers_yf, start=data_inicio, progress=False)['Close']
-    progress_bar.progress(80)
-    if isinstance(data_yf.columns, pd.MultiIndex):
-        data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
-    returns = data_yf.pct_change().dropna()
-    progress_bar.progress(100)
-except Exception as e:
-    st.error(f"Erro ao baixar dados: {e}")
-    st.stop()
-progress_bar.empty()
+# Baixa dados
+data_yf = yf.download(tickers_yf, start=data_inicio, progress=False)['Close']
+if isinstance(data_yf.columns, pd.MultiIndex):
+    data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
+
+returns = data_yf.pct_change().dropna()
 
 
 
