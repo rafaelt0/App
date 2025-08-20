@@ -391,6 +391,7 @@ st.plotly_chart(fig_rc, use_container_width=True)
 st.session_state["modo"] = modo
 st.session_state["returns"] = returns
 st.session_state["peso_manual_df"] = peso_manual_df
+st.session_state["portfolio_returns"] = portfolio_returns
 
 # Garante que pesos manuais ficam disponíveis como dicionário
 if modo == "Alocação Manual":
