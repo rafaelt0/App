@@ -239,7 +239,25 @@ if tickers:
         st.pyplot(fig)
 
         returns = data_prices.pct_change()
+        
         # Histograma de distribuição de retornos
+        # Calcular quartis
+        q1 = returns.quantile(0.25)
+        q2 = returns.quantile(0.50)
+        q3 = returns.quantile(0.75)
+        
+        st.subheader("Histograma Combinado dos Retornos Diários (%")
+        fig, ax = plt.subplots(figsize=(10,6))
+        sns.histplot(returns, bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax)
+        ax.axvline(q1, color='red', linestyle='--', label='Q1 (25%)')
+        ax.axvline(q2, color='green', linestyle='-', label='Mediana (50%)')
+        ax.axvline(q3, color='orange', linestyle='--', label='Q3 (75%)')
+        ax.set_title('Distribuição dos Retornos Diários')
+        ax.set_xlabel('Retorno Diário')
+        ax.set_ylabel('Frequência')
+        ax.legend()
+        st.pyplot(fig)
+
         st.subheader("Histograma Combinado dos Retornos Diários (%)")
         fig_hist_all = px.histogram(
             returns.melt(var_name='Ação', value_name='Retorno (%)'),
