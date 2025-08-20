@@ -27,13 +27,15 @@ portfolio_returns.index = pd.to_datetime(portfolio_returns.index, errors='coerce
 portfolio_returns = portfolio_returns.tz_localize(None)  # Remove timezone
 
 
-with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmpfile:
-      qs.reports.html(
-      portfolio_returns,
-      benchmark= retorno_bench,
-      output=tmpfile.name,
-      title="Relatório Completo do Portfólio",
-      download_filename="relatorio_portfolio.html")
+# Carregamento página
+with st.spinner("Gerando relatório... Isso pode levar alguns segundos. ⏳"):
+    qs.reports.html(
+        portfolio_returns,
+        benchmark=retorno_bench,
+        output=tmp_path,
+        title="Relatório Completo do Portfólio",
+        download_filename="relatorio_portfolio.html"
+    )
     
       st.download_button(
       label="Baixar Relatório HTML Completo (QuantStats)",
