@@ -250,13 +250,12 @@ if tickers:
         q1 = returns_hist.quantile(0.25)
         q2 = returns_hist.quantile(0.5)
         q3 = returns_hist.quantile(0.75)
-
-        st.write(q1)
         
         
         st.subheader("Histograma Combinado dos Retornos Diários (%)")
         fig, ax = plt.subplots(figsize=(10,6))
-        sns.histplot(returns_hist, bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax)
+        sns.histplot(returns_hist.melt(var_name='Ação', value_name='Retorno (%)'), 
+                     bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax)
         ax.axvline(q1, color='red', linestyle='--', label='Q1 (25%)')
         ax.axvline(q2, color='green', linestyle='-', label='Mediana (50%)')
         ax.axvline(q3, color='orange', linestyle='--', label='Q3 (75%)')
