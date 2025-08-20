@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 
 # Botão para gerar PDF via quantstats
 import tempfile
