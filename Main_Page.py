@@ -248,7 +248,7 @@ if tickers:
         # Histograma de distribuição de retornos
         
         # Calcular quartis
-        returns_hist = returns
+        returns_hist = returns.dropna(axis=0)
         q1 = returns_hist.quantile(0.25)
         q2 = returns_hist.quantile(0.25)
         q3 = returns_hist.quantile(0.25)
