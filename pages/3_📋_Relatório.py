@@ -4,7 +4,8 @@ import quantstats as qs
 
 # Botão para gerar PDF via quantstats
 import tempfile
-st.header("Baixar Relatório Completo (QuantStats)")
+# Título da página
+st.markdown("<h1 style='text-align: center;'>Baixar Relatório do Portfolio (Quantstats) 📝</h1>", unsafe_allow_html=True)
 
 # Verifica se as variáveis necessárias já estão no session_state
 required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
