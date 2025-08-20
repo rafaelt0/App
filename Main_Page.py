@@ -227,6 +227,7 @@ if tickers:
       # Se for Series (ticker único), converte para DataFrame e renomeia a coluna para o ticker
         if isinstance(data_prices, pd.Series):
             data_prices = data_prices.to_frame(name=tickers[0])
+            data_prices.index = pd.to_datetime(data_prices.index)
         
         st.subheader("Cotação Histórica")
         st.write(data_prices)
