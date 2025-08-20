@@ -232,7 +232,7 @@ if tickers:
         st.subheader("Cotação Histórica")
         st.write(data_prices)
         fig, ax = plt.subplots()
-        sns.lineplot(data=data_prices, ax=ax, x="Data", y="Cotação")
+        sns.lineplot(data=data_prices, ax=ax)
         st.pyplot(fig)
 
         returns = data_prices.pct_change()
