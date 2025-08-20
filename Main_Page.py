@@ -258,7 +258,7 @@ if tickers:
         
         st.subheader("Histograma dos Retornos Diários (%)")
         fig, ax = plt.subplots(figsize=(10,6))
-        sns.histplot(returns_melted, bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax)
+        sns.histplot(returns_melted, bins=30, kde=True, color='skyblue', edgecolor='black', ax=ax, hue='Ação')
         
         ax.axvline(q1, color='red', linestyle='--', label='Q1 (25%)')
         ax.axvline(q2, color='green', linestyle='-', label='Mediana (50%)')
