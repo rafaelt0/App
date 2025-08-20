@@ -273,12 +273,14 @@ if tickers:
 
         # Boxplot para visualizar a dispersão e outliers
         st.subheader("Boxplot dos Retornos Diários (%) por Ação")
-        fig_box = sns.boxplot(
+        fig, ax = plt.subplots()
+        sns.boxplot(
             returns.melt(var_name='Ação', value_name='Retorno (%)'),
             x='Ação',
-            y='Retorno (%)'
+            y='Retorno (%)',
+            ax=ax
         )
-        st.plotly_chart(fig_box, use_container_width=True)
+        st.pyplot(fig)
 
         # Radar chart para comparar indicadores fundamentalistas
         if not df_ind.empty and len(df_ind) > 1:
