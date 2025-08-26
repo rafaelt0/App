@@ -82,6 +82,9 @@ if isinstance(data_yf.columns, pd.MultiIndex):
 
 returns = data_yf.pct_change().dropna()
 
+
+
+
 if modo == "Alocação Manual":
     st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
     pesos_manuais = {}
@@ -400,6 +403,15 @@ if modo == "Alocação Manual":
 else:
     st.session_state["pesos_manuais"] = peso_manual_df["Peso"].to_dict()
 
+
+
+
+
+
+
+
+
+       
 
 
 
