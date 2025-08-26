@@ -82,17 +82,6 @@ if isinstance(data_yf.columns, pd.MultiIndex):
 
 returns = data_yf.pct_change().dropna()
 
-# Cria um placeholder que vai ocupar toda a tela
-loading_placeholder = st.empty()
-
-# Mensagem grande centralizada
-loading_placeholder.markdown("""
-    <div style="display:flex; justify-content:center; align-items:center; height:80vh; flex-direction:column;">
-        <h1 style="font-size:48px; text-align:center;">Carregando a página...</h1>
-        <p style="font-size:24px; text-align:center;">Aguarde alguns instantes</p>
-    </div>
-""", unsafe_allow_html=True)
-
 if modo == "Alocação Manual":
     st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
     pesos_manuais = {}
@@ -411,12 +400,7 @@ if modo == "Alocação Manual":
 else:
     st.session_state["pesos_manuais"] = peso_manual_df["Peso"].to_dict()
 
-# Remove a mensagem de carregamento
-loading_placeholder.empty()
 
-# Agora renderiza o restante da página
-st.title("Dashboard pronto!")
-st.write("Aqui vão os seus gráficos, tabelas e informações...")
 
 
 
