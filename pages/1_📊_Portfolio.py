@@ -83,8 +83,27 @@ if isinstance(data_yf.columns, pd.MultiIndex):
 returns = data_yf.pct_change().dropna()
 
 
-
-with st.spinner("Analisando e Otimizando Portfólio, aguarde... 🔬⏳")
+with loading_placeholder.container():
+    st.markdown("""
+    <div style="display: flex; justify-content: center; align-items: center; height: 80vh; flex-direction: column;">
+        <div class="loader"></div>
+        <h2>⏳ Carregando a análise do portfólio, aguarde...</h2>
+    </div>
+    <style>
+    .loader {
+      border: 12px solid #f3f3f3;
+      border-top: 12px solid #4CAF50;
+      border-radius: 50%;
+      width: 80px;
+      height: 80px;
+      animation: spin 1.5s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    </style>
+    """, unsafe_allow_html=True)
     if modo == "Alocação Manual":
         st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
         pesos_manuais = {}
