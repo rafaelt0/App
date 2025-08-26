@@ -83,6 +83,9 @@ if isinstance(data_yf.columns, pd.MultiIndex):
 returns = data_yf.pct_change().dropna()
 
 
+# Placeholder para carregamento
+loading_placeholder = st.empty()
+
 with loading_placeholder.container():
     st.markdown("""
     <div style="display: flex; justify-content: center; align-items: center; height: 80vh; flex-direction: column;">
