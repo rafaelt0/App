@@ -99,8 +99,8 @@ st.markdown("""
 page_container = st.empty()
 
 if st.button("Carregar Portfólio 🔃"):
-    with page_container.container():
         with st.spinner('🔄 Carregando toda a página, aguarde...'):
+            with page_container.container():
             if modo == "Alocação Manual":
                 st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
                 pesos_manuais = {}
