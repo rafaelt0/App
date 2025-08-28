@@ -84,7 +84,7 @@ if st.button("💡 Rodar Análise do Portfólio"):
     status_text.markdown("<h2 style='text-align: center;'>Carregando página...</h2>", unsafe_allow_html=True)
     
     step = 0
-    total_steps = 14
+    total_steps = 10
 
     # Baixa dados
     data_yf = yf.download(tickers_yf, start=data_inicio, progress=False)['Close']
