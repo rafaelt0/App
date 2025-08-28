@@ -234,8 +234,6 @@ if st.button("💡 Rodar Análise do Portfólio"):
 
     st.subheader("Estatísticas do Portfólio")
     st.dataframe(stats.round(4))
-    step +=1
-    progress_bar.progress(int(step/total_steps*100))
 
     # Limpa barra e status
     status_text.empty()
