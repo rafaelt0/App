@@ -85,28 +85,30 @@ returns = data_yf.pct_change().dropna()
 
 
 
-if modo == "Alocação Manual":
-    st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
-    pesos_manuais = {}
-    total = 0.0
-    for ticker in tickers:
-        p = st.number_input(f"Peso % de {ticker}", min_value=0.0, max_value=100.0, value=round(100/len(tickers),2), step=0.01)
-        pesos_manuais[ticker + ".SA"] = p / 100
-        total += p
-    if abs(total - 100) > 0.01:
-        st.error(f"A soma dos pesos é {total:.2f}%, deve ser 100%")
-        st.stop()
-    pesos_manuais_arr = np.array(list(pesos_manuais.values()))
-    peso_manual_df = pd.DataFrame.from_dict(pesos_manuais, orient='index', columns=["Peso"])
-else:
-    st.subheader("Otimização Hierarchical Risk Parity (HRP)")
-    hrp = HRPOpt(returns)
-    weights_hrp = hrp.optimize()
-    peso_manual_df = pd.DataFrame.from_dict(weights_hrp, orient='index', columns=["Peso"])
-    pesos_manuais_arr = peso_manual_df["Peso"].values
-
 
 if st.button("Carregar Portfólio"):
+
+    
+    if modo == "Alocação Manual":
+        st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
+        pesos_manuais = {}
+        total = 0.0
+        for ticker in tickers:
+            p = st.number_input(f"Peso % de {ticker}", min_value=0.0, max_value=100.0, value=round(100/len(tickers),2), step=0.01)
+            pesos_manuais[ticker + ".SA"] = p / 100
+            total += p
+        if abs(total - 100) > 0.01:
+            st.error(f"A soma dos pesos é {total:.2f}%, deve ser 100%")
+            st.stop()
+        pesos_manuais_arr = np.array(list(pesos_manuais.values()))
+        peso_manual_df = pd.DataFrame.from_dict(pesos_manuais, orient='index', columns=["Peso"])
+    else:
+        st.subheader("Otimização Hierarchical Risk Parity (HRP)")
+        hrp = HRPOpt(returns)
+        weights_hrp = hrp.optimize()
+        peso_manual_df = pd.DataFrame.from_dict(weights_hrp, orient='index', columns=["Peso"])
+        pesos_manuais_arr = peso_manual_df["Peso"].values
+
     # Mostrar pesos
     st.subheader("Pesos do Portfólio (%)")
     peso_manual_df.index = peso_manual_df.index.str.replace(".SA","")
