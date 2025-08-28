@@ -84,7 +84,7 @@ returns = data_yf.pct_change().dropna()
 
 
 
-if st.button("Carregar Portfólio"):
+if st.button("Carregar Portfólio 🔃"):
     if modo == "Alocação Manual":
         st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
         pesos_manuais = {}
