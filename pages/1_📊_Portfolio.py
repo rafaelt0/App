@@ -220,7 +220,26 @@ if st.button("💡 Rodar Análise do Portfólio"):
 
     st.pyplot(fig_hist)
     step +=1
-    progress_bar.progress(int(step/
+    progress_bar.progress(int(step/total_steps*100))
+
+    # Estatísticas do portfólio
+    stats = pd.DataFrame([[ 
+        sharpe(portfolio_returns, rf=taxa_selic),
+        sortino(portfolio_returns, rf=taxa_selic),
+        max_drawdown(portfolio_returns),
+        var(portfolio_returns),
+        cvar(portfolio_returns),
+        tail_ratio(portfolio_returns)
+    ]], columns=["Índice Sharpe", "Índice Sortino", "Max Drawdown", "VaR", "CVaR", "Tail Ratio"])
+
+    st.subheader("Estatísticas do Portfólio")
+    st.dataframe(stats.round(4))
+    step +=1
+    progress_bar.progress(int(step/total_steps*100))
+
+    # Limpa barra e status
+    status_text.empty()
+    st.success("✅ Página carregada com sucesso!")
 
     
     
