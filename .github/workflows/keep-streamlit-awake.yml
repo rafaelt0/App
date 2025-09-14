@@ -1,24 +1,24 @@
 name: Keep Streamlit Awake
 
-# Agenda para rodar periodicamente
 on:
   schedule:
     - cron: '0 */10 * * *'  # a cada 10 horas
-  workflow_dispatch:  # permite rodar manualmente
+  workflow_dispatch:
 
 jobs:
   keep_alive:
     runs-on: ubuntu-latest
 
     steps:
-      # Faz checkout do repositório
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # <- garante permissão para push
 
-      # Cria commit vazio e faz push usando GITHUB_TOKEN
       - name: Create empty commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit --allow-empty -m "Keep Streamlit awake" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+          git push origin HEAD
+
