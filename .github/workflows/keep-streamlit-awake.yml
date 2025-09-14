@@ -1,24 +1,36 @@
-name: Keep Streamlit Awake
+# Solução 1: Configurar Permissões no Workflow (RECOMENDADO)
+# Arquivo: .github/workflows/keep-alive.yml ou seu workflow
 
+name: Keep Streamlit Awake
 on:
   schedule:
-    - cron: '0 */10 * * *'  # a cada 10 horas
+    - cron: "0 */6 * * *"  # A cada 6 horas
   workflow_dispatch:
 
 jobs:
-  keep_alive:
+  keep-alive:
     runs-on: ubuntu-latest
-
+    
+    # ✅ ADICIONAR ESSAS PERMISSÕES
+    permissions:
+      contents: write
+      actions: write
+      
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # <- garante permissão para push
-
-      - name: Create empty commit and push
+          # ✅ USAR TOKEN COM PERMISSÕES
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit --allow-empty -m "Keep Streamlit awake" || echo "No changes to commit"
-          git push origin HEAD
-
+          
+      - name: Keep alive
+        run: |
+          echo "$(date): Keep alive ping" >> keep_alive.log
+          git add keep_alive.log
+          git commit -m "Keep Streamlit awake - $(date)"
+          git push
