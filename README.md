@@ -6,6 +6,7 @@ O **B3 Explorer** é uma aplicação web interativa desenvolvida com **Streamlit
 
 O projeto integra dados históricos do Yahoo Finance, indicadores financeiros e métodos avançados de alocação de ativos para oferecer uma ferramenta completa de apoio à decisão de investimento.
 
+Link de acesso: https://b3explorer.streamlit.app/
 ---
 
 ## ⚙️ Funcionalidades
