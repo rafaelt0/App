@@ -45,6 +45,36 @@ def section_header(icon_svg, text, tag="h3"):
         f'{icon_svg}<span>{text}</span></{tag}>',
         unsafe_allow_html=True)
 
+def render_cards_grid(data_dict, colors_sequence=None):
+    if not colors_sequence:
+        colors_sequence = ["#38bdf8", "#4ade80", "#fbbf24", "#fb7185", "#c084fc", "#f472b6", "#34d399", "#60a5fa"]
+    
+    items = list(data_dict.items())
+    num_cols = 4
+    for i in range(0, len(items), num_cols):
+        chunk = items[i:i+num_cols]
+        cols = st.columns(num_cols)
+        for col, (label, val) in zip(cols, chunk):
+            color = colors_sequence[items.index((label, val)) % len(colors_sequence)]
+            with col:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
+                            border: 1px solid #1e293b; 
+                            border-radius: 10px; 
+                            padding: 0.8rem; 
+                            text-align: center; 
+                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                            margin-bottom: 0.5rem;
+                            min-height: 90px;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            align-items: center;">
+                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
+                    <div style="font-size: 1.1rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{val}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
 # Configurar temas de plotagem escuros
 plt.style.use('dark_background')
 plt.rcParams['figure.facecolor'] = '#080c14'
@@ -202,16 +232,16 @@ cvar_5 = valores_finais[valores_finais <= var_5].mean()
 pior_cenario = valores_finais.min()
 melhor_cenario = valores_finais.max()
 
-sim_stats = pd.DataFrame({
-    "Valor Esperado Final (R$)": [valor_esperado],
-    "VaR 5% (R$)": [var_5],
-    "CVaR 5% (R$)": [cvar_5],
-    "Pior Cenário (R$)": [pior_cenario],
-    "Melhor Cenário (R$)": [melhor_cenario]
-})
+sim_stats_dict = {
+    "Valor Esperado Final": f"R$ {valor_esperado:,.2f}",
+    "VaR 5%": f"R$ {var_5:,.2f}",
+    "CVaR 5%": f"R$ {cvar_5:,.2f}",
+    "Pior Cenário": f"R$ {pior_cenario:,.2f}",
+    "Melhor Cenário": f"R$ {melhor_cenario:,.2f}"
+}
 
 section_header(ICO_CHART, "Estatísticas da Simulação Monte Carlo", "h3")
-st.dataframe(sim_stats.style.format("{:,.2f}"), use_container_width=True)
+render_cards_grid(sim_stats_dict)
 
 st.markdown("""
 <small><b>VaR 5%</b>: Valor máximo esperado que você pode perder em 5% dos piores casos.<br>
@@ -283,17 +313,25 @@ q2 = valores_finais.quantile(0.50)
 q3 = valores_finais.quantile(0.75)
 
 section_header(ICO_FRONTIER, "Distribuição do Valor Final do Portfólio", "h3")
-fig, ax = plt.subplots(figsize=(10, 5))
-sns.histplot(valores_finais, bins=30, kde=True, color='#00d2ff', edgecolor='#080c14', alpha=0.65, ax=ax)
-ax.axvline(q1, color='#ff1744', linestyle='--', linewidth=1.5, label='Q1 (25%)')
-ax.axvline(q2, color='#00ff87', linestyle='-', linewidth=2, label='Mediana (50%)')
-ax.axvline(q3, color='#ffd600', linestyle='--', linewidth=1.5, label='Q3 (75%)')
-ax.set_title('Distribuição dos Valores Finais da Simulação Monte Carlo', fontsize=12, fontweight='bold', pad=10)
-ax.set_xlabel('Valor Final do Portfólio (R$)', fontsize=10)
-ax.set_ylabel('Frequência', fontsize=10)
-ax.grid(True, color='#1e293b', linestyle=':', alpha=0.5)
-ax.legend(facecolor='#0e1524', edgecolor='#1e293b')
-st.pyplot(fig)
+fig_hist = px.histogram(
+    x=valores_finais,
+    nbins=30,
+    title="Distribuição dos Valores Finais da Simulação Monte Carlo",
+    labels={'x': 'Valor Final do Portfólio (R$)', 'y': 'Frequência'},
+    color_discrete_sequence=['#00d2ff']
+)
+fig_hist.update_layout(
+    xaxis_title="Valor Final do Portfólio (R$)",
+    yaxis_title="Frequência",
+    bargap=0.05
+)
+
+fig_hist.add_vline(x=q1, line_width=2, line_dash="dash", line_color="#ff1744", annotation_text="Q1 (25%)", annotation_position="top left")
+fig_hist.add_vline(x=q2, line_width=2.5, line_color="#00ff87", annotation_text="Mediana (50%)", annotation_position="top left")
+fig_hist.add_vline(x=q3, line_width=2, line_dash="dash", line_color="#ffd600", annotation_text="Q3 (75%)", annotation_position="top left")
+
+apply_plotly_theme(fig_hist)
+st.plotly_chart(fig_hist, use_container_width=True)
 
 # Estatísticas da distribuição final
 estatisticas = {
@@ -305,10 +343,30 @@ estatisticas = {
     "Média": valores_finais.mean(),
     "Desvio Padrão": valores_finais.std()
 }
-df_estatisticas = pd.DataFrame(estatisticas, index=["Valores (R$)"])
+estatisticas_dict = {
+    "Mínimo": f"R$ {estatisticas['Mínimo']:,.2f}",
+    "Q1 (25%)": f"R$ {estatisticas['Q1 (25%)']:,.2f}",
+    "Mediana (50%)": f"R$ {estatisticas['Mediana (50%)']:,.2f}",
+    "Q3 (75%)": f"R$ {estatisticas['Q3 (75%)']:,.2f}",
+    "Máximo": f"R$ {estatisticas['Máximo']:,.2f}",
+    "Média": f"R$ {estatisticas['Média']:,.2f}",
+    "Desvio Padrão": f"R$ {estatisticas['Desvio Padrão']:,.2f}"
+}
 section_header(ICO_METRICS, "Estatísticas da Distribuição Final", "h3")
-st.dataframe(df_estatisticas.style.format("{:,.2f}"), use_container_width=True)
+render_cards_grid(estatisticas_dict)
 loading_placeholder.empty()
+
+# Salvar estatísticas da simulação em session_state para uso no relatório
+st.session_state["simulation_run"] = True
+st.session_state["sim_n_simulations"] = n_simulations
+st.session_state["sim_valor_inicial"] = valor_inicial
+st.session_state["sim_years"] = years
+st.session_state["sim_valor_esperado"] = valor_esperado
+st.session_state["sim_var_5"] = var_5
+st.session_state["sim_cvar_5"] = cvar_5
+st.session_state["sim_pior_cenario"] = pior_cenario
+st.session_state["sim_melhor_cenario"] = melhor_cenario
+st.session_state["sim_estatisticas"] = estatisticas
 
 
 

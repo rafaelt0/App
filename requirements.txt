@@ -23,3 +23,6 @@ requests==2.32.3
 pandas_datareader==0.10
 python-bcb
 sgs
+torch
+transformers
+

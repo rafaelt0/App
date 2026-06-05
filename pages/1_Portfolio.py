@@ -90,6 +90,37 @@ def diag_row(icon_svg, text, color):
         f'color:{color};font-size:0.88rem">{icon_svg}{text}</div>',
         unsafe_allow_html=True)
 
+def render_cards_grid(data_dict, colors_sequence=None):
+    if not colors_sequence:
+        colors_sequence = ["#38bdf8", "#4ade80", "#fbbf24", "#fb7185", "#c084fc", "#f472b6", "#34d399", "#60a5fa"]
+    
+    items = list(data_dict.items())
+    num_cols = 4
+    for i in range(0, len(items), num_cols):
+        chunk = items[i:i+num_cols]
+        cols = st.columns(num_cols)
+        for col, (label, val) in zip(cols, chunk):
+            color = colors_sequence[items.index((label, val)) % len(colors_sequence)]
+            with col:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
+                            border: 1px solid #1e293b; 
+                            border-radius: 10px; 
+                            padding: 0.8rem; 
+                            text-align: center; 
+                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                            margin-bottom: 0.5rem;
+                            min-height: 90px;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            align-items: center;">
+                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
+                    <div style="font-size: 1.1rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{val}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+
 @st.cache_data(ttl=3600)
 def get_selic_rate(start_date):
     taxa_selic = sgs.get(432, start=start_date)
@@ -353,7 +384,15 @@ with st.spinner("Buscando taxa SELIC acumulada..."):
 data = pd.read_csv('acoes-listadas-b3.csv')
 stocks = list(data['Ticker'].values)
 stocks = get_sorted_tickers_by_liquidity(stocks)
-tickers = st.multiselect("Selecione as ações do portfólio", stocks)
+
+if "selected_tickers" not in st.session_state:
+    st.session_state["selected_tickers"] = []
+
+# Filter session state tickers to only include those in stocks
+default_tickers = [t for t in st.session_state["selected_tickers"] if t in stocks]
+
+tickers = st.multiselect("Selecione as ações do portfólio", stocks, default=default_tickers)
+st.session_state["selected_tickers"] = tickers
 # Valor inicial
 valor_inicial = st.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
 
@@ -437,26 +476,126 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         
             # Mostrar pesos
         st.subheader("Pesos do Portfólio (%)")
-        peso_manual_df.index = peso_manual_df.index.str.replace(".SA","")
-        st.dataframe((peso_manual_df*100).round(2).T)
+        peso_manual_df.index = peso_manual_df.index.str.replace(".SA", "", regex=False)
+        pesos_dict = {ticker: f"{(row['Peso']*100):.2f}%" for ticker, row in peso_manual_df.iterrows()}
+        render_cards_grid(pesos_dict)
         
+        # ── Sugestão de Compra de Cotas (Alocação Discreta) ───────────────────
+        st.subheader("Sugestão de Compra de Cotas")
+        st.markdown(f"Estimativa de cotas a comprar considerando o valor total de **R$ {valor_inicial:,.2f}**.")
         
+        cotas_list = []
+        total_efetivo = 0.0
         
+        for ticker, row in peso_manual_df.iterrows():
+            col_name = ticker + ".SA"
+            latest_price = 0.0
+            
+            # Busca o preço mais recente válido
+            if col_name in data_yf.columns:
+                valid_prices = data_yf[col_name].dropna()
+                latest_price = valid_prices.iloc[-1] if not valid_prices.empty else 0.0
+            elif ticker in data_yf.columns:
+                valid_prices = data_yf[ticker].dropna()
+                latest_price = valid_prices.iloc[-1] if not valid_prices.empty else 0.0
+            else:
+                for col in data_yf.columns:
+                    if ticker in col:
+                        valid_prices = data_yf[col].dropna()
+                        latest_price = valid_prices.iloc[-1] if not valid_prices.empty else 0.0
+                        break
+            
+            weight = row["Peso"]
+            valor_teorico = weight * valor_inicial
+            
+            if latest_price > 0:
+                cotas = int(np.floor(valor_teorico / latest_price))
+                valor_efetivo = cotas * latest_price
+            else:
+                cotas = 0
+                valor_efetivo = 0.0
+                
+            total_efetivo += valor_efetivo
+            
+            cotas_list.append({
+                "Ativo": ticker,
+                "Preço Unitário": latest_price,
+                "Peso Sugerido (%)": weight * 100,
+                "Valor Sugerido": valor_teorico,
+                "Cotas a Comprar": cotas,
+                "Valor Efetivo": valor_efetivo
+            })
+            
+        df_cotas = pd.DataFrame(cotas_list)
+        if total_efetivo > 0:
+            df_cotas["Peso Efetivo (%)"] = (df_cotas["Valor Efetivo"] / total_efetivo) * 100
+        else:
+            df_cotas["Peso Efetivo (%)"] = 0.0
+            
+        for idx, row_c in df_cotas.iterrows():
+            ticker_name = row_c["Ativo"]
+            pu = row_c["Preço Unitário"]
+            p_sug = row_c["Peso Sugerido (%)"]
+            val_sug = row_c["Valor Sugerido"]
+            cotas = row_c["Cotas a Comprar"]
+            val_ef = row_c["Valor Efetivo"]
+            p_ef = row_c["Peso Efetivo (%)"]
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
+                        border: 1px solid #1e293b; 
+                        border-radius: 12px; 
+                        padding: 1rem; 
+                        margin-bottom: 1rem; 
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem; margin-bottom: 0.8rem;">
+                    <span style="font-size: 1.2rem; color: #38bdf8; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{ticker_name}</span>
+                    <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">Preço Unitário: <strong style="color: #f8fafc; font-family: 'JetBrains Mono', monospace;">R$ {pu:,.2f}</strong></span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; margin-bottom: 0.8rem;">
+                    <div style="flex: 1; min-width: 120px; background: rgba(30, 41, 59, 0.5); padding: 0.6rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Cotas a Comprar</div>
+                        <div style="font-size: 1.2rem; color: #4ade80; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{int(cotas):,}</div>
+                    </div>
+                    <div style="flex: 1; min-width: 120px; background: rgba(30, 41, 59, 0.5); padding: 0.6rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Valor Efetivo</div>
+                        <div style="font-size: 1.1rem; color: #fbbf24; font-weight: 800; font-family: 'JetBrains Mono', monospace;">R$ {val_ef:,.2f}</div>
+                    </div>
+                    <div style="flex: 1; min-width: 120px; background: rgba(30, 41, 59, 0.5); padding: 0.6rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Valor Sugerido</div>
+                        <div style="font-size: 1.1rem; color: #a78bfa; font-weight: 800; font-family: 'JetBrains Mono', monospace;">R$ {val_sug:,.2f}</div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8; padding-top: 0.2rem;">
+                    <span>Peso Sugerido: <strong style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">{p_sug:.2f}%</strong></span>
+                    <span>Peso Efetivo: <strong style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">{p_ef:.2f}%</strong></span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
+        # Resumo financeiro do rebalanceamento/compra
+        sobra_caixa = valor_inicial - total_efetivo
+        
+        col_c1, col_c2, col_c3 = st.columns(3)
+        col_c1.metric("Total Alocado Efetivo", f"R$ {total_efetivo:,.2f}")
+        col_c2.metric("Saldo Restante (Caixa)", f"R$ {sobra_caixa:,.2f}")
+        col_c3.metric("Eficiência da Alocação", f"{(total_efetivo/valor_inicial)*100:.2f}%")
+        
+        st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True)
         
         alloc_df = peso_manual_df.reset_index()
         alloc_df.columns = ["Ativo", "Peso"]
         
-        fig_treemap = px.treemap(
+        fig_donut = px.pie(
             alloc_df,
-            path=['Ativo'],
+            names='Ativo',
             values='Peso',
-            color='Peso',
-            color_continuous_scale='GnBu',
-            title="Alocação do Portfólio (Treemap)"
+            hole=0.4,
+            title="Distribuição de Alocação da Carteira",
+            color_discrete_sequence=px.colors.qualitative.Safe
         )
-        apply_plotly_theme(fig_treemap)
-        st.plotly_chart(fig_treemap, use_container_width=True)
+        apply_plotly_theme(fig_donut)
+        st.plotly_chart(fig_donut, use_container_width=True)
         
         if "Markowitz" in modo:
             section_header(ICO_FRONTIER, "Gráfico da Fronteira Eficiente", "h3")
@@ -511,11 +650,80 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         apply_plotly_theme(fig)
         st.plotly_chart(fig)
         # Retornos mensais
-        st.subheader("Retornos Mensais do Portfólio")
-        
-        fig = qs.plots.monthly_returns(portfolio_returns, show=False)
-        apply_matplotlib_theme(fig)
-        st.pyplot(fig)
+        section_header(ICO_HEATMAP, "Tabela de Retornos Mensais do Portfólio", "h3")
+        try:
+            monthly_ret = portfolio_returns.groupby([portfolio_returns.index.year, portfolio_returns.index.month]).apply(lambda x: (1 + x).prod() - 1)
+            monthly_ret_df = monthly_ret.unstack(level=1) * 100
+            monthly_ret_df = monthly_ret_df.reindex(columns=range(1, 13))
+            month_cols = {
+                1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
+                7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez"
+            }
+            monthly_ret_df = monthly_ret_df.rename(columns=month_cols)
+            
+            # YTD
+            ytd_ret = portfolio_returns.groupby(portfolio_returns.index.year).apply(lambda x: (1 + x).prod() - 1) * 100
+            monthly_ret_df["YTD"] = ytd_ret
+            
+            html_rows = []
+            for year, row in monthly_ret_df.iterrows():
+                row_html = f'<tr style="border-bottom: 1px solid #1e293b; font-size: 0.88rem;">'
+                row_html += f'<td style="padding: 0.7rem 0.5rem; font-weight: 700; text-align: left; color: #f8fafc; font-family: \'JetBrains Mono\', monospace;">{year}</td>'
+                for m in ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]:
+                    val = row[m]
+                    if pd.isna(val):
+                        row_html += f'<td style="padding: 0.7rem 0.5rem; color: #475569; font-family: \'JetBrains Mono\', monospace;">-</td>'
+                    else:
+                        color = "#4ade80" if val > 0 else "#f87171" if val < 0 else "#94a3b8"
+                        sign = "+" if val > 0 else ""
+                        row_html += f'<td style="padding: 0.7rem 0.5rem; color: {color}; font-family: \'JetBrains Mono\', monospace; font-weight: 700;">{sign}{val:.2f}%</td>'
+                
+                ytd_val = row["YTD"]
+                if pd.isna(ytd_val):
+                    row_html += f'<td style="padding: 0.7rem 0.5rem; border-left: 1px solid #1e293b; color: #475569; font-family: \'JetBrains Mono\', monospace;">-</td>'
+                else:
+                    ytd_color = "#4ade80" if ytd_val > 0 else "#f87171" if ytd_val < 0 else "#94a3b8"
+                    ytd_sign = "+" if ytd_val > 0 else ""
+                    row_html += f'<td style="padding: 0.7rem 0.5rem; border-left: 1px solid #1e293b; color: {ytd_color}; font-family: \'JetBrains Mono\', monospace; font-weight: 800;">{ytd_sign}{ytd_val:.2f}%</td>'
+                row_html += '</tr>'
+                html_rows.append(row_html)
+            
+            table_html = f"""
+            <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
+                        border: 1px solid #1e293b; 
+                        border-radius: 12px; 
+                        padding: 1.2rem; 
+                        overflow-x: auto; 
+                        margin-bottom: 1.5rem;
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <table style="width: 100%; border-collapse: collapse; text-align: center; color: #f8fafc; font-family: 'Space Grotesk', sans-serif;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #1e293b; color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                            <th style="padding: 0.8rem 0.5rem; text-align: left;">Ano</th>
+                            <th style="padding: 0.8rem 0.5rem;">Jan</th>
+                            <th style="padding: 0.8rem 0.5rem;">Fev</th>
+                            <th style="padding: 0.8rem 0.5rem;">Mar</th>
+                            <th style="padding: 0.8rem 0.5rem;">Abr</th>
+                            <th style="padding: 0.8rem 0.5rem;">Mai</th>
+                            <th style="padding: 0.8rem 0.5rem;">Jun</th>
+                            <th style="padding: 0.8rem 0.5rem;">Jul</th>
+                            <th style="padding: 0.8rem 0.5rem;">Ago</th>
+                            <th style="padding: 0.8rem 0.5rem;">Set</th>
+                            <th style="padding: 0.8rem 0.5rem;">Out</th>
+                            <th style="padding: 0.8rem 0.5rem;">Nov</th>
+                            <th style="padding: 0.8rem 0.5rem;">Dez</th>
+                            <th style="padding: 0.8rem 0.5rem; border-left: 1px solid #1e293b; font-weight: 700; color: #38bdf8;">YTD</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {"".join(html_rows)}
+                    </tbody>
+                </table>
+            </div>
+            """
+            st.markdown(table_html, unsafe_allow_html=True)
+        except Exception as e:
+            st.warning(f"Não foi possível gerar a tabela de retornos mensais: {str(e)}")
         
         
         
@@ -658,84 +866,64 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
 
         st.markdown("---")
 
-        # Distribuição de retornos com estatísticas
-
-        st.subheader("Distribuição dos Retornos Diários (%) e Estatísticas")
-        fig_hist, ax_hist = plt.subplots(figsize=(10, 5))
-        sns.histplot(portfolio_returns * 100, bins=50, kde=True, color='#00ff87', edgecolor='#080c14', alpha=0.65, ax=ax_hist)
-        ax_hist.set_xlabel("Retornos Diários (%)")
-        ax_hist.set_ylabel("Frequência")
+        # Métricas Consolidadas Essenciais
+        dias_totais = (portfolio_value.index[-1] - portfolio_value.index[0]).days
+        ret_total = (portfolio_value.iloc[-1] / valor_inicial - 1) * 100
+        ret_anual = ((portfolio_value.iloc[-1] / valor_inicial) ** (365.25 / dias_totais) - 1) * 100 if dias_totais > 0 else 0.0
+        vol_anual = portfolio_returns.std() * np.sqrt(252) * 100
         
-        media = portfolio_returns.mean() * 100
-        desvio = portfolio_returns.std() * 100
-        curtose_val = kurtosis(portfolio_returns, fisher=True)
-        assimetria_val = skew(portfolio_returns)
+        excesso_retorno_diario = portfolio_returns - taxa_selic
+        std_dev = portfolio_returns.std()
+        sharpe_anual = (excesso_retorno_diario.mean() / std_dev) * np.sqrt(252) if std_dev > 0 else 0.0
         
-        stats_text = (f"Média: {media:.4f}%\n"
-                      f"Desvio Padrão: {desvio:.4f}%\n"
-                      f"Curtose (Fisher): {curtose_val:.4f}\n"
-                      f"Assimetria: {assimetria_val:.4f}")
+        max_dd_val = max_drawdown(portfolio_returns) * 100
+        var_val = var(portfolio_returns) * 100
+        alfa_anual = alfa_val * 252 * 100
         
-        props = dict(boxstyle='round', facecolor='#0e1524', edgecolor='#1e293b', alpha=0.95)
-        ax_hist.text(0.95, 0.95, stats_text, transform=ax_hist.transAxes,
-                     fontsize=10, color='#f8fafc', verticalalignment='top', horizontalalignment='right', bbox=props)
-        ax_hist.grid(True, color='#1e293b', linestyle=':', alpha=0.5)
-        apply_matplotlib_theme(fig_hist)
-        st.pyplot(fig_hist)
-        
-        # Métricas Consolidadas
         detailed_stats = pd.DataFrame({
             "Métrica": [
-                "Valor Inicial", "Valor Máximo Alcançado", "Valor Mínimo Alcançado", "Valor Final",
-                "Retorno Médio Diário", "Alfa Anualizado vs IBOV", "Beta vs IBOVESPA",
-                "R² vs IBOVESPA (%)", "Information Ratio", "VaR Diário (95%)", "CVaR Diário (95%)", "Tail Ratio"
+                "Retorno Total", "Retorno Anualizado", "Volatilidade Anualizada", "Índice de Sharpe",
+                "Beta vs IBOVESPA", "Alfa Anualizado", "Máximo Drawdown", "VaR Diário (95%)"
             ],
             "Valor": [
-                f"R$ {valor_inicial:,.2f}",
-                f"R$ {portfolio_value.max():,.2f}",
-                f"R$ {portfolio_value.min():,.2f}",
-                f"R$ {portfolio_value.iloc[-1]:,.2f}",
-                f"{portfolio_returns.mean()*100:.4f}%",
-                f"{alfa_val*252*100:.2f}%",
-                f"{beta:.4f}",
-                f"{r_quadrado*100:.2f}%",
-                f"{information_ratio:.4f}",
-                f"{var(portfolio_returns)*100:.2f}%",
-                f"{cvar(portfolio_returns)*100:.2f}%",
-                f"{tail_ratio(portfolio_returns):.4f}"
+                f"{ret_total:.2f}%", f"{ret_anual:.2f}%", f"{vol_anual:.2f}%", f"{sharpe_anual:.2f}",
+                f"{beta:.4f}", f"{alfa_anual:.2f}%", f"{max_dd_val:.2f}%", f"{var_val:.2f}%"
             ]
         })
-        section_header(ICO_METRICS, "Métricas Detalhadas do Portfólio", "h3")
-        st.dataframe(detailed_stats, use_container_width=True, hide_index=True)
-        # Retornos Anuais
-        
-        fig = qs.plots.yearly_returns(portfolio_returns, benchmark=retorno_bench, compounded=True, show=False)
-        ax = fig.gca() if hasattr(fig, 'gca') else fig.axes[0]
-        
-        # Alterar legenda
-        ax.legend(['Portfólio', 'IBOVESPA'])  # renomeia
-        ax.set_title('Retornos Anuais (Portfólio vs IBOVESPA)')
-        
-        apply_matplotlib_theme(fig)
-        st.pyplot(fig)
+        section_header(ICO_METRICS, "Métricas Consolidadas do Portfólio", "h3")
+        stats_dict = dict(zip(detailed_stats["Métrica"], detailed_stats["Valor"]))
+        render_cards_grid(stats_dict)
             
         
         
-        st.subheader("Drawdown do Portfólio")
-        # Drawdown
-        st.subheader("Análise de Drawdown por Ativo")
+        section_header(ICO_RISK, "Análise de Drawdown", "h3")
         
-        # Função para calcular drawdown
+        # 1. Gráfico de Drawdown do Portfólio
+        cum_returns = (1 + portfolio_returns).cumprod()
+        rolling_max = cum_returns.cummax()
+        drawdown = (cum_returns - rolling_max) / rolling_max
+            
+        fig1, ax1 = plt.subplots(figsize=(10, 4.5))
+        ax1.fill_between(drawdown.index, drawdown.values, 0, color='#ff1744', alpha=0.35)
+        ax1.plot(drawdown.index, drawdown.values, color='#ff1744', linewidth=1.5)
+        ax1.set_title("Evolução do Drawdown do Portfólio", fontsize=12, fontweight='bold', pad=10)
+        ax1.set_ylabel("Drawdown")
+        ax1.set_xlabel("Data")
+        ax1.grid(True, color='#1e293b', linestyle=':', alpha=0.5)
+        ax1.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+        apply_matplotlib_theme(fig1)
+        st.pyplot(fig1)
+        
+        # 2. Tabela de Drawdown por Ativo
+        st.subheader("Máximo Drawdown por Ativo Individual")
+        
         def calcular_drawdown(series):
-            cum_returns = (1 + series).cumprod()
-            rolling_max = cum_returns.cummax()
-            drawdown = (cum_returns - rolling_max) / rolling_max
-            return drawdown
+            cum_returns_act = (1 + series).cumprod()
+            rolling_max_act = cum_returns_act.cummax()
+            drawdown_act = (cum_returns_act - rolling_max_act) / rolling_max_act
+            return drawdown_act
         
-        # Calcula drawdown para cada ativo
         drawdowns_ativos = returns.apply(calcular_drawdown)
-        
-        # Calcula máximo drawdown e a data que ocorreu para cada ativo
         max_drawdowns = drawdowns_ativos.min()
         data_max_drawdowns = drawdowns_ativos.idxmin()
         
@@ -744,29 +932,36 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             'Data do Máximo Drawdown': data_max_drawdowns
         }).sort_values(by='Máximo Drawdown (%)')
         
-        # Ajusta índice para mostrar ticker sem ".SA"
         df_drawdowns.index = df_drawdowns.index.str.replace(".SA", "", regex=False)
         
-        st.dataframe(df_drawdowns.style.format({
-            'Máximo Drawdown (%)': '{:.2f}%',
-            'Data do Máximo Drawdown': lambda x: x.strftime('%Y-%m-%d')
-        }))
-        
-        cum_returns = (1 + portfolio_returns).cumprod()
-        rolling_max = cum_returns.cummax()
-        drawdown = (cum_returns - rolling_max) / rolling_max
-            
-        # Plot Drawdown
-        fig1, ax1 = plt.subplots(figsize=(10, 4.5))
-        ax1.fill_between(drawdown.index, drawdown.values, 0, color='#ff1744', alpha=0.35)
-        ax1.plot(drawdown.index, drawdown.values, color='#ff1744', linewidth=1.5)
-        ax1.set_title("Drawdown do Portfólio", fontsize=12, fontweight='bold', pad=10)
-        ax1.set_ylabel("Drawdown")
-        ax1.set_xlabel("Data")
-        ax1.grid(True, color='#1e293b', linestyle=':', alpha=0.5)
-        ax1.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-        apply_matplotlib_theme(fig1)
-        st.pyplot(fig1)
+        items_dd = list(df_drawdowns.iterrows())
+        num_cols = 4
+        for i in range(0, len(items_dd), num_cols):
+            chunk = items_dd[i:i+num_cols]
+            cols = st.columns(num_cols)
+            for col, (ticker, row_d) in zip(cols, chunk):
+                m_dd = row_d['Máximo Drawdown (%)']
+                dt_dd = row_d['Data do Máximo Drawdown'].strftime('%Y-%m-%d')
+                with col:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
+                                border: 1px solid #1e293b; 
+                                border-radius: 10px; 
+                                padding: 0.8rem; 
+                                text-align: center; 
+                                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                                margin-bottom: 0.5rem;
+                                min-height: 110px;
+                                display: flex;
+                                flex-direction: column;
+                                justify-content: center;
+                                align-items: center;">
+                        <div style="font-size: 1.1rem; color: #38bdf8; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-bottom: 0.2rem;">{ticker}</div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Máx. Drawdown</div>
+                        <div style="font-size: 1.2rem; color: #ff1744; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-bottom: 0.3rem;">{m_dd:.2f}%</div>
+                        <div style="font-size: 0.65rem; color: #64748b; font-family: 'JetBrains Mono', monospace;">{dt_dd}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
             
         # Rolling Beta (60 dias)
         window = 60
@@ -847,6 +1042,15 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         st.session_state["portfolio_returns"] = portfolio_returns
         st.session_state["retorno_bench"] = retorno_bench
         st.session_state["lookback"] = lookback_opcao
+        st.session_state["total_return"] = total_return
+        st.session_state["vol_anual"] = vol_anual
+        st.session_state["sharpe_val"] = sharpe_val
+        st.session_state["sortino_val"] = sortino_val
+        st.session_state["max_dd"] = max_dd
+        st.session_state["beta"] = beta
+        st.session_state["alfa_val"] = alfa_val
+        st.session_state["r_quadrado"] = r_quadrado
+        st.session_state["information_ratio"] = information_ratio
         
         # Garante que pesos manuais ficam disponíveis como dicionário
         if "Manual" in modo:

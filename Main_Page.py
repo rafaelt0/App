@@ -17,6 +17,9 @@ from pypfopt import plotting
 import re
 import traceback
 import time
+
+
+
 import plotly.graph_objects as go
 import plotly.express as px
 import scipy.stats as stats
@@ -155,12 +158,18 @@ ICO_RADAR   = _svg('<polygon points="12 2 22 8.5 22 19.5 12 22 2 19.5 2 8.5" str
 ICO_INFO    = _svg('<circle cx="12" cy="12" r="10" stroke="#00d2ff" stroke-width="1.8"/>'
                    '<line x1="12" y1="16" x2="12" y2="12" stroke="#00d2ff" stroke-width="2" stroke-linecap="round"/>'
                    '<line x1="12" y1="8" x2="12" y2="8.01" stroke="#00d2ff" stroke-width="2" stroke-linecap="round"/>', 16)
+ICO_NEWS    = _svg('<rect x="3" y="4" width="18" height="16" rx="2" stroke="#00ff87" stroke-width="1.8"/>'
+                   '<line x1="7" y1="8" x2="17" y2="8" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
+                   '<line x1="7" y1="12" x2="13" y2="12" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>'
+                   '<line x1="7" y1="16" x2="15" y2="16" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>', 16)
+
 
 def section_header(icon_svg, text, tag="h3"):
     st.markdown(
         f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
         f'{icon_svg}<span>{text}</span></{tag}>',
         unsafe_allow_html=True)
+
 
 # Sidebar Principal
 st.sidebar.markdown("""
@@ -240,48 +249,101 @@ else:
 tickers_filtrados = get_sorted_tickers_by_liquidity(tickers_filtrados)
 
 section_header(ICO_COMPASS, "Escolha ações para explorar", "h3")
-tickers = st.multiselect('Escolha sua ação. Selecione a página desejada e as configurações na barra lateral.', tickers_filtrados)
+
+if "selected_tickers" not in st.session_state:
+    st.session_state["selected_tickers"] = []
+
+# Filter session state tickers to only include those in tickers_filtrados
+default_tickers = [t for t in st.session_state["selected_tickers"] if t in tickers_filtrados]
+
+tickers = st.multiselect(
+    'Escolha sua ação. Selecione a página desejada e as configurações na barra lateral.',
+    tickers_filtrados,
+    default=default_tickers
+)
+
+st.session_state["selected_tickers"] = tickers
 
 
 # Só executa análise se houver pelo menos uma ação selecionada
 if tickers:
     try:
-        # 1. Configurações da barra lateral (movidas para o início para permitir o download conjunto)
-        data_inicio = st.sidebar.date_input("Data Inicial", datetime.date(2025,1,1),
-                                            min_value=datetime.date(2000,1,1),
-                                            max_value=datetime.date.today())
-        st.sidebar.header('Configurações')
-        interval_selected = st.sidebar.selectbox('Intervalo', 
-                                                 ['1d','1wk','1mo','3mo','6mo','1y'])
-
-        # 2. Exibir tela de carregamento glassmorphic
+        # 1. Exibir tela de carregamento glassmorphic
         loading_placeholder = st.empty()
         with loading_placeholder.container():
             st.markdown("""
             <div class="loading-container">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">Buscando cotações e indicadores fundamentalistas na B3...</div>
+                <div class="loading-text">Buscando indicadores fundamentalistas na B3...</div>
             </div>
             """, unsafe_allow_html=True)
 
-        # 3. Buscar dados usando funções cacheadas
+        # 2. Buscar dados usando funções cacheadas
         df = get_fundamentus_data(tickers)
 
         tickers_yf = [t + ".SA" for t in tickers]
-        data_prices = get_yfinance_data(tickers_yf, data_inicio, interval_selected)
 
-        # Se for Series (ticker único), converte para DataFrame e renomeia a coluna para o ticker
-        if isinstance(data_prices, pd.Series):
-            data_prices = data_prices.to_frame(name=tickers[0])
-            data_prices.index = pd.to_datetime(data_prices.index)
-
-        # 4. Limpar tela de carregamento
+        # 3. Limpar tela de carregamento
         loading_placeholder.empty()
 
-        section_header(ICO_SECTOR, "Setor", "h3")
-        st.write(df[['Empresa', 'Setor', 'Subsetor']].drop_duplicates(keep='last'))
+        def render_sector_cards(ticker_name, row):
+            cols = st.columns(3)
+            emp = row["Empresa"]
+            setor = row["Setor"]
+            sub = row["Subsetor"]
+            
+            metrics = [
+                ("Empresa", emp, "#38bdf8"),
+                ("Setor", setor, "#4ade80"),
+                ("Subsetor", sub, "#fbbf24")
+            ]
+            
+            for col, (label, val_str, color) in zip(cols, metrics):
+                with col:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
+                                border: 1px solid #1e293b; 
+                                border-radius: 10px; 
+                                padding: 0.8rem; 
+                                text-align: center; 
+                                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                                margin-bottom: 0.5rem;
+                                min-height: 90px;
+                                display: flex;
+                                flex-direction: column;
+                                justify-content: center;
+                                align-items: center;">
+                        <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
+                        <div style="font-size: 1.1rem; color: {color}; font-weight: 800;">{val_str}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-        # Dataframe estatísticas básicas
+        section_header(ICO_SECTOR, "Setor", "h3")
+        df_sector = df[['Empresa', 'Setor', 'Subsetor']]
+        
+        if len(tickers) > 1:
+            tabs_sector = st.tabs(tickers)
+            for tab, ticker in zip(tabs_sector, tickers):
+                with tab:
+                    if ticker in df_sector.index:
+                        row_s = df_sector.loc[ticker]
+                        if isinstance(row_s, pd.DataFrame):
+                            row_s = row_s.iloc[-1]
+                        render_sector_cards(ticker, row_s)
+                    else:
+                        st.warning(f"Sem dados de setor para {ticker}")
+        else:
+            ticker = tickers[0]
+            if ticker in df_sector.index:
+                row_s = df_sector.loc[ticker]
+                if isinstance(row_s, pd.DataFrame):
+                    row_s = row_s.iloc[-1]
+                render_sector_cards(ticker, row_s)
+            else:
+                st.warning(f"Sem dados de setor para {ticker}")
+
+
+        # Informações de mercado em caixas estilizadas
         section_header(ICO_MARKET, "Informações de Mercado", "h3")
         df_price = df[['Cotacao', 'Min_52_sem', 'Max_52_sem', 'Vol_med_2m', 
                        'Valor_de_mercado', 'Data_ult_cot']]
@@ -293,15 +355,78 @@ if tickers:
                     "Volume Médio (2 meses)", "Valor de Mercado"]:
             df_price[col] = clean_numeric_column(df_price[col]).fillna(0)
 
-        format_dict = {
-            "Cotação": "R$ {:,.2f}",
-            "Mínimo (52 semanas)": "R$ {:,.2f}",
-            "Máximo (52 semanas)": "R$ {:,.2f}",
-            "Volume Médio (2 meses)": "{:,.0f}",
-            "Valor de Mercado": "R$ {:,.0f}"
-        }
+        def format_large_br_currency(value):
+            if value >= 1e9:
+                return f"R$ {value / 1e9:,.2f} B"
+            elif value >= 1e6:
+                return f"R$ {value / 1e6:,.2f} M"
+            else:
+                return f"R$ {value:,.2f}"
 
-        st.dataframe(df_price.style.format(format_dict), use_container_width=True)
+        def format_large_number(value):
+            if value >= 1e9:
+                return f"{value / 1e9:,.2f} B"
+            elif value >= 1e6:
+                return f"{value / 1e6:,.2f} M"
+            elif value >= 1e3:
+                return f"{value / 1e3:,.1f} K"
+            else:
+                return f"{value:,.0f}"
+
+        def render_price_cards(ticker_name, row):
+            cols = st.columns(5)
+            cot = row["Cotação"]
+            min_52 = row["Mínimo (52 semanas)"]
+            max_52 = row["Máximo (52 semanas)"]
+            vol = row["Volume Médio (2 meses)"]
+            val_merc = row["Valor de Mercado"]
+            data_ult = row["Data Última Cotação"]
+            
+            metrics = [
+                ("Cotação", f"R$ {cot:,.2f}", "#38bdf8"),
+                ("Mínimo (52s)", f"R$ {min_52:,.2f}", "#f87171"),
+                ("Máximo (52s)", f"R$ {max_52:,.2f}", "#4ade80"),
+                ("Volume Médio", format_large_number(vol), "#fb7185"),
+                ("Valor de Mercado", format_large_br_currency(val_merc), "#fbbf24")
+            ]
+            
+            for col, (label, val_str, color) in zip(cols, metrics):
+                with col:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
+                                border: 1px solid #1e293b; 
+                                border-radius: 10px; 
+                                padding: 0.8rem; 
+                                text-align: center; 
+                                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                                margin-bottom: 0.5rem;">
+                        <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
+                        <div style="font-size: 1.15rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{val_str}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            st.caption(f"Última cotação registrada: {data_ult} para {ticker_name}")
+
+        if len(tickers) > 1:
+            tabs_price = st.tabs(tickers)
+            for tab, ticker in zip(tabs_price, tickers):
+                with tab:
+                    if ticker in df_price.index:
+                        row_p = df_price.loc[ticker]
+                        if isinstance(row_p, pd.DataFrame):
+                            row_p = row_p.iloc[-1]
+                        render_price_cards(ticker, row_p)
+                    else:
+                        st.warning(f"Sem dados de mercado para {ticker}")
+        else:
+            ticker = tickers[0]
+            if ticker in df_price.index:
+                row_p = df_price.loc[ticker]
+                if isinstance(row_p, pd.DataFrame):
+                    row_p = row_p.iloc[-1]
+                render_price_cards(ticker, row_p)
+            else:
+                st.warning(f"Sem dados de mercado para {ticker}")
+
 
         # Indicadores Fundamentalistas
         section_header(ICO_METRICS, "Indicadores Financeiros", "h3")
@@ -326,77 +451,75 @@ if tickers:
 
         df_ind = df_ind.fillna(0)
 
-        format_ind = {
-            "Margem Líquida": "{:.2f}%",
-            "Margem EBIT": "{:.2f}%",
-            "ROE": "{:.2f}%",
-            "ROIC": "{:.2f}%",
-            "Dividend Yield": "{:.2f}%",
-            "Crescimento Receita 5 anos": "{:.2f}%",
-            "P/L": "{:.2f}",
-            "EV/EBITDA": "{:.2f}",
-            "P/VP": "{:.2f}",
-            "Empresa": lambda x: x
-        }
-        
-        # Filtro de indicadores
-        st.markdown("""
-<h4 style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="11" cy="11" r="8"></circle>
-    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-  </svg>
-  <span>Filtros</span>
-</h4>
+        # Remove duplicate indices if any
+        df_ind = df_ind[~df_ind.index.duplicated(keep='last')]
+
+        # Função auxiliar para renderizar os cards em colunas estilizadas
+        def render_ticker_cards(row):
+            # 1. Valuation Section
+            st.markdown("""
+<div style="margin: 1.2rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="1" x2="12" y2="23"></line>
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+    </svg>
+    <span style="font-weight: 700; color: #00d2ff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Valuation</span>
+</div>
 """, unsafe_allow_html=True)
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.metric("P/L", f"{row['P/L']:.2f}")
+            with c2:
+                st.metric("P/VP", f"{row['P/VP']:.2f}")
+            with c3:
+                st.metric("EV/EBITDA", f"{row['EV/EBITDA']:.2f}")
 
-        # Organização das colunas
-        col1, col2 = st.columns(2)
+            # 2. Rentabilidade Section
+            st.markdown("""
+<div style="margin: 1.5rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+        <polyline points="17 6 23 6 23 12"></polyline>
+    </svg>
+    <span style="font-weight: 700; color: #00ff87; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Rentabilidade</span>
+</div>
+""", unsafe_allow_html=True)
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.metric("ROE", f"{row['ROE']:.2f}%")
+            with c2:
+                st.metric("ROIC", f"{row['ROIC']:.2f}%")
+            with c3:
+                st.metric("Margem Líquida", f"{row['Margem Líquida']:.2f}%")
+            with c4:
+                st.metric("Margem EBIT", f"{row['Margem EBIT']:.2f}%")
 
-        with col1:
-            min_ebit = st.number_input("Margem EBIT mínima (%)", value=0.0, step=0.1)
-            min_roe = st.number_input("ROE mínimo (%)", value=0.0, step=0.1)
-            min_margem_liq = st.number_input("Margem Líquida Mínima (%)", value=0.0, step=0.1)
-            min_cresc_5a = st.number_input("Crescimento Receita 5 Anos Mínima (%)", value=0.0, step=0.1)
-            
-        with col2:
-            min_dividend = st.number_input("Dividend Yield mínimo (%)", value=0.0, step=0.1)
-            max_pl = st.number_input("P/L máximo", value=1000.0, step=0.1)
-            min_roic = st.number_input("ROIC mínimo (%)", value=0.0, step=0.1)
-            max_ev_ebitda = st.number_input("EV/EBITDA Máximo", value=1000.0, step=0.1)
-            max_pvp = st.number_input("P/VP máximo", value=1000.0, step=0.1)
-            
+            # 3. Crescimento & Yield Section
+            st.markdown("""
+<div style="margin: 1.5rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffd600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+    </svg>
+    <span style="font-weight: 700; color: #ffd600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Crescimento & Yield</span>
+</div>
+""", unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("Dividend Yield", f"{row['Dividend Yield']:.2f}%")
+            with c2:
+                st.metric("Crescimento Receita (5 anos)", f"{row['Crescimento Receita 5 anos']:.2f}%")
 
-        # Formatação Condicional
-        def highlight_val(val, min_val=None, max_val=None):
-            if pd.isna(val):
-                return ''
-            if min_val is not None and val < min_val:
-                return 'background-color: rgba(255, 23, 68, 0.15); color: #ff1744;'  # vermelho neon translúcido
-            if max_val is not None and val > max_val:
-                return 'background-color: rgba(255, 23, 68, 0.15); color: #ff1744;'
-            return 'background-color: rgba(0, 230, 118, 0.15); color: #00ff87;'  # verde neon translúcido
-
-        # Define as cores
-        def style_indicators(row):
-            styles = [''] * len(row)
-            col_idx = {col: i for i, col in enumerate(row.index)}
-
-            styles[col_idx['Margem EBIT']] = highlight_val(row['Margem EBIT'], min_val=min_ebit)
-            styles[col_idx['ROE']] = highlight_val(row['ROE'], min_val=min_roe)
-            styles[col_idx['Margem Líquida']] = highlight_val(row['Margem Líquida'], min_val=min_margem_liq)
-            styles[col_idx['Crescimento Receita 5 anos']] = highlight_val(row['Crescimento Receita 5 anos'], min_val=min_cresc_5a)
-            styles[col_idx['Dividend Yield']] = highlight_val(row['Dividend Yield'], min_val=min_dividend)
-            styles[col_idx['EV/EBITDA']] = highlight_val(row['EV/EBITDA'], max_val=max_ev_ebitda)
-            styles[col_idx['P/L']] = highlight_val(row['P/L'], max_val=max_pl)
-            styles[col_idx['ROIC']] = highlight_val(row['ROIC'], min_val=min_roic)
-            styles[col_idx['P/VP']] = highlight_val(row['P/VP'], max_val=max_pvp)
-            
-
-            return styles
-
-        styled_ind = df_ind.style.format(format_ind).apply(style_indicators, axis=1)
-        st.dataframe(styled_ind, use_container_width=True)
+        # Exibição dos cards
+        if len(tickers) > 1:
+            tabs_tickers = st.tabs(tickers)
+            for idx, ticker in enumerate(tickers):
+                with tabs_tickers[idx]:
+                    if ticker in df_ind.index:
+                        render_ticker_cards(df_ind.loc[ticker])
+        else:
+            ticker = tickers[0]
+            if ticker in df_ind.index:
+                render_ticker_cards(df_ind.loc[ticker])
 
         # ── Comparação Visual de Múltiplos ───────────────────────────────────
         if len(tickers) > 1:
@@ -765,7 +888,7 @@ if tickers:
 
                     # ── Scorecard de valuation ────────────────────────────────
                     st.markdown("#### Scorecard de Valuation do Setor")
-                    score_cols = st.columns(len(selected_in_peers)) if len(selected_in_peers) > 1 else [st]
+                    score_cols = st.columns(len(selected_in_peers))
 
                     for i, ticker_s in enumerate(selected_in_peers):
                         sub = rank_df[rank_df["Ação"] == ticker_s]
@@ -779,7 +902,7 @@ if tickers:
                         sc = "#00ff87" if total_score >= 60 else "#ffd600" if total_score >= 40 else "#ff3d5a"
                         label = "ATRATIVO" if total_score >= 60 else "NEUTRO" if total_score >= 40 else "CARO/FRACO"
 
-                        with score_cols[i] if len(selected_in_peers) > 1 else score_cols[0]:
+                        with score_cols[i]:
                             st.markdown(f"""
 <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:2px solid {sc};
             border-radius:14px;padding:1.2rem;text-align:center;
@@ -799,37 +922,8 @@ if tickers:
                 else:
                     st.info("Nenhum ticker selecionado encontrado nos dados de peers do setor.")
 
-        st.markdown("---")
 
-        # Os dados de cotação (data_prices) já foram baixados e processados no início do bloco
 
-        
-        section_header(ICO_CHART, "Cotação Histórica", "h3")
-        st.write(data_prices)
-        fig, ax = plt.subplots(figsize=(10, 5))
-        # Custom palette with vibrant tones
-        palette = sns.color_palette("muted", len(data_prices.columns)) if len(data_prices.columns) > 1 else ['#00d2ff']
-        sns.lineplot(data=data_prices, ax=ax, palette=palette, linewidth=2)
-        ax.set_xlabel("Período")
-        ax.set_ylabel("Cotação (R$)")
-        ax.set_title("Cotação do(s) Ativo(s)", fontsize=14, fontweight='bold', pad=15)
-        ax.grid(True, color='#1e293b', linestyle=':', alpha=0.6)
-        st.pyplot(fig)
-
-        returns = data_prices.pct_change()
-
-        # Descrições yfinance
-        descriptions = []
-        for t in tickers_yf:
-            try:
-                info = yf.Ticker(t).get_info()
-                descriptions.append(info.get('longBusinessSummary', 'Não disponível'))
-            except:
-                descriptions.append('Não disponível')
-
-        df_desc = pd.DataFrame(descriptions, index=tickers, columns=["Descrição"])
-        section_header(ICO_INFO, "Descrição da Empresa", "h3")
-        st.table(df_desc)
 
     except OSError as e:
         st.cache_data.clear()
