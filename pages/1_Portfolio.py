@@ -388,11 +388,16 @@ stocks = get_sorted_tickers_by_liquidity(stocks)
 if "selected_tickers" not in st.session_state:
     st.session_state["selected_tickers"] = []
 
-# Filter session state tickers to only include those in stocks
-default_tickers = [t for t in st.session_state["selected_tickers"] if t in stocks]
+# Remove any stale tickers not in the current list
+st.session_state["selected_tickers"] = [
+    t for t in st.session_state["selected_tickers"] if t in stocks
+]
 
-tickers = st.multiselect("Selecione as ações do portfólio", stocks, default=default_tickers)
-st.session_state["selected_tickers"] = tickers
+tickers = st.multiselect(
+    "Selecione as ações do portfólio",
+    options=stocks,
+    key="selected_tickers"
+)
 # Valor inicial
 valor_inicial = st.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
 

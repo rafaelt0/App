@@ -253,16 +253,16 @@ section_header(ICO_COMPASS, "Escolha ações para explorar", "h3")
 if "selected_tickers" not in st.session_state:
     st.session_state["selected_tickers"] = []
 
-# Filter session state tickers to only include those in tickers_filtrados
-default_tickers = [t for t in st.session_state["selected_tickers"] if t in tickers_filtrados]
+# Remove any stale tickers that are no longer in the filtered list
+st.session_state["selected_tickers"] = [
+    t for t in st.session_state["selected_tickers"] if t in tickers_filtrados
+]
 
 tickers = st.multiselect(
     'Escolha sua ação. Selecione a página desejada e as configurações na barra lateral.',
-    tickers_filtrados,
-    default=default_tickers
+    options=tickers_filtrados,
+    key="selected_tickers"
 )
-
-st.session_state["selected_tickers"] = tickers
 
 
 # Só executa análise se houver pelo menos uma ação selecionada
