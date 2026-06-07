@@ -231,28 +231,40 @@ var_5 = np.percentile(valores_finais, 5)
 cvar_5 = valores_finais[valores_finais <= var_5].mean()
 pior_cenario = valores_finais.min()
 melhor_cenario = valores_finais.max()
+prob_ganho = (valores_finais > valor_inicial).mean() * 100
 
 sim_stats_dict = {
     "Valor Esperado Final": f"R$ {valor_esperado:,.2f}",
+    "Probabilidade de Ganho": f"{prob_ganho:.1f}%",
     "VaR 5%": f"R$ {var_5:,.2f}",
     "CVaR 5%": f"R$ {cvar_5:,.2f}",
     "Pior Cenário": f"R$ {pior_cenario:,.2f}",
-    "Melhor Cenário": f"R$ {melhor_cenario:,.2f}"
+    "Melhor Cenário": f"R$ {melhor_cenario:,.2f}",
 }
 
 section_header(ICO_CHART, "Estatísticas da Simulação Monte Carlo", "h3")
 render_cards_grid(sim_stats_dict)
 
-st.markdown("""
-<small><b>VaR 5%</b>: Valor máximo esperado que você pode perder em 5% dos piores casos.<br>
-<b>CVaR 5%</b>: Média das perdas nos piores 5% dos casos, mostrando um risco mais extremo.</small>
-""", unsafe_allow_html=True)
+col_exp1, col_exp2 = st.columns(2)
+with col_exp1:
+    st.markdown("""
+    <div style="background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#b8eeff;">
+    <b>VaR 5%:</b> Valor mínimo do portfólio em 95% dos cenários simulados. Abaixo disso está a zona de risco extremo.
+    </div>
+    """, unsafe_allow_html=True)
+with col_exp2:
+    st.markdown("""
+    <div style="background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#fff3b0;">
+    <b>CVaR 5%:</b> Média das perdas nos piores 5% dos cenários — representa o risco em cauda extrema.
+    </div>
+    """, unsafe_allow_html=True)
 
 # Gráfico com algumas trajetórias individuais para ilustrar a dispersão
 section_header(ICO_SIGNAL, "Trajetórias Individuais das Simulações", "h3")
+n_plot_max = min(50, n_simulations)
+n_plot = st.slider("Número de trajetórias exibidas", min_value=5, max_value=n_plot_max, value=min(20, n_plot_max), step=5)
 
 fig_individual = go.Figure()
-n_plot = min(20, n_simulations)  # limitar para 20 linhas para visualização limpa
 
 for i in range(n_plot):
     fig_individual.add_trace(go.Scatter(
@@ -305,6 +317,13 @@ fig_fan.update_layout(
     yaxis_title="Valor do Portfólio (R$)"
 )
 apply_plotly_theme(fig_fan)
+fig_fan.add_hline(
+    y=valor_inicial,
+    line_dash="dash", line_color="#94a3b8", line_width=1.5,
+    annotation_text=f"Capital Inicial: R$ {valor_inicial:,.0f}",
+    annotation_position="bottom right",
+    annotation_font=dict(color="#94a3b8", size=11)
+)
 st.plotly_chart(fig_fan, use_container_width=True)
 
 # Histograma valor final

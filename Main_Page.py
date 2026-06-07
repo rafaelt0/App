@@ -238,6 +238,10 @@ setores_selecionados = st.sidebar.multiselect(
     'Escolha um ou mais setores:', setores, default=[]
 )
 
+if st.session_state.get("selected_tickers"):
+    if st.sidebar.button("🗑 Limpar seleção de ações", use_container_width=True):
+        st.session_state["selected_tickers"] = []
+        st.rerun()
 
 #selecionar Todos ou nada, mostra todos os tickers
 if "Todos" in setores_selecionados or not setores_selecionados:
@@ -249,6 +253,9 @@ else:
 tickers_filtrados = get_sorted_tickers_by_liquidity(tickers_filtrados)
 
 section_header(ICO_COMPASS, "Escolha ações para explorar", "h3")
+n_disponíveis = len(tickers_filtrados)
+setor_label = "todos os setores" if (not setores_selecionados or "Todos" in setores_selecionados) else ", ".join(setores_selecionados[:2]) + ("..." if len(setores_selecionados) > 2 else "")
+st.caption(f"{n_disponíveis} ações disponíveis em {setor_label}, ordenadas por liquidez.")
 
 if "selected_tickers" not in st.session_state:
     st.session_state["selected_tickers"] = []
@@ -468,11 +475,11 @@ if tickers:
 """, unsafe_allow_html=True)
             c1, c2, c3 = st.columns(3)
             with c1:
-                st.metric("P/L", f"{row['P/L']:.2f}")
+                st.metric("P/L", f"{row['P/L']:.2f}", help="Preço/Lucro: quantas vezes o mercado paga pelo lucro anual. Menor = mais barato.")
             with c2:
-                st.metric("P/VP", f"{row['P/VP']:.2f}")
+                st.metric("P/VP", f"{row['P/VP']:.2f}", help="Preço/Valor Patrimonial: compara o preço de mercado com o valor contábil. <1 pode indicar desconto.")
             with c3:
-                st.metric("EV/EBITDA", f"{row['EV/EBITDA']:.2f}")
+                st.metric("EV/EBITDA", f"{row['EV/EBITDA']:.2f}", help="Enterprise Value / EBITDA: múltiplo de valuation que considera a dívida. Menor = mais barato.")
 
             # 2. Rentabilidade Section
             st.markdown("""
@@ -486,13 +493,13 @@ if tickers:
 """, unsafe_allow_html=True)
             c1, c2, c3, c4 = st.columns(4)
             with c1:
-                st.metric("ROE", f"{row['ROE']:.2f}%")
+                st.metric("ROE", f"{row['ROE']:.2f}%", help="Return on Equity: lucro gerado para cada R$ de patrimônio. Acima de 15% é considerado bom.")
             with c2:
-                st.metric("ROIC", f"{row['ROIC']:.2f}%")
+                st.metric("ROIC", f"{row['ROIC']:.2f}%", help="Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida).")
             with c3:
-                st.metric("Margem Líquida", f"{row['Margem Líquida']:.2f}%")
+                st.metric("Margem Líquida", f"{row['Margem Líquida']:.2f}%", help="Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa.")
             with c4:
-                st.metric("Margem EBIT", f"{row['Margem EBIT']:.2f}%")
+                st.metric("Margem EBIT", f"{row['Margem EBIT']:.2f}%", help="Margem operacional antes de juros e impostos. Mede a eficiência operacional.")
 
             # 3. Crescimento & Yield Section
             st.markdown("""
@@ -505,9 +512,9 @@ if tickers:
 """, unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
-                st.metric("Dividend Yield", f"{row['Dividend Yield']:.2f}%")
+                st.metric("Dividend Yield", f"{row['Dividend Yield']:.2f}%", help="Dividendos pagos divididos pelo preço. Percentual de retorno em dividendos ao ano.")
             with c2:
-                st.metric("Crescimento Receita (5 anos)", f"{row['Crescimento Receita 5 anos']:.2f}%")
+                st.metric("Crescimento Receita (5 anos)", f"{row['Crescimento Receita 5 anos']:.2f}%", help="Taxa de crescimento anual composta da receita nos últimos 5 anos.")
 
         # Exibição dos cards
         if len(tickers) > 1:
@@ -935,7 +942,21 @@ if tickers:
         st.error(f"Erro ao buscar dados: {e}")
         st.caption(f"```\n{traceback.format_exc()}\n```")
 else:
-    st.info("Selecione pelo menos uma ação para iniciar a análise.")
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:16px;padding:2rem;text-align:center;margin-top:1rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
+            <circle cx="11" cy="11" r="8" stroke="#94a3b8" stroke-width="1.8"/>
+            <path d="M21 21l-4.35-4.35" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <div style="font-size:1.1rem;font-weight:700;color:#f8fafc;margin-bottom:0.5rem">Nenhuma ação selecionada</div>
+        <div style="font-size:0.875rem;color:#94a3b8;max-width:420px;margin:0 auto">
+            Use o campo acima para buscar e selecionar ações da B3. Filtre por setor na barra lateral para encontrar empresas do seu interesse.
+        </div>
+        <div style="margin-top:1.2rem;font-size:0.8rem;color:#64748b">
+            Sugestões populares: <span style="color:#00d2ff">PETR4</span> · <span style="color:#00d2ff">VALE3</span> · <span style="color:#00d2ff">ITUB4</span> · <span style="color:#00d2ff">BBDC4</span> · <span style="color:#00d2ff">WEGE3</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 

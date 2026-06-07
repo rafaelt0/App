@@ -418,6 +418,29 @@ if len(tickers) == 1:
 
 tickers_yf = [t + ".SA" for t in tickers]
 
+# Inputs de peso manual devem aparecer ANTES do botão
+pesos_manuais_inputs = {}
+if "Manual" in modo:
+    st.markdown("---")
+    section_header(ICO_BOX, "Alocação Manual dos Pesos", "h4")
+    total_pesos = 0.0
+    for ticker in tickers:
+        p = st.number_input(
+            f"Peso % de {ticker}",
+            min_value=0.0, max_value=100.0,
+            value=round(100/len(tickers), 2),
+            step=0.01,
+            key=f"peso_manual_{ticker}"
+        )
+        pesos_manuais_inputs[ticker + ".SA"] = p / 100
+        total_pesos += p
+
+    if abs(total_pesos - 100) > 0.01:
+        st.error(f"Soma dos pesos: **{total_pesos:.2f}%** — ajuste para exatamente 100%.")
+    else:
+        st.success(f"Soma dos pesos: {total_pesos:.2f}% ✓")
+    st.markdown("---")
+
 # Baixa dados com tela de carregamento glassmorphic
 loading_placeholder = st.empty()
 with loading_placeholder.container():
@@ -444,11 +467,10 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
     
        
         if "Manual" in modo:
-            st.subheader("Defina manualmente a porcentagem de cada ativo (soma deve ser 100%)")
             pesos_manuais = {}
             total = 0.0
             for ticker in tickers:
-                p = st.number_input(f"Peso % de {ticker}", min_value=0.0, max_value=100.0, value=round(100/len(tickers),2), step=0.01)
+                p = st.session_state.get(f"peso_manual_{ticker}", round(100/len(tickers), 2))
                 pesos_manuais[ticker + ".SA"] = p / 100
                 total += p
             if abs(total - 100) > 0.01:
@@ -653,7 +675,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         fig.update_layout(title='Evolução do Valor do Portfólio vs Benchmark',
                           xaxis_title='Data', yaxis_title='Valor (R$)')
         apply_plotly_theme(fig)
-        st.plotly_chart(fig)
+        st.plotly_chart(fig, use_container_width=True)
         # Retornos mensais
         section_header(ICO_HEATMAP, "Tabela de Retornos Mensais do Portfólio", "h3")
         try:
@@ -754,11 +776,11 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         # Desempenho Resumido em Cards (st.metric)
         section_header(ICO_CHART, "Desempenho Resumido da Carteira", "h3")
         col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
-        col_m1.metric("Retorno Total", f"{total_return:.2f}%")
-        col_m2.metric("Volatilidade Anual", f"{vol_anual:.2f}%")
-        col_m3.metric("Índice Sharpe", f"{sharpe_val:.2f}")
-        col_m4.metric("Índice Sortino", f"{sortino_val:.2f}")
-        col_m5.metric("Max Drawdown", f"{max_dd:.2f}%")
+        col_m1.metric("Retorno Total", f"{total_return:.2f}%", help="Retorno total do portfólio no período selecionado.")
+        col_m2.metric("Volatilidade Anual", f"{vol_anual:.2f}%", help="Desvio padrão anualizado dos retornos. Mede o risco total.")
+        col_m3.metric("Índice Sharpe", f"{sharpe_val:.2f}", help="Retorno por unidade de risco. Acima de 1.0 é excelente.")
+        col_m4.metric("Índice Sortino", f"{sortino_val:.2f}", help="Igual ao Sharpe mas penaliza apenas volatilidade negativa.")
+        col_m5.metric("Max Drawdown", f"{max_dd:.2f}%", help="Maior perda de pico a vale. Quanto mais próximo de 0, melhor.")
 
         # ── Painel de Decisão do Investidor ───────────────────────────────────
         st.markdown("---")
@@ -769,9 +791,9 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         health_detalhes = []
 
         if sharpe_val > 1.0:
-            score += 40; health_detalhes.append((ICO_OK,   "Sharpe excelente (>1.0)", "#00ff87"))
+            score += 35; health_detalhes.append((ICO_OK,   "Sharpe excelente (>1.0)", "#00ff87"))
         elif sharpe_val > 0.5:
-            score += 20; health_detalhes.append((ICO_WARN, "Sharpe razoável (0.5–1.0)", "#ffd600"))
+            score += 17; health_detalhes.append((ICO_WARN, "Sharpe razoável (0.5–1.0)", "#ffd600"))
         else:
             health_detalhes.append((ICO_CRIT, "Sharpe baixo (<0.5) — revise a alocação", "#ff3d5a"))
 
@@ -791,9 +813,9 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
 
         alfa_anual = alfa_val * 252 * 100
         if alfa_anual > 5:
-            score += 20; health_detalhes.append((ICO_OK,   f"Alfa anual positivo: {alfa_anual:.1f}%", "#00ff87"))
+            score += 15; health_detalhes.append((ICO_OK,   f"Alfa anual positivo: {alfa_anual:.1f}%", "#00ff87"))
         elif alfa_anual > 0:
-            score += 10; health_detalhes.append((ICO_WARN, f"Alfa marginal: {alfa_anual:.1f}%", "#ffd600"))
+            score += 7; health_detalhes.append((ICO_WARN, f"Alfa marginal: {alfa_anual:.1f}%", "#ffd600"))
         else:
             health_detalhes.append((ICO_CRIT, f"Alfa negativo ({alfa_anual:.1f}%) — portfólio perde pro índice", "#ff3d5a"))
 
@@ -818,7 +840,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
                 <div style="font-size:3.5rem;font-weight:900;color:{score_color};
                             font-family:'JetBrains Mono',monospace;
                             text-shadow:0 0 15px {score_color}66;">{score}</div>
-                <div style="font-size:0.65rem;color:#94a3b8;letter-spacing:0.12em;margin-top:0.2rem;">DE 110 PONTOS</div>
+                <div style="font-size:0.65rem;color:#94a3b8;letter-spacing:0.12em;margin-top:0.2rem;">DE 100 PONTOS</div>
                 <div style="font-size:0.9rem;font-weight:700;color:{score_color};margin-top:0.5rem;
                             letter-spacing:0.08em;">{score_label}</div>
             </div>
@@ -888,11 +910,13 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         detailed_stats = pd.DataFrame({
             "Métrica": [
                 "Retorno Total", "Retorno Anualizado", "Volatilidade Anualizada", "Índice de Sharpe",
-                "Beta vs IBOVESPA", "Alfa Anualizado", "Máximo Drawdown", "VaR Diário (95%)"
+                "Beta vs IBOVESPA", "Alfa Anualizado", "Máximo Drawdown", "VaR Diário (95%)",
+                "Information Ratio"
             ],
             "Valor": [
                 f"{ret_total:.2f}%", f"{ret_anual:.2f}%", f"{vol_anual:.2f}%", f"{sharpe_anual:.2f}",
-                f"{beta:.4f}", f"{alfa_anual:.2f}%", f"{max_dd_val:.2f}%", f"{var_val:.2f}%"
+                f"{beta:.4f}", f"{alfa_anual:.2f}%", f"{max_dd_val:.2f}%", f"{var_val:.2f}%",
+                f"{information_ratio:.2f}"
             ]
         })
         section_header(ICO_METRICS, "Métricas Consolidadas do Portfólio", "h3")
