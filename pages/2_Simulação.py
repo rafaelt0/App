@@ -88,7 +88,7 @@ def render_cards_grid(data_dict, colors_sequence=None):
     num_cols = 4
     for i in range(0, len(items), num_cols):
         chunk = items[i:i+num_cols]
-        cols = st.columns(num_cols)
+        cols = st.columns(len(chunk))
         for col, (label, val) in zip(cols, chunk):
             color = colors_sequence[items.index((label, val)) % len(colors_sequence)]
             with col:

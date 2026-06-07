@@ -901,3 +901,17 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
 }
 .main-hero:hover { border-left-color: var(--primary-color) !important; }
 
+/* ─── Hide Streamlit Native Loading Indicators ───────────────────────────────*/
+/* Top progress decoration bar */
+[data-testid="stDecoration"] { display: none !important; }
+/* Top-right running/status widget */
+[data-testid="stStatusWidget"] { display: none !important; }
+/* Native spinner text (we use glassmorphic spinners instead) */
+[data-testid="stSpinner"] > div > p { display: none !important; }
+/* Hide Streamlit top toolbar when in embedded/app mode */
+[data-testid="stToolbar"] { display: none !important; }
+/* Hide "Made with Streamlit" footer */
+footer { display: none !important; }
+footer::after { display: none !important; }
+#MainMenu { display: none !important; }
+

@@ -98,7 +98,7 @@ def render_cards_grid(data_dict, colors_sequence=None):
     num_cols = 4
     for i in range(0, len(items), num_cols):
         chunk = items[i:i+num_cols]
-        cols = st.columns(num_cols)
+        cols = st.columns(len(chunk))
         for col, (label, val) in zip(cols, chunk):
             color = colors_sequence[items.index((label, val)) % len(colors_sequence)]
             with col:
@@ -115,8 +115,8 @@ def render_cards_grid(data_dict, colors_sequence=None):
                             flex-direction: column;
                             justify-content: center;
                             align-items: center;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
-                    <div style="font-size: 1.1rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{val}</div>
+                    <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em; word-break: break-word;">{label}</div>
+                    <div style="font-size: 1rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace; word-break: break-word; overflow-wrap: anywhere;">{val}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -410,9 +410,7 @@ with col_config2:
         lookback_dias = st.number_input("Dias de Lookback", min_value=30, max_value=5000, value=500, step=10)
         data_inicio = today - datetime.timedelta(days=lookback_dias)
 
-# Exibir spinner rápido para o SELIC se necessário
-with st.spinner("Buscando taxa SELIC acumulada..."):
-    taxa_selic = get_selic_rate(data_inicio)
+taxa_selic = get_selic_rate(data_inicio)
 
 
 # Seleção de ações
@@ -476,22 +474,12 @@ if "Manual" in modo:
         st.success(f"Soma dos pesos: {total_pesos:.2f}% ✓")
     st.markdown("---")
 
-# Baixa dados com tela de carregamento glassmorphic
-loading_placeholder = st.empty()
-with loading_placeholder.container():
-    st.markdown("""
-    <div class="loading-container">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">Buscando cotações históricas dos ativos na B3...</div>
-    </div>
-    """, unsafe_allow_html=True)
-
+# Pré-carrega cotações silenciosamente (resultado cacheado após primeira execução)
 data_yf = get_portfolio_prices(tickers_yf, data_inicio)
 if isinstance(data_yf.columns, pd.MultiIndex):
     data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
 
 returns = data_yf.pct_change().dropna()
-loading_placeholder.empty()
 
 page_container = st.empty()
 
@@ -1036,7 +1024,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         num_cols = 4
         for i in range(0, len(items_dd), num_cols):
             chunk = items_dd[i:i+num_cols]
-            cols = st.columns(num_cols)
+            cols = st.columns(len(chunk))
             for col, (ticker, row_d) in zip(cols, chunk):
                 m_dd = row_d['Máximo Drawdown (%)']
                 dt_dd = row_d['Data do Máximo Drawdown'].strftime('%Y-%m-%d')

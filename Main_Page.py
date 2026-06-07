@@ -357,13 +357,14 @@ if tickers:
                                 text-align: center; 
                                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
                                 margin-bottom: 0.5rem;
-                                min-height: 90px;
+                                min-height: 80px;
+                                height: auto;
                                 display: flex;
                                 flex-direction: column;
                                 justify-content: center;
                                 align-items: center;">
                         <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
-                        <div style="font-size: 1.1rem; color: {color}; font-weight: 800;">{val_str}</div>
+                        <div style="font-size: 0.95rem; color: {color}; font-weight: 800; word-break: break-word; overflow-wrap: anywhere; line-height: 1.4;">{val_str}</div>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -450,10 +451,10 @@ if tickers:
             
             metrics = [
                 ("Cotação", f"R$ {cot:,.2f}", "#38bdf8"),
-                ("Mínimo (52s)", f"R$ {min_52:,.2f}", "#f87171"),
-                ("Máximo (52s)", f"R$ {max_52:,.2f}", "#4ade80"),
-                ("Volume Médio", format_large_number(vol), "#fb7185"),
-                ("Valor de Mercado", format_large_br_currency(val_merc), "#fbbf24")
+                ("Mín. 52 Sem.", f"R$ {min_52:,.2f}", "#f87171"),
+                ("Máx. 52 Sem.", f"R$ {max_52:,.2f}", "#4ade80"),
+                ("Vol. Médio", format_large_number(vol), "#fb7185"),
+                ("Val. de Mercado", format_large_br_currency(val_merc), "#fbbf24")
             ]
             
             for col, (label, val_str, color) in zip(cols, metrics):
@@ -467,7 +468,7 @@ if tickers:
                                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
                                 margin-bottom: 0.5rem;">
                         <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
-                        <div style="font-size: 1.15rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{val_str}</div>
+                        <div style="font-size: 1rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace; word-break: break-word; overflow-wrap: anywhere;">{val_str}</div>
                     </div>
                     """, unsafe_allow_html=True)
             st.caption(f"Última cotação registrada: {data_ult} para {ticker_name}")
@@ -695,6 +696,8 @@ if tickers:
   Posicionamento da(s) ação(ões) selecionada(s) em relação a todos os pares do setor na B3.
 </p>
 """, unsafe_allow_html=True)
+
+        rank_df = pd.DataFrame()  # Inicializa; será populado se houver dados de peers
 
         # Múltiplos a comparar: (coluna fundamentus, nome display, menor=melhor?)
         MULTIPLES_CFG = [
@@ -1027,53 +1030,84 @@ if tickers:
 </h3>
 """, unsafe_allow_html=True)
 
+        usar_percentis = not rank_df.empty
+
         sintese_items = []
         for t in tickers:
             if t not in df_ind.index:
                 continue
             r = df_ind.loc[t]
+            if isinstance(r, pd.DataFrame):
+                r = r.iloc[-1]
             nome = df.loc[t, 'Empresa'] if t in df.index else t
+            if isinstance(nome, pd.Series):
+                nome = nome.iloc[0]
 
             pontos_pos = []
             pontos_neg = []
             alertas = []
+            fonte_label = ""
 
-            roe = r.get('ROE', 0)
-            roic = r.get('ROIC', 0)
-            pl = r.get('P/L', 0)
-            pvp = r.get('P/VP', 0)
-            dy = r.get('Dividend Yield', 0)
-            ml = r.get('Margem Líquida', 0)
-            cr = r.get('Crescimento Receita 5 anos', 0)
+            if usar_percentis:
+                # Usa percentis do setor já calculados
+                ticker_rank = rank_df[rank_df["Ação"] == t]
+                fonte_label = "vs. peers do setor"
+                for _, rr in ticker_rank.iterrows():
+                    mult = rr["Múltiplo"]
+                    pct = rr["Percentil"]
+                    val = rr["Valor"]
+                    med = rr["Mediana Setor"]
+                    vs = f"mediana do setor: {med:.2f}"
+                    if pct >= 70:
+                        pontos_pos.append(f"{mult} no percentil <b>{pct:.0f}°</b> do setor — {val:.2f} ({vs})")
+                    elif pct < 30:
+                        pontos_neg.append(f"{mult} no percentil <b>{pct:.0f}°</b> do setor — {val:.2f} ({vs})")
+                # Alertas extras de P/L absoluto
+                pl = float(r.get('P/L', 0) or 0)
+                if pl < 0:
+                    alertas.append(f"P/L negativo ({pl:.1f}x) — empresa registrou prejuízo")
+            else:
+                # Fallback: thresholds absolutos com contexto
+                fonte_label = "thresholds de mercado"
+                roe = float(r.get('ROE', 0) or 0)
+                roic = float(r.get('ROIC', 0) or 0)
+                pl = float(r.get('P/L', 0) or 0)
+                dy = float(r.get('Dividend Yield', 0) or 0)
+                ml = float(r.get('Margem Líquida', 0) or 0)
+                cr = float(r.get('Crescimento Receita 5 anos', 0) or 0)
 
-            if roe > 15: pontos_pos.append(f"ROE forte ({roe:.1f}%)")
-            elif roe < 5: pontos_neg.append(f"ROE fraco ({roe:.1f}%)")
+                if roe > 15: pontos_pos.append(f"ROE forte ({roe:.1f}% — acima dos 15% de referência)")
+                elif roe < 5: pontos_neg.append(f"ROE fraco ({roe:.1f}% — abaixo dos 5% mínimos)")
 
-            if roic > 12: pontos_pos.append(f"ROIC sólido ({roic:.1f}%)")
-            elif roic < 5: pontos_neg.append(f"ROIC baixo ({roic:.1f}%)")
+                if roic > 12: pontos_pos.append(f"ROIC sólido ({roic:.1f}% — acima dos 12%)")
+                elif roic < 5: pontos_neg.append(f"ROIC baixo ({roic:.1f}%)")
 
-            if 0 < pl < 15: pontos_pos.append(f"P/L atrativo ({pl:.1f}x)")
-            elif pl > 30: pontos_neg.append(f"P/L elevado ({pl:.1f}x)")
-            elif pl < 0: alertas.append(f"P/L negativo — empresa com prejuízo")
+                if 0 < pl < 15: pontos_pos.append(f"P/L atrativo ({pl:.1f}x — abaixo de 15x)")
+                elif pl > 30: pontos_neg.append(f"P/L elevado ({pl:.1f}x — acima de 30x)")
+                elif pl < 0: alertas.append(f"P/L negativo ({pl:.1f}x) — empresa com prejuízo")
 
-            if dy > 5: pontos_pos.append(f"Dividend Yield elevado ({dy:.1f}%)")
+                if dy > 5: pontos_pos.append(f"Dividend Yield elevado ({dy:.1f}%)")
 
-            if cr > 10: pontos_pos.append(f"Crescimento de receita forte ({cr:.1f}% a.a.)")
-            elif cr < 0: pontos_neg.append(f"Receita em queda ({cr:.1f}% a.a.)")
+                if cr > 10: pontos_pos.append(f"Crescimento de receita forte ({cr:.1f}% a.a.)")
+                elif cr < 0: pontos_neg.append(f"Receita em queda ({cr:.1f}% a.a.)")
 
-            if ml > 15: pontos_pos.append(f"Margem líquida saudável ({ml:.1f}%)")
-            elif ml < 5 and ml >= 0: alertas.append(f"Margem líquida comprimida ({ml:.1f}%)")
-            elif ml < 0: pontos_neg.append(f"Margem negativa ({ml:.1f}%)")
+                if ml > 15: pontos_pos.append(f"Margem líquida saudável ({ml:.1f}%)")
+                elif 0 <= ml < 5: alertas.append(f"Margem líquida comprimida ({ml:.1f}%)")
+                elif ml < 0: pontos_neg.append(f"Margem negativa ({ml:.1f}%)")
 
             n_pos = len(pontos_pos)
             n_neg = len(pontos_neg)
-            if n_pos >= 3: veredicto = ("ATRATIVO", "#00ff87")
-            elif n_neg >= 3: veredicto = ("FRACO", "#ff3d5a")
-            else: veredicto = ("NEUTRO", "#ffd600")
+            if n_pos >= 3 or (n_pos > n_neg and n_pos >= 2):
+                veredicto = ("ATRATIVO", "#00ff87")
+            elif n_neg >= 3 or (n_neg > n_pos and n_neg >= 2):
+                veredicto = ("FRACO", "#ff3d5a")
+            else:
+                veredicto = ("NEUTRO", "#ffd600")
 
-            pos_html = "".join([f'<li style="color:#00ff87;margin-bottom:2px;">{p}</li>' for p in pontos_pos])
-            neg_html = "".join([f'<li style="color:#ff3d5a;margin-bottom:2px;">{p}</li>' for p in pontos_neg])
-            ale_html = "".join([f'<li style="color:#ffd600;margin-bottom:2px;">{p}</li>' for p in alertas])
+            pos_html = "".join([f'<li style="color:#00ff87;margin-bottom:4px;line-height:1.5;">{p}</li>' for p in pontos_pos])
+            neg_html = "".join([f'<li style="color:#ff3d5a;margin-bottom:4px;line-height:1.5;">{p}</li>' for p in pontos_neg])
+            ale_html = "".join([f'<li style="color:#ffd600;margin-bottom:4px;line-height:1.5;">{p}</li>' for p in alertas])
+            sem_dados = '<li style="color:#64748b;">Dados de peers insuficientes para análise completa.</li>' if not pontos_pos and not pontos_neg and not alertas else ""
 
             sintese_items.append(f"""
 <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:14px;padding:1.2rem 1.4rem;margin-bottom:1rem;">
@@ -1082,11 +1116,13 @@ if tickers:
       <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:1.05rem;">{t}</span>
       <span style="font-size:0.78rem;color:#64748b;margin-left:0.5rem;">{nome}</span>
     </div>
-    <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto[1]}40;border-radius:6px;padding:0.2rem 0.75rem;font-size:0.72rem;font-weight:800;color:{veredicto[1]};letter-spacing:0.08em;">{veredicto[0]}</span>
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <span style="font-size:0.65rem;color:#475569;font-style:italic;">{fonte_label}</span>
+      <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto[1]}40;border-radius:6px;padding:0.2rem 0.75rem;font-size:0.72rem;font-weight:800;color:{veredicto[1]};letter-spacing:0.08em;">{veredicto[0]}</span>
+    </div>
   </div>
-  <ul style="margin:0;padding-left:1.1rem;font-size:0.82rem;line-height:1.7;list-style:disc;">
-    {pos_html}{neg_html}{ale_html}
-    {'<li style="color:#64748b;">Dados insuficientes para análise completa.</li>' if not pontos_pos and not pontos_neg and not alertas else ""}
+  <ul style="margin:0;padding-left:1.2rem;font-size:0.82rem;list-style:disc;">
+    {pos_html}{neg_html}{ale_html}{sem_dados}
   </ul>
 </div>
 """)
