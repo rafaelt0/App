@@ -506,7 +506,23 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         peso_manual_df.index = peso_manual_df.index.str.replace(".SA", "", regex=False)
         pesos_dict = {ticker: f"{(row['Peso']*100):.2f}%" for ticker, row in peso_manual_df.iterrows()}
         render_cards_grid(pesos_dict)
-        
+
+        # Download portfolio allocation
+        try:
+            df_pesos_export = peso_manual_df.copy()
+            df_pesos_export.index = df_pesos_export.index.str.replace(".SA","",regex=False)
+            df_pesos_export["Peso (%)"] = (df_pesos_export["Peso"] * 100).round(2)
+            df_pesos_export = df_pesos_export.drop(columns=["Peso"])
+            pesos_csv = df_pesos_export.to_csv().encode("utf-8")
+            st.download_button(
+                label="⬇ Exportar alocação (CSV)",
+                data=pesos_csv,
+                file_name=f"portfolio_alocacao_{datetime.date.today()}.csv",
+                mime="text/csv",
+            )
+        except Exception:
+            pass
+
         # ── Sugestão de Compra de Cotas (Alocação Discreta) ───────────────────
         st.subheader("Sugestão de Compra de Cotas")
         st.markdown(f"Estimativa de cotas a comprar considerando o valor total de **R$ {valor_inicial:,.2f}**.")
@@ -776,11 +792,26 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         # Desempenho Resumido em Cards (st.metric)
         section_header(ICO_CHART, "Desempenho Resumido da Carteira", "h3")
         col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
-        col_m1.metric("Retorno Total", f"{total_return:.2f}%", help="Retorno total do portfólio no período selecionado.")
-        col_m2.metric("Volatilidade Anual", f"{vol_anual:.2f}%", help="Desvio padrão anualizado dos retornos. Mede o risco total.")
-        col_m3.metric("Índice Sharpe", f"{sharpe_val:.2f}", help="Retorno por unidade de risco. Acima de 1.0 é excelente.")
-        col_m4.metric("Índice Sortino", f"{sortino_val:.2f}", help="Igual ao Sharpe mas penaliza apenas volatilidade negativa.")
-        col_m5.metric("Max Drawdown", f"{max_dd:.2f}%", help="Maior perda de pico a vale. Quanto mais próximo de 0, melhor.")
+        col_m1.metric("Retorno Total", f"{total_return:.2f}%",
+                      delta="Positivo" if total_return > 0 else "Negativo",
+                      delta_color="normal" if total_return > 0 else "inverse",
+                      help="Retorno total do portfólio no período selecionado.")
+        col_m2.metric("Volatilidade Anual", f"{vol_anual:.2f}%",
+                      delta="Baixa" if vol_anual < 15 else ("Alta" if vol_anual > 25 else "Moderada"),
+                      delta_color="normal" if vol_anual < 15 else ("inverse" if vol_anual > 25 else "off"),
+                      help="Desvio padrão anualizado dos retornos. Mede o risco total.")
+        col_m3.metric("Índice Sharpe", f"{sharpe_val:.2f}",
+                      delta="Excelente" if sharpe_val > 1 else ("Bom" if sharpe_val > 0.5 else "Baixo"),
+                      delta_color="normal" if sharpe_val > 0.5 else "inverse",
+                      help="Retorno por unidade de risco. Acima de 1.0 é excelente.")
+        col_m4.metric("Índice Sortino", f"{sortino_val:.2f}",
+                      delta="Excelente" if sortino_val > 1 else ("Bom" if sortino_val > 0.5 else "Baixo"),
+                      delta_color="normal" if sortino_val > 0.5 else "inverse",
+                      help="Igual ao Sharpe mas penaliza apenas volatilidade negativa.")
+        col_m5.metric("Max Drawdown", f"{max_dd:.2f}%",
+                      delta="Controlado" if max_dd > -15 else ("Severo" if max_dd < -30 else "Moderado"),
+                      delta_color="normal" if max_dd > -15 else ("inverse" if max_dd < -30 else "off"),
+                      help="Maior perda de pico a vale. Quanto mais próximo de 0, melhor.")
 
         # ── Painel de Decisão do Investidor ───────────────────────────────────
         st.markdown("---")
@@ -925,8 +956,11 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             
         
         
+        st.markdown("""
+<div style="background:linear-gradient(90deg,rgba(0,210,255,0.12) 0%,transparent 100%);height:2px;border-radius:2px;margin:2rem 0 1.5rem 0;"></div>
+""", unsafe_allow_html=True)
         section_header(ICO_RISK, "Análise de Drawdown", "h3")
-        
+
         # 1. Gráfico de Drawdown do Portfólio
         cum_returns = (1 + portfolio_returns).cumprod()
         rolling_max = cum_returns.cummax()
@@ -1032,8 +1066,11 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         apply_matplotlib_theme(fig_3)
         st.pyplot(fig_3)
         
+        st.markdown("""
+<div style="background:linear-gradient(90deg,rgba(0,210,255,0.12) 0%,transparent 100%);height:2px;border-radius:2px;margin:2rem 0 1.5rem 0;"></div>
+""", unsafe_allow_html=True)
         section_header(ICO_RISK, "Análise de Contribuição de Risco", "h3")
-        
+
         cov_matrix_rc = returns.cov()
         port_vol = np.sqrt(np.dot(pesos_manuais_arr.T, np.dot(cov_matrix_rc, pesos_manuais_arr)))
         marginal_contrib = np.dot(cov_matrix_rc, pesos_manuais_arr) / port_vol

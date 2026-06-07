@@ -539,8 +539,23 @@ def analise_sentimento_finbert(title, summary, nlp):
 
 # Verifica se a carteira está carregada
 if "peso_manual_df" not in st.session_state or st.session_state["peso_manual_df"] is None:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.warning("Configure e carregue seu portfólio na aba Portfolio para que as notícias possam ser processadas para as ações selecionadas.")
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:16px;padding:2.5rem;text-align:center;margin-top:2rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
+            <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" stroke="#94a3b8" stroke-width="1.5"/>
+            <path d="M14 4v4h4" stroke="#94a3b8" stroke-width="1.5"/>
+            <line x1="7" y1="13" x2="17" y2="13" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="7" y1="17" x2="17" y2="17" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <div style="font-size:1.15rem;font-weight:700;color:#f8fafc;margin-bottom:0.5rem">Portfólio não configurado</div>
+        <div style="font-size:0.875rem;color:#94a3b8;max-width:400px;margin:0 auto 1.2rem;">
+            Configure e carregue seu portfólio na página <strong style="color:#00ff87">Portfolio</strong> para que as notícias sejam filtradas para os ativos da sua carteira.
+        </div>
+        <div style="display:inline-block;background:rgba(0,255,135,0.08);border:1px solid rgba(0,255,135,0.25);border-radius:8px;padding:0.5rem 1.2rem;font-size:0.85rem;color:#00ff87;font-weight:600;">
+            → Acesse Portfolio na barra lateral
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
 # Recupera ativos e pesos
@@ -735,9 +750,21 @@ st.markdown("---")
 # Filtro lateral/superior de notícias
 section_header(ICO_NEWS, "Feed Qualitativo de Notícias da Carteira", "h3")
 
-selected_ticker = st.selectbox("Filtrar notícias por ativo", ["Todos os Ativos"] + tickers)
+col_filter, col_sort = st.columns([1, 1])
+with col_filter:
+    selected_ticker = st.selectbox(
+        "Filtrar por ativo",
+        ["Todos os Ativos"] + [f"{t} ({sum(1 for x in news_items if x['ticker']==t)} notícias)" for t in tickers],
+    )
+    # Normaliza a seleção (remove o sufixo de contagem)
+    selected_ticker_clean = selected_ticker.split(" (")[0] if selected_ticker != "Todos os Ativos" else "Todos os Ativos"
+with col_sort:
+    sort_mode = st.selectbox(
+        "Ordenar por",
+        ["Mais recentes", "Mais impactantes", "Mais otimistas", "Mais pessimistas"]
+    )
 
-filtered_news = news_items if selected_ticker == "Todos os Ativos" else [x for x in news_items if x["ticker"] == selected_ticker]
+filtered_news = news_items if selected_ticker_clean == "Todos os Ativos" else [x for x in news_items if x["ticker"] == selected_ticker_clean]
 
 # Ordenar notícias
 def parse_pub_time(pub_time):
@@ -756,7 +783,21 @@ def parse_pub_time(pub_time):
             return 0
     return 24
 
-filtered_news = sorted(filtered_news, key=lambda x: parse_pub_time(x["pub_time"]))
+if sort_mode == "Mais recentes":
+    filtered_news = sorted(filtered_news, key=lambda x: parse_pub_time(x["pub_time"]))
+elif sort_mode == "Mais impactantes":
+    impact_rank = {"Alto": 0, "Médio-Alto": 1, "Médio": 2, "Baixo-Médio": 3, "Baixo": 4}
+    filtered_news = sorted(filtered_news, key=lambda x: impact_rank.get(x["impact"], 5))
+elif sort_mode == "Mais otimistas":
+    filtered_news = sorted(filtered_news, key=lambda x: -x["score"])
+elif sort_mode == "Mais pessimistas":
+    filtered_news = sorted(filtered_news, key=lambda x: x["score"])
+
+total_news = len(filtered_news)
+pos_f = sum(1 for x in filtered_news if x["sentiment"] == "Otimista")
+neg_f = sum(1 for x in filtered_news if x["sentiment"] == "Pessimista")
+neu_f = total_news - pos_f - neg_f
+st.caption(f"Exibindo {total_news} notícias — {pos_f} otimistas · {neu_f} neutras · {neg_f} pessimistas")
 
 for news in filtered_news:
     badge_bg = "rgba(74, 222, 128, 0.1)" if news["sentiment"] == "Otimista" else \

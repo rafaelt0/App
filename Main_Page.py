@@ -271,6 +271,13 @@ tickers = st.multiselect(
     key="selected_tickers"
 )
 
+if tickers:
+    st.markdown(f"""
+    <div style="background:rgba(0,255,135,0.05);border:1px solid rgba(0,255,135,0.2);border-radius:10px;padding:0.6rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+        <span style="font-size:0.85rem;color:#94a3b8;">{len(tickers)} ação(ões) selecionada(s) — analise o portfólio completo na página <strong style="color:#00ff87">Portfolio</strong></span>
+        <span style="font-size:0.75rem;color:#00ff87;font-family:'JetBrains Mono',monospace;font-weight:700;">← barra lateral</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Só executa análise se houver pelo menos uma ação selecionada
 if tickers:
@@ -324,6 +331,23 @@ if tickers:
                         <div style="font-size: 1.1rem; color: {color}; font-weight: 800;">{val_str}</div>
                     </div>
                     """, unsafe_allow_html=True)
+
+        # Export button for fundamental data
+        try:
+            export_cols = ['Empresa', 'Setor', 'Subsetor', 'Cotacao', 'Min_52_sem', 'Max_52_sem',
+                           'Marg_Liquida', 'Marg_EBIT', 'ROE', 'ROIC', 'Div_Yield',
+                           'Cres_Rec_5a', 'PL', 'EV_EBITDA', 'PVP']
+            export_cols_exist = [c for c in export_cols if c in df.columns]
+            df_export = df[export_cols_exist].copy()
+            csv_data = df_export.to_csv().encode('utf-8')
+            st.download_button(
+                label="⬇ Exportar dados fundamentalistas (CSV)",
+                data=csv_data,
+                file_name=f"fundamentus_{'+'.join(tickers)}_{datetime.date.today()}.csv",
+                mime="text/csv",
+            )
+        except Exception:
+            pass
 
         section_header(ICO_SECTOR, "Setor", "h3")
         df_sector = df[['Empresa', 'Setor', 'Subsetor']]
@@ -493,13 +517,29 @@ if tickers:
 """, unsafe_allow_html=True)
             c1, c2, c3, c4 = st.columns(4)
             with c1:
-                st.metric("ROE", f"{row['ROE']:.2f}%", help="Return on Equity: lucro gerado para cada R$ de patrimônio. Acima de 15% é considerado bom.")
+                roe_val = row['ROE']
+                st.metric("ROE", f"{roe_val:.2f}%",
+                          delta="Forte" if roe_val > 15 else ("Fraco" if roe_val < 5 else "Moderado"),
+                          delta_color="normal" if roe_val > 15 else ("inverse" if roe_val < 5 else "off"),
+                          help="Return on Equity: lucro gerado para cada R$ de patrimônio. Acima de 15% é considerado bom.")
             with c2:
-                st.metric("ROIC", f"{row['ROIC']:.2f}%", help="Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida).")
+                roic_val = row['ROIC']
+                st.metric("ROIC", f"{roic_val:.2f}%",
+                          delta="Forte" if roic_val > 12 else ("Fraco" if roic_val < 5 else "Moderado"),
+                          delta_color="normal" if roic_val > 12 else ("inverse" if roic_val < 5 else "off"),
+                          help="Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida).")
             with c3:
-                st.metric("Margem Líquida", f"{row['Margem Líquida']:.2f}%", help="Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa.")
+                ml_val = row['Margem Líquida']
+                st.metric("Margem Líquida", f"{ml_val:.2f}%",
+                          delta="Alta" if ml_val > 15 else ("Baixa" if ml_val < 5 else "Média"),
+                          delta_color="normal" if ml_val > 15 else ("inverse" if ml_val < 5 else "off"),
+                          help="Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa.")
             with c4:
-                st.metric("Margem EBIT", f"{row['Margem EBIT']:.2f}%", help="Margem operacional antes de juros e impostos. Mede a eficiência operacional.")
+                mebit_val = row['Margem EBIT']
+                st.metric("Margem EBIT", f"{mebit_val:.2f}%",
+                          delta="Alta" if mebit_val > 15 else ("Baixa" if mebit_val < 5 else "Média"),
+                          delta_color="normal" if mebit_val > 15 else ("inverse" if mebit_val < 5 else "off"),
+                          help="Margem operacional antes de juros e impostos. Mede a eficiência operacional.")
 
             # 3. Crescimento & Yield Section
             st.markdown("""
@@ -512,9 +552,17 @@ if tickers:
 """, unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
-                st.metric("Dividend Yield", f"{row['Dividend Yield']:.2f}%", help="Dividendos pagos divididos pelo preço. Percentual de retorno em dividendos ao ano.")
+                dy_val = row['Dividend Yield']
+                st.metric("Dividend Yield", f"{dy_val:.2f}%",
+                          delta="Alto" if dy_val > 6 else ("Baixo" if dy_val < 2 else "Moderado"),
+                          delta_color="normal" if dy_val > 4 else "off",
+                          help="Dividendos pagos divididos pelo preço. Percentual de retorno em dividendos ao ano.")
             with c2:
-                st.metric("Crescimento Receita (5 anos)", f"{row['Crescimento Receita 5 anos']:.2f}%", help="Taxa de crescimento anual composta da receita nos últimos 5 anos.")
+                cr_val = row['Crescimento Receita 5 anos']
+                st.metric("Crescimento Receita (5 anos)", f"{cr_val:.2f}%",
+                          delta="Forte" if cr_val > 10 else ("Negativo" if cr_val < 0 else "Moderado"),
+                          delta_color="normal" if cr_val > 10 else ("inverse" if cr_val < 0 else "off"),
+                          help="Taxa de crescimento anual composta da receita nos últimos 5 anos.")
 
         # Exibição dos cards
         if len(tickers) > 1:

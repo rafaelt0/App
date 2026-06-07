@@ -663,3 +663,241 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
   line-height: 1.5;
 }
 
+/* ─── Metric Delta Color Override ────────────────────────────────────────────*/
+[data-testid="stMetricDelta"] svg { display: none !important; }
+[data-testid="stMetricDelta"] > div {
+  font-family: var(--font-mono) !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  padding: 2px 8px !important;
+  border-radius: 4px !important;
+  display: inline-block !important;
+}
+/* Positive delta */
+[data-testid="stMetricDelta"][data-testid-delta-direction="up"] > div,
+[data-testid="stMetricDelta"].stMetricDeltaPositive > div {
+  color: #00ff87 !important;
+  background: rgba(0, 255, 135, 0.08) !important;
+  border: 1px solid rgba(0, 255, 135, 0.2) !important;
+}
+/* Negative delta */
+[data-testid="stMetricDelta"][data-testid-delta-direction="down"] > div,
+[data-testid="stMetricDelta"].stMetricDeltaNegative > div {
+  color: #ff3d5a !important;
+  background: rgba(255, 61, 90, 0.08) !important;
+  border: 1px solid rgba(255, 61, 90, 0.2) !important;
+}
+
+/* ─── Download Button Distinct Style ─────────────────────────────────────────*/
+[data-testid="stDownloadButton"] > button {
+  background: linear-gradient(135deg, rgba(0,210,255,0.1) 0%, rgba(0,210,255,0.04) 100%) !important;
+  border-color: rgba(0, 210, 255, 0.4) !important;
+  color: #00d2ff !important;
+  font-size: 0.82rem !important;
+  padding: 0.45rem 1rem !important;
+}
+
+[data-testid="stDownloadButton"] > button:hover {
+  border-color: #00d2ff !important;
+  box-shadow: 0 0 16px rgba(0, 210, 255, 0.3), var(--shadow-dark) !important;
+  transform: translateY(-1px) !important;
+  color: #00d2ff !important;
+}
+
+/* ─── Expander Improvements ───────────────────────────────────────────────────*/
+[data-testid="stExpander"] {
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius-md) !important;
+  background: rgba(14, 21, 36, 0.5) !important;
+  margin-bottom: 0.5rem !important;
+  overflow: hidden !important;
+}
+
+[data-testid="stExpander"] summary {
+  padding: 0.75rem 1rem !important;
+  cursor: pointer !important;
+  font-family: var(--font-display) !important;
+  font-size: 0.83rem !important;
+  font-weight: 600 !important;
+  color: var(--text-muted) !important;
+  transition: color 0.2s ease, background 0.2s ease !important;
+  border-radius: var(--border-radius-md) !important;
+}
+
+[data-testid="stExpander"] summary:hover {
+  color: var(--text-main) !important;
+  background: rgba(0, 255, 135, 0.03) !important;
+}
+
+[data-testid="stExpander"][open] summary {
+  color: var(--text-main) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius-md) var(--border-radius-md) 0 0 !important;
+}
+
+[data-testid="stExpander"] > div:last-child {
+  padding: 1rem !important;
+}
+
+/* ─── Caption / Small Text Improvements ──────────────────────────────────────*/
+[data-testid="stCaptionContainer"], .stCaption {
+  color: #64748b !important;
+  font-size: 0.75rem !important;
+  font-family: var(--font-display) !important;
+  line-height: 1.5 !important;
+}
+
+/* ─── Number Input Hide Arrows (cleaner look) ────────────────────────────────*/
+.stNumberInput input[type="number"]::-webkit-outer-spin-button,
+.stNumberInput input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+.stNumberInput input[type="number"] { -moz-appearance: textfield !important; }
+
+/* ─── Animated Gradient Border for Scorecards ────────────────────────────────*/
+@keyframes gradient-border {
+  0% { border-color: rgba(0, 255, 135, 0.5); box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
+  50% { border-color: rgba(0, 210, 255, 0.5); box-shadow: 0 0 20px rgba(0, 210, 255, 0.25); }
+  100% { border-color: rgba(0, 255, 135, 0.5); box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
+}
+.scorecard-animated {
+  animation: gradient-border 3s ease-in-out infinite;
+}
+
+/* ─── Utility Card Classes ────────────────────────────────────────────────────*/
+.card-positive {
+  border-color: rgba(0, 255, 135, 0.35) !important;
+  box-shadow: 0 0 12px rgba(0, 255, 135, 0.08), var(--shadow-dark) !important;
+}
+.card-negative {
+  border-color: rgba(255, 61, 90, 0.35) !important;
+  box-shadow: 0 0 12px rgba(255, 61, 90, 0.08), var(--shadow-dark) !important;
+}
+.card-neutral {
+  border-color: rgba(255, 214, 0, 0.3) !important;
+  box-shadow: 0 0 12px rgba(255, 214, 0, 0.06), var(--shadow-dark) !important;
+}
+
+/* ─── Sidebar Footer / Branding ──────────────────────────────────────────────*/
+.sidebar-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: inherit;
+  padding: 0.75rem 1rem;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border-color);
+  font-size: 0.7rem;
+  color: #475569;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  z-index: 1000;
+}
+
+/* ─── Selectbox Open Dropdown Styling ────────────────────────────────────────*/
+[data-baseweb="popover"] [data-baseweb="menu"] {
+  background: #0e1524 !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius-md) !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6) !important;
+}
+[data-baseweb="popover"] [role="option"] {
+  color: var(--text-muted) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.82rem !important;
+  padding: 0.5rem 1rem !important;
+  transition: background 0.15s ease !important;
+}
+[data-baseweb="popover"] [role="option"]:hover,
+[data-baseweb="popover"] [role="option"][aria-selected="true"] {
+  background: rgba(0, 255, 135, 0.07) !important;
+  color: var(--primary-color) !important;
+}
+
+/* ─── Form Submit Button (primary) ───────────────────────────────────────────*/
+[data-testid="stFormSubmitButton"] > button {
+  background: linear-gradient(135deg, rgba(0,255,135,0.15) 0%, rgba(0,210,255,0.08) 100%) !important;
+  border-color: var(--primary-color) !important;
+  color: var(--primary-color) !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  padding: 0.75rem 2rem !important;
+  box-shadow: 0 0 16px rgba(0,255,135,0.2) !important;
+}
+[data-testid="stFormSubmitButton"] > button:hover {
+  box-shadow: 0 0 28px rgba(0,255,135,0.4) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* ─── Stacked Metric Card Fix for Mobile ─────────────────────────────────────*/
+@media (max-width: 640px) {
+  [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
+  [data-testid="stMetricLabel"] { font-size: 0.62rem !important; }
+}
+
+/* ─── Progress Bar ────────────────────────────────────────────────────────────*/
+[data-testid="stProgress"] > div > div {
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)) !important;
+  border-radius: 4px !important;
+}
+[data-testid="stProgress"] > div {
+  background: rgba(30, 41, 59, 0.5) !important;
+  border-radius: 4px !important;
+}
+
+/* ─── Tooltip (help icon) refinement ─────────────────────────────────────────*/
+[data-testid="stTooltipHoverTarget"] > div {
+  color: #475569 !important;
+  transition: color 0.2s ease !important;
+}
+[data-testid="stTooltipHoverTarget"] > div:hover { color: var(--secondary-color) !important; }
+[data-testid="stTooltipContent"] {
+  background: #0f1a2e !important;
+  border: 1px solid rgba(0, 210, 255, 0.25) !important;
+  border-radius: var(--border-radius-md) !important;
+  color: var(--text-main) !important;
+  font-family: var(--font-display) !important;
+  font-size: 0.78rem !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+  max-width: 280px !important;
+  padding: 0.6rem 0.9rem !important;
+  line-height: 1.5 !important;
+}
+
+/* ─── Plotly Chart Border Radius ─────────────────────────────────────────────*/
+.js-plotly-plot .plotly {
+  border-radius: var(--border-radius-md) !important;
+  overflow: hidden !important;
+}
+
+/* ─── Checkbox Styling ───────────────────────────────────────────────────────*/
+[data-testid="stCheckbox"] label {
+  font-family: var(--font-display) !important;
+  font-size: 0.85rem !important;
+  color: var(--text-muted) !important;
+  transition: color 0.2s ease !important;
+}
+[data-testid="stCheckbox"] label:hover { color: var(--text-main) !important; }
+[data-testid="stCheckbox"] [data-baseweb="checkbox"] [data-checked="true"] div {
+  background: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* ─── Multiselect Dropdown Improvements ──────────────────────────────────────*/
+[data-baseweb="tag"] span { font-size: 0.75rem !important; }
+[data-baseweb="tag"] [role="button"] { opacity: 0.7 !important; }
+[data-baseweb="tag"] [role="button"]:hover { opacity: 1 !important; }
+
+/* ─── Hero hover animation ───────────────────────────────────────────────────*/
+.page-hero {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease !important;
+}
+.page-hero:hover {
+  border-left-color: var(--secondary-color) !important;
+  box-shadow: var(--shadow-dark), 0 0 30px rgba(0, 210, 255, 0.08) !important;
+}
+.main-hero:hover { border-left-color: var(--primary-color) !important; }
+

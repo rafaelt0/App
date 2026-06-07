@@ -233,9 +233,16 @@ pior_cenario = valores_finais.min()
 melhor_cenario = valores_finais.max()
 prob_ganho = (valores_finais > valor_inicial).mean() * 100
 
+# Retorno anualizado esperado
+ret_esperado_pct = (valor_esperado / valor_inicial) ** (1/years) - 1
+ret_otimista_pct = (np.percentile(valores_finais, 75) / valor_inicial) ** (1/years) - 1
+ret_pessimista_pct = (np.percentile(valores_finais, 25) / valor_inicial) ** (1/years) - 1
+
 sim_stats_dict = {
     "Valor Esperado Final": f"R$ {valor_esperado:,.2f}",
     "Probabilidade de Ganho": f"{prob_ganho:.1f}%",
+    "Retorno Anual Esperado": f"{ret_esperado_pct*100:.1f}% a.a.",
+    "Retorno Anual Q75": f"{ret_otimista_pct*100:.1f}% a.a.",
     "VaR 5%": f"R$ {var_5:,.2f}",
     "CVaR 5%": f"R$ {cvar_5:,.2f}",
     "Pior Cenário": f"R$ {pior_cenario:,.2f}",
@@ -243,6 +250,26 @@ sim_stats_dict = {
 }
 
 section_header(ICO_CHART, "Estatísticas da Simulação Monte Carlo", "h3")
+
+col_s1, col_s2, col_s3 = st.columns(3)
+with col_s1:
+    ret_str = f"{ret_esperado_pct*100:.1f}% a.a."
+    st.metric("Retorno Anual Esperado", ret_str,
+              delta="Positivo" if ret_esperado_pct > 0 else "Negativo",
+              delta_color="normal" if ret_esperado_pct > 0 else "inverse",
+              help="Retorno anual composto implícito no valor esperado mediano.")
+with col_s2:
+    st.metric("Probabilidade de Ganho", f"{prob_ganho:.1f}%",
+              delta="Alta" if prob_ganho > 70 else ("Moderada" if prob_ganho > 50 else "Baixa"),
+              delta_color="normal" if prob_ganho > 60 else ("off" if prob_ganho > 40 else "inverse"),
+              help="Percentual de simulações que terminaram acima do capital inicial.")
+with col_s3:
+    perda_var = (var_5 / valor_inicial - 1) * 100
+    st.metric("VaR 5% (perda máx.)", f"{perda_var:.1f}%",
+              delta="Controlado" if perda_var > -30 else "Elevado",
+              delta_color="normal" if perda_var > -30 else "inverse",
+              help="Em 95% dos cenários, a perda máxima é este percentual.")
+
 render_cards_grid(sim_stats_dict)
 
 col_exp1, col_exp2 = st.columns(2)
@@ -325,6 +352,37 @@ fig_fan.add_hline(
     annotation_font=dict(color="#94a3b8", size=11)
 )
 st.plotly_chart(fig_fan, use_container_width=True)
+
+# Download simulation summary
+import io
+sim_summary = pd.DataFrame([{
+    "Métrica": k,
+    "Valor": v
+} for k, v in sim_stats_dict.items()])
+sim_summary_csv = sim_summary.to_csv(index=False).encode('utf-8')
+
+# Download dos percentis por data
+fan_export = fan_chart.copy()
+fan_export.index = fan_export.index.strftime('%Y-%m-%d')
+fan_export_csv = fan_export.to_csv().encode('utf-8')
+
+col_dl1, col_dl2, _ = st.columns([1, 1, 1])
+with col_dl1:
+    st.download_button(
+        label="⬇ Resumo (CSV)",
+        data=sim_summary_csv,
+        file_name=f"monte_carlo_resumo_{datetime.date.today()}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+with col_dl2:
+    st.download_button(
+        label="⬇ Percentis por Data (CSV)",
+        data=fan_export_csv,
+        file_name=f"monte_carlo_percentis_{datetime.date.today()}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
 
 # Histograma valor final
 q1 = valores_finais.quantile(0.25)
