@@ -180,6 +180,41 @@ st.sidebar.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+st.sidebar.markdown("""
+<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
+  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>
+  <div style="display:flex;flex-direction:column;gap:0.35rem;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba(0,255,135,0.4);">
+        <span style="font-size:0.65rem;font-weight:800;color:#080c14;">1</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:700;color:#00ff87;">Análise Fundamentalista</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.45;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">2</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Portfolio</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.35;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">3</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Simulação</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.25;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">4</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Notícias</span>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
 # CSS customizado
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
@@ -979,6 +1014,98 @@ if tickers:
 
 
 
+
+        # ── Síntese do Analista ──────────────────────────────────────────────
+        st.markdown("---")
+        st.markdown("""
+<h3 style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" stroke="#a855f7" stroke-width="1.8"/>
+    <path d="M12 8v4l3 3" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <span style="background:linear-gradient(135deg,#f8fafc,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Síntese do Analista</span>
+</h3>
+""", unsafe_allow_html=True)
+
+        sintese_items = []
+        for t in tickers:
+            if t not in df_ind.index:
+                continue
+            r = df_ind.loc[t]
+            nome = df.loc[t, 'Empresa'] if t in df.index else t
+
+            pontos_pos = []
+            pontos_neg = []
+            alertas = []
+
+            roe = r.get('ROE', 0)
+            roic = r.get('ROIC', 0)
+            pl = r.get('P/L', 0)
+            pvp = r.get('P/VP', 0)
+            dy = r.get('Dividend Yield', 0)
+            ml = r.get('Margem Líquida', 0)
+            cr = r.get('Crescimento Receita 5 anos', 0)
+
+            if roe > 15: pontos_pos.append(f"ROE forte ({roe:.1f}%)")
+            elif roe < 5: pontos_neg.append(f"ROE fraco ({roe:.1f}%)")
+
+            if roic > 12: pontos_pos.append(f"ROIC sólido ({roic:.1f}%)")
+            elif roic < 5: pontos_neg.append(f"ROIC baixo ({roic:.1f}%)")
+
+            if 0 < pl < 15: pontos_pos.append(f"P/L atrativo ({pl:.1f}x)")
+            elif pl > 30: pontos_neg.append(f"P/L elevado ({pl:.1f}x)")
+            elif pl < 0: alertas.append(f"P/L negativo — empresa com prejuízo")
+
+            if dy > 5: pontos_pos.append(f"Dividend Yield elevado ({dy:.1f}%)")
+
+            if cr > 10: pontos_pos.append(f"Crescimento de receita forte ({cr:.1f}% a.a.)")
+            elif cr < 0: pontos_neg.append(f"Receita em queda ({cr:.1f}% a.a.)")
+
+            if ml > 15: pontos_pos.append(f"Margem líquida saudável ({ml:.1f}%)")
+            elif ml < 5 and ml >= 0: alertas.append(f"Margem líquida comprimida ({ml:.1f}%)")
+            elif ml < 0: pontos_neg.append(f"Margem negativa ({ml:.1f}%)")
+
+            n_pos = len(pontos_pos)
+            n_neg = len(pontos_neg)
+            if n_pos >= 3: veredicto = ("ATRATIVO", "#00ff87")
+            elif n_neg >= 3: veredicto = ("FRACO", "#ff3d5a")
+            else: veredicto = ("NEUTRO", "#ffd600")
+
+            pos_html = "".join([f'<li style="color:#00ff87;margin-bottom:2px;">{p}</li>' for p in pontos_pos])
+            neg_html = "".join([f'<li style="color:#ff3d5a;margin-bottom:2px;">{p}</li>' for p in pontos_neg])
+            ale_html = "".join([f'<li style="color:#ffd600;margin-bottom:2px;">{p}</li>' for p in alertas])
+
+            sintese_items.append(f"""
+<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:14px;padding:1.2rem 1.4rem;margin-bottom:1rem;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;flex-wrap:wrap;gap:0.5rem;">
+    <div>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:1.05rem;">{t}</span>
+      <span style="font-size:0.78rem;color:#64748b;margin-left:0.5rem;">{nome}</span>
+    </div>
+    <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto[1]}40;border-radius:6px;padding:0.2rem 0.75rem;font-size:0.72rem;font-weight:800;color:{veredicto[1]};letter-spacing:0.08em;">{veredicto[0]}</span>
+  </div>
+  <ul style="margin:0;padding-left:1.1rem;font-size:0.82rem;line-height:1.7;list-style:disc;">
+    {pos_html}{neg_html}{ale_html}
+    {'<li style="color:#64748b;">Dados insuficientes para análise completa.</li>' if not pontos_pos and not pontos_neg and not alertas else ""}
+  </ul>
+</div>
+""")
+
+        if sintese_items:
+            st.markdown("".join(sintese_items), unsafe_allow_html=True)
+
+        # ── Próximo Passo ────────────────────────────────────────────────────
+        tickers_str = ", ".join(tickers[:3]) + ("..." if len(tickers) > 3 else "")
+        st.markdown(f"""
+<div style="background:linear-gradient(135deg,rgba(0,255,135,0.06),rgba(0,210,255,0.03));border:1px solid rgba(0,255,135,0.25);border-radius:14px;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">
+  <div>
+    <div style="font-size:0.72rem;color:#64748b;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.3rem;">Próximo Passo</div>
+    <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;">Abra <span style="color:#00ff87">Portfolio</span> na barra lateral</div>
+    <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.2rem;">Monte e otimize a carteira com {tickers_str}</div>
+  </div>
+  <div style="font-size:1.8rem;opacity:0.6;">→</div>
+</div>
+""", unsafe_allow_html=True)
 
     except OSError as e:
         st.cache_data.clear()

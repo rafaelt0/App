@@ -150,6 +150,41 @@ def get_sorted_tickers_by_liquidity(tickers_list):
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
+st.sidebar.markdown("""
+<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
+  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>
+  <div style="display:flex;flex-direction:column;gap:0.35rem;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Análise Fundamentalista</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#00d2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba(0,210,255,0.4);">
+        <span style="font-size:0.65rem;font-weight:800;color:#080c14;">2</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:700;color:#00d2ff;">Portfolio</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.4;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">3</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Simulação</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.25;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">4</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Notícias</span>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
 warnings.filterwarnings('ignore')
 
 # Customização do Matplotlib para o tema Obsidian Neo-Financial
@@ -1123,6 +1158,20 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             st.session_state["pesos_manuais"] = pesos_manuais
         else:
             st.session_state["pesos_manuais"] = peso_manual_df["Peso"].to_dict()
+
+        # ── Próximo Passo ────────────────────────────────────────────────────
+        st.markdown("---")
+        sharpe_txt = f"Sharpe de {sharpe_val:.2f}" if sharpe_val > 0 else "portfólio configurado"
+        st.markdown(f"""
+<div style="background:linear-gradient(135deg,rgba(0,210,255,0.06),rgba(0,255,135,0.03));border:1px solid rgba(0,210,255,0.25);border-radius:14px;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">
+  <div>
+    <div style="font-size:0.72rem;color:#64748b;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.3rem;">Próximo Passo</div>
+    <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;">Abra <span style="color:#00d2ff">Simulação</span> na barra lateral</div>
+    <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.2rem;">Com {sharpe_txt} — projete trajetórias com Monte Carlo</div>
+  </div>
+  <div style="font-size:1.8rem;opacity:0.6;">→</div>
+</div>
+""", unsafe_allow_html=True)
                     
                     
                     
