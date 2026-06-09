@@ -834,7 +834,19 @@ neg_f = sum(1 for x in filtered_news if x["sentiment"] == "Pessimista")
 neu_f = total_news - pos_f - neg_f
 st.caption(f"Exibindo {total_news} notícias — {pos_f} otimistas · {neu_f} neutras · {neg_f} pessimistas")
 
-for news in filtered_news:
+# Paginação
+ITEMS_PER_PAGE = 15
+page_key = f"{selected_ticker}_{sort_mode}"
+if st.session_state.get("_noticias_filter_key") != page_key:
+    st.session_state["noticias_page"] = 1
+    st.session_state["_noticias_filter_key"] = page_key
+if "noticias_page" not in st.session_state:
+    st.session_state["noticias_page"] = 1
+
+n_show = st.session_state["noticias_page"] * ITEMS_PER_PAGE
+news_to_show = filtered_news[:n_show]
+
+for news in news_to_show:
     badge_bg = "rgba(74, 222, 128, 0.1)" if news["sentiment"] == "Otimista" else \
                "rgba(248, 113, 113, 0.1)" if news["sentiment"] == "Pessimista" else "rgba(96, 165, 250, 0.1)"
     badge_color = "#4ade80" if news["sentiment"] == "Otimista" else \
@@ -963,6 +975,17 @@ for news in filtered_news:
                 st.markdown(f"<p style='font-size:0.7rem; color:#64748b; margin-top:4px;'>Tamanho do texto tokenizado: {news['raw_text_length']} palavras.</p>", unsafe_allow_html=True)
                 
     st.markdown("<div style='margin-bottom:1rem;'></div>", unsafe_allow_html=True)
+
+# Botão "Ver mais"
+remaining = len(filtered_news) - n_show
+if remaining > 0:
+    col_vm, _ = st.columns([1, 3])
+    with col_vm:
+        if st.button(f"Ver mais {min(remaining, ITEMS_PER_PAGE)} notícias  ({remaining} restantes)"):
+            st.session_state["noticias_page"] += 1
+            st.rerun()
+elif len(filtered_news) > ITEMS_PER_PAGE:
+    st.caption(f"✓ Todas as {len(filtered_news)} notícias carregadas.")
 
 st.markdown("---")
 

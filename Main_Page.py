@@ -146,6 +146,8 @@ ICO_RULER   = _svg('<rect x="2" y="7" width="20" height="10" rx="2" stroke="#ffd
                    '<line x1="10" y1="7" x2="10" y2="10" stroke="#ffd600" stroke-width="1.2"/>'
                    '<line x1="14" y1="7" x2="14" y2="10" stroke="#ffd600" stroke-width="1.2"/>'
                    '<line x1="18" y1="7" x2="18" y2="12" stroke="#ffd600" stroke-width="1.5"/>', 16)
+ICO_SHIELD  = _svg('<path d="M12 2l8 4v6c0 5-4 8.5-8 10C8 20.5 4 17 4 12V6l8-4z" stroke="#00ff87" stroke-width="1.8" fill="none"/>'
+                   '<path d="M9 12l2 2 4-4" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>', 16)
 ICO_BOX     = _svg('<rect x="3" y="7" width="18" height="14" rx="2" stroke="#94a3b8" stroke-width="1.8"/>'
                    '<path d="M8 7V5a4 4 0 018 0v2" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>'
                    '<line x1="12" y1="12" x2="12" y2="16" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
@@ -584,6 +586,107 @@ if tickers:
             if ticker in df_ind.index:
                 render_ticker_cards(df_ind.loc[ticker])
 
+        # ── Saúde Financeira ─────────────────────────────────────────────────
+        st.markdown("---")
+        section_header(ICO_SHIELD, "Saúde Financeira", "h3")
+        st.caption("Endividamento e liquidez da empresa. "
+                   "Dívida/PL acima de 3x e Liquidez abaixo de 1x são sinais de alerta.")
+
+        DEBT_COL_ALIASES = {
+            "div_brut_patrim": ["Dív.Brut/Patrim.", "Div_Brut_Patrim", "Div.Brut/Patrim."],
+            "liq_corrente":    ["Liq. Corr.", "Liq_Corr", "Liq. Corr"],
+            "ev_ebit":         ["EV_EBIT", "EV/EBIT"],
+        }
+
+        def extract_debt_metric(row, aliases):
+            """Tenta extrair uma métrica testando vários nomes de coluna possíveis."""
+            for name in aliases:
+                if name in row.index:
+                    v = pd.to_numeric(
+                        str(row[name]).replace(',', '.').strip('%').strip(),
+                        errors='coerce'
+                    )
+                    if not pd.isna(v):
+                        return v
+            return None
+
+        def render_debt_panel(ticker_name, row):
+            db_val = extract_debt_metric(row, DEBT_COL_ALIASES["div_brut_patrim"])
+            lc_val = extract_debt_metric(row, DEBT_COL_ALIASES["liq_corrente"])
+            ev_ebit_val = extract_debt_metric(row, DEBT_COL_ALIASES["ev_ebit"])
+
+            if db_val is None and lc_val is None and ev_ebit_val is None:
+                st.info("Dados de endividamento não disponíveis via Fundamentus para este ticker.")
+                return
+
+            debt_cards = {}
+            debt_colors = {}
+
+            if db_val is not None:
+                debt_cards["Dívida / Patrimônio"] = f"{db_val:.2f}×"
+                debt_colors["Dívida / Patrimônio"] = "#ff3d5a" if db_val > 3 else ("#ffd600" if db_val > 1.5 else "#00ff87")
+
+            if lc_val is not None:
+                debt_cards["Liquidez Corrente"] = f"{lc_val:.2f}×"
+                debt_colors["Liquidez Corrente"] = "#ff3d5a" if lc_val < 1 else ("#ffd600" if lc_val < 1.5 else "#00ff87")
+
+            if ev_ebit_val is not None:
+                debt_cards["EV / EBIT"] = f"{ev_ebit_val:.1f}×"
+                debt_colors["EV / EBIT"] = "#ff3d5a" if ev_ebit_val > 20 else ("#ffd600" if ev_ebit_val > 12 else "#00ff87")
+
+            # Render cards using .mcard-grid CSS class (already defined in style.css)
+            cards_html = "".join(
+                f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+                f'<div class="mcard-value" style="color:{debt_colors[lbl]}">{val}</div></div>'
+                for lbl, val in debt_cards.items()
+            )
+            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+            # Diagnóstico textual
+            diags = []
+            if db_val is not None:
+                if db_val > 3:
+                    diags.append(("⚠️", f"Dívida/PL de {db_val:.1f}× é elevada — verifique capacidade de pagamento", "#ff3d5a"))
+                elif db_val > 1.5:
+                    diags.append(("⚡", f"Dívida/PL de {db_val:.1f}× é moderada — monitorar", "#ffd600"))
+                else:
+                    diags.append(("✓", f"Dívida/PL de {db_val:.1f}× é saudável", "#00ff87"))
+
+            if lc_val is not None:
+                if lc_val < 1:
+                    diags.append(("⚠️", f"Liquidez Corrente {lc_val:.2f}× < 1 — risco de dificuldade de caixa", "#ff3d5a"))
+                elif lc_val < 1.5:
+                    diags.append(("⚡", f"Liquidez Corrente {lc_val:.2f}× — margem estreita", "#ffd600"))
+                else:
+                    diags.append(("✓", f"Liquidez Corrente {lc_val:.2f}× — empresa com boa folga de caixa", "#00ff87"))
+
+            for icon, msg, color in diags:
+                st.markdown(
+                    f'<div style="display:flex;align-items:flex-start;gap:8px;padding:0.35rem 0;'
+                    f'font-size:0.83rem;color:{color};">'
+                    f'<span style="flex-shrink:0">{icon}</span><span>{msg}</span></div>',
+                    unsafe_allow_html=True
+                )
+
+        if len(tickers) > 1:
+            tabs_debt = st.tabs(tickers)
+            for tab, ticker in zip(tabs_debt, tickers):
+                with tab:
+                    if ticker in df.index:
+                        row_debt = df.loc[ticker]
+                        if isinstance(row_debt, pd.DataFrame):
+                            row_debt = row_debt.iloc[-1]
+                        render_debt_panel(ticker, row_debt)
+                    else:
+                        st.warning(f"Sem dados para {ticker}")
+        else:
+            ticker = tickers[0]
+            if ticker in df.index:
+                row_debt = df.loc[ticker]
+                if isinstance(row_debt, pd.DataFrame):
+                    row_debt = row_debt.iloc[-1]
+                render_debt_panel(ticker, row_debt)
+
         # ── Comparação Visual de Múltiplos ───────────────────────────────────
         if len(tickers) > 1:
             st.markdown("""
@@ -855,8 +958,8 @@ if tickers:
                     display_df = rank_df.drop(columns=["_cor"])
                     styled_rank = (
                         display_df.style
-                        .applymap(color_veredicto, subset=["Veredicto"])
-                        .applymap(color_pct,       subset=["Percentil"])
+                        .map(color_veredicto, subset=["Veredicto"])
+                        .map(color_pct,       subset=["Percentil"])
                         .format({"Valor": "{:.2f}", "Mediana Setor": "{:.2f}",
                                  "Média Setor": "{:.2f}", "Percentil": "{:.1f}%"})
                         .set_properties(**{"font-family": "JetBrains Mono, monospace", "font-size": "0.82rem"})

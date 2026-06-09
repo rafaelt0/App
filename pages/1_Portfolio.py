@@ -885,6 +885,112 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             for ico, msg, color in health_detalhes:
                 diag_row(ico, msg, color)
 
+        # ── Stress Test — Crises Históricas ──────────────────────────────────
+        st.markdown("---")
+        ICO_STRESS = _svg(
+            '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" '
+            'stroke="#ff3d5a" stroke-width="1.8" fill="none"/>'
+            '<line x1="12" y1="9" x2="12" y2="13" stroke="#ff3d5a" stroke-width="1.8" stroke-linecap="round"/>'
+            '<line x1="12" y1="17" x2="12.01" y2="17" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>',
+            16
+        )
+        section_header(ICO_STRESS, "Stress Test — Crises Históricas", "h3")
+        st.caption("Desempenho estimado do portfólio durante períodos de turbulência histórica. "
+                   "Exibe apenas crises dentro do período de dados selecionado.")
+
+        CRISES_HISTORICAS = {
+            "COVID-19 (2020)":               ("2020-01-17", "2020-03-23"),
+            "Recessão/Impeachment (2015–16)": ("2014-12-31", "2016-12-31"),
+            "Joesley Day (2017)":            ("2017-05-17", "2017-06-30"),
+            "Crise Global (2008–09)":        ("2008-08-01", "2009-03-31"),
+        }
+
+        data_start = data_yf.index.min()
+        data_end   = data_yf.index.max()
+        stress_results = []
+
+        for crise_nome, (s_str, e_str) in CRISES_HISTORICAS.items():
+            s_ts = pd.Timestamp(s_str)
+            e_ts = pd.Timestamp(e_str)
+            if s_ts > data_end or e_ts < data_start:
+                continue
+            s_clip = max(s_ts, data_start)
+            e_clip = min(e_ts, data_end)
+            mask_p = (data_yf.index >= s_clip) & (data_yf.index <= e_clip)
+            period_prices = data_yf[mask_p]
+            if len(period_prices) < 5:
+                continue
+            period_ret = period_prices.pct_change().dropna()
+            pesos_dict = dict(zip(data_yf.columns, pesos_manuais_arr))
+            pesos_period = np.array([pesos_dict.get(c, 0) for c in period_ret.columns])
+            if pesos_period.sum() > 0:
+                pesos_period = pesos_period / pesos_period.sum()
+            port_ret_period = period_ret.dot(pesos_period)
+            cum_port = (1 + port_ret_period).prod() - 1
+            mask_b = (retorno_bench.index >= s_clip) & (retorno_bench.index <= e_clip)
+            ibov_period = retorno_bench[mask_b]
+            cum_ibov = (1 + ibov_period).prod() - 1 if len(ibov_period) >= 5 else None
+            stress_results.append({
+                "Crise": crise_nome,
+                "Período": f"{s_clip.strftime('%b/%Y')} → {e_clip.strftime('%b/%Y')}",
+                "Portfólio": cum_port,
+                "IBOV": cum_ibov,
+            })
+
+        if not stress_results:
+            st.info("Nenhuma crise histórica está no intervalo de dados selecionado. "
+                    "Selecione um período mais longo (3+ anos) para ativar o stress test.")
+        else:
+            for r in stress_results:
+                port_pct = r["Portfólio"] * 100
+                ibov_pct = r["IBOV"] * 100 if r["IBOV"] is not None else None
+                diff = (r["Portfólio"] - r["IBOV"]) * 100 if r["IBOV"] is not None else None
+                port_color = "#ff3d5a" if port_pct < 0 else "#00ff87"
+                ibov_str  = f"{ibov_pct:+.1f}%" if ibov_pct is not None else "N/D"
+                diff_str  = f"{diff:+.1f}pp" if diff is not None else "N/D"
+                diff_color = "#00ff87" if (diff is not None and diff >= 0) else "#ff3d5a"
+                cards_html = (
+                    f'<div class="mcard"><div class="mcard-label">Portfólio</div>'
+                    f'<div class="mcard-value" style="color:{port_color}">{port_pct:+.1f}%</div></div>'
+                    f'<div class="mcard"><div class="mcard-label">IBOVESPA</div>'
+                    f'<div class="mcard-value" style="color:{"#ff3d5a" if (ibov_pct is not None and ibov_pct < 0) else "#00d2ff"}">{ibov_str}</div></div>'
+                    f'<div class="mcard"><div class="mcard-label">vs IBOV</div>'
+                    f'<div class="mcard-value" style="color:{diff_color}">{diff_str}</div></div>'
+                )
+                st.markdown(
+                    f'<div style="margin-bottom:0.3rem;font-size:0.78rem;font-weight:700;'
+                    f'color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em">'
+                    f'{r["Crise"]} <span style="font-weight:400;color:#475569">({r["Período"]})</span></div>',
+                    unsafe_allow_html=True
+                )
+                st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+            if len(stress_results) >= 2:
+                crises_names = [r["Crise"].split(" (")[0] for r in stress_results]
+                port_vals = [r["Portfólio"] * 100 for r in stress_results]
+                ibov_vals = [(r["IBOV"] * 100 if r["IBOV"] is not None else 0) for r in stress_results]
+                fig_stress = go.Figure()
+                fig_stress.add_trace(go.Bar(
+                    name="Portfólio", x=crises_names, y=port_vals,
+                    marker_color=["#00ff87" if v >= 0 else "#ff3d5a" for v in port_vals],
+                    text=[f"{v:+.1f}%" for v in port_vals], textposition="outside",
+                ))
+                fig_stress.add_trace(go.Bar(
+                    name="IBOVESPA", x=crises_names, y=ibov_vals,
+                    marker_color=["rgba(0,210,255,0.6)" if v >= 0 else "rgba(255,150,0,0.6)" for v in ibov_vals],
+                    text=[f"{v:+.1f}%" for v in ibov_vals], textposition="outside",
+                ))
+                fig_stress.update_layout(
+                    barmode="group",
+                    title="Portfólio vs IBOVESPA durante Crises Históricas",
+                    yaxis_title="Retorno (%)",
+                    height=380,
+                    margin=dict(t=50, b=40, l=40, r=20),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                )
+                apply_plotly_theme(fig_stress)
+                st.plotly_chart(fig_stress, use_container_width=True)
+
         # ── Regime de Mercado (últimos 21 dias) ──────────────────────────────
         section_header(ICO_SIGNAL, "Regime de Mercado (Últimos 21 Dias)", "h4")
         retorno_recente = (1 + portfolio_returns.tail(21)).prod() - 1
