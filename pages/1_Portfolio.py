@@ -93,32 +93,13 @@ def diag_row(icon_svg, text, color):
 def render_cards_grid(data_dict, colors_sequence=None):
     if not colors_sequence:
         colors_sequence = ["#38bdf8", "#4ade80", "#fbbf24", "#fb7185", "#c084fc", "#f472b6", "#34d399", "#60a5fa"]
-    
     items = list(data_dict.items())
-    num_cols = 4
-    for i in range(0, len(items), num_cols):
-        chunk = items[i:i+num_cols]
-        cols = st.columns(len(chunk))
-        for col, (label, val) in zip(cols, chunk):
-            color = colors_sequence[items.index((label, val)) % len(colors_sequence)]
-            with col:
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                            border: 1px solid #1e293b; 
-                            border-radius: 10px; 
-                            padding: 0.8rem; 
-                            text-align: center; 
-                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                            margin-bottom: 0.5rem;
-                            min-height: 90px;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: center;
-                            align-items: center;">
-                    <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em; word-break: break-word;">{label}</div>
-                    <div style="font-size: 1rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace; word-break: break-word; overflow-wrap: anywhere;">{val}</div>
-                </div>
-                """, unsafe_allow_html=True)
+    cards_html = "".join(
+        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+        f'<div class="mcard-value" style="color:{colors_sequence[i % len(colors_sequence)]}">{val}</div></div>'
+        for i, (lbl, val) in enumerate(items)
+    )
+    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 
 @st.cache_data(ttl=3600)

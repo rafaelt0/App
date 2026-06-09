@@ -336,37 +336,20 @@ if tickers:
         loading_placeholder.empty()
 
         def render_sector_cards(ticker_name, row):
-            cols = st.columns(3)
             emp = row["Empresa"]
             setor = row["Setor"]
             sub = row["Subsetor"]
-            
             metrics = [
                 ("Empresa", emp, "#38bdf8"),
                 ("Setor", setor, "#4ade80"),
-                ("Subsetor", sub, "#fbbf24")
+                ("Subsetor", sub, "#fbbf24"),
             ]
-            
-            for col, (label, val_str, color) in zip(cols, metrics):
-                with col:
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                                border: 1px solid #1e293b; 
-                                border-radius: 10px; 
-                                padding: 0.8rem; 
-                                text-align: center; 
-                                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                                margin-bottom: 0.5rem;
-                                min-height: 80px;
-                                height: auto;
-                                display: flex;
-                                flex-direction: column;
-                                justify-content: center;
-                                align-items: center;">
-                        <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
-                        <div style="font-size: 0.95rem; color: {color}; font-weight: 800; word-break: break-word; overflow-wrap: anywhere; line-height: 1.4;">{val_str}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            cards_html = "".join(
+                f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+                f'<div class="mcard-value" style="color:{clr};font-size:0.95rem">{val}</div></div>'
+                for lbl, val, clr in metrics
+            )
+            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
         # Export button for fundamental data
         try:
@@ -441,36 +424,25 @@ if tickers:
                 return f"{value:,.0f}"
 
         def render_price_cards(ticker_name, row):
-            cols = st.columns(5)
             cot = row["Cotação"]
             min_52 = row["Mínimo (52 semanas)"]
             max_52 = row["Máximo (52 semanas)"]
             vol = row["Volume Médio (2 meses)"]
             val_merc = row["Valor de Mercado"]
             data_ult = row["Data Última Cotação"]
-            
             metrics = [
                 ("Cotação", f"R$ {cot:,.2f}", "#38bdf8"),
                 ("Mín. 52 Sem.", f"R$ {min_52:,.2f}", "#f87171"),
                 ("Máx. 52 Sem.", f"R$ {max_52:,.2f}", "#4ade80"),
                 ("Vol. Médio", format_large_number(vol), "#fb7185"),
-                ("Val. de Mercado", format_large_br_currency(val_merc), "#fbbf24")
+                ("Val. de Mercado", format_large_br_currency(val_merc), "#fbbf24"),
             ]
-            
-            for col, (label, val_str, color) in zip(cols, metrics):
-                with col:
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                                border: 1px solid #1e293b; 
-                                border-radius: 10px; 
-                                padding: 0.8rem; 
-                                text-align: center; 
-                                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                                margin-bottom: 0.5rem;">
-                        <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
-                        <div style="font-size: 1rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace; word-break: break-word; overflow-wrap: anywhere;">{val_str}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            cards_html = "".join(
+                f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+                f'<div class="mcard-value" style="color:{clr}">{val}</div></div>'
+                for lbl, val, clr in metrics
+            )
+            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
             st.caption(f"Última cotação registrada: {data_ult} para {ticker_name}")
 
         if len(tickers) > 1:
