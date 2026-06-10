@@ -779,6 +779,17 @@ if tickers:
             "Use como referência comparativa — premissas são estimativas que merecem revisão crítica."
         )
 
+        # Keywords para setores cíclicos — earnings não representam capacidade normal
+        _CYCLICAL_KEYS = (
+            "mineração", "mineracao", "minério", "minerio", "mineral",
+            "siderurgia", "metalurgia", "aço", "aco", "ferro",
+            "petróleo", "petroleo", "petroquím", "petroquim", "refino",
+            "celulose", "papel", "florestal",
+            "agropecuária", "agropecuaria", "açúcar", "acucar", "etanol", "café", "cafe",
+        )
+        # P/L mínimo usado para normalizar LPA de cíclicas em pico de ciclo
+        _PL_CICLO_NORMAL = 12.0
+
         def render_dcf_panel(ticker_name, cotacao, pl, cres5a, setor, roe=None, div_yield=None):
             s = setor.lower() if setor else ""
             if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio", "financeiro")):
@@ -794,16 +805,42 @@ if tickers:
                 st.warning(f"P/L negativo ou indisponível para **{ticker_name}** — LPA não pode ser estimado para o DCF.")
                 return
 
+            # Detectar setor cíclico e normalizar P/L se necessário
+            is_cyclical = any(k in s for k in _CYCLICAL_KEYS)
+            pl_norm_applied = False
+            pl_efetivo = pl
+            if is_cyclical and pl < _PL_CICLO_NORMAL:
+                pl_efetivo = _PL_CICLO_NORMAL
+                pl_norm_applied = True
+
             selic = get_selic_anual_dcf()
             default_wacc = round(min(selic * 100 + 5.0, 20.0), 1)
-            default_g1   = round(min(max(float(cres5a) if not pd.isna(cres5a) else 5.0, 0.0), 25.0), 1)
-            default_g2   = round(default_g1 * 0.5, 1)
+            raw_g1 = float(cres5a) if not pd.isna(cres5a) else 5.0
+            # Cíclicas: crescimento histórico de receita em pico superestima o futuro — cap em 8%
+            if is_cyclical:
+                raw_g1 = min(raw_g1, 8.0)
+            default_g1 = round(min(max(raw_g1, 0.0), 25.0), 1)
+            default_g2 = round(default_g1 * 0.5, 1)
+
+            # Banner de alerta para cíclicas
+            if is_cyclical:
+                lpa_pico = cotacao / pl
+                lpa_norm = cotacao / pl_efetivo
+                st.warning(
+                    f"⚠️ **Setor cíclico detectado** — lucros de pico não são sustentáveis.\n\n"
+                    f"LPA atual (P/L={pl:.1f}×): **R$ {lpa_pico:.2f}** — pode estar no topo do ciclo de commodities.\n\n"
+                    f"{'O modelo usa **LPA normalizado** (P/L=' + f'{pl_efetivo:.0f}×): **R$ {lpa_norm:.2f}**' if pl_norm_applied else 'P/L já está acima de 12× — nenhuma normalização aplicada.'} "
+                    f"(referência mid-ciclo histórico para o setor)."
+                )
 
             # Confiança do modelo
             has_roe = roe and not pd.isna(roe) and roe > 0
             has_dy  = div_yield and not pd.isna(div_yield) and div_yield > 0
-            pl_ok   = 5 < pl < 80
-            if has_roe and pl_ok:
+            pl_ok   = 5 < pl_efetivo < 80
+            if is_cyclical:
+                conf_label, conf_color = "Baixa — Cíclico", "#ff3d5a"
+                conf_tip = "Empresas cíclicas: LPA varia com o ciclo de commodities. Use como referência aproximada de mid-ciclo."
+            elif has_roe and pl_ok:
                 conf_label, conf_color, conf_tip = "Alta", "#00ff87", "ROE disponível → ajuste Damodaran ativo. P/L razoável."
             elif has_roe or pl_ok:
                 conf_label, conf_color, conf_tip = "Média", "#ffd600", "Ajuste parcial: " + ("ROE disponível mas P/L extremo." if has_roe else "P/L razoável mas sem ROE para calibrar retenção.")
@@ -836,7 +873,7 @@ if tickers:
                                    key=f"dcf_gt_{ticker_name}",
                                    help="Taxa de crescimento na perpetuidade. PIB nominal BR estimado: 3–4%.")
 
-            iv, upside, fcf_mult = calcular_dcf_lpa(cotacao, pl, g1, g2, gt, wacc, roe_pct=roe)
+            iv, upside, fcf_mult = calcular_dcf_lpa(cotacao, pl_efetivo, g1, g2, gt, wacc, roe_pct=roe)
 
             if iv is None:
                 st.warning("WACC precisa ser maior que o crescimento terminal para o cálculo ser válido.")
@@ -933,7 +970,7 @@ if tickers:
                 for w in wacc_vals:
                     row_s = []
                     for g in g1_vals:
-                        _, up, _ = calcular_dcf_lpa(cotacao, pl, g, max(g*0.5, 0), gt, w, roe_pct=roe)
+                        _, up, _ = calcular_dcf_lpa(cotacao, pl_efetivo, g, max(g*0.5, 0), gt, w, roe_pct=roe)
                         row_s.append(round(up, 1) if up is not None else None)
                     sens_z.append(row_s)
 
