@@ -698,6 +698,9 @@ if tickers:
             db_val = extract_debt_metric(row, DEBT_COL_ALIASES["div_brut_patrim"])
             lc_val = extract_debt_metric(row, DEBT_COL_ALIASES["liq_corrente"])
             ev_ebit_val = extract_debt_metric(row, DEBT_COL_ALIASES["ev_ebit"])
+            # Fundamentus remove o decimal de múltiplos (EV/EBIT 12,5× → armazenado como 1250)
+            if ev_ebit_val is not None:
+                ev_ebit_val = ev_ebit_val / 100.0
 
             if db_val is None and lc_val is None and ev_ebit_val is None:
                 st.info("Dados de endividamento não disponíveis via Fundamentus para este ticker.")
@@ -1000,10 +1003,12 @@ if tickers:
             df_dcf = df[dcf_base + dcf_extra].drop_duplicates(keep='last').copy()
             df_dcf['Cotacao'] = clean_numeric_column(df_dcf['Cotacao'])
             df_dcf['PL'] = clean_numeric_column(df_dcf['PL']) / 100.0
+            # ROE e Div_Yield já vêm em formato percentual do Fundamentus (ex: 15.2 para 15.2%)
+            # — NÃO multiplicar por 100, ao contrário de PL/EV/EBITDA que perdem o decimal
             if 'ROE' in df_dcf.columns:
-                df_dcf['ROE'] = clean_numeric_column(df_dcf['ROE']) * 100
+                df_dcf['ROE'] = clean_numeric_column(df_dcf['ROE'])
             if 'Div_Yield' in df_dcf.columns:
-                df_dcf['Div_Yield'] = clean_numeric_column(df_dcf['Div_Yield']) * 100
+                df_dcf['Div_Yield'] = clean_numeric_column(df_dcf['Div_Yield'])
 
             def _dcf_extra(ticker, row_d):
                 roe_v = float(row_d['ROE']) if 'ROE' in row_d.index and not pd.isna(row_d['ROE']) else None
