@@ -88,6 +88,35 @@ def get_ev_ebitda_context(setor: str):
         return ("EV/Recursos · DCF", "Empresa pré-operacional: sem receita, EBITDA estruturalmente negativo.")
     return None
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_selic_anual_dcf():
+    try:
+        from python_bcb import sgs as _sgs
+        import datetime as _dt
+        taxa = _sgs.get(432, start=_dt.date.today() - _dt.timedelta(days=30))
+        return round((1 + taxa.iloc[-1, 0] / 100) ** 252 - 1, 4)
+    except Exception:
+        return 0.105  # fallback ~10.5% a.a.
+
+def calcular_dcf_lpa(cotacao, pl, g1_pct, g2_pct, gt_pct, wacc_pct):
+    """DCF em 2 fases baseado em LPA projetado. Retorna (valor_intrínseco, upside_pct)."""
+    if pl <= 0.1 or cotacao <= 0:
+        return None, None
+    g1, g2, gt, r = g1_pct/100, g2_pct/100, gt_pct/100, wacc_pct/100
+    if r <= gt:
+        return None, None
+    lpa = cotacao / pl
+    vp = 0
+    for t in range(1, 6):
+        lpa *= (1 + g1)
+        vp += lpa / (1 + r) ** t
+    for t in range(6, 11):
+        lpa *= (1 + g2)
+        vp += lpa / (1 + r) ** t
+    tv = lpa * (1 + gt) / (r - gt)
+    vp += tv / (1 + r) ** 10
+    return vp, (vp / cotacao - 1) * 100
+
 @st.cache_data(ttl=3600)
 def get_fundamentus_data(tickers):
     """Busca dados fundamentalistas com retry automático."""
@@ -163,6 +192,8 @@ ICO_RULER   = _svg('<rect x="2" y="7" width="20" height="10" rx="2" stroke="#ffd
                    '<line x1="18" y1="7" x2="18" y2="12" stroke="#ffd600" stroke-width="1.5"/>', 16)
 ICO_SHIELD  = _svg('<path d="M12 2l8 4v6c0 5-4 8.5-8 10C8 20.5 4 17 4 12V6l8-4z" stroke="#00ff87" stroke-width="1.8" fill="none"/>'
                    '<path d="M9 12l2 2 4-4" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>', 16)
+ICO_DCF     = _svg('<line x1="12" y1="1" x2="12" y2="23" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/>'
+                   '<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round" fill="none"/>', 16)
 ICO_BOX     = _svg('<rect x="3" y="7" width="18" height="14" rx="2" stroke="#94a3b8" stroke-width="1.8"/>'
                    '<path d="M8 7V5a4 4 0 018 0v2" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>'
                    '<line x1="12" y1="12" x2="12" y2="16" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
@@ -721,6 +752,174 @@ if tickers:
                 if isinstance(row_debt, pd.DataFrame):
                     row_debt = row_debt.iloc[-1]
                 render_debt_panel(ticker, row_debt)
+
+        # ── Valuation Intrínseco — DCF ────────────────────────────────────────
+        st.markdown("---")
+        section_header(ICO_DCF, "Valuation Intrínseco — DCF", "h3")
+        st.caption(
+            "Modelo de Fluxo de Caixa Descontado em duas fases baseado em Lucro por Ação (LPA) projetado. "
+            "Use como referência comparativa — premissas são estimativas que merecem revisão crítica."
+        )
+
+        def render_dcf_panel(ticker_name, cotacao, pl, cres5a, setor):
+            s = setor.lower() if setor else ""
+            if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio", "financeiro")):
+                st.info("🏦 **Bancos e financeiras:** DCF baseado em LPA não é adequado — o resultado financeiro é a atividade-fim. Use **P/L e P/VP**.")
+                return
+            if any(k in s for k in ("seguro", "previdência", "previdencia", "resseguro")):
+                st.info("🛡️ **Seguradoras:** Use **Modelo de Desconto de Dividendos (DDM)** — lucro atrelado ao resultado financeiro do float.")
+                return
+            if any(k in s for k in ("holding", "participação", "participacao")):
+                st.info("🏢 **Holdings:** Avalie via **Desconto sobre NAV** — o valor reside nas subsidiárias, não no fluxo operacional.")
+                return
+            if pl <= 0.1 or pd.isna(pl):
+                st.warning(f"P/L negativo ou indisponível para **{ticker_name}** — LPA não pode ser estimado para o DCF.")
+                return
+
+            selic = get_selic_anual_dcf()
+            default_wacc = round(min(selic * 100 + 5.0, 20.0), 1)
+            default_g1   = round(min(max(float(cres5a) if not pd.isna(cres5a) else 5.0, 0.0), 25.0), 1)
+            default_g2   = round(default_g1 * 0.5, 1)
+
+            with st.expander("⚙️ Personalizar premissas", expanded=False):
+                ca, cb = st.columns(2)
+                with ca:
+                    wacc = st.slider("WACC — Taxa de Desconto (%)", 7.0, 20.0, value=default_wacc, step=0.5,
+                                     key=f"dcf_wacc_{ticker_name}",
+                                     help=f"Selic atual: {selic*100:.1f}% a.a. + prêmio de risco de capital (sugerido: +4-6%)")
+                    g1 = st.slider("Crescimento Anos 1–5 (%)", 0.0, 30.0, value=default_g1, step=0.5,
+                                   key=f"dcf_g1_{ticker_name}",
+                                   help=f"Crescimento histórico de receita (5 anos): {cres5a:.1f}%. Seja conservador.")
+                with cb:
+                    g2 = st.slider("Crescimento Anos 6–10 (%)", 0.0, 20.0, value=default_g2, step=0.5,
+                                   key=f"dcf_g2_{ticker_name}",
+                                   help="Fase de desaceleração — costuma ser metade do crescimento da fase 1.")
+                    gt = st.slider("Crescimento Terminal (%)", 1.0, 6.0, value=3.5, step=0.5,
+                                   key=f"dcf_gt_{ticker_name}",
+                                   help="Taxa de crescimento na perpetuidade. PIB nominal BR estimado: 3–4%.")
+
+            iv, upside = calcular_dcf_lpa(cotacao, pl, g1, g2, gt, wacc)
+
+            if iv is None:
+                st.warning("WACC precisa ser maior que o crescimento terminal para o cálculo ser válido.")
+                return
+
+            ms = (iv - cotacao) / iv * 100
+            if upside > 20:
+                verdict, vcolor, vicon = "SUBAVALIADO", "#00ff87", "↑"
+            elif upside < -20:
+                verdict, vcolor, vicon = "SOBREAVALIADO", "#ff3d5a", "↓"
+            else:
+                verdict, vcolor, vicon = "PREÇO JUSTO", "#ffd600", "≈"
+
+            # Cards principais
+            ms_color = "#00ff87" if ms > 20 else ("#ffd600" if ms > 0 else "#ff3d5a")
+            cards_html = (
+                f'<div class="mcard"><div class="mcard-label">Valor Intrínseco</div>'
+                f'<div class="mcard-value" style="color:#a855f7">R$ {iv:,.2f}</div></div>'
+                f'<div class="mcard"><div class="mcard-label">Preço Atual</div>'
+                f'<div class="mcard-value" style="color:#94a3b8">R$ {cotacao:,.2f}</div></div>'
+                f'<div class="mcard"><div class="mcard-label">Potencial</div>'
+                f'<div class="mcard-value" style="color:{vcolor}">{upside:+.1f}%</div></div>'
+                f'<div class="mcard"><div class="mcard-label">Margem de Seg.</div>'
+                f'<div class="mcard-value" style="color:{ms_color}">{ms:.1f}%</div></div>'
+            )
+            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+            # Barra visual preço vs IV
+            total_range = max(iv, cotacao) * 1.1 or 1
+            price_p = min(cotacao / total_range * 100, 100)
+            iv_p    = min(iv    / total_range * 100, 100)
+            bar_color = "#00ff87" if iv > cotacao else "#ff3d5a"
+            st.markdown(f"""
+<div style="margin:0.6rem 0 0.5rem 0;">
+  <div style="font-size:0.68rem;color:#64748b;font-weight:600;text-transform:uppercase;
+              letter-spacing:0.05em;margin-bottom:0.4rem;">Preço Atual vs Valor Intrínseco</div>
+  <div style="position:relative;height:26px;background:#1e293b;border-radius:6px;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;width:{price_p:.1f}%;height:100%;
+                background:rgba(148,163,184,0.25);border-radius:6px 0 0 6px;"></div>
+    <div style="position:absolute;top:0;left:{iv_p:.1f}%;width:3px;height:100%;
+                background:{bar_color};transform:translateX(-50%);
+                box-shadow:0 0 8px {bar_color}88;"></div>
+    <div style="position:absolute;top:0;left:{price_p:.1f}%;width:3px;height:100%;
+                background:#94a3b8;transform:translateX(-50%);"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;margin-top:0.3rem;align-items:center;">
+    <span style="font-size:0.72rem;color:#94a3b8;">R$ {cotacao:,.2f} (atual)</span>
+    <span style="font-size:0.82rem;font-weight:800;color:{vcolor};letter-spacing:0.04em;">
+      {vicon} {verdict}</span>
+    <span style="font-size:0.72rem;color:#a855f7;">IV: R$ {iv:,.2f}</span>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+            # Sensibilidade
+            with st.expander("📊 Análise de Sensibilidade — WACC × Crescimento", expanded=False):
+                st.caption("Potencial de valorização (%) para diferentes combinações. Verde = subavaliado, Vermelho = sobreavaliado.")
+                wacc_vals = [8, 10, 12, 14, 16]
+                g1_vals   = [0, 5, 10, 15, 20, 25]
+                sens_z = []
+                for w in wacc_vals:
+                    row_s = []
+                    for g in g1_vals:
+                        _, up = calcular_dcf_lpa(cotacao, pl, g, max(g*0.5, 0), gt, w)
+                        row_s.append(round(up, 1) if up is not None else None)
+                    sens_z.append(row_s)
+
+                fig_sens = go.Figure(go.Heatmap(
+                    z=sens_z,
+                    x=[f"{g}%" for g in g1_vals],
+                    y=[f"{w}%" for w in wacc_vals],
+                    colorscale="RdYlGn",
+                    zmid=0, zmin=-80, zmax=80,
+                    text=[[f"{v:+.0f}%" if v is not None else "N/A" for v in r] for r in sens_z],
+                    texttemplate="%{text}", textfont=dict(size=11, color="white"),
+                    hovertemplate="WACC: %{y}<br>Cresc. Fase 1: %{x}<br>Potencial: %{text}<extra></extra>",
+                ))
+                fig_sens.update_layout(
+                    xaxis_title="Crescimento Fase 1 (Anos 1–5)",
+                    yaxis_title="WACC",
+                    height=260,
+                    margin=dict(t=8, b=40, l=60, r=8),
+                )
+                apply_plotly_theme(fig_sens)
+                st.plotly_chart(fig_sens, use_container_width=True)
+
+        # Montar df auxiliar para DCF com Cotacao e PL
+        dcf_cols = [c for c in ['Cotacao', 'PL'] if c in df.columns]
+        if len(dcf_cols) == 2:
+            df_dcf = df[dcf_cols].drop_duplicates(keep='last').copy()
+            df_dcf['Cotacao'] = clean_numeric_column(df_dcf['Cotacao'])
+            df_dcf['PL'] = clean_numeric_column(df_dcf['PL']) / 100.0
+
+            if len(tickers) > 1:
+                tabs_dcf = st.tabs(tickers)
+                for tab, ticker in zip(tabs_dcf, tickers):
+                    with tab:
+                        if ticker in df_dcf.index:
+                            row_d = df_dcf.loc[ticker]
+                            if isinstance(row_d, pd.DataFrame):
+                                row_d = row_d.iloc[-1]
+                            cres = df_ind.loc[ticker, 'Crescimento Receita 5 anos'] if ticker in df_ind.index else 5.0
+                            if isinstance(cres, pd.Series):
+                                cres = float(cres.iloc[-1])
+                            render_dcf_panel(ticker, float(row_d['Cotacao']), float(row_d['PL']),
+                                             float(cres) if not pd.isna(cres) else 5.0, _get_setor(ticker))
+                        else:
+                            st.warning(f"Sem dados para {ticker}")
+            else:
+                ticker = tickers[0]
+                if ticker in df_dcf.index:
+                    row_d = df_dcf.loc[ticker]
+                    if isinstance(row_d, pd.DataFrame):
+                        row_d = row_d.iloc[-1]
+                    cres = df_ind.loc[ticker, 'Crescimento Receita 5 anos'] if ticker in df_ind.index else 5.0
+                    if isinstance(cres, pd.Series):
+                        cres = float(cres.iloc[-1])
+                    render_dcf_panel(ticker, float(row_d['Cotacao']), float(row_d['PL']),
+                                     float(cres) if not pd.isna(cres) else 5.0, _get_setor(ticker))
+        else:
+            st.info("Dados de Cotação ou P/L não disponíveis para o DCF.")
 
         # ── Comparação Visual de Múltiplos ───────────────────────────────────
         if len(tickers) > 1:
