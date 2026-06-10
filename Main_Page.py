@@ -73,6 +73,21 @@ def clean_numeric_column(col):
     col = col.str.replace(',', '.')
     return pd.to_numeric(col, errors='coerce')
 
+def get_ev_ebitda_context(setor: str):
+    """Returns (alt_metric, reason) when EV/EBITDA doesn't apply, or None if it applies normally."""
+    s = setor.lower() if setor else ""
+    if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio")):
+        return ("P/L · P/VP", "Bancos: resultado financeiro é a atividade-fim — EV/EBITDA não se aplica.")
+    if any(k in s for k in ("seguro", "previdência", "previdencia", "resseguro")):
+        return ("P/L · P/VP", "Seguradoras: lucro atrelado ao resultado financeiro (float) — EV/EBITDA não se aplica.")
+    if any(k in s for k in ("holding", "participação", "participacao")):
+        return ("Desconto sobre NAV", "Holdings: receita de equivalência patrimonial — EBITDA é quase nulo ou negativo.")
+    if any(k in s for k in ("tecnologia", "software", "internet")):
+        return ("EV/Sales", "Tech em crescimento: EBITDA frequentemente negativo pelo reinvestimento agressivo.")
+    if any(k in s for k in ("exploração", "exploracao", "pré-operacional", "pre-operacional")):
+        return ("EV/Recursos · DCF", "Empresa pré-operacional: sem receita, EBITDA estruturalmente negativo.")
+    return None
+
 @st.cache_data(ttl=3600)
 def get_fundamentus_data(tickers):
     """Busca dados fundamentalistas com retry automático."""
@@ -495,8 +510,16 @@ if tickers:
         # Remove duplicate indices if any
         df_ind = df_ind[~df_ind.index.duplicated(keep='last')]
 
+        def _get_setor(ticker):
+            if 'Setor' not in df.columns or ticker not in df.index:
+                return ''
+            val = df.loc[ticker, 'Setor']
+            if isinstance(val, pd.Series):
+                val = val.iloc[-1]
+            return str(val) if not pd.isna(val) else ''
+
         # Função auxiliar para renderizar os cards em colunas estilizadas
-        def render_ticker_cards(row):
+        def render_ticker_cards(row, setor=""):
             # 1. Valuation Section
             st.markdown("""
 <div style="margin: 1.2rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
@@ -513,7 +536,19 @@ if tickers:
             with c2:
                 st.metric("P/VP", f"{row['P/VP']:.2f}", help="Preço/Valor Patrimonial: compara o preço de mercado com o valor contábil. <1 pode indicar desconto.")
             with c3:
-                st.metric("EV/EBITDA", f"{row['EV/EBITDA']:.2f}", help="Enterprise Value / EBITDA: múltiplo de valuation que considera a dívida. Menor = mais barato.")
+                ev_val = row['EV/EBITDA']
+                if pd.isna(ev_val) or abs(ev_val) < 0.01:
+                    ctx = get_ev_ebitda_context(setor)
+                    if ctx:
+                        alt, reason = ctx
+                        st.metric("EV/EBITDA", "—",
+                                  delta="→ " + alt, delta_color="off", help=reason)
+                    else:
+                        st.metric("EV/EBITDA", "N/D",
+                                  help="Dado não disponível para este ticker via Fundamentus.")
+                else:
+                    st.metric("EV/EBITDA", f"{ev_val:.2f}",
+                              help="Enterprise Value / EBITDA: múltiplo de valuation que considera a dívida. Menor = mais barato.")
 
             # 2. Rentabilidade Section
             st.markdown("""
@@ -580,11 +615,11 @@ if tickers:
             for idx, ticker in enumerate(tickers):
                 with tabs_tickers[idx]:
                     if ticker in df_ind.index:
-                        render_ticker_cards(df_ind.loc[ticker])
+                        render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(ticker))
         else:
             ticker = tickers[0]
             if ticker in df_ind.index:
-                render_ticker_cards(df_ind.loc[ticker])
+                render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(ticker))
 
         # ── Saúde Financeira ─────────────────────────────────────────────────
         st.markdown("---")
@@ -720,6 +755,8 @@ if tickers:
             for v in df_chart[selected_comp_mult].values:
                 if pd.isna(v):
                     text_labels.append("N/D")
+                elif selected_comp_mult == "EV/EBITDA" and abs(v) < 0.01:
+                    text_labels.append("N/A")
                 elif is_pct:
                     text_labels.append(f"{v:.2f}%")
                 else:
