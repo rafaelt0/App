@@ -98,24 +98,42 @@ def get_selic_anual_dcf():
     except Exception:
         return 0.105  # fallback ~10.5% a.a.
 
-def calcular_dcf_lpa(cotacao, pl, g1_pct, g2_pct, gt_pct, wacc_pct):
-    """DCF em 2 fases baseado em LPA projetado. Retorna (valor_intrínseco, upside_pct)."""
+def calcular_dcf_lpa(cotacao, pl, g1_pct, g2_pct, gt_pct, wacc_pct, roe_pct=None):
+    """DCF em 2 fases com ajuste Damodaran de retenção. Retorna (valor_intrínseco, upside_pct, fcf_mult)."""
     if pl <= 0.1 or cotacao <= 0:
-        return None, None
+        return None, None, None
     g1, g2, gt, r = g1_pct/100, g2_pct/100, gt_pct/100, wacc_pct/100
     if r <= gt:
-        return None, None
+        return None, None, None
     lpa = cotacao / pl
+    # Damodaran: retention_rate = g/ROE — quanto precisa ser retido para financiar o crescimento
+    if roe_pct and roe_pct > 0 and roe_pct > g1_pct:
+        retention = g1_pct / roe_pct
+        fcf_mult = max(1.0 - retention, 0.05)  # mínimo 5% distribuível
+    else:
+        fcf_mult = 1.0  # fallback: sem ajuste se ROE indisponível ou menor que g
+    fcf = lpa * fcf_mult
     vp = 0
     for t in range(1, 6):
-        lpa *= (1 + g1)
-        vp += lpa / (1 + r) ** t
+        fcf *= (1 + g1)
+        vp += fcf / (1 + r) ** t
     for t in range(6, 11):
-        lpa *= (1 + g2)
-        vp += lpa / (1 + r) ** t
-    tv = lpa * (1 + gt) / (r - gt)
+        fcf *= (1 + g2)
+        vp += fcf / (1 + r) ** t
+    tv = fcf * (1 + gt) / (r - gt)
     vp += tv / (1 + r) ** 10
-    return vp, (vp / cotacao - 1) * 100
+    return vp, (vp / cotacao - 1) * 100, fcf_mult
+
+def calcular_ddm(cotacao, div_yield_pct, gt_pct, wacc_pct):
+    """DDM Gordon Growth: IV = DPS / (WACC - g). Retorna (valor_intrínseco, upside_pct)."""
+    if div_yield_pct <= 0 or cotacao <= 0:
+        return None, None
+    dps = cotacao * div_yield_pct / 100
+    r, g = wacc_pct / 100, gt_pct / 100
+    if r <= g:
+        return None, None
+    iv = dps / (r - g)
+    return iv, (iv / cotacao - 1) * 100
 
 @st.cache_data(ttl=3600)
 def get_fundamentus_data(tickers):
@@ -761,7 +779,7 @@ if tickers:
             "Use como referência comparativa — premissas são estimativas que merecem revisão crítica."
         )
 
-        def render_dcf_panel(ticker_name, cotacao, pl, cres5a, setor):
+        def render_dcf_panel(ticker_name, cotacao, pl, cres5a, setor, roe=None, div_yield=None):
             s = setor.lower() if setor else ""
             if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio", "financeiro")):
                 st.info("🏦 **Bancos e financeiras:** DCF baseado em LPA não é adequado — o resultado financeiro é a atividade-fim. Use **P/L e P/VP**.")
@@ -781,6 +799,26 @@ if tickers:
             default_g1   = round(min(max(float(cres5a) if not pd.isna(cres5a) else 5.0, 0.0), 25.0), 1)
             default_g2   = round(default_g1 * 0.5, 1)
 
+            # Confiança do modelo
+            has_roe = roe and not pd.isna(roe) and roe > 0
+            has_dy  = div_yield and not pd.isna(div_yield) and div_yield > 0
+            pl_ok   = 5 < pl < 80
+            if has_roe and pl_ok:
+                conf_label, conf_color, conf_tip = "Alta", "#00ff87", "ROE disponível → ajuste Damodaran ativo. P/L razoável."
+            elif has_roe or pl_ok:
+                conf_label, conf_color, conf_tip = "Média", "#ffd600", "Ajuste parcial: " + ("ROE disponível mas P/L extremo." if has_roe else "P/L razoável mas sem ROE para calibrar retenção.")
+            else:
+                conf_label, conf_color, conf_tip = "Baixa", "#ff3d5a", "Sem ROE e P/L atípico — resultado indicativo, use com cautela."
+
+            conf_html = (
+                f'<span style="display:inline-flex;align-items:center;gap:4px;'
+                f'background:rgba(0,0,0,0.25);border:1px solid {conf_color}33;'
+                f'border-radius:20px;padding:2px 10px;font-size:0.72rem;color:{conf_color};'
+                f'font-weight:700;margin-bottom:0.6rem;" title="{conf_tip}">'
+                f'● Confiança {conf_label}</span>'
+            )
+            st.markdown(conf_html, unsafe_allow_html=True)
+
             with st.expander("⚙️ Personalizar premissas", expanded=False):
                 ca, cb = st.columns(2)
                 with ca:
@@ -798,43 +836,76 @@ if tickers:
                                    key=f"dcf_gt_{ticker_name}",
                                    help="Taxa de crescimento na perpetuidade. PIB nominal BR estimado: 3–4%.")
 
-            iv, upside = calcular_dcf_lpa(cotacao, pl, g1, g2, gt, wacc)
+            iv, upside, fcf_mult = calcular_dcf_lpa(cotacao, pl, g1, g2, gt, wacc, roe_pct=roe)
 
             if iv is None:
                 st.warning("WACC precisa ser maior que o crescimento terminal para o cálculo ser válido.")
                 return
 
-            ms = (iv - cotacao) / iv * 100
-            if upside > 20:
+            # DDM como método complementar para pagadores de dividendo
+            iv_ddm, upside_ddm = None, None
+            if has_dy and div_yield >= 2.0:
+                iv_ddm, upside_ddm = calcular_ddm(cotacao, div_yield, gt, wacc)
+
+            # Consenso: média ponderada DCF (2/3) + DDM (1/3) quando ambos disponíveis
+            if iv_ddm is not None:
+                iv_cons   = iv * 2/3 + iv_ddm * 1/3
+                up_cons   = (iv_cons / cotacao - 1) * 100
+            else:
+                iv_cons, up_cons = iv, upside
+
+            ms = (iv_cons - cotacao) / iv_cons * 100
+            if up_cons > 20:
                 verdict, vcolor, vicon = "SUBAVALIADO", "#00ff87", "↑"
-            elif upside < -20:
+            elif up_cons < -20:
                 verdict, vcolor, vicon = "SOBREAVALIADO", "#ff3d5a", "↓"
             else:
                 verdict, vcolor, vicon = "PREÇO JUSTO", "#ffd600", "≈"
 
-            # Cards principais
             ms_color = "#00ff87" if ms > 20 else ("#ffd600" if ms > 0 else "#ff3d5a")
+
+            # Ajuste Damodaran: mostrar retenção aplicada
+            retention_note = ""
+            if has_roe and fcf_mult is not None and fcf_mult < 0.99:
+                ret_pct = (1 - fcf_mult) * 100
+                retention_note = (
+                    f'<div style="font-size:0.70rem;color:#64748b;margin-bottom:0.5rem;">'
+                    f'Ajuste Damodaran: {ret_pct:.0f}% do LPA retido para financiar crescimento '
+                    f'(ROE={roe:.1f}%) → FCF/LPA = {fcf_mult*100:.0f}%</div>'
+                )
+
+            # Cards principais (DCF + DDM quando disponível)
             cards_html = (
-                f'<div class="mcard"><div class="mcard-label">Valor Intrínseco</div>'
+                f'<div class="mcard"><div class="mcard-label">IV — DCF</div>'
                 f'<div class="mcard-value" style="color:#a855f7">R$ {iv:,.2f}</div></div>'
+            )
+            if iv_ddm is not None:
+                cards_html += (
+                    f'<div class="mcard"><div class="mcard-label">IV — DDM</div>'
+                    f'<div class="mcard-value" style="color:#818cf8">R$ {iv_ddm:,.2f}</div></div>'
+                    f'<div class="mcard"><div class="mcard-label">Consenso</div>'
+                    f'<div class="mcard-value" style="color:#c084fc">R$ {iv_cons:,.2f}</div></div>'
+                )
+            cards_html += (
                 f'<div class="mcard"><div class="mcard-label">Preço Atual</div>'
                 f'<div class="mcard-value" style="color:#94a3b8">R$ {cotacao:,.2f}</div></div>'
                 f'<div class="mcard"><div class="mcard-label">Potencial</div>'
-                f'<div class="mcard-value" style="color:{vcolor}">{upside:+.1f}%</div></div>'
+                f'<div class="mcard-value" style="color:{vcolor}">{up_cons:+.1f}%</div></div>'
                 f'<div class="mcard"><div class="mcard-label">Margem de Seg.</div>'
                 f'<div class="mcard-value" style="color:{ms_color}">{ms:.1f}%</div></div>'
             )
-            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+            st.markdown(retention_note + f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
-            # Barra visual preço vs IV
-            total_range = max(iv, cotacao) * 1.1 or 1
+            # Barra visual preço vs IV consenso
+            total_range = max(iv_cons, cotacao) * 1.1 or 1
             price_p = min(cotacao / total_range * 100, 100)
-            iv_p    = min(iv    / total_range * 100, 100)
-            bar_color = "#00ff87" if iv > cotacao else "#ff3d5a"
+            iv_p    = min(iv_cons  / total_range * 100, 100)
+            bar_color = "#00ff87" if iv_cons > cotacao else "#ff3d5a"
+            iv_label = "Consenso" if iv_ddm is not None else "IV (DCF)"
             st.markdown(f"""
 <div style="margin:0.6rem 0 0.5rem 0;">
   <div style="font-size:0.68rem;color:#64748b;font-weight:600;text-transform:uppercase;
-              letter-spacing:0.05em;margin-bottom:0.4rem;">Preço Atual vs Valor Intrínseco</div>
+              letter-spacing:0.05em;margin-bottom:0.4rem;">Preço Atual vs {iv_label}</div>
   <div style="position:relative;height:26px;background:#1e293b;border-radius:6px;overflow:hidden;">
     <div style="position:absolute;top:0;left:0;width:{price_p:.1f}%;height:100%;
                 background:rgba(148,163,184,0.25);border-radius:6px 0 0 6px;"></div>
@@ -848,7 +919,7 @@ if tickers:
     <span style="font-size:0.72rem;color:#94a3b8;">R$ {cotacao:,.2f} (atual)</span>
     <span style="font-size:0.82rem;font-weight:800;color:{vcolor};letter-spacing:0.04em;">
       {vicon} {verdict}</span>
-    <span style="font-size:0.72rem;color:#a855f7;">IV: R$ {iv:,.2f}</span>
+    <span style="font-size:0.72rem;color:#a855f7;">{iv_label}: R$ {iv_cons:,.2f}</span>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -862,7 +933,7 @@ if tickers:
                 for w in wacc_vals:
                     row_s = []
                     for g in g1_vals:
-                        _, up = calcular_dcf_lpa(cotacao, pl, g, max(g*0.5, 0), gt, w)
+                        _, up, _ = calcular_dcf_lpa(cotacao, pl, g, max(g*0.5, 0), gt, w, roe_pct=roe)
                         row_s.append(round(up, 1) if up is not None else None)
                     sens_z.append(row_s)
 
@@ -885,12 +956,22 @@ if tickers:
                 apply_plotly_theme(fig_sens)
                 st.plotly_chart(fig_sens, use_container_width=True)
 
-        # Montar df auxiliar para DCF com Cotacao e PL
-        dcf_cols = [c for c in ['Cotacao', 'PL'] if c in df.columns]
-        if len(dcf_cols) == 2:
-            df_dcf = df[dcf_cols].drop_duplicates(keep='last').copy()
+        # Montar df auxiliar para DCF com Cotacao, PL, ROE e Div_Yield
+        dcf_base = [c for c in ['Cotacao', 'PL'] if c in df.columns]
+        dcf_extra = [c for c in ['ROE', 'Div_Yield'] if c in df.columns]
+        if len(dcf_base) == 2:
+            df_dcf = df[dcf_base + dcf_extra].drop_duplicates(keep='last').copy()
             df_dcf['Cotacao'] = clean_numeric_column(df_dcf['Cotacao'])
             df_dcf['PL'] = clean_numeric_column(df_dcf['PL']) / 100.0
+            if 'ROE' in df_dcf.columns:
+                df_dcf['ROE'] = clean_numeric_column(df_dcf['ROE']) * 100
+            if 'Div_Yield' in df_dcf.columns:
+                df_dcf['Div_Yield'] = clean_numeric_column(df_dcf['Div_Yield']) * 100
+
+            def _dcf_extra(ticker, row_d):
+                roe_v = float(row_d['ROE']) if 'ROE' in row_d.index and not pd.isna(row_d['ROE']) else None
+                dy_v  = float(row_d['Div_Yield']) if 'Div_Yield' in row_d.index and not pd.isna(row_d['Div_Yield']) else None
+                return roe_v, dy_v
 
             if len(tickers) > 1:
                 tabs_dcf = st.tabs(tickers)
@@ -903,8 +984,10 @@ if tickers:
                             cres = df_ind.loc[ticker, 'Crescimento Receita 5 anos'] if ticker in df_ind.index else 5.0
                             if isinstance(cres, pd.Series):
                                 cres = float(cres.iloc[-1])
+                            roe_v, dy_v = _dcf_extra(ticker, row_d)
                             render_dcf_panel(ticker, float(row_d['Cotacao']), float(row_d['PL']),
-                                             float(cres) if not pd.isna(cres) else 5.0, _get_setor(ticker))
+                                             float(cres) if not pd.isna(cres) else 5.0,
+                                             _get_setor(ticker), roe=roe_v, div_yield=dy_v)
                         else:
                             st.warning(f"Sem dados para {ticker}")
             else:
@@ -916,8 +999,10 @@ if tickers:
                     cres = df_ind.loc[ticker, 'Crescimento Receita 5 anos'] if ticker in df_ind.index else 5.0
                     if isinstance(cres, pd.Series):
                         cres = float(cres.iloc[-1])
+                    roe_v, dy_v = _dcf_extra(ticker, row_d)
                     render_dcf_panel(ticker, float(row_d['Cotacao']), float(row_d['PL']),
-                                     float(cres) if not pd.isna(cres) else 5.0, _get_setor(ticker))
+                                     float(cres) if not pd.isna(cres) else 5.0,
+                                     _get_setor(ticker), roe=roe_v, div_yield=dy_v)
         else:
             st.info("Dados de Cotação ou P/L não disponíveis para o DCF.")
 
