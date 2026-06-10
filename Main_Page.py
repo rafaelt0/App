@@ -98,31 +98,51 @@ def get_selic_anual_dcf():
     except Exception:
         return 0.105  # fallback ~10.5% a.a.
 
-def calcular_dcf_lpa(cotacao, pl, g1_pct, g2_pct, gt_pct, wacc_pct, roe_pct=None):
-    """DCF em 2 fases com ajuste Damodaran de retenção. Retorna (valor_intrínseco, upside_pct, fcf_mult)."""
+def calcular_dcf_lpa(cotacao, pl, g1_pct, g2_pct, gt_pct, wacc_pct, roe_pct=None, roic_pct=None):
+    """DCF FCFF em 2 fases, alinhado ao método Damodaran.
+    ROC = ROIC (preferência) ou ROE; retenção terminal separada da fase de crescimento.
+    Retorna (valor_intrínseco, upside_pct, fcf_mult, fcf_mult_tv).
+    """
     if pl <= 0.1 or cotacao <= 0:
-        return None, None, None
+        return None, None, None, None
     g1, g2, gt, r = g1_pct/100, g2_pct/100, gt_pct/100, wacc_pct/100
     if r <= gt:
-        return None, None, None
-    lpa = cotacao / pl
-    # Damodaran: retention_rate = g/ROE — quanto precisa ser retido para financiar o crescimento
-    if roe_pct and roe_pct > 0 and roe_pct > g1_pct:
-        retention = g1_pct / roe_pct
-        fcf_mult = max(1.0 - retention, 0.05)  # mínimo 5% distribuível
+        return None, None, None, None
+    lpa0 = cotacao / pl
+
+    # ROC: ROIC aproxima EBIT(1-t)/(Dívida+PL) — mais alinhado ao Damodaran que ROE (alavancado)
+    roc = roic_pct if (roic_pct and roic_pct > 0) else roe_pct
+
+    # Retenção na fase de crescimento: retention = g / ROC  (Damodaran: g = ROC × reinvestimento)
+    if roc and roc > 0 and roc > g1_pct:
+        retention = g1_pct / roc
+        fcf_mult = max(1.0 - retention, 0.05)
     else:
-        fcf_mult = 1.0  # fallback: sem ajuste se ROE indisponível ou menor que g
-    fcf = lpa * fcf_mult
+        fcf_mult = 1.0
+
+    # ROC estável: converge para próximo ao WACC na perpetuidade (Damodaran: beta → 1, spread cai)
+    # Usamos min(ROIC_atual, WACC + 2%) para não projetar rentabilidade de pico na eternidade
+    roc_stable = max(wacc_pct + 2.0, gt_pct + 1.0)
+    if roc:
+        roc_stable = min(roc, roc_stable)
+    retention_tv = gt_pct / roc_stable
+    fcf_mult_tv = max(1.0 - retention_tv, 0.0)
+
+    # VP fases 1-5 e 6-10: cada ano calculado a partir do lpa0 (sem acumulação de fcf_mult)
     vp = 0
     for t in range(1, 6):
-        fcf *= (1 + g1)
-        vp += fcf / (1 + r) ** t
+        lpa_t = lpa0 * (1 + g1) ** t
+        vp += lpa_t * fcf_mult / (1 + r) ** t
     for t in range(6, 11):
-        fcf *= (1 + g2)
-        vp += fcf / (1 + r) ** t
-    tv = fcf * (1 + gt) / (r - gt)
+        lpa_t = lpa0 * (1 + g1) ** 5 * (1 + g2) ** (t - 5)
+        vp += lpa_t * fcf_mult / (1 + r) ** t
+
+    # Valor Terminal com retenção estável (Damodaran: TV = FCF_{n+1} / (WACC − g_terminal))
+    lpa10 = lpa0 * (1 + g1) ** 5 * (1 + g2) ** 5
+    fcf_tv = lpa10 * fcf_mult_tv
+    tv = fcf_tv * (1 + gt) / (r - gt)
     vp += tv / (1 + r) ** 10
-    return vp, (vp / cotacao - 1) * 100, fcf_mult
+    return vp, (vp / cotacao - 1) * 100, fcf_mult, fcf_mult_tv
 
 def calcular_ddm(cotacao, div_yield_pct, gt_pct, wacc_pct):
     """DDM Gordon Growth: IV = DPS / (WACC - g). Retorna (valor_intrínseco, upside_pct)."""
@@ -778,8 +798,8 @@ if tickers:
         st.markdown("---")
         section_header(ICO_DCF, "Valuation Intrínseco — DCF", "h3")
         st.caption(
-            "Modelo de Fluxo de Caixa Descontado em duas fases baseado em Lucro por Ação (LPA) projetado. "
-            "Use como referência comparativa — premissas são estimativas que merecem revisão crítica."
+            "DCF em 2 fases (Damodaran): retenção = g/ROIC por fase; valor terminal com ROC estável ≈ WACC+2%. "
+            "LPA como proxy de FCFF por ação — use como referência comparativa, não como preço-alvo preciso."
         )
 
         # Keywords para setores cíclicos — earnings não representam capacidade normal
@@ -793,7 +813,7 @@ if tickers:
         # P/L mínimo usado para normalizar LPA de cíclicas em pico de ciclo
         _PL_CICLO_NORMAL = 12.0
 
-        def render_dcf_panel(ticker_name, cotacao, pl, cres5a, setor, roe=None, div_yield=None):
+        def render_dcf_panel(ticker_name, cotacao, pl, cres5a, setor, roe=None, div_yield=None, roic=None):
             s = setor.lower() if setor else ""
             if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio", "financeiro")):
                 st.info("🏦 **Bancos e financeiras:** DCF baseado em LPA não é adequado — o resultado financeiro é a atividade-fim. Use **P/L e P/VP**.")
@@ -837,25 +857,30 @@ if tickers:
                 )
 
             # Confiança do modelo
-            has_roe = roe and not pd.isna(roe) and roe > 0
-            has_dy  = div_yield and not pd.isna(div_yield) and div_yield > 0
-            pl_ok   = 5 < pl_efetivo < 80
+            has_roic = roic and not pd.isna(roic) and roic > 0
+            has_roe  = roe and not pd.isna(roe) and roe > 0
+            has_dy   = div_yield and not pd.isna(div_yield) and div_yield > 0
+            pl_ok    = 5 < pl_efetivo < 80
+            roc_used_label = "ROIC" if has_roic else ("ROE" if has_roe else "N/D")
             if is_cyclical:
                 conf_label, conf_color = "Baixa — Cíclico", "#ff3d5a"
                 conf_tip = "Empresas cíclicas: LPA varia com o ciclo de commodities. Use como referência aproximada de mid-ciclo."
-            elif has_roe and pl_ok:
-                conf_label, conf_color, conf_tip = "Alta", "#00ff87", "ROE disponível → ajuste Damodaran ativo. P/L razoável."
-            elif has_roe or pl_ok:
-                conf_label, conf_color, conf_tip = "Média", "#ffd600", "Ajuste parcial: " + ("ROE disponível mas P/L extremo." if has_roe else "P/L razoável mas sem ROE para calibrar retenção.")
+            elif (has_roic or has_roe) and pl_ok:
+                conf_label, conf_color = "Alta", "#00ff87"
+                conf_tip = f"ROC ({roc_used_label}) disponível → retenção Damodaran calibrada. P/L razoável."
+            elif (has_roic or has_roe) or pl_ok:
+                conf_label, conf_color = "Média", "#ffd600"
+                conf_tip = f"Ajuste parcial: {roc_used_label} disponível mas P/L extremo." if (has_roic or has_roe) else "P/L razoável mas sem ROC para calibrar retenção."
             else:
-                conf_label, conf_color, conf_tip = "Baixa", "#ff3d5a", "Sem ROE e P/L atípico — resultado indicativo, use com cautela."
+                conf_label, conf_color = "Baixa", "#ff3d5a"
+                conf_tip = "Sem ROC e P/L atípico — resultado indicativo, use com cautela."
 
             conf_html = (
                 f'<span style="display:inline-flex;align-items:center;gap:4px;'
                 f'background:rgba(0,0,0,0.25);border:1px solid {conf_color}33;'
                 f'border-radius:20px;padding:2px 10px;font-size:0.72rem;color:{conf_color};'
                 f'font-weight:700;margin-bottom:0.6rem;" title="{conf_tip}">'
-                f'● Confiança {conf_label}</span>'
+                f'● Confiança {conf_label} · ROC={roc_used_label}</span>'
             )
             st.markdown(conf_html, unsafe_allow_html=True)
 
@@ -876,7 +901,9 @@ if tickers:
                                    key=f"dcf_gt_{ticker_name}",
                                    help="Taxa de crescimento na perpetuidade. PIB nominal BR estimado: 3–4%.")
 
-            iv, upside, fcf_mult = calcular_dcf_lpa(cotacao, pl_efetivo, g1, g2, gt, wacc, roe_pct=roe)
+            iv, upside, fcf_mult, fcf_mult_tv = calcular_dcf_lpa(
+                cotacao, pl_efetivo, g1, g2, gt, wacc, roe_pct=roe, roic_pct=roic
+            )
 
             if iv is None:
                 st.warning("WACC precisa ser maior que o crescimento terminal para o cálculo ser válido.")
@@ -904,14 +931,17 @@ if tickers:
 
             ms_color = "#00ff87" if ms > 20 else ("#ffd600" if ms > 0 else "#ff3d5a")
 
-            # Ajuste Damodaran: mostrar retenção aplicada
+            # Ajuste Damodaran: mostrar retenção de crescimento e terminal
+            roc_val = roic if has_roic else (roe if has_roe else None)
             retention_note = ""
-            if has_roe and fcf_mult is not None and fcf_mult < 0.99:
-                ret_pct = (1 - fcf_mult) * 100
+            if roc_val and fcf_mult is not None:
+                ret_g = (1 - fcf_mult) * 100
+                ret_tv = (1 - fcf_mult_tv) * 100 if fcf_mult_tv is not None else None
+                tv_note = f" | Fase terminal: {ret_tv:.0f}% retido (ROC={min(roc_val, wacc+2):.1f}%)" if ret_tv is not None else ""
                 retention_note = (
                     f'<div style="font-size:0.70rem;color:#64748b;margin-bottom:0.5rem;">'
-                    f'Ajuste Damodaran: {ret_pct:.0f}% do LPA retido para financiar crescimento '
-                    f'(ROE={roe:.1f}%) → FCF/LPA = {fcf_mult*100:.0f}%</div>'
+                    f'Retenção ({roc_used_label}={roc_val:.1f}%): '
+                    f'crescimento {ret_g:.0f}% retido → FCF/LPA={fcf_mult*100:.0f}%{tv_note}</div>'
                 )
 
             # Cards principais (DCF + DDM quando disponível)
@@ -973,7 +1003,7 @@ if tickers:
                 for w in wacc_vals:
                     row_s = []
                     for g in g1_vals:
-                        _, up, _ = calcular_dcf_lpa(cotacao, pl_efetivo, g, max(g*0.5, 0), gt, w, roe_pct=roe)
+                        _, up, _, _ = calcular_dcf_lpa(cotacao, pl_efetivo, g, max(g*0.5, 0), gt, w, roe_pct=roe, roic_pct=roic)
                         row_s.append(round(up, 1) if up is not None else None)
                     sens_z.append(row_s)
 
@@ -998,22 +1028,21 @@ if tickers:
 
         # Montar df auxiliar para DCF com Cotacao, PL, ROE e Div_Yield
         dcf_base = [c for c in ['Cotacao', 'PL'] if c in df.columns]
-        dcf_extra = [c for c in ['ROE', 'Div_Yield'] if c in df.columns]
+        dcf_extra = [c for c in ['ROE', 'ROIC', 'Div_Yield'] if c in df.columns]
         if len(dcf_base) == 2:
             df_dcf = df[dcf_base + dcf_extra].drop_duplicates(keep='last').copy()
             df_dcf['Cotacao'] = clean_numeric_column(df_dcf['Cotacao'])
             df_dcf['PL'] = clean_numeric_column(df_dcf['PL']) / 100.0
-            # ROE e Div_Yield já vêm em formato percentual do Fundamentus (ex: 15.2 para 15.2%)
+            # ROE, ROIC e Div_Yield já vêm em formato percentual do Fundamentus (ex: 15.2 para 15.2%)
             # — NÃO multiplicar por 100, ao contrário de PL/EV/EBITDA que perdem o decimal
-            if 'ROE' in df_dcf.columns:
-                df_dcf['ROE'] = clean_numeric_column(df_dcf['ROE'])
-            if 'Div_Yield' in df_dcf.columns:
-                df_dcf['Div_Yield'] = clean_numeric_column(df_dcf['Div_Yield'])
+            for col in ['ROE', 'ROIC', 'Div_Yield']:
+                if col in df_dcf.columns:
+                    df_dcf[col] = clean_numeric_column(df_dcf[col])
 
-            def _dcf_extra(ticker, row_d):
-                roe_v = float(row_d['ROE']) if 'ROE' in row_d.index and not pd.isna(row_d['ROE']) else None
-                dy_v  = float(row_d['Div_Yield']) if 'Div_Yield' in row_d.index and not pd.isna(row_d['Div_Yield']) else None
-                return roe_v, dy_v
+            def _dcf_extra(row_d):
+                def _get(col):
+                    return float(row_d[col]) if col in row_d.index and not pd.isna(row_d[col]) else None
+                return _get('ROE'), _get('ROIC'), _get('Div_Yield')
 
             if len(tickers) > 1:
                 tabs_dcf = st.tabs(tickers)
@@ -1026,10 +1055,10 @@ if tickers:
                             cres = df_ind.loc[ticker, 'Crescimento Receita 5 anos'] if ticker in df_ind.index else 5.0
                             if isinstance(cres, pd.Series):
                                 cres = float(cres.iloc[-1])
-                            roe_v, dy_v = _dcf_extra(ticker, row_d)
+                            roe_v, roic_v, dy_v = _dcf_extra(row_d)
                             render_dcf_panel(ticker, float(row_d['Cotacao']), float(row_d['PL']),
                                              float(cres) if not pd.isna(cres) else 5.0,
-                                             _get_setor(ticker), roe=roe_v, div_yield=dy_v)
+                                             _get_setor(ticker), roe=roe_v, div_yield=dy_v, roic=roic_v)
                         else:
                             st.warning(f"Sem dados para {ticker}")
             else:
@@ -1041,10 +1070,10 @@ if tickers:
                     cres = df_ind.loc[ticker, 'Crescimento Receita 5 anos'] if ticker in df_ind.index else 5.0
                     if isinstance(cres, pd.Series):
                         cres = float(cres.iloc[-1])
-                    roe_v, dy_v = _dcf_extra(ticker, row_d)
+                    roe_v, roic_v, dy_v = _dcf_extra(row_d)
                     render_dcf_panel(ticker, float(row_d['Cotacao']), float(row_d['PL']),
                                      float(cres) if not pd.isna(cres) else 5.0,
-                                     _get_setor(ticker), roe=roe_v, div_yield=dy_v)
+                                     _get_setor(ticker), roe=roe_v, div_yield=dy_v, roic=roic_v)
         else:
             st.info("Dados de Cotação ou P/L não disponíveis para o DCF.")
 
