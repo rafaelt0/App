@@ -155,6 +155,131 @@ def calcular_ddm(cotacao, div_yield_pct, gt_pct, wacc_pct):
     iv = dps / (r - g)
     return iv, (iv / cotacao - 1) * 100
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_yfinance_fcff(ticker_b3):
+    """Busca dados para DCF FCFF completo via yfinance. Retorna dict ou None."""
+    try:
+        t = yf.Ticker(f"{ticker_b3}.SA")
+
+        def _avg(df, keys, n=2):
+            for k in keys:
+                if k in df.index:
+                    vals = pd.to_numeric(df.loc[k], errors='coerce').dropna()
+                    if len(vals):
+                        return float(vals.iloc[:n].mean())
+            return None
+
+        inc  = t.financials
+        cf   = t.cashflow
+        bs   = t.balance_sheet
+        info = t.info or {}
+
+        if inc is None or inc.empty:
+            return None
+
+        ebit     = _avg(inc, ['EBIT', 'Operating Income'])
+        pretax   = _avg(inc, ['Pretax Income'])
+        taxexp   = _avg(inc, ['Tax Provision', 'Income Tax Expense'])
+        interest = _avg(inc, ['Interest Expense', 'Interest Expense Non Operating'])
+        da       = _avg(cf,  ['Depreciation And Amortization', 'Depreciation'])
+        capex    = _avg(cf,  ['Capital Expenditure'])         # negative in yfinance
+        dwc      = _avg(cf,  ['Change In Working Capital'])
+
+        debt  = _avg(bs, ['Total Debt', 'Long Term Debt And Capital Lease Obligation', 'Long Term Debt'], n=1)
+        cash  = _avg(bs, ['Cash And Cash Equivalents', 'Cash Cash Equivalents And Short Term Investments'], n=1)
+        equity= _avg(bs, ['Stockholders Equity', 'Total Equity Gross Minority Interest'], n=1)
+
+        shares = (info.get('sharesOutstanding') or
+                  info.get('impliedSharesOutstanding') or
+                  info.get('floatShares'))
+        beta   = float(info.get('beta') or 1.0)
+
+        if not ebit or not shares or shares <= 0:
+            return None
+
+        # Alíquota efetiva (cap 10-40%, fallback 34% Brasil)
+        if pretax and taxexp and abs(pretax) > 0:
+            tax_rate = min(max(abs(taxexp) / abs(pretax), 0.10), 0.40)
+        else:
+            tax_rate = 0.34
+
+        nopat   = ebit * (1 - tax_rate)
+        da_v    = da    if da    is not None else 0.0
+        capex_v = abs(capex) if capex is not None else 0.0  # capex é negativo no yf
+        dwc_v   = dwc   if dwc   is not None else 0.0
+        fcff    = nopat + da_v - capex_v - dwc_v
+
+        # Taxa de reinvestimento histórica: (CapEx_líq + ΔWC) / NOPAT
+        reinv = (capex_v - da_v + dwc_v) / nopat if nopat > 0 else None
+        if reinv is not None:
+            reinv = min(max(reinv, 0.0), 0.95)
+
+        # ROIC = NOPAT / Capital Investido
+        inv_cap = (debt or 0) + (equity or 0) - (cash or 0)
+        roic = (nopat / inv_cap * 100) if inv_cap > 1_000 else None
+
+        # Custo de dívida = Juros / Dívida Total
+        kd = abs(interest) / (debt or 1) * 100 if interest and debt and debt > 0 else None
+
+        net_debt = (debt or 0) - (cash or 0)
+
+        missing = [lbl for lbl, val in [("D&A", da), ("CapEx", capex), ("ΔWC", dwc)] if val is None]
+
+        return {
+            'fcff_ps':     fcff / shares,
+            'nopat_ps':    nopat / shares,
+            'net_debt_ps': net_debt / shares,
+            'fcff':        fcff,
+            'nopat':       nopat,
+            'ebit':        ebit,
+            'da':          da_v,
+            'capex':       capex_v,
+            'delta_wc':    dwc_v,
+            'tax_rate':    tax_rate,
+            'reinv_rate':  reinv,
+            'roic':        roic,
+            'kd':          kd,
+            'net_debt':    net_debt,
+            'debt':        debt or 0,
+            'cash':        cash or 0,
+            'shares':      shares,
+            'beta':        beta,
+            'missing':     missing,
+        }
+    except Exception:
+        return None
+
+def calcular_dcf_fcff(fcff0_ps, nopat0_ps, net_debt_ps, cotacao,
+                      g1_pct, g2_pct, gt_pct, wacc_pct, roic_pct=None):
+    """DCF FCFF completo: projeção FCFF + TV com retenção estável + ponte firma→ação.
+    Retorna (iv_equity_por_acao, upside_pct).
+    """
+    if fcff0_ps <= 0 or not nopat0_ps or nopat0_ps <= 0:
+        return None, None
+    g1r, g2r, gtr, r = g1_pct/100, g2_pct/100, gt_pct/100, wacc_pct/100
+    if r <= gtr:
+        return None, None
+    # ROC estável na perpetuidade → WACC + 2% (Damodaran: spread cai com o tempo)
+    roc_s = max(wacc_pct + 2.0, gt_pct + 1.0)
+    if roic_pct:
+        roc_s = min(roic_pct, roc_s)
+    fcf_mult_tv = max(1.0 - gt_pct / roc_s, 0.0)
+
+    vp = 0.0
+    for t in range(1, 6):
+        vp += fcff0_ps * (1 + g1r) ** t / (1 + r) ** t
+    for t in range(6, 11):
+        vp += fcff0_ps * (1 + g1r) ** 5 * (1 + g2r) ** (t - 5) / (1 + r) ** t
+    # Valor Terminal: NOPAT do ano 10 com retenção estável (Damodaran TV = FCFF_{n+1}/(r-g))
+    nopat10 = nopat0_ps * (1 + g1r) ** 5 * (1 + g2r) ** 5
+    fcff_tv  = nopat10 * fcf_mult_tv
+    tv = fcff_tv * (1 + gtr) / (r - gtr)
+    vp += tv / (1 + r) ** 10
+
+    iv_equity = vp - net_debt_ps           # ponte firma → patrimônio por ação
+    upside = (iv_equity / cotacao - 1) * 100 if cotacao > 0 else None
+    return iv_equity, upside
+
 @st.cache_data(ttl=3600)
 def get_fundamentus_data(tickers):
     """Busca dados fundamentalistas com retry automático."""
@@ -798,8 +923,8 @@ if tickers:
         st.markdown("---")
         section_header(ICO_DCF, "Valuation Intrínseco — DCF", "h3")
         st.caption(
-            "DCF em 2 fases (Damodaran): retenção = g/ROIC por fase; valor terminal com ROC estável ≈ WACC+2%. "
-            "LPA como proxy de FCFF por ação — use como referência comparativa, não como preço-alvo preciso."
+            "DCF FCFF (Damodaran) quando dados yfinance disponíveis — EBIT(1-t) + D&A − CapEx − ΔWC, "
+            "com ponte firma→ação (− dívida líquida). Fallback para LPA quando sem dados de cash flow."
         )
 
         # Keywords para setores cíclicos — earnings não representam capacidade normal
@@ -836,8 +961,20 @@ if tickers:
                 pl_efetivo = _PL_CICLO_NORMAL
                 pl_norm_applied = True
 
+            # Buscar dados FCFF do yfinance (cacheado — ~0.5s na 1ª chamada)
+            yfdata = get_yfinance_fcff(ticker_name)
+
             selic = get_selic_anual_dcf()
-            default_wacc = round(min(selic * 100 + 5.0, 20.0), 1)
+            # WACC sugerido: Rf + β × (ERP_EUA + CRP_Brasil) ≈ Rf + β × 8%
+            if yfdata and yfdata.get('beta'):
+                _beta = max(min(float(yfdata['beta']), 2.5), 0.3)
+                _ke   = selic * 100 + _beta * 8.0
+                default_wacc = round(min(_ke, 22.0), 1)
+                _wacc_hint = f"Beta={_beta:.2f} → Ke≈{_ke:.1f}% (Rf={selic*100:.1f}% + β×8%)"
+            else:
+                default_wacc = round(min(selic * 100 + 5.0, 20.0), 1)
+                _wacc_hint = f"Selic {selic*100:.1f}% + prêmio de risco ~5%"
+
             raw_g1 = float(cres5a) if not pd.isna(cres5a) else 5.0
             # Cíclicas: crescimento histórico de receita em pico superestima o futuro — cap em 8%
             if is_cyclical:
@@ -857,39 +994,40 @@ if tickers:
                 )
 
             # Confiança do modelo
-            has_roic = roic and not pd.isna(roic) and roic > 0
-            has_roe  = roe and not pd.isna(roe) and roe > 0
-            has_dy   = div_yield and not pd.isna(div_yield) and div_yield > 0
-            pl_ok    = 5 < pl_efetivo < 80
+            has_roic  = roic and not pd.isna(roic) and roic > 0
+            has_roe   = roe and not pd.isna(roe) and roe > 0
+            has_dy    = div_yield and not pd.isna(div_yield) and div_yield > 0
+            has_fcff  = yfdata is not None and yfdata.get('fcff_ps', 0) > 0
+            pl_ok     = 5 < pl_efetivo < 80
             roc_used_label = "ROIC" if has_roic else ("ROE" if has_roe else "N/D")
             if is_cyclical:
                 conf_label, conf_color = "Baixa — Cíclico", "#ff3d5a"
                 conf_tip = "Empresas cíclicas: LPA varia com o ciclo de commodities. Use como referência aproximada de mid-ciclo."
+            elif has_fcff and not is_cyclical:
+                conf_label, conf_color = "Alta — FCFF Real", "#00ff87"
+                conf_tip = "Dados de EBIT, D&A, CapEx e ΔWC disponíveis via yfinance — DCF completo ativo."
             elif (has_roic or has_roe) and pl_ok:
-                conf_label, conf_color = "Alta", "#00ff87"
-                conf_tip = f"ROC ({roc_used_label}) disponível → retenção Damodaran calibrada. P/L razoável."
-            elif (has_roic or has_roe) or pl_ok:
-                conf_label, conf_color = "Média", "#ffd600"
-                conf_tip = f"Ajuste parcial: {roc_used_label} disponível mas P/L extremo." if (has_roic or has_roe) else "P/L razoável mas sem ROC para calibrar retenção."
+                conf_label, conf_color = "Média — LPA proxy", "#ffd600"
+                conf_tip = f"Sem cash flow completo. ROC ({roc_used_label}) disponível → retenção Damodaran calibrada."
             else:
-                conf_label, conf_color = "Baixa", "#ff3d5a"
-                conf_tip = "Sem ROC e P/L atípico — resultado indicativo, use com cautela."
+                conf_label, conf_color = "Baixa — LPA proxy", "#ff3d5a"
+                conf_tip = "Sem dados de cash flow e sem ROC — estimativa muito aproximada."
 
             conf_html = (
                 f'<span style="display:inline-flex;align-items:center;gap:4px;'
                 f'background:rgba(0,0,0,0.25);border:1px solid {conf_color}33;'
                 f'border-radius:20px;padding:2px 10px;font-size:0.72rem;color:{conf_color};'
                 f'font-weight:700;margin-bottom:0.6rem;" title="{conf_tip}">'
-                f'● Confiança {conf_label} · ROC={roc_used_label}</span>'
+                f'● Confiança {conf_label}</span>'
             )
             st.markdown(conf_html, unsafe_allow_html=True)
 
             with st.expander("⚙️ Personalizar premissas", expanded=False):
                 ca, cb = st.columns(2)
                 with ca:
-                    wacc = st.slider("WACC — Taxa de Desconto (%)", 7.0, 20.0, value=default_wacc, step=0.5,
+                    wacc = st.slider("WACC — Taxa de Desconto (%)", 7.0, 22.0, value=default_wacc, step=0.5,
                                      key=f"dcf_wacc_{ticker_name}",
-                                     help=f"Selic atual: {selic*100:.1f}% a.a. + prêmio de risco de capital (sugerido: +4-6%)")
+                                     help=_wacc_hint)
                     g1 = st.slider("Crescimento Anos 1–5 (%)", 0.0, 30.0, value=default_g1, step=0.5,
                                    key=f"dcf_g1_{ticker_name}",
                                    help=f"Crescimento histórico de receita (5 anos): {cres5a:.1f}%. Seja conservador.")
@@ -909,19 +1047,33 @@ if tickers:
                 st.warning("WACC precisa ser maior que o crescimento terminal para o cálculo ser válido.")
                 return
 
-            # DDM como método complementar para pagadores de dividendo
+            # DCF FCFF completo (Damodaran) se dados yfinance disponíveis
+            iv_fcff, up_fcff = None, None
+            if has_fcff:
+                iv_fcff, up_fcff = calcular_dcf_fcff(
+                    yfdata['fcff_ps'], yfdata['nopat_ps'], yfdata['net_debt_ps'],
+                    cotacao, g1, g2, gt, wacc, roic_pct=yfdata.get('roic')
+                )
+                if iv_fcff is not None and iv_fcff <= 0:
+                    st.warning(f"Dívida líquida (R$ {yfdata['net_debt_ps']:,.2f}/ação) supera o valor operacional — empresa tecnicamente insolvente a estas premissas.")
+                    iv_fcff, up_fcff = None, None
+
+            # DDM complementar para pagadores de dividendo
             iv_ddm, upside_ddm = None, None
             if has_dy and div_yield >= 2.0:
                 iv_ddm, upside_ddm = calcular_ddm(cotacao, div_yield, gt, wacc)
 
-            # Consenso: média ponderada DCF (2/3) + DDM (1/3) quando ambos disponíveis
-            if iv_ddm is not None:
-                iv_cons   = iv * 2/3 + iv_ddm * 1/3
-                up_cons   = (iv_cons / cotacao - 1) * 100
+            # Valor principal: FCFF se disponível (completo), senão LPA (proxy)
+            iv_primary  = iv_fcff if iv_fcff is not None else iv
+            up_primary  = up_fcff if iv_fcff is not None else upside
+            # Consenso: incorpora DDM como dado complementar quando disponível
+            if iv_ddm is not None and iv_primary is not None:
+                iv_cons = iv_primary * (2/3) + iv_ddm * (1/3)
+                up_cons = (iv_cons / cotacao - 1) * 100
             else:
-                iv_cons, up_cons = iv, upside
+                iv_cons, up_cons = iv_primary, up_primary
 
-            ms = (iv_cons - cotacao) / iv_cons * 100
+            ms = (iv_cons - cotacao) / iv_cons * 100 if iv_cons and iv_cons != 0 else 0
             if up_cons > 20:
                 verdict, vcolor, vicon = "SUBAVALIADO", "#00ff87", "↑"
             elif up_cons < -20:
@@ -931,28 +1083,24 @@ if tickers:
 
             ms_color = "#00ff87" if ms > 20 else ("#ffd600" if ms > 0 else "#ff3d5a")
 
-            # Ajuste Damodaran: mostrar retenção de crescimento e terminal
-            roc_val = roic if has_roic else (roe if has_roe else None)
-            retention_note = ""
-            if roc_val and fcf_mult is not None:
-                ret_g = (1 - fcf_mult) * 100
-                ret_tv = (1 - fcf_mult_tv) * 100 if fcf_mult_tv is not None else None
-                tv_note = f" | Fase terminal: {ret_tv:.0f}% retido (ROC={min(roc_val, wacc+2):.1f}%)" if ret_tv is not None else ""
-                retention_note = (
-                    f'<div style="font-size:0.70rem;color:#64748b;margin-bottom:0.5rem;">'
-                    f'Retenção ({roc_used_label}={roc_val:.1f}%): '
-                    f'crescimento {ret_g:.0f}% retido → FCF/LPA={fcf_mult*100:.0f}%{tv_note}</div>'
+            # Cards de resultados
+            cards_html = ""
+            if iv_fcff is not None:
+                cards_html += (
+                    f'<div class="mcard"><div class="mcard-label">IV — FCFF ✓</div>'
+                    f'<div class="mcard-value" style="color:#00e5ff">R$ {iv_fcff:,.2f}</div></div>'
                 )
-
-            # Cards principais (DCF + DDM quando disponível)
-            cards_html = (
-                f'<div class="mcard"><div class="mcard-label">IV — DCF</div>'
-                f'<div class="mcard-value" style="color:#a855f7">R$ {iv:,.2f}</div></div>'
+            cards_html += (
+                f'<div class="mcard"><div class="mcard-label">IV — LPA proxy</div>'
+                f'<div class="mcard-value" style="color:{"#a855f7" if iv_fcff is None else "#475569"}">R$ {iv:,.2f}</div></div>'
             )
             if iv_ddm is not None:
                 cards_html += (
                     f'<div class="mcard"><div class="mcard-label">IV — DDM</div>'
                     f'<div class="mcard-value" style="color:#818cf8">R$ {iv_ddm:,.2f}</div></div>'
+                )
+            if iv_ddm is not None or iv_fcff is not None:
+                cards_html += (
                     f'<div class="mcard"><div class="mcard-label">Consenso</div>'
                     f'<div class="mcard-value" style="color:#c084fc">R$ {iv_cons:,.2f}</div></div>'
                 )
@@ -964,14 +1112,60 @@ if tickers:
                 f'<div class="mcard"><div class="mcard-label">Margem de Seg.</div>'
                 f'<div class="mcard-value" style="color:{ms_color}">{ms:.1f}%</div></div>'
             )
-            st.markdown(retention_note + f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
-            # Barra visual preço vs IV consenso
-            total_range = max(iv_cons, cotacao) * 1.1 or 1
+            # Breakdown do FCFF (expander) — só quando disponível
+            if yfdata and has_fcff:
+                with st.expander("📋 Composição do FCFF (yfinance)", expanded=False):
+                    billions = yfdata['fcff'] >= 1e9
+                    scale = 1e9 if billions else 1e6
+                    unit = "bi" if billions else "mi"
+                    def _fmt(v): return f"R$ {v/scale:,.1f} {unit}"
+                    rows_fcff = [
+                        ("EBIT",                   _fmt(yfdata['ebit']),     ""),
+                        (f"× (1 − t={yfdata['tax_rate']*100:.0f}%)", "→ NOPAT", _fmt(yfdata['nopat'])),
+                        ("+ D&A",                  _fmt(yfdata['da']),       ""),
+                        ("− CapEx",                _fmt(-yfdata['capex']),   ""),
+                        ("− ΔWC",                  _fmt(-yfdata['delta_wc']),""),
+                        ("= FCFF",                 _fmt(yfdata['fcff']),     f"R$ {yfdata['fcff_ps']:.2f}/ação"),
+                        ("Dívida Líquida",         _fmt(yfdata['net_debt']), f"R$ {yfdata['net_debt_ps']:.2f}/ação"),
+                    ]
+                    for label, val, note in rows_fcff:
+                        sep = "border-top:1px solid #1e293b;" if "FCFF" in label else ""
+                        note_html = f'<span style="color:#64748b;font-size:0.68rem;margin-left:6px">{note}</span>' if note else ""
+                        st.markdown(
+                            f'<div style="display:flex;justify-content:space-between;'
+                            f'padding:3px 0;font-size:0.78rem;{sep}">'
+                            f'<span style="color:#94a3b8">{label}</span>'
+                            f'<span style="color:#f8fafc;font-family:monospace">{val}{note_html}</span></div>',
+                            unsafe_allow_html=True
+                        )
+                    extras = []
+                    if yfdata.get('reinv_rate') is not None:
+                        extras.append(f"Reinvestimento histórico: {yfdata['reinv_rate']*100:.0f}%")
+                    if yfdata.get('roic') is not None:
+                        extras.append(f"ROIC: {yfdata['roic']:.1f}%")
+                    if yfdata.get('kd') is not None:
+                        extras.append(f"Custo dívida: {yfdata['kd']:.1f}%")
+                    extras.append(f"Beta: {yfdata['beta']:.2f}")
+                    if yfdata.get('missing'):
+                        extras.append(f"⚠ Ausentes: {', '.join(yfdata['missing'])}")
+                    st.caption("  ·  ".join(extras))
+
+            # Barra visual preço vs IV principal
+            iv_bar = iv_cons if iv_cons else cotacao
+            total_range = max(iv_bar, cotacao) * 1.1 or 1
             price_p = min(cotacao / total_range * 100, 100)
-            iv_p    = min(iv_cons  / total_range * 100, 100)
-            bar_color = "#00ff87" if iv_cons > cotacao else "#ff3d5a"
-            iv_label = "Consenso" if iv_ddm is not None else "IV (DCF)"
+            iv_p    = min(iv_bar   / total_range * 100, 100)
+            bar_color = "#00ff87" if iv_bar > cotacao else "#ff3d5a"
+            if iv_fcff is not None and iv_ddm is not None:
+                iv_label = "Consenso (FCFF+DDM)"
+            elif iv_fcff is not None:
+                iv_label = "IV (FCFF)"
+            elif iv_ddm is not None:
+                iv_label = "Consenso (LPA+DDM)"
+            else:
+                iv_label = "IV (LPA proxy)"
             st.markdown(f"""
 <div style="margin:0.6rem 0 0.5rem 0;">
   <div style="font-size:0.68rem;color:#64748b;font-weight:600;text-transform:uppercase;
@@ -989,7 +1183,7 @@ if tickers:
     <span style="font-size:0.72rem;color:#94a3b8;">R$ {cotacao:,.2f} (atual)</span>
     <span style="font-size:0.82rem;font-weight:800;color:{vcolor};letter-spacing:0.04em;">
       {vicon} {verdict}</span>
-    <span style="font-size:0.72rem;color:#a855f7;">{iv_label}: R$ {iv_cons:,.2f}</span>
+    <span style="font-size:0.72rem;color:#a855f7;">{iv_label}: R$ {iv_bar:,.2f}</span>
   </div>
 </div>
 """, unsafe_allow_html=True)
