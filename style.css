@@ -1,5 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
+/* Smooth scroll + overscroll containment */
+html {
+  scroll-behavior: smooth;
+}
+
 /* Global variables and design tokens */
 :root {
   --bg-color: #080c14;
@@ -25,6 +30,7 @@
   background: radial-gradient(circle at 50% 0%, #132237 0%, var(--bg-color) 70%) !important;
   color: var(--text-main) !important;
   font-family: var(--font-display) !important;
+  overscroll-behavior-y: contain;
 }
 
 /* Scrollbars */
@@ -142,6 +148,15 @@ div[data-baseweb="notification"][kind="error"] {
   background: transparent !important;
   border-bottom: 1px solid var(--border-color) !important;
   gap: 0.5rem !important;
+  overflow-x: auto !important;
+  flex-wrap: nowrap !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  overscroll-behavior-x: contain !important;
+  scroll-snap-type: x proximity !important;
+}
+[data-testid="stTabs"] [data-baseweb="tab-list"]::-webkit-scrollbar {
+  display: none !important;
 }
 
 [data-testid="stTabs"] [data-baseweb="tab"] {
@@ -453,6 +468,73 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
   50% { opacity: 1; text-shadow: 0 0 10px rgba(0, 210, 255, 0.4); }
 }
 
+/* ─── Responsive Card Grid (CSS flex — replaces st.columns for cards) ───────*/
+.mcard-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+.mcard {
+  flex: 1 1 130px;
+  background: linear-gradient(135deg, #0e1726, #070c14);
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 0.85rem 0.7rem;
+  text-align: center;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15);
+  min-height: 78px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+}
+.mcard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.mcard:hover {
+  border-color: rgba(0, 255, 135, 0.35);
+  box-shadow: 0 10px 28px rgba(0,255,135,0.1), 0 4px 6px -1px rgba(0,0,0,0.2);
+  transform: translateY(-3px);
+}
+.mcard:hover::before {
+  opacity: 1;
+}
+.mcard:active {
+  transform: translateY(-1px) scale(0.99);
+  box-shadow: 0 4px 12px rgba(0,255,135,0.06), 0 2px 4px rgba(0,0,0,0.2);
+}
+.mcard-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.05em;
+  word-break: break-word;
+  line-height: 1.3;
+}
+.mcard-value {
+  font-size: clamp(0.82rem, 2.5vw, 1rem);
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
 /* ─── Page Hero Header ──────────────────────────────────────────────────────*/
 .page-hero {
   display: flex;
@@ -533,17 +615,23 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
 /* ─── Mobile Responsiveness ─────────────────────────────────────────────────*/
 @media (max-width: 768px) {
 
-  /* Hero compacto */
+  /* Hero compacto — mantém row para parecer com apps nativos */
   .page-hero {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     gap: 0.75rem;
-    padding: 1.2rem 1.25rem;
+    padding: 1rem 1rem;
     margin-bottom: 1.25rem;
   }
-  .page-hero-icon { font-size: 2rem; }
-  .page-hero-title { font-size: 1.3rem !important; }
-  .page-hero-subtitle { font-size: 0.82rem; }
+  .page-hero-icon { width: 44px; height: 44px; flex-shrink: 0; }
+  .page-hero-title { font-size: 1.2rem !important; }
+  .page-hero-subtitle {
+    font-size: 0.78rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
   /* Reduz padding geral do app */
   .main .block-container {
@@ -551,24 +639,19 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
     max-width: 100% !important;
   }
 
-  /* Métricas empilhadas */
-  [data-testid="stMetric"] {
-    padding: 1rem !important;
-  }
-  [data-testid="stMetricValue"] {
-    font-size: 1.4rem !important;
-  }
+  /* Métricas compactas */
+  [data-testid="stMetric"] { padding: 0.75rem !important; }
+  [data-testid="stMetricValue"],
+  [data-testid="stMetricValue"] > div { font-size: 1.35rem !important; }
 
   /* Tabelas com scroll horizontal */
-  .dataframe-container, [data-testid="stDataFrame"] {
+  [data-testid="stDataFrame"], .stDataFrame {
     overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   /* Forms sem padding excessivo */
-  [data-testid="stForm"] {
-    padding: 1rem !important;
-  }
+  [data-testid="stForm"] { padding: 1rem !important; }
 
   /* Sidebar overlay no mobile */
   [data-testid="stSidebar"] {
@@ -576,27 +659,85 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
     max-width: 320px !important;
   }
 
-  /* Botões full width */
+  /* Botões touch-friendly (44px mínimo per HIG) */
   .stButton > button,
   .stDownloadButton > button,
   .stFormSubmitButton > button {
-    width: 100% !important;
     padding: 0.75rem 1rem !important;
-    font-size: 0.95rem !important;
+    font-size: 0.9rem !important;
+    min-height: 44px !important;
   }
 
-  /* Oculta scrollbar decorativa no mobile */
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  /* Scrollbar discreta no mobile */
+  ::-webkit-scrollbar { width: 3px; height: 3px; }
 
-  /* Gráficos responsivos */
-  .js-plotly-plot, .plot-container { max-width: 100% !important; }
+  /* Gráficos sem overflow horizontal */
+  .js-plotly-plot, .plot-container {
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
 
-  /* Alinha colunas em coluna única quando apertado */
+  /* Colunas Streamlit: wrap mas sem forçar 100% ainda */
   [data-testid="stHorizontalBlock"] {
     flex-wrap: wrap !important;
+    gap: 0.5rem !important;
   }
+
+  /* Tabs: fonte menor para caber mais tickers */
+  [data-testid="stTabs"] [data-baseweb="tab"] {
+    padding: 0.5rem 0.8rem !important;
+    font-size: 0.78rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* Inputs: altura mínima para toque confortável */
+  .stNumberInput input { min-height: 44px !important; font-size: 1rem !important; }
+  .stSelectbox div[data-baseweb="select"] > div,
+  .stMultiSelect div[data-baseweb="select"] > div { min-height: 44px !important; }
+
+  /* Sliders: área de toque maior e touch-action para não conflitar com scroll vertical */
+  [data-baseweb="slider"] {
+    padding: 0.5rem 0 !important;
+    touch-action: pan-y !important;
+  }
+
+  /* Sidebar: permite scroll interno no mobile */
+  [data-testid="stSidebarUserContent"] {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Colunas Streamlit: 2 por linha — mais compacto e parecido com apps nativos */
   [data-testid="stHorizontalBlock"] > div {
-    min-width: 100% !important;
+    flex: 1 1 calc(50% - 0.5rem) !important;
+    min-width: min(48%, 140px) !important;
+  }
+
+  /* Métricas ainda menores */
+  [data-testid="stMetricValue"],
+  [data-testid="stMetricValue"] > div {
+    font-size: 1.1rem !important;
+    white-space: normal !important;
+  }
+  [data-testid="stMetricLabel"],
+  [data-testid="stMetricLabel"] > div { font-size: 0.6rem !important; }
+
+  /* Cards de texto compactos */
+  .mcard { min-height: 68px; padding: 0.65rem 0.5rem; }
+  .mcard-value { font-size: 0.88rem !important; }
+
+  /* Hero mínimo */
+  .page-hero { padding: 0.85rem !important; }
+  .page-hero-title { font-size: 1.05rem !important; }
+  .page-hero-icon { width: 40px; height: 40px; }
+
+  /* Safe area insets para iPhones com notch/Dynamic Island */
+  .main .block-container {
+    padding-bottom: max(2rem, env(safe-area-inset-bottom)) !important;
+    padding-left: max(0.75rem, env(safe-area-inset-left)) !important;
+    padding-right: max(0.75rem, env(safe-area-inset-right)) !important;
   }
 }
 
@@ -662,4 +803,268 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
   margin: 0;
   line-height: 1.5;
 }
+
+/* ─── Metric Delta Color Override ────────────────────────────────────────────*/
+[data-testid="stMetricDelta"] svg { display: none !important; }
+[data-testid="stMetricDelta"] > div {
+  font-family: var(--font-mono) !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  padding: 2px 8px !important;
+  border-radius: 4px !important;
+  display: inline-block !important;
+}
+/* Positive delta */
+[data-testid="stMetricDelta"][data-testid-delta-direction="up"] > div,
+[data-testid="stMetricDelta"].stMetricDeltaPositive > div {
+  color: #00ff87 !important;
+  background: rgba(0, 255, 135, 0.08) !important;
+  border: 1px solid rgba(0, 255, 135, 0.2) !important;
+}
+/* Negative delta */
+[data-testid="stMetricDelta"][data-testid-delta-direction="down"] > div,
+[data-testid="stMetricDelta"].stMetricDeltaNegative > div {
+  color: #ff3d5a !important;
+  background: rgba(255, 61, 90, 0.08) !important;
+  border: 1px solid rgba(255, 61, 90, 0.2) !important;
+}
+
+/* ─── Download Button Distinct Style ─────────────────────────────────────────*/
+[data-testid="stDownloadButton"] > button {
+  background: linear-gradient(135deg, rgba(0,210,255,0.1) 0%, rgba(0,210,255,0.04) 100%) !important;
+  border-color: rgba(0, 210, 255, 0.4) !important;
+  color: #00d2ff !important;
+  font-size: 0.82rem !important;
+  padding: 0.45rem 1rem !important;
+}
+
+[data-testid="stDownloadButton"] > button:hover {
+  border-color: #00d2ff !important;
+  box-shadow: 0 0 16px rgba(0, 210, 255, 0.3), var(--shadow-dark) !important;
+  transform: translateY(-1px) !important;
+  color: #00d2ff !important;
+}
+
+/* ─── Expander Improvements ───────────────────────────────────────────────────*/
+[data-testid="stExpander"] {
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius-md) !important;
+  background: rgba(14, 21, 36, 0.5) !important;
+  margin-bottom: 0.5rem !important;
+  overflow: hidden !important;
+}
+
+[data-testid="stExpander"] summary {
+  padding: 0.75rem 1rem !important;
+  cursor: pointer !important;
+  font-family: var(--font-display) !important;
+  font-size: 0.83rem !important;
+  font-weight: 600 !important;
+  color: var(--text-muted) !important;
+  transition: color 0.2s ease, background 0.2s ease !important;
+  border-radius: var(--border-radius-md) !important;
+}
+
+[data-testid="stExpander"] summary:hover {
+  color: var(--text-main) !important;
+  background: rgba(0, 255, 135, 0.03) !important;
+}
+
+[data-testid="stExpander"][open] summary {
+  color: var(--text-main) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius-md) var(--border-radius-md) 0 0 !important;
+}
+
+[data-testid="stExpander"] > div:last-child {
+  padding: 1rem !important;
+}
+
+/* ─── Caption / Small Text Improvements ──────────────────────────────────────*/
+[data-testid="stCaptionContainer"], .stCaption {
+  color: #64748b !important;
+  font-size: 0.75rem !important;
+  font-family: var(--font-display) !important;
+  line-height: 1.5 !important;
+}
+
+/* ─── Number Input Hide Arrows (cleaner look) ────────────────────────────────*/
+.stNumberInput input[type="number"]::-webkit-outer-spin-button,
+.stNumberInput input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+.stNumberInput input[type="number"] { -moz-appearance: textfield !important; }
+
+/* ─── Accessibility: reduced motion ─────────────────────────────────────────*/
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Keyboard focus ring (visible only for keyboard nav, not mouse) ─────────*/
+:focus-visible {
+  outline: 2px solid var(--secondary-color) !important;
+  outline-offset: 2px !important;
+  border-radius: var(--border-radius-sm) !important;
+}
+
+/* ─── Animated Gradient Border for Scorecards ────────────────────────────────*/
+@keyframes gradient-border {
+  0% { border-color: rgba(0, 255, 135, 0.5); box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
+  50% { border-color: rgba(0, 210, 255, 0.5); box-shadow: 0 0 20px rgba(0, 210, 255, 0.25); }
+  100% { border-color: rgba(0, 255, 135, 0.5); box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
+}
+.scorecard-animated {
+  animation: gradient-border 3s ease-in-out infinite;
+}
+
+/* ─── Utility Card Classes ────────────────────────────────────────────────────*/
+.card-positive {
+  border-color: rgba(0, 255, 135, 0.35) !important;
+  box-shadow: 0 0 12px rgba(0, 255, 135, 0.08), var(--shadow-dark) !important;
+}
+.card-negative {
+  border-color: rgba(255, 61, 90, 0.35) !important;
+  box-shadow: 0 0 12px rgba(255, 61, 90, 0.08), var(--shadow-dark) !important;
+}
+.card-neutral {
+  border-color: rgba(255, 214, 0, 0.3) !important;
+  box-shadow: 0 0 12px rgba(255, 214, 0, 0.06), var(--shadow-dark) !important;
+}
+
+/* ─── Sidebar Footer / Branding ──────────────────────────────────────────────*/
+.sidebar-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: inherit;
+  padding: 0.75rem 1rem;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border-color);
+  font-size: 0.7rem;
+  color: #475569;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  z-index: 1000;
+}
+
+/* ─── Selectbox Open Dropdown Styling ────────────────────────────────────────*/
+[data-baseweb="popover"] [data-baseweb="menu"] {
+  background: #0e1524 !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius-md) !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6) !important;
+}
+[data-baseweb="popover"] [role="option"] {
+  color: var(--text-muted) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.82rem !important;
+  padding: 0.5rem 1rem !important;
+  transition: background 0.15s ease !important;
+}
+[data-baseweb="popover"] [role="option"]:hover,
+[data-baseweb="popover"] [role="option"][aria-selected="true"] {
+  background: rgba(0, 255, 135, 0.07) !important;
+  color: var(--primary-color) !important;
+}
+
+/* ─── Form Submit Button (primary) ───────────────────────────────────────────*/
+[data-testid="stFormSubmitButton"] > button {
+  background: linear-gradient(135deg, rgba(0,255,135,0.15) 0%, rgba(0,210,255,0.08) 100%) !important;
+  border-color: var(--primary-color) !important;
+  color: var(--primary-color) !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  padding: 0.75rem 2rem !important;
+  box-shadow: 0 0 16px rgba(0,255,135,0.2) !important;
+}
+[data-testid="stFormSubmitButton"] > button:hover {
+  box-shadow: 0 0 28px rgba(0,255,135,0.4) !important;
+  transform: translateY(-2px) !important;
+}
+
+
+/* ─── Progress Bar ────────────────────────────────────────────────────────────*/
+[data-testid="stProgress"] > div > div {
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)) !important;
+  border-radius: 4px !important;
+}
+[data-testid="stProgress"] > div {
+  background: rgba(30, 41, 59, 0.5) !important;
+  border-radius: 4px !important;
+}
+
+/* ─── Tooltip (help icon) refinement ─────────────────────────────────────────*/
+[data-testid="stTooltipHoverTarget"] > div {
+  color: #475569 !important;
+  transition: color 0.2s ease !important;
+}
+[data-testid="stTooltipHoverTarget"] > div:hover { color: var(--secondary-color) !important; }
+[data-testid="stTooltipContent"] {
+  background: #0f1a2e !important;
+  border: 1px solid rgba(0, 210, 255, 0.25) !important;
+  border-radius: var(--border-radius-md) !important;
+  color: var(--text-main) !important;
+  font-family: var(--font-display) !important;
+  font-size: 0.78rem !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+  max-width: 280px !important;
+  padding: 0.6rem 0.9rem !important;
+  line-height: 1.5 !important;
+}
+
+/* ─── Plotly Chart Border Radius ─────────────────────────────────────────────*/
+.js-plotly-plot .plotly {
+  border-radius: var(--border-radius-md) !important;
+  overflow: hidden !important;
+}
+
+/* ─── Checkbox Styling ───────────────────────────────────────────────────────*/
+[data-testid="stCheckbox"] label {
+  font-family: var(--font-display) !important;
+  font-size: 0.85rem !important;
+  color: var(--text-muted) !important;
+  transition: color 0.2s ease !important;
+}
+[data-testid="stCheckbox"] label:hover { color: var(--text-main) !important; }
+[data-testid="stCheckbox"] [data-baseweb="checkbox"] [data-checked="true"] div {
+  background: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* ─── Multiselect Dropdown Improvements ──────────────────────────────────────*/
+[data-baseweb="tag"] span { font-size: 0.75rem !important; }
+[data-baseweb="tag"] [role="button"] { opacity: 0.7 !important; }
+[data-baseweb="tag"] [role="button"]:hover { opacity: 1 !important; }
+
+/* ─── Hero hover animation ───────────────────────────────────────────────────*/
+.page-hero {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease !important;
+}
+.page-hero:hover {
+  border-left-color: var(--secondary-color) !important;
+  box-shadow: var(--shadow-dark), 0 0 30px rgba(0, 210, 255, 0.08) !important;
+}
+.main-hero:hover { border-left-color: var(--primary-color) !important; }
+
+/* ─── Hide Streamlit Native Loading Indicators ───────────────────────────────*/
+/* Top progress decoration bar */
+[data-testid="stDecoration"] { display: none !important; }
+/* Top-right running/status widget */
+[data-testid="stStatusWidget"] { display: none !important; }
+/* Native spinner text (we use glassmorphic spinners instead) */
+[data-testid="stSpinner"] > div > p { display: none !important; }
+/* Hide Streamlit top toolbar when in embedded/app mode */
+[data-testid="stToolbar"] { display: none !important; }
+/* Hide "Made with Streamlit" footer */
+footer { display: none !important; }
+footer::after { display: none !important; }
+#MainMenu { display: none !important; }
 

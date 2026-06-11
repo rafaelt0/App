@@ -93,32 +93,13 @@ def diag_row(icon_svg, text, color):
 def render_cards_grid(data_dict, colors_sequence=None):
     if not colors_sequence:
         colors_sequence = ["#38bdf8", "#4ade80", "#fbbf24", "#fb7185", "#c084fc", "#f472b6", "#34d399", "#60a5fa"]
-    
     items = list(data_dict.items())
-    num_cols = 4
-    for i in range(0, len(items), num_cols):
-        chunk = items[i:i+num_cols]
-        cols = st.columns(num_cols)
-        for col, (label, val) in zip(cols, chunk):
-            color = colors_sequence[items.index((label, val)) % len(colors_sequence)]
-            with col:
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                            border: 1px solid #1e293b; 
-                            border-radius: 10px; 
-                            padding: 0.8rem; 
-                            text-align: center; 
-                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                            margin-bottom: 0.5rem;
-                            min-height: 90px;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: center;
-                            align-items: center;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
-                    <div style="font-size: 1.1rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{val}</div>
-                </div>
-                """, unsafe_allow_html=True)
+    cards_html = "".join(
+        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+        f'<div class="mcard-value" style="color:{colors_sequence[i % len(colors_sequence)]}">{val}</div></div>'
+        for i, (lbl, val) in enumerate(items)
+    )
+    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 
 @st.cache_data(ttl=3600)
@@ -149,6 +130,41 @@ def get_sorted_tickers_by_liquidity(tickers_list):
 # CSS customizado
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+st.sidebar.markdown("""
+<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
+  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>
+  <div style="display:flex;flex-direction:column;gap:0.35rem;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Análise Fundamentalista</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#00d2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba(0,210,255,0.4);">
+        <span style="font-size:0.65rem;font-weight:800;color:#080c14;">2</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:700;color:#00d2ff;">Portfolio</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.4;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">3</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Simulação</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.25;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">4</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Notícias</span>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 warnings.filterwarnings('ignore')
 
@@ -375,9 +391,7 @@ with col_config2:
         lookback_dias = st.number_input("Dias de Lookback", min_value=30, max_value=5000, value=500, step=10)
         data_inicio = today - datetime.timedelta(days=lookback_dias)
 
-# Exibir spinner rápido para o SELIC se necessário
-with st.spinner("Buscando taxa SELIC acumulada..."):
-    taxa_selic = get_selic_rate(data_inicio)
+taxa_selic = get_selic_rate(data_inicio)
 
 
 # Seleção de ações
@@ -441,22 +455,12 @@ if "Manual" in modo:
         st.success(f"Soma dos pesos: {total_pesos:.2f}% ✓")
     st.markdown("---")
 
-# Baixa dados com tela de carregamento glassmorphic
-loading_placeholder = st.empty()
-with loading_placeholder.container():
-    st.markdown("""
-    <div class="loading-container">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">Buscando cotações históricas dos ativos na B3...</div>
-    </div>
-    """, unsafe_allow_html=True)
-
+# Pré-carrega cotações silenciosamente (resultado cacheado após primeira execução)
 data_yf = get_portfolio_prices(tickers_yf, data_inicio)
 if isinstance(data_yf.columns, pd.MultiIndex):
     data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
 
 returns = data_yf.pct_change().dropna()
-loading_placeholder.empty()
 
 page_container = st.empty()
 
@@ -506,7 +510,23 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         peso_manual_df.index = peso_manual_df.index.str.replace(".SA", "", regex=False)
         pesos_dict = {ticker: f"{(row['Peso']*100):.2f}%" for ticker, row in peso_manual_df.iterrows()}
         render_cards_grid(pesos_dict)
-        
+
+        # Download portfolio allocation
+        try:
+            df_pesos_export = peso_manual_df.copy()
+            df_pesos_export.index = df_pesos_export.index.str.replace(".SA","",regex=False)
+            df_pesos_export["Peso (%)"] = (df_pesos_export["Peso"] * 100).round(2)
+            df_pesos_export = df_pesos_export.drop(columns=["Peso"])
+            pesos_csv = df_pesos_export.to_csv().encode("utf-8")
+            st.download_button(
+                label="⬇ Exportar alocação (CSV)",
+                data=pesos_csv,
+                file_name=f"portfolio_alocacao_{datetime.date.today()}.csv",
+                mime="text/csv",
+            )
+        except Exception:
+            pass
+
         # ── Sugestão de Compra de Cotas (Alocação Discreta) ───────────────────
         st.subheader("Sugestão de Compra de Cotas")
         st.markdown(f"Estimativa de cotas a comprar considerando o valor total de **R$ {valor_inicial:,.2f}**.")
@@ -776,11 +796,26 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         # Desempenho Resumido em Cards (st.metric)
         section_header(ICO_CHART, "Desempenho Resumido da Carteira", "h3")
         col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
-        col_m1.metric("Retorno Total", f"{total_return:.2f}%", help="Retorno total do portfólio no período selecionado.")
-        col_m2.metric("Volatilidade Anual", f"{vol_anual:.2f}%", help="Desvio padrão anualizado dos retornos. Mede o risco total.")
-        col_m3.metric("Índice Sharpe", f"{sharpe_val:.2f}", help="Retorno por unidade de risco. Acima de 1.0 é excelente.")
-        col_m4.metric("Índice Sortino", f"{sortino_val:.2f}", help="Igual ao Sharpe mas penaliza apenas volatilidade negativa.")
-        col_m5.metric("Max Drawdown", f"{max_dd:.2f}%", help="Maior perda de pico a vale. Quanto mais próximo de 0, melhor.")
+        col_m1.metric("Retorno Total", f"{total_return:.2f}%",
+                      delta="Positivo" if total_return > 0 else "Negativo",
+                      delta_color="normal" if total_return > 0 else "inverse",
+                      help="Retorno total do portfólio no período selecionado.")
+        col_m2.metric("Volatilidade Anual", f"{vol_anual:.2f}%",
+                      delta="Baixa" if vol_anual < 15 else ("Alta" if vol_anual > 25 else "Moderada"),
+                      delta_color="normal" if vol_anual < 15 else ("inverse" if vol_anual > 25 else "off"),
+                      help="Desvio padrão anualizado dos retornos. Mede o risco total.")
+        col_m3.metric("Índice Sharpe", f"{sharpe_val:.2f}",
+                      delta="Excelente" if sharpe_val > 1 else ("Bom" if sharpe_val > 0.5 else "Baixo"),
+                      delta_color="normal" if sharpe_val > 0.5 else "inverse",
+                      help="Retorno por unidade de risco. Acima de 1.0 é excelente.")
+        col_m4.metric("Índice Sortino", f"{sortino_val:.2f}",
+                      delta="Excelente" if sortino_val > 1 else ("Bom" if sortino_val > 0.5 else "Baixo"),
+                      delta_color="normal" if sortino_val > 0.5 else "inverse",
+                      help="Igual ao Sharpe mas penaliza apenas volatilidade negativa.")
+        col_m5.metric("Max Drawdown", f"{max_dd:.2f}%",
+                      delta="Controlado" if max_dd > -15 else ("Severo" if max_dd < -30 else "Moderado"),
+                      delta_color="normal" if max_dd > -15 else ("inverse" if max_dd < -30 else "off"),
+                      help="Maior perda de pico a vale. Quanto mais próximo de 0, melhor.")
 
         # ── Painel de Decisão do Investidor ───────────────────────────────────
         st.markdown("---")
@@ -849,6 +884,112 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             st.markdown("**Diagnóstico por indicador:**")
             for ico, msg, color in health_detalhes:
                 diag_row(ico, msg, color)
+
+        # ── Stress Test — Crises Históricas ──────────────────────────────────
+        st.markdown("---")
+        ICO_STRESS = _svg(
+            '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" '
+            'stroke="#ff3d5a" stroke-width="1.8" fill="none"/>'
+            '<line x1="12" y1="9" x2="12" y2="13" stroke="#ff3d5a" stroke-width="1.8" stroke-linecap="round"/>'
+            '<line x1="12" y1="17" x2="12.01" y2="17" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>',
+            16
+        )
+        section_header(ICO_STRESS, "Stress Test — Crises Históricas", "h3")
+        st.caption("Desempenho estimado do portfólio durante períodos de turbulência histórica. "
+                   "Exibe apenas crises dentro do período de dados selecionado.")
+
+        CRISES_HISTORICAS = {
+            "COVID-19 (2020)":               ("2020-01-17", "2020-03-23"),
+            "Recessão/Impeachment (2015–16)": ("2014-12-31", "2016-12-31"),
+            "Joesley Day (2017)":            ("2017-05-17", "2017-06-30"),
+            "Crise Global (2008–09)":        ("2008-08-01", "2009-03-31"),
+        }
+
+        data_start = data_yf.index.min()
+        data_end   = data_yf.index.max()
+        stress_results = []
+
+        for crise_nome, (s_str, e_str) in CRISES_HISTORICAS.items():
+            s_ts = pd.Timestamp(s_str)
+            e_ts = pd.Timestamp(e_str)
+            if s_ts > data_end or e_ts < data_start:
+                continue
+            s_clip = max(s_ts, data_start)
+            e_clip = min(e_ts, data_end)
+            mask_p = (data_yf.index >= s_clip) & (data_yf.index <= e_clip)
+            period_prices = data_yf[mask_p]
+            if len(period_prices) < 5:
+                continue
+            period_ret = period_prices.pct_change().dropna()
+            pesos_dict = dict(zip(data_yf.columns, pesos_manuais_arr))
+            pesos_period = np.array([pesos_dict.get(c, 0) for c in period_ret.columns])
+            if pesos_period.sum() > 0:
+                pesos_period = pesos_period / pesos_period.sum()
+            port_ret_period = period_ret.dot(pesos_period)
+            cum_port = (1 + port_ret_period).prod() - 1
+            mask_b = (retorno_bench.index >= s_clip) & (retorno_bench.index <= e_clip)
+            ibov_period = retorno_bench[mask_b]
+            cum_ibov = (1 + ibov_period).prod() - 1 if len(ibov_period) >= 5 else None
+            stress_results.append({
+                "Crise": crise_nome,
+                "Período": f"{s_clip.strftime('%b/%Y')} → {e_clip.strftime('%b/%Y')}",
+                "Portfólio": cum_port,
+                "IBOV": cum_ibov,
+            })
+
+        if not stress_results:
+            st.info("Nenhuma crise histórica está no intervalo de dados selecionado. "
+                    "Selecione um período mais longo (3+ anos) para ativar o stress test.")
+        else:
+            for r in stress_results:
+                port_pct = r["Portfólio"] * 100
+                ibov_pct = r["IBOV"] * 100 if r["IBOV"] is not None else None
+                diff = (r["Portfólio"] - r["IBOV"]) * 100 if r["IBOV"] is not None else None
+                port_color = "#ff3d5a" if port_pct < 0 else "#00ff87"
+                ibov_str  = f"{ibov_pct:+.1f}%" if ibov_pct is not None else "N/D"
+                diff_str  = f"{diff:+.1f}pp" if diff is not None else "N/D"
+                diff_color = "#00ff87" if (diff is not None and diff >= 0) else "#ff3d5a"
+                cards_html = (
+                    f'<div class="mcard"><div class="mcard-label">Portfólio</div>'
+                    f'<div class="mcard-value" style="color:{port_color}">{port_pct:+.1f}%</div></div>'
+                    f'<div class="mcard"><div class="mcard-label">IBOVESPA</div>'
+                    f'<div class="mcard-value" style="color:{"#ff3d5a" if (ibov_pct is not None and ibov_pct < 0) else "#00d2ff"}">{ibov_str}</div></div>'
+                    f'<div class="mcard"><div class="mcard-label">vs IBOV</div>'
+                    f'<div class="mcard-value" style="color:{diff_color}">{diff_str}</div></div>'
+                )
+                st.markdown(
+                    f'<div style="margin-bottom:0.3rem;font-size:0.78rem;font-weight:700;'
+                    f'color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em">'
+                    f'{r["Crise"]} <span style="font-weight:400;color:#475569">({r["Período"]})</span></div>',
+                    unsafe_allow_html=True
+                )
+                st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+            if len(stress_results) >= 2:
+                crises_names = [r["Crise"].split(" (")[0] for r in stress_results]
+                port_vals = [r["Portfólio"] * 100 for r in stress_results]
+                ibov_vals = [(r["IBOV"] * 100 if r["IBOV"] is not None else 0) for r in stress_results]
+                fig_stress = go.Figure()
+                fig_stress.add_trace(go.Bar(
+                    name="Portfólio", x=crises_names, y=port_vals,
+                    marker_color=["#00ff87" if v >= 0 else "#ff3d5a" for v in port_vals],
+                    text=[f"{v:+.1f}%" for v in port_vals], textposition="outside",
+                ))
+                fig_stress.add_trace(go.Bar(
+                    name="IBOVESPA", x=crises_names, y=ibov_vals,
+                    marker_color=["rgba(0,210,255,0.6)" if v >= 0 else "rgba(255,150,0,0.6)" for v in ibov_vals],
+                    text=[f"{v:+.1f}%" for v in ibov_vals], textposition="outside",
+                ))
+                fig_stress.update_layout(
+                    barmode="group",
+                    title="Portfólio vs IBOVESPA durante Crises Históricas",
+                    yaxis_title="Retorno (%)",
+                    height=380,
+                    margin=dict(t=50, b=40, l=40, r=20),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                )
+                apply_plotly_theme(fig_stress)
+                st.plotly_chart(fig_stress, use_container_width=True)
 
         # ── Regime de Mercado (últimos 21 dias) ──────────────────────────────
         section_header(ICO_SIGNAL, "Regime de Mercado (Últimos 21 Dias)", "h4")
@@ -925,8 +1066,11 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             
         
         
+        st.markdown("""
+<div style="background:linear-gradient(90deg,rgba(0,210,255,0.12) 0%,transparent 100%);height:2px;border-radius:2px;margin:2rem 0 1.5rem 0;"></div>
+""", unsafe_allow_html=True)
         section_header(ICO_RISK, "Análise de Drawdown", "h3")
-        
+
         # 1. Gráfico de Drawdown do Portfólio
         cum_returns = (1 + portfolio_returns).cumprod()
         rolling_max = cum_returns.cummax()
@@ -967,7 +1111,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         num_cols = 4
         for i in range(0, len(items_dd), num_cols):
             chunk = items_dd[i:i+num_cols]
-            cols = st.columns(num_cols)
+            cols = st.columns(len(chunk))
             for col, (ticker, row_d) in zip(cols, chunk):
                 m_dd = row_d['Máximo Drawdown (%)']
                 dt_dd = row_d['Data do Máximo Drawdown'].strftime('%Y-%m-%d')
@@ -1032,8 +1176,11 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         apply_matplotlib_theme(fig_3)
         st.pyplot(fig_3)
         
+        st.markdown("""
+<div style="background:linear-gradient(90deg,rgba(0,210,255,0.12) 0%,transparent 100%);height:2px;border-radius:2px;margin:2rem 0 1.5rem 0;"></div>
+""", unsafe_allow_html=True)
         section_header(ICO_RISK, "Análise de Contribuição de Risco", "h3")
-        
+
         cov_matrix_rc = returns.cov()
         port_vol = np.sqrt(np.dot(pesos_manuais_arr.T, np.dot(cov_matrix_rc, pesos_manuais_arr)))
         marginal_contrib = np.dot(cov_matrix_rc, pesos_manuais_arr) / port_vol
@@ -1086,6 +1233,20 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             st.session_state["pesos_manuais"] = pesos_manuais
         else:
             st.session_state["pesos_manuais"] = peso_manual_df["Peso"].to_dict()
+
+        # ── Próximo Passo ────────────────────────────────────────────────────
+        st.markdown("---")
+        sharpe_txt = f"Sharpe de {sharpe_val:.2f}" if sharpe_val > 0 else "portfólio configurado"
+        st.markdown(f"""
+<div style="background:linear-gradient(135deg,rgba(0,210,255,0.06),rgba(0,255,135,0.03));border:1px solid rgba(0,210,255,0.25);border-radius:14px;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">
+  <div>
+    <div style="font-size:0.72rem;color:#64748b;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.3rem;">Próximo Passo</div>
+    <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;">Abra <span style="color:#00d2ff">Simulação</span> na barra lateral</div>
+    <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.2rem;">Com {sharpe_txt} — projete trajetórias com Monte Carlo</div>
+  </div>
+  <div style="font-size:1.8rem;opacity:0.6;">→</div>
+</div>
+""", unsafe_allow_html=True)
                     
                     
                     

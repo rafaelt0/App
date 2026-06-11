@@ -19,6 +19,41 @@ import matplotlib.ticker as mtick
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
+st.sidebar.markdown("""
+<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
+  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>
+  <div style="display:flex;flex-direction:column;gap:0.35rem;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Análise Fundamentalista</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Portfolio</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#ffd600;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba(255,214,0,0.4);">
+        <span style="font-size:0.65rem;font-weight:800;color:#080c14;">3</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:700;color:#ffd600;">Simulação</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.35;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">4</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Notícias</span>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
 def _svg(body, size=14):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
@@ -48,32 +83,13 @@ def section_header(icon_svg, text, tag="h3"):
 def render_cards_grid(data_dict, colors_sequence=None):
     if not colors_sequence:
         colors_sequence = ["#38bdf8", "#4ade80", "#fbbf24", "#fb7185", "#c084fc", "#f472b6", "#34d399", "#60a5fa"]
-    
     items = list(data_dict.items())
-    num_cols = 4
-    for i in range(0, len(items), num_cols):
-        chunk = items[i:i+num_cols]
-        cols = st.columns(num_cols)
-        for col, (label, val) in zip(cols, chunk):
-            color = colors_sequence[items.index((label, val)) % len(colors_sequence)]
-            with col:
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                            border: 1px solid #1e293b; 
-                            border-radius: 10px; 
-                            padding: 0.8rem; 
-                            text-align: center; 
-                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                            margin-bottom: 0.5rem;
-                            min-height: 90px;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: center;
-                            align-items: center;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
-                    <div style="font-size: 1.1rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{val}</div>
-                </div>
-                """, unsafe_allow_html=True)
+    cards_html = "".join(
+        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+        f'<div class="mcard-value" style="color:{colors_sequence[i % len(colors_sequence)]}">{val}</div></div>'
+        for i, (lbl, val) in enumerate(items)
+    )
+    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 # Configurar temas de plotagem escuros
 plt.style.use('dark_background')
@@ -233,9 +249,16 @@ pior_cenario = valores_finais.min()
 melhor_cenario = valores_finais.max()
 prob_ganho = (valores_finais > valor_inicial).mean() * 100
 
+# Retorno anualizado esperado
+ret_esperado_pct = (valor_esperado / valor_inicial) ** (1/years) - 1
+ret_otimista_pct = (np.percentile(valores_finais, 75) / valor_inicial) ** (1/years) - 1
+ret_pessimista_pct = (np.percentile(valores_finais, 25) / valor_inicial) ** (1/years) - 1
+
 sim_stats_dict = {
     "Valor Esperado Final": f"R$ {valor_esperado:,.2f}",
     "Probabilidade de Ganho": f"{prob_ganho:.1f}%",
+    "Retorno Anual Esperado": f"{ret_esperado_pct*100:.1f}% a.a.",
+    "Retorno Anual Q75": f"{ret_otimista_pct*100:.1f}% a.a.",
     "VaR 5%": f"R$ {var_5:,.2f}",
     "CVaR 5%": f"R$ {cvar_5:,.2f}",
     "Pior Cenário": f"R$ {pior_cenario:,.2f}",
@@ -243,6 +266,26 @@ sim_stats_dict = {
 }
 
 section_header(ICO_CHART, "Estatísticas da Simulação Monte Carlo", "h3")
+
+col_s1, col_s2, col_s3 = st.columns(3)
+with col_s1:
+    ret_str = f"{ret_esperado_pct*100:.1f}% a.a."
+    st.metric("Retorno Anual Esperado", ret_str,
+              delta="Positivo" if ret_esperado_pct > 0 else "Negativo",
+              delta_color="normal" if ret_esperado_pct > 0 else "inverse",
+              help="Retorno anual composto implícito no valor esperado mediano.")
+with col_s2:
+    st.metric("Probabilidade de Ganho", f"{prob_ganho:.1f}%",
+              delta="Alta" if prob_ganho > 70 else ("Moderada" if prob_ganho > 50 else "Baixa"),
+              delta_color="normal" if prob_ganho > 60 else ("off" if prob_ganho > 40 else "inverse"),
+              help="Percentual de simulações que terminaram acima do capital inicial.")
+with col_s3:
+    perda_var = (var_5 / valor_inicial - 1) * 100
+    st.metric("VaR 5% (perda máx.)", f"{perda_var:.1f}%",
+              delta="Controlado" if perda_var > -30 else "Elevado",
+              delta_color="normal" if perda_var > -30 else "inverse",
+              help="Em 95% dos cenários, a perda máxima é este percentual.")
+
 render_cards_grid(sim_stats_dict)
 
 col_exp1, col_exp2 = st.columns(2)
@@ -326,6 +369,37 @@ fig_fan.add_hline(
 )
 st.plotly_chart(fig_fan, use_container_width=True)
 
+# Download simulation summary
+import io
+sim_summary = pd.DataFrame([{
+    "Métrica": k,
+    "Valor": v
+} for k, v in sim_stats_dict.items()])
+sim_summary_csv = sim_summary.to_csv(index=False).encode('utf-8')
+
+# Download dos percentis por data
+fan_export = fan_chart.copy()
+fan_export.index = fan_export.index.strftime('%Y-%m-%d')
+fan_export_csv = fan_export.to_csv().encode('utf-8')
+
+col_dl1, col_dl2, _ = st.columns([1, 1, 1])
+with col_dl1:
+    st.download_button(
+        label="⬇ Resumo (CSV)",
+        data=sim_summary_csv,
+        file_name=f"monte_carlo_resumo_{datetime.date.today()}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+with col_dl2:
+    st.download_button(
+        label="⬇ Percentis por Data (CSV)",
+        data=fan_export_csv,
+        file_name=f"monte_carlo_percentis_{datetime.date.today()}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
 # Histograma valor final
 q1 = valores_finais.quantile(0.25)
 q2 = valores_finais.quantile(0.50)
@@ -385,6 +459,68 @@ st.session_state["sim_var_5"] = var_5
 st.session_state["sim_cvar_5"] = cvar_5
 st.session_state["sim_pior_cenario"] = pior_cenario
 st.session_state["sim_melhor_cenario"] = melhor_cenario
+# ── Síntese do Analista (Simulação) ─────────────────────────────────────
+st.markdown("---")
+st.markdown("""
+<h3 style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" stroke="#a855f7" stroke-width="1.8"/>
+    <path d="M12 8v4l3 3" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <span style="background:linear-gradient(135deg,#f8fafc,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Síntese do Analista</span>
+</h3>
+""", unsafe_allow_html=True)
+
+# Gera análise textual dos resultados da simulação
+cenario_label = "otimista" if prob_ganho > 70 else ("equilibrado" if prob_ganho > 50 else "adverso")
+risco_label = "controlado" if perda_var > -30 else ("elevado" if perda_var < -50 else "moderado")
+ret_label = "positivo" if ret_esperado_pct > 0 else "negativo"
+
+sintese_sim_items = []
+if prob_ganho > 70:
+    sintese_sim_items.append(f'<li style="color:#00ff87;margin-bottom:3px;">Alta probabilidade de ganho ({prob_ganho:.1f}%) — cenário {cenario_label}</li>')
+elif prob_ganho > 50:
+    sintese_sim_items.append(f'<li style="color:#ffd600;margin-bottom:3px;">Probabilidade de ganho moderada ({prob_ganho:.1f}%) — cenário {cenario_label}</li>')
+else:
+    sintese_sim_items.append(f'<li style="color:#ff3d5a;margin-bottom:3px;">Baixa probabilidade de ganho ({prob_ganho:.1f}%) — revise a alocação</li>')
+
+sintese_sim_items.append(f'<li style="color:{"#00ff87" if ret_esperado_pct > 0.05 else "#ffd600" if ret_esperado_pct > 0 else "#ff3d5a"};margin-bottom:3px;">Retorno anual esperado {ret_label}: {ret_esperado_pct*100:.1f}% a.a. ao longo de {years} ano(s)</li>')
+sintese_sim_items.append(f'<li style="color:{"#00ff87" if risco_label == "controlado" else "#ffd600" if risco_label == "moderado" else "#ff3d5a"};margin-bottom:3px;">Risco de cauda {risco_label}: perda máxima esperada de {perda_var:.1f}% no VaR 5%</li>')
+
+amplitude = (melhor_cenario - pior_cenario) / valor_inicial * 100
+if amplitude > 200:
+    sintese_sim_items.append(f'<li style="color:#ffd600;margin-bottom:3px;">Alta dispersão de cenários ({amplitude:.0f}% de amplitude) — portfólio com volatilidade significativa</li>')
+else:
+    sintese_sim_items.append(f'<li style="color:#00ff87;margin-bottom:3px;">Dispersão de cenários controlada ({amplitude:.0f}% de amplitude)</li>')
+
+veredicto_sim = ("FAVORÁVEL", "#00ff87") if prob_ganho > 65 and ret_esperado_pct > 0.05 else \
+                ("NEUTRO", "#ffd600") if prob_ganho > 45 else ("DESFAVORÁVEL", "#ff3d5a")
+
+st.markdown(f"""
+<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:14px;padding:1.2rem 1.4rem;margin-bottom:1rem;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;flex-wrap:wrap;gap:0.5rem;">
+    <span style="font-weight:700;color:#f8fafc;font-size:0.95rem;">Projeção {years} ano(s) — {n_simulations} simulações</span>
+    <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto_sim[1]}40;border-radius:6px;padding:0.2rem 0.75rem;font-size:0.72rem;font-weight:800;color:{veredicto_sim[1]};letter-spacing:0.08em;">{veredicto_sim[0]}</span>
+  </div>
+  <ul style="margin:0;padding-left:1.1rem;font-size:0.82rem;line-height:1.9;list-style:disc;">
+    {"".join(sintese_sim_items)}
+  </ul>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Próximo Passo ────────────────────────────────────────────────────────
+cenario_desc = f"cenário {cenario_label} com {prob_ganho:.0f}% de probabilidade de ganho"
+st.markdown(f"""
+<div style="background:linear-gradient(135deg,rgba(168,85,247,0.06),rgba(0,210,255,0.03));border:1px solid rgba(168,85,247,0.25);border-radius:14px;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">
+  <div>
+    <div style="font-size:0.72rem;color:#64748b;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.3rem;">Próximo Passo</div>
+    <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;">Abra <span style="color:#a855f7">Notícias</span> na barra lateral</div>
+    <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.2rem;">Monitore o sentimento qualitativo — {cenario_desc}</div>
+  </div>
+  <div style="font-size:1.8rem;opacity:0.6;">→</div>
+</div>
+""", unsafe_allow_html=True)
+
 st.session_state["sim_estatisticas"] = estatisticas
 
 

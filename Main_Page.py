@@ -73,6 +73,213 @@ def clean_numeric_column(col):
     col = col.str.replace(',', '.')
     return pd.to_numeric(col, errors='coerce')
 
+def get_ev_ebitda_context(setor: str):
+    """Returns (alt_metric, reason) when EV/EBITDA doesn't apply, or None if it applies normally."""
+    s = setor.lower() if setor else ""
+    if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio")):
+        return ("P/L · P/VP", "Bancos: resultado financeiro é a atividade-fim — EV/EBITDA não se aplica.")
+    if any(k in s for k in ("seguro", "previdência", "previdencia", "resseguro")):
+        return ("P/L · P/VP", "Seguradoras: lucro atrelado ao resultado financeiro (float) — EV/EBITDA não se aplica.")
+    if any(k in s for k in ("holding", "participação", "participacao")):
+        return ("Desconto sobre NAV", "Holdings: receita de equivalência patrimonial — EBITDA é quase nulo ou negativo.")
+    if any(k in s for k in ("tecnologia", "software", "internet")):
+        return ("EV/Sales", "Tech em crescimento: EBITDA frequentemente negativo pelo reinvestimento agressivo.")
+    if any(k in s for k in ("exploração", "exploracao", "pré-operacional", "pre-operacional")):
+        return ("EV/Recursos · DCF", "Empresa pré-operacional: sem receita, EBITDA estruturalmente negativo.")
+    return None
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_selic_anual_dcf():
+    try:
+        from python_bcb import sgs as _sgs
+        import datetime as _dt
+        taxa = _sgs.get(432, start=_dt.date.today() - _dt.timedelta(days=30))
+        return round((1 + taxa.iloc[-1, 0] / 100) ** 252 - 1, 4)
+    except Exception:
+        return 0.105  # fallback ~10.5% a.a.
+
+def calcular_dcf_lpa(cotacao, pl, g1_pct, g2_pct, gt_pct, wacc_pct, roe_pct=None, roic_pct=None):
+    """DCF FCFF em 2 fases, alinhado ao método Damodaran.
+    ROC = ROIC (preferência) ou ROE; retenção terminal separada da fase de crescimento.
+    Retorna (valor_intrínseco, upside_pct, fcf_mult, fcf_mult_tv).
+    """
+    if pl <= 0.1 or cotacao <= 0:
+        return None, None, None, None
+    g1, g2, gt, r = g1_pct/100, g2_pct/100, gt_pct/100, wacc_pct/100
+    if r <= gt:
+        return None, None, None, None
+    lpa0 = cotacao / pl
+
+    # ROC: ROIC aproxima EBIT(1-t)/(Dívida+PL) — mais alinhado ao Damodaran que ROE (alavancado)
+    roc = roic_pct if (roic_pct and roic_pct > 0) else roe_pct
+
+    # Retenção na fase de crescimento: retention = g / ROC  (Damodaran: g = ROC × reinvestimento)
+    if roc and roc > 0 and roc > g1_pct:
+        retention = g1_pct / roc
+        fcf_mult = max(1.0 - retention, 0.05)
+    else:
+        fcf_mult = 1.0
+
+    # ROC estável: converge para próximo ao WACC na perpetuidade (Damodaran: beta → 1, spread cai)
+    # Usamos min(ROIC_atual, WACC + 2%) para não projetar rentabilidade de pico na eternidade
+    roc_stable = max(wacc_pct + 2.0, gt_pct + 1.0)
+    if roc:
+        roc_stable = min(roc, roc_stable)
+    retention_tv = gt_pct / roc_stable
+    fcf_mult_tv = max(1.0 - retention_tv, 0.0)
+
+    # VP fases 1-5 e 6-10: cada ano calculado a partir do lpa0 (sem acumulação de fcf_mult)
+    vp = 0
+    for t in range(1, 6):
+        lpa_t = lpa0 * (1 + g1) ** t
+        vp += lpa_t * fcf_mult / (1 + r) ** t
+    for t in range(6, 11):
+        lpa_t = lpa0 * (1 + g1) ** 5 * (1 + g2) ** (t - 5)
+        vp += lpa_t * fcf_mult / (1 + r) ** t
+
+    # Valor Terminal com retenção estável (Damodaran: TV = FCF_{n+1} / (WACC − g_terminal))
+    lpa10 = lpa0 * (1 + g1) ** 5 * (1 + g2) ** 5
+    fcf_tv = lpa10 * fcf_mult_tv
+    tv = fcf_tv * (1 + gt) / (r - gt)
+    vp += tv / (1 + r) ** 10
+    return vp, (vp / cotacao - 1) * 100, fcf_mult, fcf_mult_tv
+
+def calcular_ddm(cotacao, div_yield_pct, gt_pct, wacc_pct):
+    """DDM Gordon Growth: IV = DPS / (WACC - g). Retorna (valor_intrínseco, upside_pct)."""
+    if div_yield_pct <= 0 or cotacao <= 0:
+        return None, None
+    dps = cotacao * div_yield_pct / 100
+    r, g = wacc_pct / 100, gt_pct / 100
+    if r <= g:
+        return None, None
+    iv = dps / (r - g)
+    return iv, (iv / cotacao - 1) * 100
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_yfinance_fcff(ticker_b3):
+    """Busca dados para DCF FCFF completo via yfinance. Retorna dict ou None."""
+    try:
+        t = yf.Ticker(f"{ticker_b3}.SA")
+
+        def _avg(df, keys, n=2):
+            for k in keys:
+                if k in df.index:
+                    vals = pd.to_numeric(df.loc[k], errors='coerce').dropna()
+                    if len(vals):
+                        return float(vals.iloc[:n].mean())
+            return None
+
+        inc  = t.financials
+        cf   = t.cashflow
+        bs   = t.balance_sheet
+        info = t.info or {}
+
+        if inc is None or inc.empty:
+            return None
+
+        ebit     = _avg(inc, ['EBIT', 'Operating Income'])
+        pretax   = _avg(inc, ['Pretax Income'])
+        taxexp   = _avg(inc, ['Tax Provision', 'Income Tax Expense'])
+        interest = _avg(inc, ['Interest Expense', 'Interest Expense Non Operating'])
+        da       = _avg(cf,  ['Depreciation And Amortization', 'Depreciation'])
+        capex    = _avg(cf,  ['Capital Expenditure'])         # negative in yfinance
+        dwc      = _avg(cf,  ['Change In Working Capital'])
+
+        debt  = _avg(bs, ['Total Debt', 'Long Term Debt And Capital Lease Obligation', 'Long Term Debt'], n=1)
+        cash  = _avg(bs, ['Cash And Cash Equivalents', 'Cash Cash Equivalents And Short Term Investments'], n=1)
+        equity= _avg(bs, ['Stockholders Equity', 'Total Equity Gross Minority Interest'], n=1)
+
+        shares = (info.get('sharesOutstanding') or
+                  info.get('impliedSharesOutstanding') or
+                  info.get('floatShares'))
+        beta   = float(info.get('beta') or 1.0)
+
+        if not ebit or not shares or shares <= 0:
+            return None
+
+        # Alíquota efetiva (cap 10-40%, fallback 34% Brasil)
+        if pretax and taxexp and abs(pretax) > 0:
+            tax_rate = min(max(abs(taxexp) / abs(pretax), 0.10), 0.40)
+        else:
+            tax_rate = 0.34
+
+        nopat   = ebit * (1 - tax_rate)
+        da_v    = da    if da    is not None else 0.0
+        capex_v = abs(capex) if capex is not None else 0.0  # capex é negativo no yf
+        dwc_v   = dwc   if dwc   is not None else 0.0
+        fcff    = nopat + da_v - capex_v - dwc_v
+
+        # Taxa de reinvestimento histórica: (CapEx_líq + ΔWC) / NOPAT
+        reinv = (capex_v - da_v + dwc_v) / nopat if nopat > 0 else None
+        if reinv is not None:
+            reinv = min(max(reinv, 0.0), 0.95)
+
+        # ROIC = NOPAT / Capital Investido
+        inv_cap = (debt or 0) + (equity or 0) - (cash or 0)
+        roic = (nopat / inv_cap * 100) if inv_cap > 1_000 else None
+
+        # Custo de dívida = Juros / Dívida Total
+        kd = abs(interest) / (debt or 1) * 100 if interest and debt and debt > 0 else None
+
+        net_debt = (debt or 0) - (cash or 0)
+
+        missing = [lbl for lbl, val in [("D&A", da), ("CapEx", capex), ("ΔWC", dwc)] if val is None]
+
+        return {
+            'fcff_ps':     fcff / shares,
+            'nopat_ps':    nopat / shares,
+            'net_debt_ps': net_debt / shares,
+            'fcff':        fcff,
+            'nopat':       nopat,
+            'ebit':        ebit,
+            'da':          da_v,
+            'capex':       capex_v,
+            'delta_wc':    dwc_v,
+            'tax_rate':    tax_rate,
+            'reinv_rate':  reinv,
+            'roic':        roic,
+            'kd':          kd,
+            'net_debt':    net_debt,
+            'debt':        debt or 0,
+            'cash':        cash or 0,
+            'shares':      shares,
+            'beta':        beta,
+            'missing':     missing,
+        }
+    except Exception:
+        return None
+
+def calcular_dcf_fcff(fcff0_ps, nopat0_ps, net_debt_ps, cotacao,
+                      g1_pct, g2_pct, gt_pct, wacc_pct, roic_pct=None):
+    """DCF FCFF completo: projeção FCFF + TV com retenção estável + ponte firma→ação.
+    Retorna (iv_equity_por_acao, upside_pct).
+    """
+    if fcff0_ps <= 0 or not nopat0_ps or nopat0_ps <= 0:
+        return None, None
+    g1r, g2r, gtr, r = g1_pct/100, g2_pct/100, gt_pct/100, wacc_pct/100
+    if r <= gtr:
+        return None, None
+    # ROC estável na perpetuidade → WACC + 2% (Damodaran: spread cai com o tempo)
+    roc_s = max(wacc_pct + 2.0, gt_pct + 1.0)
+    if roic_pct:
+        roc_s = min(roic_pct, roc_s)
+    fcf_mult_tv = max(1.0 - gt_pct / roc_s, 0.0)
+
+    vp = 0.0
+    for t in range(1, 6):
+        vp += fcff0_ps * (1 + g1r) ** t / (1 + r) ** t
+    for t in range(6, 11):
+        vp += fcff0_ps * (1 + g1r) ** 5 * (1 + g2r) ** (t - 5) / (1 + r) ** t
+    # Valor Terminal: NOPAT do ano 10 com retenção estável (Damodaran TV = FCFF_{n+1}/(r-g))
+    nopat10 = nopat0_ps * (1 + g1r) ** 5 * (1 + g2r) ** 5
+    fcff_tv  = nopat10 * fcf_mult_tv
+    tv = fcff_tv * (1 + gtr) / (r - gtr)
+    vp += tv / (1 + r) ** 10
+
+    iv_equity = vp - net_debt_ps           # ponte firma → patrimônio por ação
+    upside = (iv_equity / cotacao - 1) * 100 if cotacao > 0 else None
+    return iv_equity, upside
+
 @st.cache_data(ttl=3600)
 def get_fundamentus_data(tickers):
     """Busca dados fundamentalistas com retry automático."""
@@ -146,6 +353,10 @@ ICO_RULER   = _svg('<rect x="2" y="7" width="20" height="10" rx="2" stroke="#ffd
                    '<line x1="10" y1="7" x2="10" y2="10" stroke="#ffd600" stroke-width="1.2"/>'
                    '<line x1="14" y1="7" x2="14" y2="10" stroke="#ffd600" stroke-width="1.2"/>'
                    '<line x1="18" y1="7" x2="18" y2="12" stroke="#ffd600" stroke-width="1.5"/>', 16)
+ICO_SHIELD  = _svg('<path d="M12 2l8 4v6c0 5-4 8.5-8 10C8 20.5 4 17 4 12V6l8-4z" stroke="#00ff87" stroke-width="1.8" fill="none"/>'
+                   '<path d="M9 12l2 2 4-4" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>', 16)
+ICO_DCF     = _svg('<line x1="12" y1="1" x2="12" y2="23" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/>'
+                   '<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round" fill="none"/>', 16)
 ICO_BOX     = _svg('<rect x="3" y="7" width="18" height="14" rx="2" stroke="#94a3b8" stroke-width="1.8"/>'
                    '<path d="M8 7V5a4 4 0 018 0v2" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>'
                    '<line x1="12" y1="12" x2="12" y2="16" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
@@ -177,6 +388,41 @@ st.sidebar.markdown("""
   <span style="font-size:0.7rem;font-weight:600;letter-spacing:0.1em;color:#94a3b8;text-transform:uppercase">
     Navegação
   </span>
+</div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("""
+<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
+  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>
+  <div style="display:flex;flex-direction:column;gap:0.35rem;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba(0,255,135,0.4);">
+        <span style="font-size:0.65rem;font-weight:800;color:#080c14;">1</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:700;color:#00ff87;">Análise Fundamentalista</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.45;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">2</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Portfolio</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.35;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">3</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Simulação</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.25;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">4</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Notícias</span>
+    </div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -271,6 +517,13 @@ tickers = st.multiselect(
     key="selected_tickers"
 )
 
+if tickers:
+    st.markdown(f"""
+    <div style="background:rgba(0,255,135,0.05);border:1px solid rgba(0,255,135,0.2);border-radius:10px;padding:0.6rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+        <span style="font-size:0.85rem;color:#94a3b8;">{len(tickers)} ação(ões) selecionada(s) — analise o portfólio completo na página <strong style="color:#00ff87">Portfolio</strong></span>
+        <span style="font-size:0.75rem;color:#00ff87;font-family:'JetBrains Mono',monospace;font-weight:700;">← barra lateral</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Só executa análise se houver pelo menos uma ação selecionada
 if tickers:
@@ -294,36 +547,37 @@ if tickers:
         loading_placeholder.empty()
 
         def render_sector_cards(ticker_name, row):
-            cols = st.columns(3)
             emp = row["Empresa"]
             setor = row["Setor"]
             sub = row["Subsetor"]
-            
             metrics = [
                 ("Empresa", emp, "#38bdf8"),
                 ("Setor", setor, "#4ade80"),
-                ("Subsetor", sub, "#fbbf24")
+                ("Subsetor", sub, "#fbbf24"),
             ]
-            
-            for col, (label, val_str, color) in zip(cols, metrics):
-                with col:
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                                border: 1px solid #1e293b; 
-                                border-radius: 10px; 
-                                padding: 0.8rem; 
-                                text-align: center; 
-                                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                                margin-bottom: 0.5rem;
-                                min-height: 90px;
-                                display: flex;
-                                flex-direction: column;
-                                justify-content: center;
-                                align-items: center;">
-                        <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
-                        <div style="font-size: 1.1rem; color: {color}; font-weight: 800;">{val_str}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            cards_html = "".join(
+                f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+                f'<div class="mcard-value" style="color:{clr};font-size:0.95rem">{val}</div></div>'
+                for lbl, val, clr in metrics
+            )
+            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+        # Export button for fundamental data
+        try:
+            export_cols = ['Empresa', 'Setor', 'Subsetor', 'Cotacao', 'Min_52_sem', 'Max_52_sem',
+                           'Marg_Liquida', 'Marg_EBIT', 'ROE', 'ROIC', 'Div_Yield',
+                           'Cres_Rec_5a', 'PL', 'EV_EBITDA', 'PVP']
+            export_cols_exist = [c for c in export_cols if c in df.columns]
+            df_export = df[export_cols_exist].copy()
+            csv_data = df_export.to_csv().encode('utf-8')
+            st.download_button(
+                label="⬇ Exportar dados fundamentalistas (CSV)",
+                data=csv_data,
+                file_name=f"fundamentus_{'+'.join(tickers)}_{datetime.date.today()}.csv",
+                mime="text/csv",
+            )
+        except Exception:
+            pass
 
         section_header(ICO_SECTOR, "Setor", "h3")
         df_sector = df[['Empresa', 'Setor', 'Subsetor']]
@@ -381,36 +635,25 @@ if tickers:
                 return f"{value:,.0f}"
 
         def render_price_cards(ticker_name, row):
-            cols = st.columns(5)
             cot = row["Cotação"]
             min_52 = row["Mínimo (52 semanas)"]
             max_52 = row["Máximo (52 semanas)"]
             vol = row["Volume Médio (2 meses)"]
             val_merc = row["Valor de Mercado"]
             data_ult = row["Data Última Cotação"]
-            
             metrics = [
                 ("Cotação", f"R$ {cot:,.2f}", "#38bdf8"),
-                ("Mínimo (52s)", f"R$ {min_52:,.2f}", "#f87171"),
-                ("Máximo (52s)", f"R$ {max_52:,.2f}", "#4ade80"),
-                ("Volume Médio", format_large_number(vol), "#fb7185"),
-                ("Valor de Mercado", format_large_br_currency(val_merc), "#fbbf24")
+                ("Mín. 52 Sem.", f"R$ {min_52:,.2f}", "#f87171"),
+                ("Máx. 52 Sem.", f"R$ {max_52:,.2f}", "#4ade80"),
+                ("Vol. Médio", format_large_number(vol), "#fb7185"),
+                ("Val. de Mercado", format_large_br_currency(val_merc), "#fbbf24"),
             ]
-            
-            for col, (label, val_str, color) in zip(cols, metrics):
-                with col:
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                                border: 1px solid #1e293b; 
-                                border-radius: 10px; 
-                                padding: 0.8rem; 
-                                text-align: center; 
-                                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                                margin-bottom: 0.5rem;">
-                        <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 0.3rem; letter-spacing: 0.05em;">{label}</div>
-                        <div style="font-size: 1.15rem; color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{val_str}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            cards_html = "".join(
+                f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+                f'<div class="mcard-value" style="color:{clr}">{val}</div></div>'
+                for lbl, val, clr in metrics
+            )
+            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
             st.caption(f"Última cotação registrada: {data_ult} para {ticker_name}")
 
         if len(tickers) > 1:
@@ -461,8 +704,16 @@ if tickers:
         # Remove duplicate indices if any
         df_ind = df_ind[~df_ind.index.duplicated(keep='last')]
 
+        def _get_setor(ticker):
+            if 'Setor' not in df.columns or ticker not in df.index:
+                return ''
+            val = df.loc[ticker, 'Setor']
+            if isinstance(val, pd.Series):
+                val = val.iloc[-1]
+            return str(val) if not pd.isna(val) else ''
+
         # Função auxiliar para renderizar os cards em colunas estilizadas
-        def render_ticker_cards(row):
+        def render_ticker_cards(row, setor=""):
             # 1. Valuation Section
             st.markdown("""
 <div style="margin: 1.2rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
@@ -479,7 +730,19 @@ if tickers:
             with c2:
                 st.metric("P/VP", f"{row['P/VP']:.2f}", help="Preço/Valor Patrimonial: compara o preço de mercado com o valor contábil. <1 pode indicar desconto.")
             with c3:
-                st.metric("EV/EBITDA", f"{row['EV/EBITDA']:.2f}", help="Enterprise Value / EBITDA: múltiplo de valuation que considera a dívida. Menor = mais barato.")
+                ev_val = row['EV/EBITDA']
+                if pd.isna(ev_val) or abs(ev_val) < 0.01:
+                    ctx = get_ev_ebitda_context(setor)
+                    if ctx:
+                        alt, reason = ctx
+                        st.metric("EV/EBITDA", "—",
+                                  delta="→ " + alt, delta_color="off", help=reason)
+                    else:
+                        st.metric("EV/EBITDA", "N/D",
+                                  help="Dado não disponível para este ticker via Fundamentus.")
+                else:
+                    st.metric("EV/EBITDA", f"{ev_val:.2f}",
+                              help="Enterprise Value / EBITDA: múltiplo de valuation que considera a dívida. Menor = mais barato.")
 
             # 2. Rentabilidade Section
             st.markdown("""
@@ -493,13 +756,29 @@ if tickers:
 """, unsafe_allow_html=True)
             c1, c2, c3, c4 = st.columns(4)
             with c1:
-                st.metric("ROE", f"{row['ROE']:.2f}%", help="Return on Equity: lucro gerado para cada R$ de patrimônio. Acima de 15% é considerado bom.")
+                roe_val = row['ROE']
+                st.metric("ROE", f"{roe_val:.2f}%",
+                          delta="Forte" if roe_val > 15 else ("Fraco" if roe_val < 5 else "Moderado"),
+                          delta_color="normal" if roe_val > 15 else ("inverse" if roe_val < 5 else "off"),
+                          help="Return on Equity: lucro gerado para cada R$ de patrimônio. Acima de 15% é considerado bom.")
             with c2:
-                st.metric("ROIC", f"{row['ROIC']:.2f}%", help="Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida).")
+                roic_val = row['ROIC']
+                st.metric("ROIC", f"{roic_val:.2f}%",
+                          delta="Forte" if roic_val > 12 else ("Fraco" if roic_val < 5 else "Moderado"),
+                          delta_color="normal" if roic_val > 12 else ("inverse" if roic_val < 5 else "off"),
+                          help="Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida).")
             with c3:
-                st.metric("Margem Líquida", f"{row['Margem Líquida']:.2f}%", help="Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa.")
+                ml_val = row['Margem Líquida']
+                st.metric("Margem Líquida", f"{ml_val:.2f}%",
+                          delta="Alta" if ml_val > 15 else ("Baixa" if ml_val < 5 else "Média"),
+                          delta_color="normal" if ml_val > 15 else ("inverse" if ml_val < 5 else "off"),
+                          help="Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa.")
             with c4:
-                st.metric("Margem EBIT", f"{row['Margem EBIT']:.2f}%", help="Margem operacional antes de juros e impostos. Mede a eficiência operacional.")
+                mebit_val = row['Margem EBIT']
+                st.metric("Margem EBIT", f"{mebit_val:.2f}%",
+                          delta="Alta" if mebit_val > 15 else ("Baixa" if mebit_val < 5 else "Média"),
+                          delta_color="normal" if mebit_val > 15 else ("inverse" if mebit_val < 5 else "off"),
+                          help="Margem operacional antes de juros e impostos. Mede a eficiência operacional.")
 
             # 3. Crescimento & Yield Section
             st.markdown("""
@@ -512,9 +791,17 @@ if tickers:
 """, unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
-                st.metric("Dividend Yield", f"{row['Dividend Yield']:.2f}%", help="Dividendos pagos divididos pelo preço. Percentual de retorno em dividendos ao ano.")
+                dy_val = row['Dividend Yield']
+                st.metric("Dividend Yield", f"{dy_val:.2f}%",
+                          delta="Alto" if dy_val > 6 else ("Baixo" if dy_val < 2 else "Moderado"),
+                          delta_color="normal" if dy_val > 4 else "off",
+                          help="Dividendos pagos divididos pelo preço. Percentual de retorno em dividendos ao ano.")
             with c2:
-                st.metric("Crescimento Receita (5 anos)", f"{row['Crescimento Receita 5 anos']:.2f}%", help="Taxa de crescimento anual composta da receita nos últimos 5 anos.")
+                cr_val = row['Crescimento Receita 5 anos']
+                st.metric("Crescimento Receita (5 anos)", f"{cr_val:.2f}%",
+                          delta="Forte" if cr_val > 10 else ("Negativo" if cr_val < 0 else "Moderado"),
+                          delta_color="normal" if cr_val > 10 else ("inverse" if cr_val < 0 else "off"),
+                          help="Taxa de crescimento anual composta da receita nos últimos 5 anos.")
 
         # Exibição dos cards
         if len(tickers) > 1:
@@ -522,11 +809,478 @@ if tickers:
             for idx, ticker in enumerate(tickers):
                 with tabs_tickers[idx]:
                     if ticker in df_ind.index:
-                        render_ticker_cards(df_ind.loc[ticker])
+                        render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(ticker))
         else:
             ticker = tickers[0]
             if ticker in df_ind.index:
-                render_ticker_cards(df_ind.loc[ticker])
+                render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(ticker))
+
+        # ── Saúde Financeira ─────────────────────────────────────────────────
+        st.markdown("---")
+        section_header(ICO_SHIELD, "Saúde Financeira", "h3")
+        st.caption("Endividamento e liquidez da empresa. "
+                   "Dívida/PL acima de 3x e Liquidez abaixo de 1x são sinais de alerta.")
+
+        DEBT_COL_ALIASES = {
+            "div_brut_patrim": ["Dív.Brut/Patrim.", "Div_Brut_Patrim", "Div.Brut/Patrim."],
+            "liq_corrente":    ["Liq. Corr.", "Liq_Corr", "Liq. Corr"],
+            "ev_ebit":         ["EV_EBIT", "EV/EBIT"],
+        }
+
+        def extract_debt_metric(row, aliases):
+            """Tenta extrair uma métrica testando vários nomes de coluna possíveis."""
+            for name in aliases:
+                if name in row.index:
+                    v = pd.to_numeric(
+                        str(row[name]).replace(',', '.').strip('%').strip(),
+                        errors='coerce'
+                    )
+                    if not pd.isna(v):
+                        return v
+            return None
+
+        def render_debt_panel(ticker_name, row):
+            db_val = extract_debt_metric(row, DEBT_COL_ALIASES["div_brut_patrim"])
+            lc_val = extract_debt_metric(row, DEBT_COL_ALIASES["liq_corrente"])
+            ev_ebit_val = extract_debt_metric(row, DEBT_COL_ALIASES["ev_ebit"])
+            # Fundamentus remove o decimal de múltiplos (EV/EBIT 12,5× → armazenado como 1250)
+            if ev_ebit_val is not None:
+                ev_ebit_val = ev_ebit_val / 100.0
+
+            if db_val is None and lc_val is None and ev_ebit_val is None:
+                st.info("Dados de endividamento não disponíveis via Fundamentus para este ticker.")
+                return
+
+            debt_cards = {}
+            debt_colors = {}
+
+            if db_val is not None:
+                debt_cards["Dívida / Patrimônio"] = f"{db_val:.2f}×"
+                debt_colors["Dívida / Patrimônio"] = "#ff3d5a" if db_val > 3 else ("#ffd600" if db_val > 1.5 else "#00ff87")
+
+            if lc_val is not None:
+                debt_cards["Liquidez Corrente"] = f"{lc_val:.2f}×"
+                debt_colors["Liquidez Corrente"] = "#ff3d5a" if lc_val < 1 else ("#ffd600" if lc_val < 1.5 else "#00ff87")
+
+            if ev_ebit_val is not None:
+                debt_cards["EV / EBIT"] = f"{ev_ebit_val:.1f}×"
+                debt_colors["EV / EBIT"] = "#ff3d5a" if ev_ebit_val > 20 else ("#ffd600" if ev_ebit_val > 12 else "#00ff87")
+
+            # Render cards using .mcard-grid CSS class (already defined in style.css)
+            cards_html = "".join(
+                f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+                f'<div class="mcard-value" style="color:{debt_colors[lbl]}">{val}</div></div>'
+                for lbl, val in debt_cards.items()
+            )
+            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+            # Diagnóstico textual
+            diags = []
+            if db_val is not None:
+                if db_val > 3:
+                    diags.append(("⚠️", f"Dívida/PL de {db_val:.1f}× é elevada — verifique capacidade de pagamento", "#ff3d5a"))
+                elif db_val > 1.5:
+                    diags.append(("⚡", f"Dívida/PL de {db_val:.1f}× é moderada — monitorar", "#ffd600"))
+                else:
+                    diags.append(("✓", f"Dívida/PL de {db_val:.1f}× é saudável", "#00ff87"))
+
+            if lc_val is not None:
+                if lc_val < 1:
+                    diags.append(("⚠️", f"Liquidez Corrente {lc_val:.2f}× < 1 — risco de dificuldade de caixa", "#ff3d5a"))
+                elif lc_val < 1.5:
+                    diags.append(("⚡", f"Liquidez Corrente {lc_val:.2f}× — margem estreita", "#ffd600"))
+                else:
+                    diags.append(("✓", f"Liquidez Corrente {lc_val:.2f}× — empresa com boa folga de caixa", "#00ff87"))
+
+            for icon, msg, color in diags:
+                st.markdown(
+                    f'<div style="display:flex;align-items:flex-start;gap:8px;padding:0.35rem 0;'
+                    f'font-size:0.83rem;color:{color};">'
+                    f'<span style="flex-shrink:0">{icon}</span><span>{msg}</span></div>',
+                    unsafe_allow_html=True
+                )
+
+        if len(tickers) > 1:
+            tabs_debt = st.tabs(tickers)
+            for tab, ticker in zip(tabs_debt, tickers):
+                with tab:
+                    if ticker in df.index:
+                        row_debt = df.loc[ticker]
+                        if isinstance(row_debt, pd.DataFrame):
+                            row_debt = row_debt.iloc[-1]
+                        render_debt_panel(ticker, row_debt)
+                    else:
+                        st.warning(f"Sem dados para {ticker}")
+        else:
+            ticker = tickers[0]
+            if ticker in df.index:
+                row_debt = df.loc[ticker]
+                if isinstance(row_debt, pd.DataFrame):
+                    row_debt = row_debt.iloc[-1]
+                render_debt_panel(ticker, row_debt)
+
+        # ── Valuation Intrínseco — DCF ────────────────────────────────────────
+        st.markdown("---")
+        section_header(ICO_DCF, "Valuation Intrínseco — DCF", "h3")
+        st.caption(
+            "DCF FCFF (Damodaran) quando dados yfinance disponíveis — EBIT(1-t) + D&A − CapEx − ΔWC, "
+            "com ponte firma→ação (− dívida líquida). Fallback para LPA quando sem dados de cash flow."
+        )
+
+        # Keywords para setores cíclicos — earnings não representam capacidade normal
+        _CYCLICAL_KEYS = (
+            "mineração", "mineracao", "minério", "minerio", "mineral",
+            "siderurgia", "metalurgia", "aço", "aco", "ferro",
+            "petróleo", "petroleo", "petroquím", "petroquim", "refino",
+            "celulose", "papel", "florestal",
+            "agropecuária", "agropecuaria", "açúcar", "acucar", "etanol", "café", "cafe",
+        )
+        # P/L mínimo usado para normalizar LPA de cíclicas em pico de ciclo
+        _PL_CICLO_NORMAL = 12.0
+
+        def render_dcf_panel(ticker_name, cotacao, pl, cres5a, setor, roe=None, div_yield=None, roic=None):
+            s = setor.lower() if setor else ""
+            if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio", "financeiro")):
+                st.info("🏦 **Bancos e financeiras:** DCF baseado em LPA não é adequado — o resultado financeiro é a atividade-fim. Use **P/L e P/VP**.")
+                return
+            if any(k in s for k in ("seguro", "previdência", "previdencia", "resseguro")):
+                st.info("🛡️ **Seguradoras:** Use **Modelo de Desconto de Dividendos (DDM)** — lucro atrelado ao resultado financeiro do float.")
+                return
+            if any(k in s for k in ("holding", "participação", "participacao")):
+                st.info("🏢 **Holdings:** Avalie via **Desconto sobre NAV** — o valor reside nas subsidiárias, não no fluxo operacional.")
+                return
+            if pl <= 0.1 or pd.isna(pl):
+                st.warning(f"P/L negativo ou indisponível para **{ticker_name}** — LPA não pode ser estimado para o DCF.")
+                return
+
+            # Detectar setor cíclico e normalizar P/L se necessário
+            is_cyclical = any(k in s for k in _CYCLICAL_KEYS)
+            pl_norm_applied = False
+            pl_efetivo = pl
+            if is_cyclical and pl < _PL_CICLO_NORMAL:
+                pl_efetivo = _PL_CICLO_NORMAL
+                pl_norm_applied = True
+
+            # Buscar dados FCFF do yfinance (cacheado — ~0.5s na 1ª chamada)
+            yfdata = get_yfinance_fcff(ticker_name)
+
+            selic = get_selic_anual_dcf()
+            # WACC sugerido: Rf + β × (ERP_EUA + CRP_Brasil) ≈ Rf + β × 8%
+            if yfdata and yfdata.get('beta'):
+                _beta = max(min(float(yfdata['beta']), 2.5), 0.3)
+                _ke   = selic * 100 + _beta * 8.0
+                default_wacc = round(min(_ke, 22.0), 1)
+                _wacc_hint = f"Beta={_beta:.2f} → Ke≈{_ke:.1f}% (Rf={selic*100:.1f}% + β×8%)"
+            else:
+                default_wacc = round(min(selic * 100 + 5.0, 20.0), 1)
+                _wacc_hint = f"Selic {selic*100:.1f}% + prêmio de risco ~5%"
+
+            raw_g1 = float(cres5a) if not pd.isna(cres5a) else 5.0
+            # Cíclicas: crescimento histórico de receita em pico superestima o futuro — cap em 8%
+            if is_cyclical:
+                raw_g1 = min(raw_g1, 8.0)
+            default_g1 = round(min(max(raw_g1, 0.0), 25.0), 1)
+            default_g2 = round(default_g1 * 0.5, 1)
+
+            # Banner de alerta para cíclicas
+            if is_cyclical:
+                lpa_pico = cotacao / pl
+                lpa_norm = cotacao / pl_efetivo
+                st.warning(
+                    f"⚠️ **Setor cíclico detectado** — lucros de pico não são sustentáveis.\n\n"
+                    f"LPA atual (P/L={pl:.1f}×): **R$ {lpa_pico:.2f}** — pode estar no topo do ciclo de commodities.\n\n"
+                    f"{'O modelo usa **LPA normalizado** (P/L=' + f'{pl_efetivo:.0f}×): **R$ {lpa_norm:.2f}**' if pl_norm_applied else 'P/L já está acima de 12× — nenhuma normalização aplicada.'} "
+                    f"(referência mid-ciclo histórico para o setor)."
+                )
+
+            # Confiança do modelo
+            has_roic  = roic and not pd.isna(roic) and roic > 0
+            has_roe   = roe and not pd.isna(roe) and roe > 0
+            has_dy    = div_yield and not pd.isna(div_yield) and div_yield > 0
+            has_fcff  = yfdata is not None and yfdata.get('fcff_ps', 0) > 0
+            pl_ok     = 5 < pl_efetivo < 80
+            roc_used_label = "ROIC" if has_roic else ("ROE" if has_roe else "N/D")
+            if is_cyclical:
+                conf_label, conf_color = "Baixa — Cíclico", "#ff3d5a"
+                conf_tip = "Empresas cíclicas: LPA varia com o ciclo de commodities. Use como referência aproximada de mid-ciclo."
+            elif has_fcff and not is_cyclical:
+                conf_label, conf_color = "Alta — FCFF Real", "#00ff87"
+                conf_tip = "Dados de EBIT, D&A, CapEx e ΔWC disponíveis via yfinance — DCF completo ativo."
+            elif (has_roic or has_roe) and pl_ok:
+                conf_label, conf_color = "Média — LPA proxy", "#ffd600"
+                conf_tip = f"Sem cash flow completo. ROC ({roc_used_label}) disponível → retenção Damodaran calibrada."
+            else:
+                conf_label, conf_color = "Baixa — LPA proxy", "#ff3d5a"
+                conf_tip = "Sem dados de cash flow e sem ROC — estimativa muito aproximada."
+
+            conf_html = (
+                f'<span style="display:inline-flex;align-items:center;gap:4px;'
+                f'background:rgba(0,0,0,0.25);border:1px solid {conf_color}33;'
+                f'border-radius:20px;padding:2px 10px;font-size:0.72rem;color:{conf_color};'
+                f'font-weight:700;margin-bottom:0.6rem;" title="{conf_tip}">'
+                f'● Confiança {conf_label}</span>'
+            )
+            st.markdown(conf_html, unsafe_allow_html=True)
+
+            with st.expander("⚙️ Personalizar premissas", expanded=False):
+                ca, cb = st.columns(2)
+                with ca:
+                    wacc = st.slider("WACC — Taxa de Desconto (%)", 7.0, 22.0, value=default_wacc, step=0.5,
+                                     key=f"dcf_wacc_{ticker_name}",
+                                     help=_wacc_hint)
+                    g1 = st.slider("Crescimento Anos 1–5 (%)", 0.0, 30.0, value=default_g1, step=0.5,
+                                   key=f"dcf_g1_{ticker_name}",
+                                   help=f"Crescimento histórico de receita (5 anos): {cres5a:.1f}%. Seja conservador.")
+                with cb:
+                    g2 = st.slider("Crescimento Anos 6–10 (%)", 0.0, 20.0, value=default_g2, step=0.5,
+                                   key=f"dcf_g2_{ticker_name}",
+                                   help="Fase de desaceleração — costuma ser metade do crescimento da fase 1.")
+                    gt = st.slider("Crescimento Terminal (%)", 1.0, 6.0, value=3.5, step=0.5,
+                                   key=f"dcf_gt_{ticker_name}",
+                                   help="Taxa de crescimento na perpetuidade. PIB nominal BR estimado: 3–4%.")
+
+            iv, upside, fcf_mult, fcf_mult_tv = calcular_dcf_lpa(
+                cotacao, pl_efetivo, g1, g2, gt, wacc, roe_pct=roe, roic_pct=roic
+            )
+
+            if iv is None:
+                st.warning("WACC precisa ser maior que o crescimento terminal para o cálculo ser válido.")
+                return
+
+            # DCF FCFF completo (Damodaran) se dados yfinance disponíveis
+            iv_fcff, up_fcff = None, None
+            if has_fcff:
+                iv_fcff, up_fcff = calcular_dcf_fcff(
+                    yfdata['fcff_ps'], yfdata['nopat_ps'], yfdata['net_debt_ps'],
+                    cotacao, g1, g2, gt, wacc, roic_pct=yfdata.get('roic')
+                )
+                if iv_fcff is not None and iv_fcff <= 0:
+                    st.warning(f"Dívida líquida (R$ {yfdata['net_debt_ps']:,.2f}/ação) supera o valor operacional — empresa tecnicamente insolvente a estas premissas.")
+                    iv_fcff, up_fcff = None, None
+
+            # DDM complementar para pagadores de dividendo
+            iv_ddm, upside_ddm = None, None
+            if has_dy and div_yield >= 2.0:
+                iv_ddm, upside_ddm = calcular_ddm(cotacao, div_yield, gt, wacc)
+
+            # Valor principal e consenso
+            # FCFF disponível → resultado único (não misturar com LPA ou DDM)
+            # FCFF indisponível → LPA × 2/3 + DDM × 1/3 quando DDM aplicável
+            iv_primary = iv_fcff if iv_fcff is not None else iv
+            up_primary = up_fcff if iv_fcff is not None else upside
+            if iv_fcff is not None:
+                # FCFF é o modelo completo — DDM fica como referência, não entra no cálculo
+                iv_cons, up_cons = iv_fcff, up_fcff
+                show_consensus = False
+            elif iv_ddm is not None:
+                iv_cons  = iv * (2/3) + iv_ddm * (1/3)
+                up_cons  = (iv_cons / cotacao - 1) * 100
+                show_consensus = True
+            else:
+                iv_cons, up_cons = iv, upside
+                show_consensus = False
+
+            ms = (iv_cons - cotacao) / iv_cons * 100 if iv_cons and iv_cons != 0 else 0
+            if up_cons > 20:
+                verdict, vcolor, vicon = "SUBAVALIADO", "#00ff87", "↑"
+            elif up_cons < -20:
+                verdict, vcolor, vicon = "SOBREAVALIADO", "#ff3d5a", "↓"
+            else:
+                verdict, vcolor, vicon = "PREÇO JUSTO", "#ffd600", "≈"
+
+            ms_color = "#00ff87" if ms > 20 else ("#ffd600" if ms > 0 else "#ff3d5a")
+
+            # Cards de resultados
+            cards_html = ""
+            if iv_fcff is not None:
+                cards_html += (
+                    f'<div class="mcard"><div class="mcard-label">IV — FCFF ✓</div>'
+                    f'<div class="mcard-value" style="color:#00e5ff">R$ {iv_fcff:,.2f}</div></div>'
+                )
+            # LPA: principal quando sem FCFF, referência (cinza) quando FCFF disponível
+            lpa_color = "#a855f7" if iv_fcff is None else "#475569"
+            lpa_label = "IV — LPA proxy" if iv_fcff is None else "LPA proxy (ref.)"
+            cards_html += (
+                f'<div class="mcard"><div class="mcard-label">{lpa_label}</div>'
+                f'<div class="mcard-value" style="color:{lpa_color}">R$ {iv:,.2f}</div></div>'
+            )
+            if iv_ddm is not None:
+                # DDM: entra no consenso quando sem FCFF; é só referência quando FCFF disponível
+                ddm_color = "#818cf8" if iv_fcff is None else "#475569"
+                ddm_label = "IV — DDM" if iv_fcff is None else "DDM (ref.)"
+                cards_html += (
+                    f'<div class="mcard"><div class="mcard-label">{ddm_label}</div>'
+                    f'<div class="mcard-value" style="color:{ddm_color}">R$ {iv_ddm:,.2f}</div></div>'
+                )
+            if show_consensus:
+                cards_html += (
+                    f'<div class="mcard"><div class="mcard-label">Consenso</div>'
+                    f'<div class="mcard-value" style="color:#c084fc">R$ {iv_cons:,.2f}</div></div>'
+                )
+            cards_html += (
+                f'<div class="mcard"><div class="mcard-label">Preço Atual</div>'
+                f'<div class="mcard-value" style="color:#94a3b8">R$ {cotacao:,.2f}</div></div>'
+                f'<div class="mcard"><div class="mcard-label">Potencial</div>'
+                f'<div class="mcard-value" style="color:{vcolor}">{up_cons:+.1f}%</div></div>'
+                f'<div class="mcard"><div class="mcard-label">Margem de Seg.</div>'
+                f'<div class="mcard-value" style="color:{ms_color}">{ms:.1f}%</div></div>'
+            )
+            st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+            # Breakdown do FCFF (expander) — só quando disponível
+            if yfdata and has_fcff:
+                with st.expander("📋 Composição do FCFF (yfinance)", expanded=False):
+                    billions = yfdata['fcff'] >= 1e9
+                    scale = 1e9 if billions else 1e6
+                    unit = "bi" if billions else "mi"
+                    def _fmt(v): return f"R$ {v/scale:,.1f} {unit}"
+                    rows_fcff = [
+                        ("EBIT",                   _fmt(yfdata['ebit']),     ""),
+                        (f"× (1 − t={yfdata['tax_rate']*100:.0f}%)", "→ NOPAT", _fmt(yfdata['nopat'])),
+                        ("+ D&A",                  _fmt(yfdata['da']),       ""),
+                        ("− CapEx",                _fmt(-yfdata['capex']),   ""),
+                        ("− ΔWC",                  _fmt(-yfdata['delta_wc']),""),
+                        ("= FCFF",                 _fmt(yfdata['fcff']),     f"R$ {yfdata['fcff_ps']:.2f}/ação"),
+                        ("Dívida Líquida",         _fmt(yfdata['net_debt']), f"R$ {yfdata['net_debt_ps']:.2f}/ação"),
+                    ]
+                    for label, val, note in rows_fcff:
+                        sep = "border-top:1px solid #1e293b;" if "FCFF" in label else ""
+                        note_html = f'<span style="color:#64748b;font-size:0.68rem;margin-left:6px">{note}</span>' if note else ""
+                        st.markdown(
+                            f'<div style="display:flex;justify-content:space-between;'
+                            f'padding:3px 0;font-size:0.78rem;{sep}">'
+                            f'<span style="color:#94a3b8">{label}</span>'
+                            f'<span style="color:#f8fafc;font-family:monospace">{val}{note_html}</span></div>',
+                            unsafe_allow_html=True
+                        )
+                    extras = []
+                    if yfdata.get('reinv_rate') is not None:
+                        extras.append(f"Reinvestimento histórico: {yfdata['reinv_rate']*100:.0f}%")
+                    if yfdata.get('roic') is not None:
+                        extras.append(f"ROIC: {yfdata['roic']:.1f}%")
+                    if yfdata.get('kd') is not None:
+                        extras.append(f"Custo dívida: {yfdata['kd']:.1f}%")
+                    extras.append(f"Beta: {yfdata['beta']:.2f}")
+                    if yfdata.get('missing'):
+                        extras.append(f"⚠ Ausentes: {', '.join(yfdata['missing'])}")
+                    st.caption("  ·  ".join(extras))
+
+            # Barra visual preço vs IV principal
+            iv_bar = iv_cons if iv_cons else cotacao
+            total_range = max(iv_bar, cotacao) * 1.1 or 1
+            price_p = min(cotacao / total_range * 100, 100)
+            iv_p    = min(iv_bar   / total_range * 100, 100)
+            bar_color = "#00ff87" if iv_bar > cotacao else "#ff3d5a"
+            if iv_fcff is not None:
+                iv_label = "IV (FCFF)"
+            elif show_consensus:
+                iv_label = "Consenso (LPA+DDM)"
+            else:
+                iv_label = "IV (LPA proxy)"
+            st.markdown(f"""
+<div style="margin:0.6rem 0 0.5rem 0;">
+  <div style="font-size:0.68rem;color:#64748b;font-weight:600;text-transform:uppercase;
+              letter-spacing:0.05em;margin-bottom:0.4rem;">Preço Atual vs {iv_label}</div>
+  <div style="position:relative;height:26px;background:#1e293b;border-radius:6px;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;width:{price_p:.1f}%;height:100%;
+                background:rgba(148,163,184,0.25);border-radius:6px 0 0 6px;"></div>
+    <div style="position:absolute;top:0;left:{iv_p:.1f}%;width:3px;height:100%;
+                background:{bar_color};transform:translateX(-50%);
+                box-shadow:0 0 8px {bar_color}88;"></div>
+    <div style="position:absolute;top:0;left:{price_p:.1f}%;width:3px;height:100%;
+                background:#94a3b8;transform:translateX(-50%);"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;margin-top:0.3rem;align-items:center;">
+    <span style="font-size:0.72rem;color:#94a3b8;">R$ {cotacao:,.2f} (atual)</span>
+    <span style="font-size:0.82rem;font-weight:800;color:{vcolor};letter-spacing:0.04em;">
+      {vicon} {verdict}</span>
+    <span style="font-size:0.72rem;color:#a855f7;">{iv_label}: R$ {iv_bar:,.2f}</span>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+            # Sensibilidade
+            with st.expander("📊 Análise de Sensibilidade — WACC × Crescimento", expanded=False):
+                st.caption("Potencial de valorização (%) para diferentes combinações. Verde = subavaliado, Vermelho = sobreavaliado.")
+                wacc_vals = [8, 10, 12, 14, 16]
+                g1_vals   = [0, 5, 10, 15, 20, 25]
+                sens_z = []
+                for w in wacc_vals:
+                    row_s = []
+                    for g in g1_vals:
+                        _, up, _, _ = calcular_dcf_lpa(cotacao, pl_efetivo, g, max(g*0.5, 0), gt, w, roe_pct=roe, roic_pct=roic)
+                        row_s.append(round(up, 1) if up is not None else None)
+                    sens_z.append(row_s)
+
+                fig_sens = go.Figure(go.Heatmap(
+                    z=sens_z,
+                    x=[f"{g}%" for g in g1_vals],
+                    y=[f"{w}%" for w in wacc_vals],
+                    colorscale="RdYlGn",
+                    zmid=0, zmin=-80, zmax=80,
+                    text=[[f"{v:+.0f}%" if v is not None else "N/A" for v in r] for r in sens_z],
+                    texttemplate="%{text}", textfont=dict(size=11, color="white"),
+                    hovertemplate="WACC: %{y}<br>Cresc. Fase 1: %{x}<br>Potencial: %{text}<extra></extra>",
+                ))
+                fig_sens.update_layout(
+                    xaxis_title="Crescimento Fase 1 (Anos 1–5)",
+                    yaxis_title="WACC",
+                    height=260,
+                    margin=dict(t=8, b=40, l=60, r=8),
+                )
+                apply_plotly_theme(fig_sens)
+                st.plotly_chart(fig_sens, use_container_width=True)
+
+        # Montar df auxiliar para DCF com Cotacao, PL, ROE e Div_Yield
+        dcf_base = [c for c in ['Cotacao', 'PL'] if c in df.columns]
+        dcf_extra = [c for c in ['ROE', 'ROIC', 'Div_Yield'] if c in df.columns]
+        if len(dcf_base) == 2:
+            df_dcf = df[dcf_base + dcf_extra].drop_duplicates(keep='last').copy()
+            df_dcf['Cotacao'] = clean_numeric_column(df_dcf['Cotacao'])
+            df_dcf['PL'] = clean_numeric_column(df_dcf['PL']) / 100.0
+            # ROE, ROIC e Div_Yield já vêm em formato percentual do Fundamentus (ex: 15.2 para 15.2%)
+            # — NÃO multiplicar por 100, ao contrário de PL/EV/EBITDA que perdem o decimal
+            for col in ['ROE', 'ROIC', 'Div_Yield']:
+                if col in df_dcf.columns:
+                    df_dcf[col] = clean_numeric_column(df_dcf[col])
+
+            def _dcf_extra(row_d):
+                def _get(col):
+                    return float(row_d[col]) if col in row_d.index and not pd.isna(row_d[col]) else None
+                return _get('ROE'), _get('ROIC'), _get('Div_Yield')
+
+            if len(tickers) > 1:
+                tabs_dcf = st.tabs(tickers)
+                for tab, ticker in zip(tabs_dcf, tickers):
+                    with tab:
+                        if ticker in df_dcf.index:
+                            row_d = df_dcf.loc[ticker]
+                            if isinstance(row_d, pd.DataFrame):
+                                row_d = row_d.iloc[-1]
+                            cres = df_ind.loc[ticker, 'Crescimento Receita 5 anos'] if ticker in df_ind.index else 5.0
+                            if isinstance(cres, pd.Series):
+                                cres = float(cres.iloc[-1])
+                            roe_v, roic_v, dy_v = _dcf_extra(row_d)
+                            render_dcf_panel(ticker, float(row_d['Cotacao']), float(row_d['PL']),
+                                             float(cres) if not pd.isna(cres) else 5.0,
+                                             _get_setor(ticker), roe=roe_v, div_yield=dy_v, roic=roic_v)
+                        else:
+                            st.warning(f"Sem dados para {ticker}")
+            else:
+                ticker = tickers[0]
+                if ticker in df_dcf.index:
+                    row_d = df_dcf.loc[ticker]
+                    if isinstance(row_d, pd.DataFrame):
+                        row_d = row_d.iloc[-1]
+                    cres = df_ind.loc[ticker, 'Crescimento Receita 5 anos'] if ticker in df_ind.index else 5.0
+                    if isinstance(cres, pd.Series):
+                        cres = float(cres.iloc[-1])
+                    roe_v, roic_v, dy_v = _dcf_extra(row_d)
+                    render_dcf_panel(ticker, float(row_d['Cotacao']), float(row_d['PL']),
+                                     float(cres) if not pd.isna(cres) else 5.0,
+                                     _get_setor(ticker), roe=roe_v, div_yield=dy_v, roic=roic_v)
+        else:
+            st.info("Dados de Cotação ou P/L não disponíveis para o DCF.")
 
         # ── Comparação Visual de Múltiplos ───────────────────────────────────
         if len(tickers) > 1:
@@ -561,6 +1315,8 @@ if tickers:
             for v in df_chart[selected_comp_mult].values:
                 if pd.isna(v):
                     text_labels.append("N/D")
+                elif selected_comp_mult == "EV/EBITDA" and abs(v) < 0.01:
+                    text_labels.append("N/A")
                 elif is_pct:
                     text_labels.append(f"{v:.2f}%")
                 else:
@@ -612,6 +1368,8 @@ if tickers:
   Posicionamento da(s) ação(ões) selecionada(s) em relação a todos os pares do setor na B3.
 </p>
 """, unsafe_allow_html=True)
+
+        rank_df = pd.DataFrame()  # Inicializa; será populado se houver dados de peers
 
         # Múltiplos a comparar: (coluna fundamentus, nome display, menor=melhor?)
         MULTIPLES_CFG = [
@@ -797,8 +1555,8 @@ if tickers:
                     display_df = rank_df.drop(columns=["_cor"])
                     styled_rank = (
                         display_df.style
-                        .applymap(color_veredicto, subset=["Veredicto"])
-                        .applymap(color_pct,       subset=["Percentil"])
+                        .map(color_veredicto, subset=["Veredicto"])
+                        .map(color_pct,       subset=["Percentil"])
                         .format({"Valor": "{:.2f}", "Mediana Setor": "{:.2f}",
                                  "Média Setor": "{:.2f}", "Percentil": "{:.1f}%"})
                         .set_properties(**{"font-family": "JetBrains Mono, monospace", "font-size": "0.82rem"})
@@ -931,6 +1689,131 @@ if tickers:
 
 
 
+
+        # ── Síntese do Analista ──────────────────────────────────────────────
+        st.markdown("---")
+        st.markdown("""
+<h3 style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" stroke="#a855f7" stroke-width="1.8"/>
+    <path d="M12 8v4l3 3" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <span style="background:linear-gradient(135deg,#f8fafc,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Síntese do Analista</span>
+</h3>
+""", unsafe_allow_html=True)
+
+        usar_percentis = not rank_df.empty
+
+        sintese_items = []
+        for t in tickers:
+            if t not in df_ind.index:
+                continue
+            r = df_ind.loc[t]
+            if isinstance(r, pd.DataFrame):
+                r = r.iloc[-1]
+            nome = df.loc[t, 'Empresa'] if t in df.index else t
+            if isinstance(nome, pd.Series):
+                nome = nome.iloc[0]
+
+            pontos_pos = []
+            pontos_neg = []
+            alertas = []
+            fonte_label = ""
+
+            if usar_percentis:
+                # Usa percentis do setor já calculados
+                ticker_rank = rank_df[rank_df["Ação"] == t]
+                fonte_label = "vs. peers do setor"
+                for _, rr in ticker_rank.iterrows():
+                    mult = rr["Múltiplo"]
+                    pct = rr["Percentil"]
+                    val = rr["Valor"]
+                    med = rr["Mediana Setor"]
+                    vs = f"mediana do setor: {med:.2f}"
+                    if pct >= 70:
+                        pontos_pos.append(f"{mult} no percentil <b>{pct:.0f}°</b> do setor — {val:.2f} ({vs})")
+                    elif pct < 30:
+                        pontos_neg.append(f"{mult} no percentil <b>{pct:.0f}°</b> do setor — {val:.2f} ({vs})")
+                # Alertas extras de P/L absoluto
+                pl = float(r.get('P/L', 0) or 0)
+                if pl < 0:
+                    alertas.append(f"P/L negativo ({pl:.1f}x) — empresa registrou prejuízo")
+            else:
+                # Fallback: thresholds absolutos com contexto
+                fonte_label = "thresholds de mercado"
+                roe = float(r.get('ROE', 0) or 0)
+                roic = float(r.get('ROIC', 0) or 0)
+                pl = float(r.get('P/L', 0) or 0)
+                dy = float(r.get('Dividend Yield', 0) or 0)
+                ml = float(r.get('Margem Líquida', 0) or 0)
+                cr = float(r.get('Crescimento Receita 5 anos', 0) or 0)
+
+                if roe > 15: pontos_pos.append(f"ROE forte ({roe:.1f}% — acima dos 15% de referência)")
+                elif roe < 5: pontos_neg.append(f"ROE fraco ({roe:.1f}% — abaixo dos 5% mínimos)")
+
+                if roic > 12: pontos_pos.append(f"ROIC sólido ({roic:.1f}% — acima dos 12%)")
+                elif roic < 5: pontos_neg.append(f"ROIC baixo ({roic:.1f}%)")
+
+                if 0 < pl < 15: pontos_pos.append(f"P/L atrativo ({pl:.1f}x — abaixo de 15x)")
+                elif pl > 30: pontos_neg.append(f"P/L elevado ({pl:.1f}x — acima de 30x)")
+                elif pl < 0: alertas.append(f"P/L negativo ({pl:.1f}x) — empresa com prejuízo")
+
+                if dy > 5: pontos_pos.append(f"Dividend Yield elevado ({dy:.1f}%)")
+
+                if cr > 10: pontos_pos.append(f"Crescimento de receita forte ({cr:.1f}% a.a.)")
+                elif cr < 0: pontos_neg.append(f"Receita em queda ({cr:.1f}% a.a.)")
+
+                if ml > 15: pontos_pos.append(f"Margem líquida saudável ({ml:.1f}%)")
+                elif 0 <= ml < 5: alertas.append(f"Margem líquida comprimida ({ml:.1f}%)")
+                elif ml < 0: pontos_neg.append(f"Margem negativa ({ml:.1f}%)")
+
+            n_pos = len(pontos_pos)
+            n_neg = len(pontos_neg)
+            if n_pos >= 3 or (n_pos > n_neg and n_pos >= 2):
+                veredicto = ("ATRATIVO", "#00ff87")
+            elif n_neg >= 3 or (n_neg > n_pos and n_neg >= 2):
+                veredicto = ("FRACO", "#ff3d5a")
+            else:
+                veredicto = ("NEUTRO", "#ffd600")
+
+            pos_html = "".join([f'<li style="color:#00ff87;margin-bottom:4px;line-height:1.5;">{p}</li>' for p in pontos_pos])
+            neg_html = "".join([f'<li style="color:#ff3d5a;margin-bottom:4px;line-height:1.5;">{p}</li>' for p in pontos_neg])
+            ale_html = "".join([f'<li style="color:#ffd600;margin-bottom:4px;line-height:1.5;">{p}</li>' for p in alertas])
+            sem_dados = '<li style="color:#64748b;">Dados de peers insuficientes para análise completa.</li>' if not pontos_pos and not pontos_neg and not alertas else ""
+
+            sintese_items.append(f"""
+<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:14px;padding:1.2rem 1.4rem;margin-bottom:1rem;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;flex-wrap:wrap;gap:0.5rem;">
+    <div>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:1.05rem;">{t}</span>
+      <span style="font-size:0.78rem;color:#64748b;margin-left:0.5rem;">{nome}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <span style="font-size:0.65rem;color:#475569;font-style:italic;">{fonte_label}</span>
+      <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto[1]}40;border-radius:6px;padding:0.2rem 0.75rem;font-size:0.72rem;font-weight:800;color:{veredicto[1]};letter-spacing:0.08em;">{veredicto[0]}</span>
+    </div>
+  </div>
+  <ul style="margin:0;padding-left:1.2rem;font-size:0.82rem;list-style:disc;">
+    {pos_html}{neg_html}{ale_html}{sem_dados}
+  </ul>
+</div>
+""")
+
+        if sintese_items:
+            st.markdown("".join(sintese_items), unsafe_allow_html=True)
+
+        # ── Próximo Passo ────────────────────────────────────────────────────
+        tickers_str = ", ".join(tickers[:3]) + ("..." if len(tickers) > 3 else "")
+        st.markdown(f"""
+<div style="background:linear-gradient(135deg,rgba(0,255,135,0.06),rgba(0,210,255,0.03));border:1px solid rgba(0,255,135,0.25);border-radius:14px;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">
+  <div>
+    <div style="font-size:0.72rem;color:#64748b;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.3rem;">Próximo Passo</div>
+    <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;">Abra <span style="color:#00ff87">Portfolio</span> na barra lateral</div>
+    <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.2rem;">Monte e otimize a carteira com {tickers_str}</div>
+  </div>
+  <div style="font-size:1.8rem;opacity:0.6;">→</div>
+</div>
+""", unsafe_allow_html=True)
 
     except OSError as e:
         st.cache_data.clear()

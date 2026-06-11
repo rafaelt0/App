@@ -17,6 +17,41 @@ import traceback
 with open("style.css") as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
+st.sidebar.markdown("""
+<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
+  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>
+  <div style="display:flex;flex-direction:column;gap:0.35rem;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Análise Fundamentalista</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Portfolio</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Simulação</span>
+    </div>
+    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#a855f7;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba(168,85,247,0.4);">
+        <span style="font-size:0.65rem;font-weight:800;color:#fff;">4</span>
+      </div>
+      <span style="font-size:0.8rem;font-weight:700;color:#a855f7;">Notícias</span>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
 def _svg(body, size=14):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
@@ -539,8 +574,23 @@ def analise_sentimento_finbert(title, summary, nlp):
 
 # Verifica se a carteira está carregada
 if "peso_manual_df" not in st.session_state or st.session_state["peso_manual_df"] is None:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.warning("Configure e carregue seu portfólio na aba Portfolio para que as notícias possam ser processadas para as ações selecionadas.")
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:16px;padding:2.5rem;text-align:center;margin-top:2rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
+            <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" stroke="#94a3b8" stroke-width="1.5"/>
+            <path d="M14 4v4h4" stroke="#94a3b8" stroke-width="1.5"/>
+            <line x1="7" y1="13" x2="17" y2="13" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="7" y1="17" x2="17" y2="17" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <div style="font-size:1.15rem;font-weight:700;color:#f8fafc;margin-bottom:0.5rem">Portfólio não configurado</div>
+        <div style="font-size:0.875rem;color:#94a3b8;max-width:400px;margin:0 auto 1.2rem;">
+            Configure e carregue seu portfólio na página <strong style="color:#00ff87">Portfolio</strong> para que as notícias sejam filtradas para os ativos da sua carteira.
+        </div>
+        <div style="display:inline-block;background:rgba(0,255,135,0.08);border:1px solid rgba(0,255,135,0.25);border-radius:8px;padding:0.5rem 1.2rem;font-size:0.85rem;color:#00ff87;font-weight:600;">
+            → Acesse Portfolio na barra lateral
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
 # Recupera ativos e pesos
@@ -735,9 +785,21 @@ st.markdown("---")
 # Filtro lateral/superior de notícias
 section_header(ICO_NEWS, "Feed Qualitativo de Notícias da Carteira", "h3")
 
-selected_ticker = st.selectbox("Filtrar notícias por ativo", ["Todos os Ativos"] + tickers)
+col_filter, col_sort = st.columns([1, 1])
+with col_filter:
+    selected_ticker = st.selectbox(
+        "Filtrar por ativo",
+        ["Todos os Ativos"] + [f"{t} ({sum(1 for x in news_items if x['ticker']==t)} notícias)" for t in tickers],
+    )
+    # Normaliza a seleção (remove o sufixo de contagem)
+    selected_ticker_clean = selected_ticker.split(" (")[0] if selected_ticker != "Todos os Ativos" else "Todos os Ativos"
+with col_sort:
+    sort_mode = st.selectbox(
+        "Ordenar por",
+        ["Mais recentes", "Mais impactantes", "Mais otimistas", "Mais pessimistas"]
+    )
 
-filtered_news = news_items if selected_ticker == "Todos os Ativos" else [x for x in news_items if x["ticker"] == selected_ticker]
+filtered_news = news_items if selected_ticker_clean == "Todos os Ativos" else [x for x in news_items if x["ticker"] == selected_ticker_clean]
 
 # Ordenar notícias
 def parse_pub_time(pub_time):
@@ -756,9 +818,35 @@ def parse_pub_time(pub_time):
             return 0
     return 24
 
-filtered_news = sorted(filtered_news, key=lambda x: parse_pub_time(x["pub_time"]))
+if sort_mode == "Mais recentes":
+    filtered_news = sorted(filtered_news, key=lambda x: parse_pub_time(x["pub_time"]))
+elif sort_mode == "Mais impactantes":
+    impact_rank = {"Alto": 0, "Médio-Alto": 1, "Médio": 2, "Baixo-Médio": 3, "Baixo": 4}
+    filtered_news = sorted(filtered_news, key=lambda x: impact_rank.get(x["impact"], 5))
+elif sort_mode == "Mais otimistas":
+    filtered_news = sorted(filtered_news, key=lambda x: -x["score"])
+elif sort_mode == "Mais pessimistas":
+    filtered_news = sorted(filtered_news, key=lambda x: x["score"])
 
-for news in filtered_news:
+total_news = len(filtered_news)
+pos_f = sum(1 for x in filtered_news if x["sentiment"] == "Otimista")
+neg_f = sum(1 for x in filtered_news if x["sentiment"] == "Pessimista")
+neu_f = total_news - pos_f - neg_f
+st.caption(f"Exibindo {total_news} notícias — {pos_f} otimistas · {neu_f} neutras · {neg_f} pessimistas")
+
+# Paginação
+ITEMS_PER_PAGE = 15
+page_key = f"{selected_ticker}_{sort_mode}"
+if st.session_state.get("_noticias_filter_key") != page_key:
+    st.session_state["noticias_page"] = 1
+    st.session_state["_noticias_filter_key"] = page_key
+if "noticias_page" not in st.session_state:
+    st.session_state["noticias_page"] = 1
+
+n_show = st.session_state["noticias_page"] * ITEMS_PER_PAGE
+news_to_show = filtered_news[:n_show]
+
+for news in news_to_show:
     badge_bg = "rgba(74, 222, 128, 0.1)" if news["sentiment"] == "Otimista" else \
                "rgba(248, 113, 113, 0.1)" if news["sentiment"] == "Pessimista" else "rgba(96, 165, 250, 0.1)"
     badge_color = "#4ade80" if news["sentiment"] == "Otimista" else \
@@ -887,6 +975,17 @@ for news in filtered_news:
                 st.markdown(f"<p style='font-size:0.7rem; color:#64748b; margin-top:4px;'>Tamanho do texto tokenizado: {news['raw_text_length']} palavras.</p>", unsafe_allow_html=True)
                 
     st.markdown("<div style='margin-bottom:1rem;'></div>", unsafe_allow_html=True)
+
+# Botão "Ver mais"
+remaining = len(filtered_news) - n_show
+if remaining > 0:
+    col_vm, _ = st.columns([1, 3])
+    with col_vm:
+        if st.button(f"Ver mais {min(remaining, ITEMS_PER_PAGE)} notícias  ({remaining} restantes)"):
+            st.session_state["noticias_page"] += 1
+            st.rerun()
+elif len(filtered_news) > ITEMS_PER_PAGE:
+    st.caption(f"✓ Todas as {len(filtered_news)} notícias carregadas.")
 
 st.markdown("---")
 
