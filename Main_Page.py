@@ -724,25 +724,51 @@ if tickers:
     <span style="font-weight: 700; color: #00d2ff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Valuation</span>
 </div>
 """, unsafe_allow_html=True)
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.metric("P/L", f"{row['P/L']:.2f}", help="Preço/Lucro: quantas vezes o mercado paga pelo lucro anual. Menor = mais barato.")
-            with c2:
-                st.metric("P/VP", f"{row['P/VP']:.2f}", help="Preço/Valor Patrimonial: compara o preço de mercado com o valor contábil. <1 pode indicar desconto.")
-            with c3:
-                ev_val = row['EV/EBITDA']
-                if pd.isna(ev_val) or abs(ev_val) < 0.01:
-                    ctx = get_ev_ebitda_context(setor)
-                    if ctx:
-                        alt, reason = ctx
-                        st.metric("EV/EBITDA", "—",
-                                  delta="→ " + alt, delta_color="off", help=reason)
-                    else:
-                        st.metric("EV/EBITDA", "N/D",
-                                  help="Dado não disponível para este ticker via Fundamentus.")
+            def _badge(text, level):
+                if level == "normal":
+                    c, bg, bd = "#00ff87", "rgba(0,255,135,0.08)", "rgba(0,255,135,0.2)"
+                elif level == "inverse":
+                    c, bg, bd = "#ff3d5a", "rgba(255,61,90,0.08)", "rgba(255,61,90,0.2)"
                 else:
-                    st.metric("EV/EBITDA", f"{ev_val:.2f}",
-                              help="Enterprise Value / EBITDA: múltiplo de valuation que considera a dívida. Menor = mais barato.")
+                    c, bg, bd = "#94a3b8", "rgba(148,163,184,0.08)", "rgba(148,163,184,0.15)"
+                return (f'<div class="mcard-delta" style="color:{c};background:{bg};'
+                        f'border:1px solid {bd}">{text}</div>')
+
+            def _card(label, value, vc, badge="", tip=""):
+                t = f' title="{tip}"' if tip else ""
+                return (f'<div class="mcard"{t}>'
+                        f'<div class="mcard-label">{label}</div>'
+                        f'<div class="mcard-value" style="color:{vc}">{value}</div>'
+                        f'{badge}</div>')
+
+            def _pct_card(lbl, v, strong_thr, weak_thr, tip,
+                          strong_lbl="Forte", weak_lbl="Fraco", mid_lbl="Moderado"):
+                lvl = "normal" if v > strong_thr else ("inverse" if v < weak_thr else "off")
+                txt = strong_lbl if v > strong_thr else (weak_lbl if v < weak_thr else mid_lbl)
+                vc  = "#00ff87" if lvl == "normal" else ("#ff3d5a" if lvl == "inverse" else "#f8fafc")
+                return _card(lbl, f"{v:.2f}%", vc, badge=_badge(txt, lvl), tip=tip)
+
+            pl_val  = row['P/L']
+            pvp_val = row['P/VP']
+            ev_val  = row['EV/EBITDA']
+            ev_zero = pd.isna(ev_val) or abs(ev_val) < 0.01
+            ctx = get_ev_ebitda_context(setor) if ev_zero else None
+            if ev_zero and ctx:
+                alt, reason = ctx
+                ev_card = _card("EV/EBITDA", "—", "#64748b",
+                                badge=_badge("→ " + alt, "off"), tip=reason)
+            elif ev_zero:
+                ev_card = _card("EV/EBITDA", "N/D", "#475569",
+                                tip="Dado não disponível para este ticker via Fundamentus.")
+            else:
+                ev_card = _card("EV/EBITDA", f"{ev_val:.2f}", "#f8fafc",
+                                tip="Enterprise Value / EBITDA: múltiplo de valuation que considera a dívida. Menor = mais barato.")
+            st.markdown('<div class="mcard-grid">' +
+                _card("P/L", f"{pl_val:.2f}", "#f8fafc",
+                      tip="Preço/Lucro: quantas vezes o mercado paga pelo lucro anual. Menor = mais barato.") +
+                _card("P/VP", f"{pvp_val:.2f}", "#f8fafc",
+                      tip="Preço/Valor Patrimonial: compara o preço de mercado com o valor contábil. <1 pode indicar desconto.") +
+                ev_card + '</div>', unsafe_allow_html=True)
 
             # 2. Rentabilidade Section
             st.markdown("""
@@ -754,31 +780,22 @@ if tickers:
     <span style="font-weight: 700; color: #00ff87; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Rentabilidade</span>
 </div>
 """, unsafe_allow_html=True)
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                roe_val = row['ROE']
-                st.metric("ROE", f"{roe_val:.2f}%",
-                          delta="Forte" if roe_val > 15 else ("Fraco" if roe_val < 5 else "Moderado"),
-                          delta_color="normal" if roe_val > 15 else ("inverse" if roe_val < 5 else "off"),
-                          help="Return on Equity: lucro gerado para cada R$ de patrimônio. Acima de 15% é considerado bom.")
-            with c2:
-                roic_val = row['ROIC']
-                st.metric("ROIC", f"{roic_val:.2f}%",
-                          delta="Forte" if roic_val > 12 else ("Fraco" if roic_val < 5 else "Moderado"),
-                          delta_color="normal" if roic_val > 12 else ("inverse" if roic_val < 5 else "off"),
-                          help="Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida).")
-            with c3:
-                ml_val = row['Margem Líquida']
-                st.metric("Margem Líquida", f"{ml_val:.2f}%",
-                          delta="Alta" if ml_val > 15 else ("Baixa" if ml_val < 5 else "Média"),
-                          delta_color="normal" if ml_val > 15 else ("inverse" if ml_val < 5 else "off"),
-                          help="Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa.")
-            with c4:
-                mebit_val = row['Margem EBIT']
-                st.metric("Margem EBIT", f"{mebit_val:.2f}%",
-                          delta="Alta" if mebit_val > 15 else ("Baixa" if mebit_val < 5 else "Média"),
-                          delta_color="normal" if mebit_val > 15 else ("inverse" if mebit_val < 5 else "off"),
-                          help="Margem operacional antes de juros e impostos. Mede a eficiência operacional.")
+            roe_val   = row['ROE']
+            roic_val  = row['ROIC']
+            ml_val    = row['Margem Líquida']
+            mebit_val = row['Margem EBIT']
+            st.markdown('<div class="mcard-grid">' +
+                _pct_card("ROE", roe_val, 15, 5,
+                          "Return on Equity: lucro gerado para cada R$ de patrimônio. Acima de 15% é considerado bom.") +
+                _pct_card("ROIC", roic_val, 12, 5,
+                          "Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida).") +
+                _pct_card("Margem Líquida", ml_val, 15, 5,
+                          "Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa.",
+                          "Alta", "Baixa", "Média") +
+                _pct_card("Margem EBIT", mebit_val, 15, 5,
+                          "Margem operacional antes de juros e impostos. Mede a eficiência operacional.",
+                          "Alta", "Baixa", "Média") +
+                '</div>', unsafe_allow_html=True)
 
             # 3. Crescimento & Yield Section
             st.markdown("""
@@ -789,19 +806,20 @@ if tickers:
     <span style="font-weight: 700; color: #ffd600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Crescimento & Yield</span>
 </div>
 """, unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            with c1:
-                dy_val = row['Dividend Yield']
-                st.metric("Dividend Yield", f"{dy_val:.2f}%",
-                          delta="Alto" if dy_val > 6 else ("Baixo" if dy_val < 2 else "Moderado"),
-                          delta_color="normal" if dy_val > 4 else "off",
-                          help="Dividendos pagos divididos pelo preço. Percentual de retorno em dividendos ao ano.")
-            with c2:
-                cr_val = row['Crescimento Receita 5 anos']
-                st.metric("Crescimento Receita (5 anos)", f"{cr_val:.2f}%",
-                          delta="Forte" if cr_val > 10 else ("Negativo" if cr_val < 0 else "Moderado"),
-                          delta_color="normal" if cr_val > 10 else ("inverse" if cr_val < 0 else "off"),
-                          help="Taxa de crescimento anual composta da receita nos últimos 5 anos.")
+            dy_val = row['Dividend Yield']
+            cr_val = row['Crescimento Receita 5 anos']
+            dy_lvl = "normal" if dy_val > 4 else "off"
+            cr_lvl = "normal" if cr_val > 10 else ("inverse" if cr_val < 0 else "off")
+            st.markdown('<div class="mcard-grid">' +
+                _card("Dividend Yield", f"{dy_val:.2f}%",
+                      "#00ff87" if dy_val > 4 else "#f8fafc",
+                      badge=_badge("Alto" if dy_val > 6 else ("Baixo" if dy_val < 2 else "Moderado"), dy_lvl),
+                      tip="Dividendos pagos divididos pelo preço. Percentual de retorno em dividendos ao ano.") +
+                _card("Crescimento Receita (5a)", f"{cr_val:.2f}%",
+                      "#00ff87" if cr_val > 10 else ("#ff3d5a" if cr_val < 0 else "#f8fafc"),
+                      badge=_badge("Forte" if cr_val > 10 else ("Negativo" if cr_val < 0 else "Moderado"), cr_lvl),
+                      tip="Taxa de crescimento anual composta da receita nos últimos 5 anos.") +
+                '</div>', unsafe_allow_html=True)
 
         # Exibição dos cards
         if len(tickers) > 1:
