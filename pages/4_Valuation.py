@@ -81,11 +81,16 @@ def get_koller_data(ticker_b3: str):
         info = t.info or {}
 
         def _v(df, keys, col_i=0):
+            if df is None or df.empty or col_i >= len(df.columns):
+                return None
             for k in keys:
                 if k in df.index:
-                    v = pd.to_numeric(df.loc[k].iloc[col_i], errors='coerce')
-                    if not pd.isna(v):
-                        return float(v)
+                    try:
+                        v = pd.to_numeric(df.loc[k].iloc[col_i], errors='coerce')
+                        if not pd.isna(v):
+                            return float(v)
+                    except Exception:
+                        continue
             return None
 
         if inc is None or inc.empty:
@@ -169,8 +174,8 @@ def get_koller_data(ticker_b3: str):
             'equity_book': lat['equity'], 'kd_est': kd_est,
             'rev_cagr': rev_cagr,
         }
-    except Exception:
-        return None
+    except Exception as e:
+        return {'_error': str(e)}
 
 # ─── DCF Engine (Koller) ───────────────────────────────────────────────────────
 def calc_cv(noplat_next, g_pct, roic_cv_pct, wacc_dec):
@@ -244,9 +249,15 @@ with st.spinner(f"Carregando dados financeiros de {ticker}..."):
     selic  = get_selic()
     kdata  = get_koller_data(ticker)
 
-if kdata is None:
-    st.error(f"Não foi possível carregar dados do yfinance para **{ticker}.SA**. "
-             f"Verifique o ticker ou tente novamente.")
+if kdata is None or '_error' in (kdata or {}):
+    err_detail = kdata.get('_error', '') if isinstance(kdata, dict) else ''
+    st.error(
+        f"Não foi possível carregar dados do yfinance para **{ticker}.SA**.\n\n"
+        f"**Causas comuns:** ticker inválido, empresa sem demonstrações financeiras "
+        f"no yfinance (bancos, FIIs, BDRs), ou instabilidade temporária da API.\n\n"
+        + (f"_Detalhe técnico: {err_detail}_" if err_detail else
+           "Tente PETR4, WEGE3, VALE3, RENT3 ou outro ticker de empresa operacional.")
+    )
     st.stop()
 
 ys      = kdata['years']
