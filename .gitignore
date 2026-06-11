@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
 *.pyo
-.claude/
+# Ignorar dados internos do Claude Code, mas manter commands (project skills)
+.claude/*
+!.claude/commands/
 .env
