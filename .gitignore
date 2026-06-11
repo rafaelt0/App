@@ -1,7 +1,33 @@
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-# Ignorar dados internos do Claude Code, mas manter commands (project skills)
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code session data (keep project commands)
 .claude/*
 !.claude/commands/
-.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Distribution
+dist/
+build/
+*.egg-info/
