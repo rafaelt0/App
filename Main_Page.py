@@ -1063,15 +1063,22 @@ if tickers:
             if has_dy and div_yield >= 2.0:
                 iv_ddm, upside_ddm = calcular_ddm(cotacao, div_yield, gt, wacc)
 
-            # Valor principal: FCFF se disponível (completo), senão LPA (proxy)
-            iv_primary  = iv_fcff if iv_fcff is not None else iv
-            up_primary  = up_fcff if iv_fcff is not None else upside
-            # Consenso: incorpora DDM como dado complementar quando disponível
-            if iv_ddm is not None and iv_primary is not None:
-                iv_cons = iv_primary * (2/3) + iv_ddm * (1/3)
-                up_cons = (iv_cons / cotacao - 1) * 100
+            # Valor principal e consenso
+            # FCFF disponível → resultado único (não misturar com LPA ou DDM)
+            # FCFF indisponível → LPA × 2/3 + DDM × 1/3 quando DDM aplicável
+            iv_primary = iv_fcff if iv_fcff is not None else iv
+            up_primary = up_fcff if iv_fcff is not None else upside
+            if iv_fcff is not None:
+                # FCFF é o modelo completo — DDM fica como referência, não entra no cálculo
+                iv_cons, up_cons = iv_fcff, up_fcff
+                show_consensus = False
+            elif iv_ddm is not None:
+                iv_cons  = iv * (2/3) + iv_ddm * (1/3)
+                up_cons  = (iv_cons / cotacao - 1) * 100
+                show_consensus = True
             else:
-                iv_cons, up_cons = iv_primary, up_primary
+                iv_cons, up_cons = iv, upside
+                show_consensus = False
 
             ms = (iv_cons - cotacao) / iv_cons * 100 if iv_cons and iv_cons != 0 else 0
             if up_cons > 20:
@@ -1090,16 +1097,22 @@ if tickers:
                     f'<div class="mcard"><div class="mcard-label">IV — FCFF ✓</div>'
                     f'<div class="mcard-value" style="color:#00e5ff">R$ {iv_fcff:,.2f}</div></div>'
                 )
+            # LPA: principal quando sem FCFF, referência (cinza) quando FCFF disponível
+            lpa_color = "#a855f7" if iv_fcff is None else "#475569"
+            lpa_label = "IV — LPA proxy" if iv_fcff is None else "LPA proxy (ref.)"
             cards_html += (
-                f'<div class="mcard"><div class="mcard-label">IV — LPA proxy</div>'
-                f'<div class="mcard-value" style="color:{"#a855f7" if iv_fcff is None else "#475569"}">R$ {iv:,.2f}</div></div>'
+                f'<div class="mcard"><div class="mcard-label">{lpa_label}</div>'
+                f'<div class="mcard-value" style="color:{lpa_color}">R$ {iv:,.2f}</div></div>'
             )
             if iv_ddm is not None:
+                # DDM: entra no consenso quando sem FCFF; é só referência quando FCFF disponível
+                ddm_color = "#818cf8" if iv_fcff is None else "#475569"
+                ddm_label = "IV — DDM" if iv_fcff is None else "DDM (ref.)"
                 cards_html += (
-                    f'<div class="mcard"><div class="mcard-label">IV — DDM</div>'
-                    f'<div class="mcard-value" style="color:#818cf8">R$ {iv_ddm:,.2f}</div></div>'
+                    f'<div class="mcard"><div class="mcard-label">{ddm_label}</div>'
+                    f'<div class="mcard-value" style="color:{ddm_color}">R$ {iv_ddm:,.2f}</div></div>'
                 )
-            if iv_ddm is not None or iv_fcff is not None:
+            if show_consensus:
                 cards_html += (
                     f'<div class="mcard"><div class="mcard-label">Consenso</div>'
                     f'<div class="mcard-value" style="color:#c084fc">R$ {iv_cons:,.2f}</div></div>'
@@ -1158,11 +1171,9 @@ if tickers:
             price_p = min(cotacao / total_range * 100, 100)
             iv_p    = min(iv_bar   / total_range * 100, 100)
             bar_color = "#00ff87" if iv_bar > cotacao else "#ff3d5a"
-            if iv_fcff is not None and iv_ddm is not None:
-                iv_label = "Consenso (FCFF+DDM)"
-            elif iv_fcff is not None:
+            if iv_fcff is not None:
                 iv_label = "IV (FCFF)"
-            elif iv_ddm is not None:
+            elif show_consensus:
                 iv_label = "Consenso (LPA+DDM)"
             else:
                 iv_label = "IV (LPA proxy)"
