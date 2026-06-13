@@ -18,6 +18,8 @@ import re
 import traceback
 import time
 
+from utils import db as _db
+
 
 
 import plotly.graph_objects as go
@@ -91,11 +93,22 @@ def get_ev_ebitda_context(setor: str):
 
 @st.cache_data(ttl=3600)
 def get_fundamentus_data(tickers):
-    """Busca dados fundamentalistas com retry automático."""
+    """Busca dados fundamentalistas com SQLite cache (4h) + retry automático."""
+    cache_key = f"fund_{'_'.join(sorted(tickers))}"
+    cached = _db.cache_get(cache_key, ttl=14400)
+    if cached:
+        try:
+            df = pd.read_json(cached)
+            if not df.empty:
+                return df
+        except Exception:
+            pass
     for attempt in range(3):
         try:
-            return pd.concat([fundamentus.get_papel(t) for t in tickers])
-        except OSError as e:
+            result = pd.concat([fundamentus.get_papel(t) for t in tickers])
+            _db.cache_set(cache_key, result.to_json())
+            return result
+        except OSError:
             if attempt < 2:
                 time.sleep(1)
                 continue
@@ -283,6 +296,31 @@ if 'Setor' not in data.columns:
 stocks = list(data['Ticker'].values)
 setores = sorted(data['Setor'].dropna().unique())
 setores.insert(0, "Todos")
+_ticker_setor = dict(zip(data['Ticker'], data['Setor']))
+
+# ── Watchlist (sidebar) ───────────────────────────────────────────────────────
+_watchlist = _db.wl_get()
+if _watchlist:
+    st.sidebar.markdown("""
+<div style="padding:0.6rem 0 0.3rem 0;border-bottom:1px solid #1e293b;margin-bottom:0.5rem">
+  <span style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#ffd600;text-transform:uppercase">
+    ⭐ Favoritos
+  </span>
+</div>""", unsafe_allow_html=True)
+    for _wt in _watchlist:
+        _c1, _c2 = st.sidebar.columns([5, 1])
+        with _c1:
+            if st.button(_wt, key=f"wl_load_{_wt}", use_container_width=True,
+                         help=_ticker_setor.get(_wt, "")):
+                _cur = st.session_state.get("selected_tickers", [])
+                if _wt not in _cur:
+                    st.session_state["selected_tickers"] = _cur + [_wt]
+                st.rerun()
+        with _c2:
+            if st.button("✕", key=f"wl_rm_{_wt}", help="Remover dos favoritos"):
+                _db.wl_remove(_wt)
+                st.rerun()
+    st.sidebar.markdown("<div style='margin-bottom:0.75rem'></div>", unsafe_allow_html=True)
 
 st.sidebar.subheader("Escolha o setor.")
 
@@ -321,6 +359,7 @@ st.session_state["selected_tickers"] = [
 tickers = st.multiselect(
     'Escolha sua ação. Selecione a página desejada e as configurações na barra lateral.',
     options=tickers_filtrados,
+    format_func=lambda t: f"{t}  ·  {_ticker_setor.get(t, '')}",
     key="selected_tickers"
 )
 
@@ -611,14 +650,31 @@ if tickers:
                           help="Taxa de crescimento anual composta da receita nos últimos 5 anos.")
 
         # Exibição dos cards
+        def _render_star_button(tkr):
+            starred = _db.wl_has(tkr)
+            label = "★ Favoritado" if starred else "☆ Favoritar"
+            color = "#ffd600" if starred else "#475569"
+            st.markdown(
+                f'<div style="display:inline-flex;align-items:center;margin-bottom:0.4rem">',
+                unsafe_allow_html=True)
+            if st.button(label, key=f"star_{tkr}",
+                         help="Remover dos favoritos" if starred else "Salvar nos favoritos"):
+                if starred:
+                    _db.wl_remove(tkr)
+                else:
+                    _db.wl_add(tkr)
+                st.rerun()
+
         if len(tickers) > 1:
             tabs_tickers = st.tabs(tickers)
             for idx, ticker in enumerate(tickers):
                 with tabs_tickers[idx]:
+                    _render_star_button(ticker)
                     if ticker in df_ind.index:
                         render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(ticker))
         else:
             ticker = tickers[0]
+            _render_star_button(ticker)
             if ticker in df_ind.index:
                 render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(ticker))
 

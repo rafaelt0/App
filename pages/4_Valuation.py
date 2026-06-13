@@ -4,8 +4,11 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import datetime as dt
+import os
 import warnings
 warnings.filterwarnings('ignore')
+
+from utils import db as _db
 
 try:
     with open("style.css") as f:
@@ -944,3 +947,99 @@ with tabs[7]:
                 unsafe_allow_html=True)
     else:
         st.warning("NOPLAT, EBIT ou Receita indisponíveis para calcular os múltiplos implícitos.")
+
+    # ── Peer Comparison automático ─────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### Peers do Setor — Comparação Automática")
+    st.caption("Múltiplos de mercado de empresas do mesmo setor via Fundamentus. "
+               "Contexto para calibrar se o valuation DCF é razoável.")
+
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def _get_peers_multiples():
+        try:
+            import fundamentus.resultado as fzr
+            raw = fzr.get_resultado_raw()
+            cols = {'P/L': 'PL', 'P/VP': 'PVP', 'EV/EBITDA': 'EV_EBITDA',
+                    'ROE': 'ROE', 'ROIC': 'ROIC', 'Div.Yield': 'DY'}
+            df2 = pd.DataFrame(index=raw.index)
+            for src, dst in cols.items():
+                if src in raw.columns:
+                    df2[dst] = pd.to_numeric(
+                        raw[src].astype(str).str.replace(',', '.').str.replace(r'[^\d.\-]', '', regex=True),
+                        errors='coerce')
+            return df2
+        except Exception:
+            return pd.DataFrame()
+
+    _csv_path = os.path.join(os.path.dirname(__file__), '..', 'acoes-listadas-b3.csv')
+    _b3_data  = pd.read_csv(_csv_path) if os.path.exists(_csv_path) else pd.DataFrame()
+    _setor_ticker = (_b3_data[_b3_data['Ticker'] == ticker]['Setor'].values[0]
+                     if not _b3_data.empty and ticker in _b3_data['Ticker'].values else None)
+
+    if _setor_ticker:
+        _peers_tickers = _b3_data[_b3_data['Setor'] == _setor_ticker]['Ticker'].tolist()
+        st.caption(f"Setor: **{_setor_ticker}** · {len(_peers_tickers)} empresas comparáveis")
+
+        with st.spinner("Carregando múltiplos do setor..."):
+            _peers_df = _get_peers_multiples()
+
+        if not _peers_df.empty:
+            _peers_in = [p for p in _peers_tickers if p in _peers_df.index]
+            if _peers_in:
+                _comp = _peers_df.loc[_peers_in].copy()
+                for col in _comp.columns:
+                    _comp[col] = pd.to_numeric(_comp[col], errors='coerce')
+                    _comp.loc[_comp[col] == 0, col] = pd.NA
+                    if col in ('PL', 'PVP', 'EV_EBITDA'):
+                        _comp.loc[(_comp[col] < 0) | (_comp[col] > 500), col] = pd.NA
+                _comp = _comp.dropna(how='all')
+
+                # Highlight the analyzed ticker
+                _comp.index.name = 'Ticker'
+                _disp = _comp.copy().rename(columns={
+                    'PL': 'P/L', 'PVP': 'P/VP', 'EV_EBITDA': 'EV/EBITDA',
+                    'ROE': 'ROE (%)', 'ROIC': 'ROIC (%)', 'DY': 'DY (%)'})
+
+                def _highlight(row):
+                    if row.name == ticker:
+                        return ['background-color: rgba(168,85,247,0.15); font-weight:bold'] * len(row)
+                    return [''] * len(row)
+
+                _styled = _disp.style.apply(_highlight, axis=1).format("{:.1f}", na_rep="—")
+                st.dataframe(_styled, use_container_width=True)
+
+                # Bar chart — EV/EBITDA peer comparison
+                _ev_col = 'EV/EBITDA'
+                if _ev_col in _disp.columns:
+                    _chart_df = _disp[[_ev_col]].dropna().sort_values(_ev_col)
+                    _colors = ['#a855f7' if i == ticker else '#334155' for i in _chart_df.index]
+                    _fig_peers = go.Figure(go.Bar(
+                        x=_chart_df.index.tolist(),
+                        y=_chart_df[_ev_col].tolist(),
+                        marker_color=_colors,
+                        text=[f"{v:.1f}×" for v in _chart_df[_ev_col]],
+                        textposition='outside',
+                    ))
+                    _fig_peers.update_layout(title=f"EV/EBITDA — Peers ({_setor_ticker})",
+                                             height=260, yaxis_title="EV/EBITDA (×)",
+                                             xaxis_tickangle=-35)
+                    apply_plotly_theme(_fig_peers)
+                    st.plotly_chart(_fig_peers, use_container_width=True)
+            else:
+                st.info("Dados de múltiplos não disponíveis para os peers deste setor.")
+        else:
+            st.warning("Não foi possível carregar dados de peers do Fundamentus.")
+    else:
+        st.info("Setor não identificado no CSV B3 — comparação de peers indisponível.")
+
+    # ── Watchlist button ───────────────────────────────────────────────────────
+    st.markdown("---")
+    _starred = _db.wl_has(ticker)
+    if st.button("★ Remover dos Favoritos" if _starred else "☆ Salvar nos Favoritos",
+                 key="val_watchlist_btn",
+                 help="Ticker salvo na watchlist da página principal"):
+        if _starred:
+            _db.wl_remove(ticker)
+        else:
+            _db.wl_add(ticker)
+        st.rerun()
