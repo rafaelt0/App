@@ -140,6 +140,107 @@ def get_sorted_tickers_by_liquidity(tickers_list):
     except Exception:
         return tickers_list
 
+
+@st.cache_data(ttl=14400, show_spinner=False)
+def get_hist_fundamentals(ticker_sa: str):
+    """Fetch annual income statement + balance sheet from yfinance (4h cache)."""
+    t_yf = yf.Ticker(ticker_sa)
+    out = {}
+    try:
+        fin = t_yf.financials
+        if fin is not None and not fin.empty:
+            out['fin'] = fin.to_json()
+    except Exception:
+        pass
+    try:
+        bs = t_yf.balance_sheet
+        if bs is not None and not bs.empty:
+            out['bs'] = bs.to_json()
+    except Exception:
+        pass
+    return out
+
+
+def _build_hist_df(tkr: str):
+    """Returns a DataFrame indexed by year with Receita, Lucro, Margens, ROE."""
+    raw = get_hist_fundamentals(tkr + ".SA")
+    if not raw:
+        return None
+
+    def _parse(json_str):
+        df_p = pd.read_json(json_str)
+        try:
+            df_p.columns = pd.to_datetime(df_p.columns.astype('int64'), unit='ms').year
+        except Exception:
+            try:
+                df_p.columns = pd.to_datetime(df_p.columns).year
+            except Exception:
+                pass
+        return df_p
+
+    def _row(df_p, *keys):
+        for k in keys:
+            if k in df_p.index:
+                return df_p.loc[k]
+        return None
+
+    fin_df = bs_df = None
+    if 'fin' in raw:
+        try:
+            fin_df = _parse(raw['fin'])
+        except Exception:
+            pass
+    if 'bs' in raw:
+        try:
+            bs_df = _parse(raw['bs'])
+        except Exception:
+            pass
+
+    records = {}
+
+    if fin_df is not None:
+        rev = _row(fin_df, 'Total Revenue', 'Revenue')
+        ni  = _row(fin_df, 'Net Income', 'Net Income Common Stockholders',
+                   'Net Income Applicable To Common Shares',
+                   'Net Income Including Noncontrolling Interests')
+        eb  = _row(fin_df, 'EBIT', 'Operating Income', 'Ebit')
+
+        for y in sorted(fin_df.columns.tolist()):
+            y = int(y)
+            rec = records.setdefault(y, {})
+            r_v = float(rev[y]) if (rev is not None and y in rev.index and pd.notna(rev[y])) else None
+            n_v = float(ni[y])  if (ni  is not None and y in ni.index  and pd.notna(ni[y]))  else None
+            e_v = float(eb[y])  if (eb  is not None and y in eb.index  and pd.notna(eb[y]))  else None
+            if r_v is not None:
+                rec['Receita'] = r_v
+            if n_v is not None:
+                rec['Lucro Líquido'] = n_v
+            if r_v and n_v is not None and abs(r_v) > 0:
+                rec['Margem Líquida (%)'] = n_v / r_v * 100
+            if r_v and e_v is not None and abs(r_v) > 0:
+                rec['Margem EBIT (%)'] = e_v / r_v * 100
+
+    if bs_df is not None and fin_df is not None:
+        eq = _row(bs_df, 'Stockholders Equity', 'Common Stock Equity',
+                  'Total Stockholder Equity', 'Total Equity Gross Minority Interest')
+        ni = _row(fin_df, 'Net Income', 'Net Income Common Stockholders',
+                  'Net Income Applicable To Common Shares',
+                  'Net Income Including Noncontrolling Interests')
+        if eq is not None and ni is not None:
+            for y in sorted(bs_df.columns.tolist()):
+                y = int(y)
+                e_v = float(eq[y]) if y in eq.index and pd.notna(eq[y]) else None
+                n_v = float(ni[y]) if y in ni.index and pd.notna(ni[y]) else None
+                if e_v and n_v is not None and abs(e_v) > 0:
+                    records.setdefault(y, {})['ROE (%)'] = n_v / e_v * 100
+
+    if not records:
+        return None
+    df_h = pd.DataFrame(records).T.sort_index()
+    df_h.index.name = 'Ano'
+    return df_h
+
+
 st.set_page_config(
     page_title="B3 Explorer — Análise Quantitativa de Ações",
     page_icon="b3.webp",
@@ -758,6 +859,113 @@ if tickers:
             _render_star_button(ticker)
             if ticker in df_ind.index:
                 render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(ticker))
+
+        # ── Histórico Fundamentalista ─────────────────────────────────────────
+        st.markdown("---")
+        section_header(ICO_CHART, "Histórico Fundamentalista", "h3")
+        st.caption("Evolução anual de receita, lucro, margens e ROE — últimos 4 anos (fonte: yfinance / relatórios anuais).")
+
+        def _render_hist_section(tkr):
+            with st.spinner(f"Buscando histórico de {tkr}..."):
+                df_h = _build_hist_df(tkr)
+            if df_h is None or df_h.empty:
+                st.info(f"Dados históricos não disponíveis para {tkr} via yfinance.")
+                return
+
+            tab_rev, tab_marg, tab_roe = st.tabs(["Receita & Lucro", "Margens", "ROE"])
+
+            with tab_rev:
+                cols_rev = [c for c in ['Receita', 'Lucro Líquido'] if c in df_h.columns]
+                if not cols_rev:
+                    st.info("Dados de receita não disponíveis.")
+                else:
+                    df_rev = df_h[cols_rev].dropna(how='all')
+                    max_abs = df_rev.abs().max().max()
+                    scale, unit = (1e9, "R$ Bilhões") if max_abs >= 1e9 else (1e6, "R$ Milhões") if max_abs >= 1e6 else (1, "R$")
+                    df_rev = df_rev / scale
+                    clr = {'Receita': '#00d2ff', 'Lucro Líquido': '#00ff87'}
+                    fig_rev = go.Figure()
+                    for col in cols_rev:
+                        vals = df_rev[col].fillna(0)
+                        fig_rev.add_trace(go.Bar(
+                            name=col,
+                            x=df_rev.index.astype(str),
+                            y=vals,
+                            marker_color=clr.get(col, '#94a3b8'),
+                            text=[f"{v:.1f}" if v != 0 else "" for v in vals],
+                            textposition='outside',
+                            textfont=dict(size=10, color='#f8fafc')
+                        ))
+                    fig_rev.update_layout(
+                        barmode='group', xaxis_title="Ano", yaxis_title=unit,
+                        height=360, margin=dict(t=20, b=40, l=40, r=20),
+                    )
+                    apply_plotly_theme(fig_rev)
+                    st.plotly_chart(fig_rev, use_container_width=True)
+
+            with tab_marg:
+                cols_m = [c for c in ['Margem Líquida (%)', 'Margem EBIT (%)'] if c in df_h.columns]
+                if not cols_m:
+                    st.info("Dados de margem não disponíveis.")
+                else:
+                    df_m = df_h[cols_m].dropna(how='all')
+                    clr_m = {'Margem Líquida (%)': '#00ff87', 'Margem EBIT (%)': '#ffd600'}
+                    fig_m = go.Figure()
+                    for col in cols_m:
+                        vals = df_m[col]
+                        fig_m.add_trace(go.Scatter(
+                            name=col,
+                            x=df_m.index.astype(str), y=vals,
+                            mode='lines+markers+text',
+                            line=dict(color=clr_m.get(col, '#94a3b8'), width=2.5),
+                            marker=dict(size=8),
+                            text=[f"{v:.1f}%" if pd.notna(v) else "" for v in vals],
+                            textposition='top center',
+                            textfont=dict(size=10, color='#f8fafc')
+                        ))
+                    fig_m.update_layout(
+                        xaxis_title="Ano", yaxis_title="Margem (%)",
+                        yaxis=dict(ticksuffix="%"),
+                        height=360, margin=dict(t=20, b=40, l=40, r=20),
+                    )
+                    apply_plotly_theme(fig_m)
+                    st.plotly_chart(fig_m, use_container_width=True)
+
+            with tab_roe:
+                if 'ROE (%)' not in df_h.columns or df_h['ROE (%)'].dropna().empty:
+                    st.info("Dados de ROE histórico não disponíveis.")
+                else:
+                    df_roe = df_h[['ROE (%)']].dropna()
+                    fig_roe = go.Figure(go.Scatter(
+                        x=df_roe.index.astype(str), y=df_roe['ROE (%)'],
+                        mode='lines+markers+text',
+                        line=dict(color='#a855f7', width=2.5),
+                        marker=dict(size=9, color='#a855f7'),
+                        fill='tozeroy', fillcolor='rgba(168,85,247,0.08)',
+                        text=[f"{v:.1f}%" if pd.notna(v) else "" for v in df_roe['ROE (%)']],
+                        textposition='top center',
+                        textfont=dict(size=10, color='#f8fafc')
+                    ))
+                    fig_roe.add_hline(
+                        y=15, line_dash="dash", line_color="#00ff87", line_width=1.5,
+                        annotation_text="Referência: 15%", annotation_position="top right",
+                        annotation_font=dict(color="#00ff87", size=10)
+                    )
+                    fig_roe.update_layout(
+                        xaxis_title="Ano", yaxis_title="ROE (%)",
+                        yaxis=dict(ticksuffix="%"),
+                        height=360, margin=dict(t=20, b=40, l=40, r=20),
+                    )
+                    apply_plotly_theme(fig_roe)
+                    st.plotly_chart(fig_roe, use_container_width=True)
+
+        if len(tickers) > 1:
+            tabs_hist = st.tabs(tickers)
+            for _h_idx, _h_tkr in enumerate(tickers):
+                with tabs_hist[_h_idx]:
+                    _render_hist_section(_h_tkr)
+        else:
+            _render_hist_section(tickers[0])
 
         # ── Saúde Financeira ─────────────────────────────────────────────────
         st.markdown("---")
