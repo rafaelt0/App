@@ -363,6 +363,91 @@ tickers = st.multiselect(
     key="selected_tickers"
 )
 
+if not tickers:
+    # ── Onboarding ─────────────────────────────────────────────────────────────
+    st.markdown("""
+<div style="margin:1.5rem 0 0.5rem 0;padding:1.5rem;background:linear-gradient(135deg,rgba(0,255,135,0.04) 0%,rgba(0,210,255,0.04) 100%);border:1px solid rgba(0,255,135,0.12);border-radius:14px;">
+  <h3 style="margin:0 0 0.3rem 0;font-size:1.1rem;background:linear-gradient(135deg,#f8fafc 40%,#00ff87 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
+    Bem-vindo ao B3 Explorer
+  </h3>
+  <p style="color:#94a3b8;font-size:0.85rem;margin:0 0 1.2rem 0;line-height:1.6">
+    Plataforma de análise quantitativa de ações da B3. Escolha um ticker no campo acima
+    ou clique em uma ação abaixo para começar.
+  </p>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;">
+    <div style="background:rgba(14,23,38,0.6);border:1px solid #1e293b;border-radius:10px;padding:0.85rem;">
+      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#00ff87;text-transform:uppercase;margin-bottom:0.5rem">① Escolha</div>
+      <div style="font-size:0.8rem;color:#cbd5e1;line-height:1.5">Filtre por setor na barra lateral ou digite o código da ação no campo de busca acima.</div>
+    </div>
+    <div style="background:rgba(14,23,38,0.6);border:1px solid #1e293b;border-radius:10px;padding:0.85rem;">
+      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#00d2ff;text-transform:uppercase;margin-bottom:0.5rem">② Analise</div>
+      <div style="font-size:0.8rem;color:#cbd5e1;line-height:1.5">Veja P/L, EV/EBITDA, ROE, ROIC, endividamento e posição no setor vs peers automaticamente.</div>
+    </div>
+    <div style="background:rgba(14,23,38,0.6);border:1px solid #1e293b;border-radius:10px;padding:0.85rem;">
+      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#a855f7;text-transform:uppercase;margin-bottom:0.5rem">③ Valoração</div>
+      <div style="font-size:0.8rem;color:#cbd5e1;line-height:1.5">Use a página <b style="color:#a855f7">Valuation</b> para o DCF completo McKinsey/Koller em 8 etapas.</div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+    # Quick-start grid
+    st.markdown(
+        '<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#64748b;'
+        'text-transform:uppercase;margin:1.2rem 0 0.6rem 0">Início rápido — ações populares</div>',
+        unsafe_allow_html=True)
+
+    _QUICK = [
+        ("WEGE3",  "Máquinas",      "#00ff87"),
+        ("PETR4",  "Petróleo",       "#ffd600"),
+        ("VALE3",  "Mineração",      "#f87171"),
+        ("ITUB4",  "Banco",          "#00d2ff"),
+        ("RENT3",  "Locação",        "#a855f7"),
+        ("ABEV3",  "Bebidas",        "#fb923c"),
+        ("EGIE3",  "Energia",        "#34d399"),
+        ("RADL3",  "Farmácia",       "#60a5fa"),
+    ]
+    _cols = st.columns(4)
+    for i, (tkr, setor, cor) in enumerate(_QUICK):
+        with _cols[i % 4]:
+            st.markdown(
+                f'<div style="text-align:center;padding:0.2rem 0 0.1rem 0;'
+                f'font-size:0.62rem;color:{cor};font-weight:700;text-transform:uppercase;'
+                f'letter-spacing:0.06em">{setor}</div>',
+                unsafe_allow_html=True)
+            if st.button(tkr, key=f"qs_{tkr}", use_container_width=True,
+                         help=f"Analisar {tkr} — {setor}"):
+                st.session_state["selected_tickers"] = [tkr]
+                st.rerun()
+
+    # Sector shortcuts
+    st.markdown(
+        '<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#64748b;'
+        'text-transform:uppercase;margin:1.4rem 0 0.6rem 0">Explorar por setor</div>',
+        unsafe_allow_html=True)
+    _SETORES_DEST = [
+        "Bancos", "Petróleo e Gás", "Mineração", "Energia Elétrica",
+        "Tecnologia", "Bebidas", "Saúde", "Varejo",
+    ]
+    _sc = st.columns(4)
+    for i, _s in enumerate(_SETORES_DEST):
+        with _sc[i % 4]:
+            if st.button(_s, key=f"setor_qs_{_s}", use_container_width=True):
+                # Match against available sectors (partial match)
+                _match = [s for s in setores if _s.lower() in s.lower() or s.lower() in _s.lower()]
+                if _match:
+                    st.session_state["selected_sectors_hint"] = _match[0]
+                st.toast(f'Filtre por "{_s}" no seletor de setores na barra lateral →', icon="↙")
+
+    st.markdown(
+        '<div style="margin-top:1.2rem;padding:0.75rem 1rem;background:rgba(0,0,0,0.2);'
+        'border-radius:8px;border-left:3px solid #334155">'
+        '<span style="font-size:0.78rem;color:#64748b">💡 <b style="color:#94a3b8">Dica:</b> '
+        'Use o campo de busca acima para digitar qualquer ticker da B3. '
+        'O filtro de setor na barra lateral reduz a lista para facilitar a escolha.</span>'
+        '</div>',
+        unsafe_allow_html=True)
+
 if tickers:
     st.markdown(f"""
     <div style="background:rgba(0,255,135,0.05);border:1px solid rgba(0,255,135,0.2);border-radius:10px;padding:0.6rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
