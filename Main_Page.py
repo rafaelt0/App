@@ -738,10 +738,6 @@ if tickers:
         def _render_star_button(tkr):
             starred = _db.wl_has(tkr)
             label = "★ Favoritado" if starred else "☆ Favoritar"
-            color = "#ffd600" if starred else "#475569"
-            st.markdown(
-                f'<div style="display:inline-flex;align-items:center;margin-bottom:0.4rem">',
-                unsafe_allow_html=True)
             if st.button(label, key=f"star_{tkr}",
                          help="Remover dos favoritos" if starred else "Salvar nos favoritos"):
                 if starred:
@@ -1430,22 +1426,6 @@ if tickers:
     except Exception as e:
         st.error(f"Erro ao buscar dados: {e}")
         st.caption(f"```\n{traceback.format_exc()}\n```")
-else:
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:16px;padding:2rem;text-align:center;margin-top:1rem;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
-            <circle cx="11" cy="11" r="8" stroke="#94a3b8" stroke-width="1.8"/>
-            <path d="M21 21l-4.35-4.35" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
-        </svg>
-        <div style="font-size:1.1rem;font-weight:700;color:#f8fafc;margin-bottom:0.5rem">Nenhuma ação selecionada</div>
-        <div style="font-size:0.875rem;color:#94a3b8;max-width:420px;margin:0 auto">
-            Use o campo acima para buscar e selecionar ações da B3. Filtre por setor na barra lateral para encontrar empresas do seu interesse.
-        </div>
-        <div style="margin-top:1.2rem;font-size:0.8rem;color:#64748b">
-            Sugestões populares: <span style="color:#00d2ff">PETR4</span> · <span style="color:#00d2ff">VALE3</span> · <span style="color:#00d2ff">ITUB4</span> · <span style="color:#00d2ff">BBDC4</span> · <span style="color:#00d2ff">WEGE3</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
 
 
