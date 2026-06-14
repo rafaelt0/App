@@ -245,7 +245,7 @@ def run_agent():
 
         try:
             with client.messages.stream(
-                model="claude-opus-4-8",
+                model="claude-sonnet-4-6",
                 max_tokens=8192,
                 thinking={"type": "adaptive"},
                 system=SYSTEM,
@@ -258,15 +258,17 @@ def run_agent():
             print("\n[STOP] Authentication error — check ANTHROPIC_API_KEY.")
             break
         except anthropic.PermissionDeniedError as e:
-            print(f"\n[STOP] Permission denied (credits exhausted?): {e}")
+            # Anthropic returns 403 when prepaid credits are exhausted
+            print(f"\n[STOP] Credits exhausted (HTTP 403): {e}")
             break
         except anthropic.RateLimitError as e:
             print(f"\n[WAIT] Rate limited: {e}. Sleeping 60s...")
             time.sleep(60)
             continue
         except anthropic.APIStatusError as e:
-            if e.status_code in (402, 403):
-                print(f"\n[STOP] Credits exhausted or billing issue (HTTP {e.status_code}): {e.message}")
+            if e.status_code == 402:
+                # Some billing systems return 402 Payment Required
+                print(f"\n[STOP] Payment required — credits exhausted (HTTP 402): {e.message}")
                 break
             print(f"\n[ERROR] API error {e.status_code}: {e.message}. Retrying in 10s...")
             time.sleep(10)
