@@ -348,8 +348,11 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 # CSS customizado
-with open("style.css") as f:
-    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+try:
+    with open("style.css") as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+except FileNotFoundError:
+    pass
 
 
 

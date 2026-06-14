@@ -128,8 +128,11 @@ def get_sorted_tickers_by_liquidity(tickers_list):
         return tickers_list
 
 # CSS customizado
-with open("style.css") as f:
-    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+try:
+    with open("style.css") as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+except FileNotFoundError:
+    pass
 
 st.sidebar.markdown("""
 <div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
@@ -391,7 +394,11 @@ with col_config2:
         lookback_dias = st.number_input("Dias de Lookback", min_value=30, max_value=5000, value=500, step=10)
         data_inicio = today - datetime.timedelta(days=lookback_dias)
 
-taxa_selic = get_selic_rate(data_inicio)
+try:
+    taxa_selic = get_selic_rate(data_inicio)
+except Exception as _selic_err:
+    st.warning(f"Não foi possível buscar a taxa Selic no BCB ({_selic_err}). Usando valor de referência: 13,75% a.a.")
+    taxa_selic = (1 + 0.1375) ** (1 / 252) - 1
 
 
 # Seleção de ações
@@ -455,8 +462,18 @@ if "Manual" in modo:
         st.success(f"Soma dos pesos: {total_pesos:.2f}% ✓")
     st.markdown("---")
 
-# Pré-carrega cotações silenciosamente (resultado cacheado após primeira execução)
-data_yf = get_portfolio_prices(tickers_yf, data_inicio)
+# Pré-carrega cotações (resultado cacheado após primeira execução)
+with st.spinner("Baixando cotações históricas..."):
+    try:
+        data_yf = get_portfolio_prices(tickers_yf, data_inicio)
+    except Exception as _price_err:
+        st.error(f"Erro ao buscar cotações no Yahoo Finance: {_price_err}. Verifique sua conexão e tente novamente.")
+        st.stop()
+
+if data_yf.empty:
+    st.error("Nenhuma cotação retornada para os ativos selecionados. Verifique os tickers e o período escolhido.")
+    st.stop()
+
 if isinstance(data_yf.columns, pd.MultiIndex):
     data_yf.columns = ['_'.join(col).strip() for col in data_yf.columns.values]
 
