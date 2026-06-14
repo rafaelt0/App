@@ -23,9 +23,11 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Claude Code session data (keep project commands)
+# Claude Code session data (keep project commands and agents)
 .claude/*
 !.claude/commands/
+!.claude/agents/
+!.claude/agents/*.md
 
 # Jupyter
 .ipynb_checkpoints/
