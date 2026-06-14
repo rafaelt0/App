@@ -21,9 +21,39 @@ st.markdown(
 # ─── Carregamento de dados ────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def carregar_dados():
-    import fundamentus
-    df = fundamentus.get_resultado()
-    return df
+    import fundamentus.resultado as fzr
+
+    raw = fzr.get_resultado_raw()
+
+    # Explicit rename map — avoids crashing when fundamentus.com.br changes a column name
+    RENAMES = {
+        'Cotação':         'cotacao',
+        'P/L':             'pl',
+        'P/VP':            'pvp',
+        'PSR':             'psr',
+        'Div.Yield':       'dy',
+        'P/Ativo':         'pa',
+        'P/Cap.Giro':      'pcg',
+        'P/EBIT':          'pebit',
+        'P/Ativ Circ.Liq': 'pacl',
+        'EV/EBIT':         'evebit',
+        'EV/EBITDA':       'evebitda',
+        'Mrg Ebit':        'mrgebit',
+        'Mrg. Líq.':       'mrgliq',
+        'ROIC':            'roic',
+        'ROE':             'roe',
+        'Liq. Corr.':      'liqc',
+        'Liq.2meses':      'liq2m',
+        'Patrim. Líq':     'patrliq',
+        'Cresc. Rec.5a':   'c5y',
+    }
+    # Debt/patrimony column name varies — match flexibly
+    for col in raw.columns:
+        s = col.lower().replace(' ', '').replace('.', '')
+        if 'brut' in s and 'patrim' in s and col not in RENAMES:
+            RENAMES[col] = 'divbpatr'
+
+    return raw.rename(columns={k: v for k, v in RENAMES.items() if k in raw.columns})
 
 
 try:
