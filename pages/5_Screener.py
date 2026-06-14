@@ -29,8 +29,8 @@ def carregar_dados():
 try:
     with st.spinner("Carregando dados da B3..."):
         df_raw = carregar_dados()
-except Exception:
-    st.error("Não foi possível carregar os dados. Tente novamente em instantes.")
+except Exception as e:
+    st.error(f"Não foi possível carregar os dados da Fundamentus: {e}")
     st.stop()
 
 if df_raw is None or df_raw.empty:
@@ -152,8 +152,14 @@ df_filtrado = df_filtrado.head(200)
 
 # ─── Métricas resumo ─────────────────────────────────────────────────────────
 total_passaram = int(mask.sum())
-avg_dy = (df_filtrado["dy"].mean() * 100) if ("dy" in df_filtrado.columns and not df_filtrado.empty) else None
-avg_roe = (df_filtrado["roe"].mean() * 100) if ("roe" in df_filtrado.columns and not df_filtrado.empty) else None
+def _safe_mean_pct(df, col):
+    if col not in df.columns or df.empty:
+        return None
+    v = df[col].mean()
+    return None if pd.isna(v) else v * 100
+
+avg_dy = _safe_mean_pct(df_filtrado, "dy")
+avg_roe = _safe_mean_pct(df_filtrado, "roe")
 
 col_m1, col_m2, col_m3 = st.columns(3)
 with col_m1:
