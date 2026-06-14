@@ -83,6 +83,34 @@ for col in df.columns:
 st.sidebar.header("Filtros")
 st.sidebar.caption("Ajuste os parâmetros para encontrar ações que se encaixam no seu perfil.")
 
+# 2b. Ticker/name search
+ticker_search = st.sidebar.text_input("Buscar ticker", placeholder="Ex: WEGE3")
+
+# 2a. Sector filter — join from CSV if available
+import os as _os
+_SECTOR_CSV = "/home/user/App/acoes-listadas-b3.csv"
+_sector_options = []
+_sector_df = None
+if _os.path.exists(_SECTOR_CSV):
+    try:
+        _sector_df = pd.read_csv(_SECTOR_CSV, usecols=["Ticker", "Setor"])
+        _sector_options = sorted(_sector_df["Setor"].dropna().unique().tolist())
+    except Exception:
+        _sector_df = None
+
+setor_selecionado = []
+if _sector_options:
+    setor_selecionado = st.sidebar.multiselect(
+        "Setor",
+        options=_sector_options,
+        help="Filtra por setor de atuação da empresa (fonte: B3).",
+    )
+
+# 2c. Reset filters button
+if st.sidebar.button("Resetar filtros"):
+    st.cache_data.clear()
+    st.rerun()
+
 # P/L
 pl_range = st.sidebar.slider(
     "P/L (Preço / Lucro)",
@@ -137,7 +165,15 @@ st.sidebar.caption(
     f"Dados: Fundamentus · Atualização: {datetime.date.today().strftime('%d/%m/%Y')}"
 )
 
-# ─── Aplicação dos filtros ────────────────────────────────────────────────────
+# ─── Aplicação dos pré-filtros (ticker search e setor) ───────────────────────
+if ticker_search:
+    df = df[df.index.str.contains(ticker_search.upper(), na=False)]
+
+if setor_selecionado and _sector_df is not None:
+    tickers_no_setor = _sector_df[_sector_df["Setor"].isin(setor_selecionado)]["Ticker"].str.upper()
+    df = df[df.index.isin(tickers_no_setor)]
+
+# ─── Aplicação dos filtros numéricos ─────────────────────────────────────────
 mask = pd.Series(True, index=df.index)
 
 # P/L: inclui apenas linhas com valor não-nulo dentro do range
@@ -281,6 +317,17 @@ else:
         mime="text/csv",
         help="Baixa as ações filtradas em formato CSV para análise externa.",
     )
+
+    # ─── 2d. Abrir ticker no B3 Explorer ──────────────────────────────────────
+    st.markdown("---")
+    ticker_abrir = st.selectbox(
+        "Abrir ticker no B3 Explorer →",
+        [""] + list(df_filtrado.index),
+        help="Selecione uma ação para abrir a análise completa na página principal.",
+    )
+    if ticker_abrir:
+        st.session_state["selected_tickers"] = [ticker_abrir]
+        st.switch_page("Main_Page.py")
 
 # ─── Nota de rodapé ───────────────────────────────────────────────────────────
 st.markdown("---")
