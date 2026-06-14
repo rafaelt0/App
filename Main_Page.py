@@ -161,49 +161,53 @@ def get_hist_fundamentals(ticker_sa: str):
     return out
 
 
+def _hist_parse(json_str):
+    """Parse a yfinance JSON financials/balance-sheet string into a year-indexed DataFrame."""
+    df_p = pd.read_json(json_str)
+    try:
+        df_p.columns = pd.to_datetime(df_p.columns.astype('int64'), unit='ms').year
+    except Exception:
+        try:
+            df_p.columns = pd.to_datetime(df_p.columns).year
+        except Exception:
+            pass
+    return df_p
+
+
+def _hist_row(df_p, *keys):
+    """Return the first matching row from df_p by trying each key in order."""
+    for k in keys:
+        if k in df_p.index:
+            return df_p.loc[k]
+    return None
+
+
 def _build_hist_df(tkr: str):
     """Returns a DataFrame indexed by year with Receita, Lucro, Margens, ROE."""
     raw = get_hist_fundamentals(tkr + ".SA")
     if not raw:
         return None
 
-    def _parse(json_str):
-        df_p = pd.read_json(json_str)
-        try:
-            df_p.columns = pd.to_datetime(df_p.columns.astype('int64'), unit='ms').year
-        except Exception:
-            try:
-                df_p.columns = pd.to_datetime(df_p.columns).year
-            except Exception:
-                pass
-        return df_p
-
-    def _row(df_p, *keys):
-        for k in keys:
-            if k in df_p.index:
-                return df_p.loc[k]
-        return None
-
     fin_df = bs_df = None
     if 'fin' in raw:
         try:
-            fin_df = _parse(raw['fin'])
+            fin_df = _hist_parse(raw['fin'])
         except Exception:
             pass
     if 'bs' in raw:
         try:
-            bs_df = _parse(raw['bs'])
+            bs_df = _hist_parse(raw['bs'])
         except Exception:
             pass
 
     records = {}
 
     if fin_df is not None:
-        rev = _row(fin_df, 'Total Revenue', 'Revenue')
-        ni  = _row(fin_df, 'Net Income', 'Net Income Common Stockholders',
-                   'Net Income Applicable To Common Shares',
-                   'Net Income Including Noncontrolling Interests')
-        eb  = _row(fin_df, 'EBIT', 'Operating Income', 'Ebit')
+        rev = _hist_row(fin_df, 'Total Revenue', 'Revenue')
+        ni  = _hist_row(fin_df, 'Net Income', 'Net Income Common Stockholders',
+                        'Net Income Applicable To Common Shares',
+                        'Net Income Including Noncontrolling Interests')
+        eb  = _hist_row(fin_df, 'EBIT', 'Operating Income', 'Ebit')
 
         for y in sorted(fin_df.columns.tolist()):
             y = int(y)
@@ -221,11 +225,11 @@ def _build_hist_df(tkr: str):
                 rec['Margem EBIT (%)'] = e_v / r_v * 100
 
     if bs_df is not None and fin_df is not None:
-        eq = _row(bs_df, 'Stockholders Equity', 'Common Stock Equity',
-                  'Total Stockholder Equity', 'Total Equity Gross Minority Interest')
-        ni = _row(fin_df, 'Net Income', 'Net Income Common Stockholders',
-                  'Net Income Applicable To Common Shares',
-                  'Net Income Including Noncontrolling Interests')
+        eq = _hist_row(bs_df, 'Stockholders Equity', 'Common Stock Equity',
+                       'Total Stockholder Equity', 'Total Equity Gross Minority Interest')
+        ni = _hist_row(fin_df, 'Net Income', 'Net Income Common Stockholders',
+                       'Net Income Applicable To Common Shares',
+                       'Net Income Including Noncontrolling Interests')
         if eq is not None and ni is not None:
             for y in sorted(bs_df.columns.tolist()):
                 y = int(y)
@@ -239,6 +243,42 @@ def _build_hist_df(tkr: str):
     df_h = pd.DataFrame(records).T.sort_index()
     df_h.index.name = 'Ano'
     return df_h
+
+
+# Mapa de renomeação de colunas do fundamentus para identificadores internos
+_FUNDAMENTUS_RENAME = {
+    'P/L':        'PL',
+    'P/VP':       'PVP',
+    'EV/EBITDA':  'EV_EBITDA',
+    'EV/EBIT':    'EV_EBIT',
+    'PSR':        'PSR',
+    'ROE':        'ROE',
+    'ROIC':       'ROIC',
+    'Mrg Ebit':   'Marg_EBIT',
+    'Mrg. Líq.':  'Marg_Liquida',
+    'Div.Yield':  'Div_Yield',
+}
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_sector_peers(_setores):
+    """Busca todos os tickers listados no fundamentus e mapeia colunas para identificadores internos.
+
+    O argumento ``_setores`` é recebido (como tupla) apenas para que o Streamlit inclua o setor
+    na chave de cache; os dados retornados cobrem toda a B3 para permitir filtragem posterior
+    por setor individual sem chamadas extras à API.
+    """
+    import fundamentus.resultado as fzr
+    try:
+        raw = fzr.get_resultado_raw()
+        df2 = pd.DataFrame(index=raw.index)
+        for src, dest in _FUNDAMENTUS_RENAME.items():
+            if src in raw.columns:
+                df2[dest] = raw[src]
+        df2 = df2.drop_duplicates(keep='first')
+        return df2
+    except Exception:
+        return pd.DataFrame()
 
 
 st.set_page_config(
@@ -1216,34 +1256,7 @@ if tickers:
             setor_info = " | ".join([f"**{t}**: {ticker_setor_map.get(t, '?')}" for t in tickers])
             st.caption(f"Setores detectados: {setor_info}")
 
-            # Busca todos os tickers do setor via fundamentus
-            @st.cache_data(ttl=3600, show_spinner=False)
-            def get_sector_peers(setores):
-                import fundamentus.resultado as fzr
-                try:
-                    raw = fzr.get_resultado_raw()
-                    # Mapeia as colunas do raw para os identificadores de MULTIPLES_CFG
-                    rename_map = {
-                        'P/L': 'PL',
-                        'P/VP': 'PVP',
-                        'EV/EBITDA': 'EV_EBITDA',
-                        'EV/EBIT': 'EV_EBIT',
-                        'PSR': 'PSR',
-                        'ROE': 'ROE',
-                        'ROIC': 'ROIC',
-                        'Mrg Ebit': 'Marg_EBIT',
-                        'Mrg. Líq.': 'Marg_Liquida',
-                        'Div.Yield': 'Div_Yield'
-                    }
-                    df2 = pd.DataFrame(index=raw.index)
-                    for src, dest in rename_map.items():
-                        if src in raw.columns:
-                            df2[dest] = raw[src]
-                    df2 = df2.drop_duplicates(keep='first')
-                    return df2
-                except Exception:
-                    return pd.DataFrame()
-
+            # Busca todos os tickers do setor via fundamentus (função cacheada no nível do módulo)
             with st.spinner("Buscando peers do setor..."):
                 peers_raw = get_sector_peers(tuple(setores_ativas))
 
