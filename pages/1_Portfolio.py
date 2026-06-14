@@ -16,6 +16,7 @@ from scipy.stats import kurtosis, skew
 import quantstats as qs
 from bcb import sgs
 import matplotlib.ticker as mtick
+from utils.charts import apply_plotly_theme
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
 def _svg(body, size=14):
@@ -202,36 +203,6 @@ def apply_matplotlib_theme(fig):
     return fig
 
 # Customização do Plotly para o tema Obsidian Neo-Financial
-def apply_plotly_theme(fig):
-    fig.update_layout(
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Space Grotesk, sans-serif", color="#f8fafc"),
-        xaxis=dict(
-            gridcolor='#1e293b',
-            linecolor='#1e293b',
-            tickfont=dict(family="JetBrains Mono, monospace", color="#94a3b8")
-        ),
-        yaxis=dict(
-            gridcolor='#1e293b',
-            linecolor='#1e293b',
-            tickfont=dict(family="JetBrains Mono, monospace", color="#94a3b8")
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.5,
-            xanchor="center",
-            x=0.5,
-            bgcolor='rgba(14, 21, 36, 0.8)',
-            bordercolor='#1e293b',
-            borderwidth=1
-        ),
-        margin=dict(b=80)
-    )
-    return fig
-
 def plot_efficient_frontier_and_random_portfolios(mu, S, returns, cleaned_weights, rf):
     num_portfolios = 5000
     results = np.zeros((3, num_portfolios))

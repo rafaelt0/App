@@ -12,6 +12,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 import email.utils
 import traceback
+from utils.charts import apply_plotly_theme
 
 # CSS customizado
 with open("style.css") as f:
@@ -108,24 +109,6 @@ def get_diag_row_html(icon_svg, text, color):
     )
 
 # Customização do Plotly para o tema Obsidian Neo-Financial
-def apply_plotly_theme(fig):
-    fig.update_layout(
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Space Grotesk, sans-serif", color="#f8fafc"),
-        xaxis=dict(
-            gridcolor='#1e293b',
-            linecolor='#1e293b',
-            tickfont=dict(family="JetBrains Mono, monospace", color="#94a3b8")
-        ),
-        yaxis=dict(
-            gridcolor='#1e293b',
-            linecolor='#1e293b',
-            tickfont=dict(family="JetBrains Mono, monospace", color="#94a3b8")
-        )
-    )
-
 # Hero Header
 st.markdown("""
 <div class="page-hero">

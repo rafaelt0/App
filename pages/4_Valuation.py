@@ -9,6 +9,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from utils import db as _db
+from utils.charts import apply_plotly_theme
 
 try:
     with open("style.css") as f:
@@ -50,19 +51,6 @@ def _red_badge(txt):
 
 def _neutral_badge(txt):
     return txt, "color:#94a3b8;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.15)"
-
-def apply_plotly_theme(fig):
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Space Grotesk, sans-serif", color="#f8fafc"),
-        xaxis=dict(gridcolor='#1e293b', linecolor='#1e293b',
-                   tickfont=dict(family="JetBrains Mono, monospace", color="#94a3b8")),
-        yaxis=dict(gridcolor='#1e293b', linecolor='#1e293b',
-                   tickfont=dict(family="JetBrains Mono, monospace", color="#94a3b8")),
-        legend=dict(bgcolor='rgba(14,21,36,0.8)', bordercolor='#1e293b', borderwidth=1),
-        margin=dict(t=20, b=40, l=60, r=20),
-    )
-    return fig
 
 # ─── Data fetching ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
