@@ -73,16 +73,25 @@ def get_fundamentus_data(tickers):
                 return df
         except Exception:
             pass
+    last_exc = None
     for attempt in range(3):
         try:
-            result = pd.concat([fundamentus.get_papel(t) for t in tickers])
+            raw = [fundamentus.get_papel(t) for t in tickers]
+            results = [r for r in raw if r is not None]
+            if not results:
+                raise RuntimeError(
+                    f"Nenhum dado retornado pelo Fundamentus para: {', '.join(tickers)}. "
+                    "Verifique se os tickers estão corretos."
+                )
+            result = pd.concat(results)
             _db.cache_set(cache_key, result.to_json())
             return result
-        except OSError:
+        except Exception as exc:
+            last_exc = exc
             if attempt < 2:
                 time.sleep(1)
                 continue
-            raise
+    raise last_exc
 
 @st.cache_data(ttl=3600)
 def get_yfinance_data(tickers_yf, start, interval):
@@ -228,6 +237,21 @@ _FUNDAMENTUS_RENAME = {
     'Mrg. Líq.':  'Marg_Liquida',
     'Div.Yield':  'Div_Yield',
 }
+
+# Múltiplos a comparar na seção de peers: (coluna interna, nome display, menor=melhor?, categoria)
+MULTIPLES_CFG = [
+    ("PL",          "P/L",             True,  "Valuation"),
+    ("PVP",         "P/VP",            True,  "Valuation"),
+    ("EV_EBITDA",   "EV/EBITDA",       True,  "Valuation"),
+    ("EV_EBIT",     "EV/EBIT",         True,  "Valuation"),
+    ("PSR",         "PSR",             True,  "Valuation"),
+    ("ROE",         "ROE (%)",         False, "Rentabilidade"),
+    ("ROIC",        "ROIC (%)",        False, "Rentabilidade"),
+    ("Marg_EBIT",   "Margem EBIT (%)", False, "Rentabilidade"),
+    ("Marg_Liquida","Marg. Líq. (%)", False, "Rentabilidade"),
+    ("Div_Yield",   "Div. Yield (%)",  False, "Yield"),
+]
+COLS_NEEDED = [c[0] for c in MULTIPLES_CFG]
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -515,6 +539,24 @@ def color_pct(val):
     if val >= 40:
         return 'color:#ffd600;font-weight:700'
     return 'color:#ff3d5a;font-weight:700'
+
+
+def _get_setor(df, ticker):
+    """Retorna o setor de um ticker a partir do DataFrame fundamentus.
+
+    Parâmetros
+    ----------
+    df : pd.DataFrame
+        DataFrame retornado por ``get_fundamentus_data``.
+    ticker : str
+        Código do ticker (sem sufixo .SA).
+    """
+    if 'Setor' not in df.columns or ticker not in df.index:
+        return ''
+    val = df.loc[ticker, 'Setor']
+    if isinstance(val, pd.Series):
+        val = val.iloc[-1]
+    return str(val) if not pd.isna(val) else ''
 
 
 def _render_hist_section(tkr):
@@ -1224,21 +1266,6 @@ if tickers:
 """, unsafe_allow_html=True)
 
         rank_df = pd.DataFrame()  # Inicializa; será populado se houver dados de peers
-
-        # Múltiplos a comparar: (coluna fundamentus, nome display, menor=melhor?)
-        MULTIPLES_CFG = [
-            ("PL",         "P/L",          True,  "Valuation"),
-            ("PVP",        "P/VP",         True,  "Valuation"),
-            ("EV_EBITDA",  "EV/EBITDA",    True,  "Valuation"),
-            ("EV_EBIT",    "EV/EBIT",      True,  "Valuation"),
-            ("PSR",        "PSR",          True,  "Valuation"),
-            ("ROE",        "ROE (%)",      False, "Rentabilidade"),
-            ("ROIC",       "ROIC (%)",     False, "Rentabilidade"),
-            ("Marg_EBIT",  "Margem EBIT (%)", False, "Rentabilidade"),
-            ("Marg_Liquida","Marg. Líq. (%)", False, "Rentabilidade"),
-            ("Div_Yield",  "Div. Yield (%)", False, "Yield"),
-        ]
-        COLS_NEEDED = [c[0] for c in MULTIPLES_CFG]
 
         # Detecta setor(es) das ações selecionadas
         setores_ativas = df['Setor'].dropna().unique().tolist()
