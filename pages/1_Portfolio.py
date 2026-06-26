@@ -298,9 +298,32 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, returns, cleaned_weight
         text=[f"Mínima Volatilidade<br>Retorno: {min_return:.2%}<br>Vol: {min_stddev:.2%}"],
         hoverinfo='text'
     ))
-    
+
+    # LAC — Linha de Alocação de Capital (EAE1242 — Tobin, 1958)
+    # Parte do Rf (volatilidade=0) e passa pela carteira tangente (Max Sharpe)
+    if opt_stddev > 0:
+        lac_slope = (opt_return - rf) / opt_stddev
+        lac_x_end = opt_stddev * 1.8
+        fig.add_trace(go.Scatter(
+            x=[0, lac_x_end],
+            y=[rf, rf + lac_slope * lac_x_end],
+            mode='lines',
+            line=dict(color='#ffd600', width=2, dash='dash'),
+            name="LAC — Linha de Alocação de Capital",
+            hovertemplate="LAC<br>Vol: %{x:.2%}<br>Retorno: %{y:.2%}<extra></extra>"
+        ))
+        fig.add_trace(go.Scatter(
+            x=[0], y=[rf],
+            mode='markers+text',
+            marker=dict(color='#ffd600', size=8, symbol='circle'),
+            text=["Rf (Selic)"], textposition="top right",
+            textfont=dict(color="#ffd600", size=10),
+            name="Taxa Livre de Risco (Rf)",
+            hovertemplate=f"Rf (Selic) = {rf:.2%}<extra></extra>"
+        ))
+
     fig.update_layout(
-        title="Fronteira Eficiente de Markowitz e Portfólios Simulados",
+        title="Fronteira Eficiente de Markowitz · LAC · Carteira Tangente",
         xaxis_title="Volatilidade Anualizada (Desvio Padrão)",
         yaxis_title="Retorno Esperado Anualizado",
         template='plotly_dark'
@@ -638,6 +661,86 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
                 selic_anual = (1 + taxa_selic) ** 252 - 1
                 fig_frontier = plot_efficient_frontier_and_random_portfolios(mu, S, returns, cleaned_weights, selic_anual)
                 st.plotly_chart(fig_frontier, use_container_width=True)
+
+            # ── Teorema da Separação de Tobin (1958) ─────────────────────────
+            st.markdown("""
+<div style="background:linear-gradient(135deg,rgba(245,158,11,0.07),rgba(168,85,247,0.04));
+border:1px solid rgba(245,158,11,0.25);border-radius:14px;padding:1rem 1.2rem;margin:0.5rem 0 1rem 0">
+<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#f59e0b;text-transform:uppercase;margin-bottom:0.5rem">
+📐 Teorema da Separação de Tobin (1958)
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+  <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:0.7rem">
+    <div style="font-size:0.68rem;font-weight:700;color:#00ff87;margin-bottom:0.3rem">① Decisão Objetiva — igual para todos</div>
+    <div style="font-size:0.72rem;color:#94a3b8;line-height:1.5">
+    Qual é a carteira ótima de ativos de risco?<br>
+    Resposta: sempre a <b style="color:#ff1744">Carteira Tangente</b> (Max Sharpe).<br>
+    Independente da sua aversão ao risco.
+    </div>
+  </div>
+  <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:0.7rem">
+    <div style="font-size:0.68rem;font-weight:700;color:#a855f7;margin-bottom:0.3rem">② Decisão Subjetiva — depende do perfil</div>
+    <div style="font-size:0.72rem;color:#94a3b8;line-height:1.5">
+    Quanto alocar entre Rf e a Carteira Tangente?<br>
+    Conservador: mais Rf. Agressivo: mais tangente.<br>
+    Todos os pontos ótimos estão na <b style="color:#ffd600">LAC</b>.
+    </div>
+  </div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+            # Calcula parâmetros da carteira tangente
+            _opt_w = np.array(list(cleaned_weights.values()))
+            _et = float(np.sum(_opt_w * mu))               # E[R] tangente
+            _st = float(np.sqrt(np.dot(_opt_w.T, np.dot(S, _opt_w))))  # σ tangente
+            _sharpe_t = (_et - selic_anual) / _st if _st > 0 else 0
+
+            st.markdown("**Simulador da LAC — quanto você aloca em ativos de risco?**")
+            st.caption(
+                "Mova o slider para ver como o retorno esperado e o risco do seu portfólio mudam "
+                "ao longo da Linha de Alocação de Capital. "
+                "O Sharpe permanece constante — essa é a essência do Teorema da Separação."
+            )
+
+            _w = st.slider(
+                "% em ativos de risco (Carteira Tangente)",
+                min_value=0, max_value=150, value=100, step=5,
+                format="%d%%",
+                help="0% = 100% na Selic (sem risco). 100% = Carteira Tangente pura. >100% = alavancagem."
+            ) / 100.0
+
+            _ep  = selic_anual + _w * (_et - selic_anual)    # E[Rp] na LAC
+            _sp  = abs(_w) * _st                               # σp na LAC (Rf tem σ=0)
+            _shp = (_ep - selic_anual) / _sp if _sp > 0 else 0
+
+            _perfil = (
+                "🏦 Conservador — grande parte em Rf (Selic)" if _w < 0.4 else
+                "⚖️ Moderado — equilíbrio entre Rf e Carteira Tangente" if _w < 0.8 else
+                "🚀 Arrojado — próximo ou na Carteira Tangente" if _w <= 1.0 else
+                "⚡ Alavancado — tomou emprestado ao Rf para investir mais"
+            )
+
+            tc1, tc2, tc3, tc4 = st.columns(4)
+            tc1.metric("% em Rf (Selic)",     f"{(1-_w)*100:.0f}%")
+            tc2.metric("E[Retorno] a.a.",     f"{_ep*100:.2f}%",
+                       delta=f"{(_ep-selic_anual)*100:+.2f}% acima do Rf")
+            tc3.metric("Volatilidade a.a.",   f"{_sp*100:.2f}%")
+            tc4.metric("Sharpe do Portfólio", f"{_shp:.3f}",
+                       delta=f"= Sharpe tangente ({_sharpe_t:.3f})",
+                       delta_color="off",
+                       help="O Sharpe é CONSTANTE em toda a LAC — essa é a prova do Teorema da Separação.")
+
+            st.markdown(f"""
+<div style="background:rgba(245,158,11,0.06);border-left:3px solid #f59e0b;
+border-radius:0 8px 8px 0;padding:0.6rem 1rem;font-size:0.78rem;color:#cbd5e1;margin-top:0.3rem">
+<b style="color:#f59e0b">Perfil:</b> {_perfil}<br>
+<span style="color:#64748b;font-size:0.68rem">
+Sharpe constante = {_sharpe_t:.3f} ao longo de toda a LAC.
+Rf = {selic_anual*100:.2f}% · E[R tangente] = {_et*100:.2f}% · σ tangente = {_st*100:.2f}%
+</span>
+</div>
+""", unsafe_allow_html=True)
         
         # Heatmap de Correlação Interativo (Plotly)
         section_header(ICO_HEATMAP, "Heatmap de Correlação entre Ativos", "h3")
@@ -872,6 +975,162 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             st.markdown("**Diagnóstico por indicador:**")
             for ico, msg, color in health_detalhes:
                 diag_row(ico, msg, color)
+
+        # ── Análise CAPM por Ativo — EAE1242 (Sharpe, 1964) ─────────────────
+        st.markdown("---")
+        ICO_CAPM = _svg(
+            '<line x1="3" y1="21" x2="21" y2="3" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/>'
+            '<circle cx="8" cy="16" r="2.5" fill="#00ff87"/>'
+            '<circle cx="14" cy="10" r="2.5" fill="#ff3d5a"/>'
+            '<circle cx="18" cy="6" r="2.5" fill="#ffd600"/>'
+            '<line x1="3" y1="21" x2="21" y2="3" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 2"/>',
+            16
+        )
+        section_header(ICO_CAPM, "Análise CAPM por Ativo", "h3")
+        st.caption(
+            "**CAPM (Sharpe, 1964):** E[Rᵢ] = Rƒ + βᵢ × (E[Rₘ] − Rƒ)  ·  "
+            "β > 1 = mais volátil que o mercado  ·  α > 0 = retorno acima do esperado pelo risco"
+        )
+
+        selic_anual_capm = (1 + taxa_selic) ** 252 - 1
+        bench_sq = retorno_bench.squeeze()
+        rm_anual = bench_sq.mean() * 252
+
+        def _clean_col(c):
+            return c.replace('Close_', '').replace('close_', '').replace('.SA', '').strip()
+
+        capm_rows = []
+        for col in returns.columns:
+            ri = returns[col].dropna()
+            rm = bench_sq.reindex(ri.index).dropna()
+            ri = ri.reindex(rm.index)
+            if len(ri) < 20:
+                continue
+            cov_mat = np.cov(ri.values, rm.values)
+            var_m = cov_mat[1, 1]
+            if var_m <= 0:
+                continue
+            beta_i  = cov_mat[0, 1] / var_m
+            alpha_i = (ri.mean() - beta_i * rm.mean()) * 252          # Jensen's alpha a.a.
+            ri_var  = np.var(ri.values)
+            r2      = (cov_mat[0, 1] ** 2) / (ri_var * var_m) if ri_var * var_m > 0 else 0
+            ri_anual = ri.mean() * 252
+            er_capm  = selic_anual_capm + beta_i * (rm_anual - selic_anual_capm)
+            treynor  = (ri_anual - selic_anual_capm) / beta_i if beta_i != 0 else float('nan')
+            capm_rows.append({
+                'Ativo':              _clean_col(col),
+                'Beta (β)':          round(beta_i, 3),
+                'Alpha Jensen (a.a.)': round(alpha_i * 100, 2),
+                'R² (Risco Sist.)':  round(r2 * 100, 1),
+                'E[Ri] CAPM':        round(er_capm * 100, 2),
+                'Retorno Real':       round(ri_anual * 100, 2),
+                'Treynor':           round(treynor, 3),
+                '_alpha_sign':        alpha_i,
+            })
+
+        if capm_rows:
+            df_capm = pd.DataFrame(capm_rows)
+
+            # Tabela CAPM
+            df_display = df_capm.drop(columns=['_alpha_sign']).copy()
+            df_display['Alpha Jensen (a.a.)'] = df_display['Alpha Jensen (a.a.)'].apply(lambda x: f"{x:+.2f}%")
+            df_display['R² (Risco Sist.)']    = df_display['R² (Risco Sist.)'].apply(lambda x: f"{x:.1f}%")
+            df_display['E[Ri] CAPM']           = df_display['E[Ri] CAPM'].apply(lambda x: f"{x:.2f}%")
+            df_display['Retorno Real']          = df_display['Retorno Real'].apply(lambda x: f"{x:.2f}%")
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            st.caption(
+                "**Beta (β):** sensibilidade ao mercado.  "
+                "**Alpha (α):** retorno acima do previsto pelo CAPM — Jensen's Alpha.  "
+                "**R²:** % do risco total explicado pelo mercado (risco sistemático).  "
+                "**Treynor:** retorno excedente por unidade de risco sistemático."
+            )
+
+            # SML — Security Market Line
+            st.markdown("##### Security Market Line (SML)")
+            betas  = df_capm['Beta (β)'].values
+            b_min  = min(-0.2, betas.min() - 0.2)
+            b_max  = max(1.6,  betas.max() + 0.3)
+            b_line = np.linspace(b_min, b_max, 120)
+            sml_y  = (selic_anual_capm + b_line * (rm_anual - selic_anual_capm)) * 100
+
+            fig_sml = go.Figure()
+            fig_sml.add_trace(go.Scatter(
+                x=b_line, y=sml_y, mode='lines',
+                line=dict(color='#a855f7', width=2),
+                name='SML — Retorno Esperado CAPM',
+                hovertemplate="β=%{x:.2f}<br>E[R]=%{y:.2f}%<extra></extra>"
+            ))
+            # Reference lines
+            fig_sml.add_vline(x=1.0, line_dash='dot', line_color='#334155', line_width=1)
+            fig_sml.add_hline(y=selic_anual_capm * 100, line_dash='dot', line_color='#334155', line_width=1)
+            # Rf point
+            fig_sml.add_trace(go.Scatter(
+                x=[0], y=[selic_anual_capm * 100],
+                mode='markers+text',
+                marker=dict(color='#ffd600', size=9, symbol='diamond'),
+                text=['Rf'], textposition='top right', textfont=dict(color='#ffd600', size=10),
+                name='Rf (Selic)', hovertemplate=f"Rf = {selic_anual_capm:.2%}<extra></extra>"
+            ))
+            # IBOVESPA (β=1)
+            fig_sml.add_trace(go.Scatter(
+                x=[1.0], y=[rm_anual * 100],
+                mode='markers+text',
+                marker=dict(color='#00d2ff', size=10, symbol='star'),
+                text=['IBOV'], textposition='top right', textfont=dict(color='#00d2ff', size=10),
+                name='IBOVESPA (β=1)', hovertemplate=f"IBOV<br>β=1.00<br>Retorno={rm_anual:.2%}<extra></extra>"
+            ))
+            # Each asset
+            for _, row in df_capm.iterrows():
+                cor = '#00ff87' if row['_alpha_sign'] > 0 else '#ff3d5a'
+                fig_sml.add_trace(go.Scatter(
+                    x=[row['Beta (β)']],
+                    y=[row['Retorno Real']],
+                    mode='markers+text',
+                    marker=dict(size=11, color=cor, line=dict(color='#f8fafc', width=1)),
+                    text=[row['Ativo']], textposition='top center',
+                    textfont=dict(size=9, color=cor),
+                    name=row['Ativo'],
+                    hovertemplate=(
+                        f"<b>{row['Ativo']}</b><br>"
+                        f"β = {row['Beta (β)']:.3f}<br>"
+                        f"Retorno Real: {row['Retorno Real']:.2f}%<br>"
+                        f"E[R] CAPM: {row['E[Ri] CAPM']:.2f}%<br>"
+                        f"Alpha: {row['Alpha Jensen (a.a.)']:+.2f}%<extra></extra>"
+                    )
+                ))
+            fig_sml.update_layout(
+                xaxis_title="Beta (β) — Risco Sistemático vs IBOVESPA",
+                yaxis_title="Retorno Anualizado (%)",
+                template='plotly_dark',
+                showlegend=False,
+                annotations=[
+                    dict(x=b_max - 0.1, y=sml_y[-1] + 4, text="Acima da SML: α > 0",
+                         showarrow=False, font=dict(color='#00ff87', size=10), xanchor='right'),
+                    dict(x=b_max - 0.1, y=sml_y[-1] - 4, text="Abaixo da SML: α < 0",
+                         showarrow=False, font=dict(color='#ff3d5a', size=10), xanchor='right'),
+                ]
+            )
+            apply_plotly_theme(fig_sml)
+            st.plotly_chart(fig_sml, use_container_width=True)
+            st.caption("🟢 Acima da SML = Alpha positivo (gerou valor além do risco assumido)  ·  🔴 Abaixo = Alpha negativo")
+
+            # Decomposição de risco
+            st.markdown("##### Decomposição de Risco: Sistemático vs Não-Sistemático")
+            st.caption("R² = risco sistemático (mercado) / risco total.  1 − R² = risco idiossincrático (diversificável).")
+            risco_cols = st.columns(len(capm_rows))
+            for i, row in enumerate(capm_rows):
+                with risco_cols[i]:
+                    r2_val = row['R² (Risco Sist.)']
+                    st.markdown(f"""
+<div style="text-align:center;padding:0.6rem;border:1px solid #1e293b;border-radius:10px">
+  <div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:0.4rem">{row['Ativo']}</div>
+  <div style="font-size:1.1rem;font-weight:700;color:#a855f7">{r2_val:.0f}%</div>
+  <div style="font-size:0.6rem;color:#64748b">sistemático</div>
+  <div style="font-size:0.9rem;color:#334155">{100-r2_val:.0f}%</div>
+  <div style="font-size:0.6rem;color:#64748b">idiossincrático</div>
+</div>""", unsafe_allow_html=True)
+        else:
+            st.info("Dados insuficientes para calcular CAPM individual por ativo.")
 
         # ── Stress Test — Crises Históricas ──────────────────────────────────
         st.markdown("---")
