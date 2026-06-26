@@ -445,7 +445,7 @@ with tabs[0]:
         border = (
             f"border-left:3px solid {color}"
             if is_sel
-            else f"border-left:3px solid #1e293b"
+            else "border-left:3px solid #1e293b"
         )
         bg = "rgba(0,255,135,0.03)" if is_sel else "transparent"
         st.markdown(

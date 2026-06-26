@@ -1,23 +1,86 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* Global variables and design tokens */
+/* ── B3Lab Design System ─────────────────────────────────────────────────── */
 :root {
+  /* Brand */
+  --brand-primary: #00ff87;
+  --brand-secondary: #00d2ff;
+  --brand-accent: #ffd600;
+  --brand-danger: #ff3d5a;
+  --brand-gradient: linear-gradient(135deg, #00ff87 0%, #00d2ff 100%);
+
+  /* Surfaces */
   --bg-color: #080c14;
   --panel-bg: #0e1524;
+  --panel-raised: #131d2e;
+  --panel-border: #1e293b;
+
+  /* Aliases (backward compat) */
   --primary-color: #00ff87;
   --secondary-color: #00d2ff;
   --accent-color: #ffd600;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
   --border-color: #1e293b;
   --border-glow: rgba(0, 255, 135, 0.15);
+
+  /* Typography */
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-faint: #475569;
+  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Radii (both naming conventions) */
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
   --border-radius-lg: 16px;
   --border-radius-md: 10px;
   --border-radius-sm: 6px;
-  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Shadows */
   --shadow-glow: 0 0 20px rgba(0, 255, 135, 0.08);
+  --shadow-glow-strong: 0 0 32px rgba(0, 255, 135, 0.18);
   --shadow-dark: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ── B3Lab Brand Utilities ───────────────────────────────────────────────── */
+
+.b3lab-gradient-text {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.b3lab-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: rgba(0, 255, 135, 0.12);
+  color: var(--brand-primary);
+  border: 1px solid rgba(0, 255, 135, 0.25);
+}
+.b3lab-badge-blue  { background: rgba(0,210,255,.12); color: var(--brand-secondary); border-color: rgba(0,210,255,.25); }
+.b3lab-badge-gold  { background: rgba(255,214,0,.12);  color: var(--brand-accent);    border-color: rgba(255,214,0,.25); }
+.b3lab-badge-red   { background: rgba(255,61,90,.12);  color: var(--brand-danger);    border-color: rgba(255,61,90,.25); }
+
+.b3lab-stat {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+.b3lab-stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--brand-gradient);
 }
 
 /* Base Body and App Container Override */

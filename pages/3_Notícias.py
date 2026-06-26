@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import datetime
-import plotly.express as px
 import plotly.graph_objects as go
 import random
 import re
@@ -11,7 +9,6 @@ import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
 import email.utils
-import traceback
 from utils.charts import apply_plotly_theme
 
 # CSS customizado
@@ -462,7 +459,7 @@ def get_brazilian_news(ticker_name):
                 'summary': ''
             })
         return news_items
-    except Exception as e:
+    except Exception:
         return []
 
 
@@ -476,7 +473,7 @@ def load_finbert_pipeline():
         model = BertForSequenceClassification.from_pretrained(model_name)
         nlp = pipeline("text-classification", model=model, tokenizer=tokenizer, top_k=None)
         return nlp
-    except Exception as e:
+    except Exception:
         return None
 
 # Load FinBERT
@@ -534,7 +531,7 @@ def analise_sentimento_finbert(title, summary, nlp):
             "is_finbert": True,
             "raw_text_length": len(text.split())
         }
-    except Exception as e:
+    except Exception:
         # Fallback on error
         res_pln = analise_sentimento_pln(title, summary)
         scores = [
@@ -583,9 +580,9 @@ pesos = {t.replace(".SA", ""): row.iloc[0] for t, row in peso_df.iterrows()}
 
 # Informar o estado do algoritmo NLP na barra lateral
 if finbert_nlp is not None:
-    st.sidebar.success(f"🤖 FinBERT-PT-BR Ativo")
+    st.sidebar.success("🤖 FinBERT-PT-BR Ativo")
 else:
-    st.sidebar.info(f"📝 PLN Léxico Ativo (Fallback)")
+    st.sidebar.info("📝 PLN Léxico Ativo (Fallback)")
 
 # Gerador dinâmico de notícias baseado nos ativos selecionados com avaliação PLN em tempo real
 news_items = []
@@ -979,11 +976,11 @@ insights_html = []
 
 # Gerar diagnósticos baseados no score médio
 if normalized_score >= 60:
-    insights_html.append(get_diag_row_html(ICO_OK, f"<b>Fator de Sentimento Positivo:</b> A carteira possui sentimentos favoráveis dominantes. Isto apoia a tese de manutenção ou leve ampliação em correções técnicas.", "#00ff87"))
+    insights_html.append(get_diag_row_html(ICO_OK, "<b>Fator de Sentimento Positivo:</b> A carteira possui sentimentos favoráveis dominantes. Isto apoia a tese de manutenção ou leve ampliação em correções técnicas.", "#00ff87"))
 elif normalized_score >= 40:
-    insights_html.append(get_diag_row_html(ICO_WARN, f"<b>Sentimento de Consolidação:</b> Fluxo de notícias equilibrado entre fatores macro e dinâmicas internas. Mantenha os rebalanceamentos normais programados.", "#ffd600"))
+    insights_html.append(get_diag_row_html(ICO_WARN, "<b>Sentimento de Consolidação:</b> Fluxo de notícias equilibrado entre fatores macro e dinâmicas internas. Mantenha os rebalanceamentos normais programados.", "#ffd600"))
 else:
-    insights_html.append(get_diag_row_html(ICO_CRIT, f"<b>Sinal de Alerta Qualitativo:</b> Sentimento desfavorável predominante nos ativos selecionados. Monitore potenciais rompimentos de suporte técnico.", "#ff3d5a"))
+    insights_html.append(get_diag_row_html(ICO_CRIT, "<b>Sinal de Alerta Qualitativo:</b> Sentimento desfavorável predominante nos ativos selecionados. Monitore potenciais rompimentos de suporte técnico.", "#ff3d5a"))
     
 # Análise de concentração qualitativa (pesos elevados em ações com sentimento negativo)
 risco_alto = False

@@ -3,7 +3,6 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import datetime
 import warnings
 import plotly.express as px
@@ -11,11 +10,9 @@ import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
 from pypfopt import expected_returns, risk_models
 from pypfopt.efficient_frontier import EfficientFrontier
-from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
-from scipy.stats import kurtosis, skew
+from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
 from bcb import sgs
-import matplotlib.ticker as mtick
 from utils.charts import apply_plotly_theme
 
 
@@ -1026,7 +1023,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
             html_rows = []
             for year, row in monthly_ret_df.iterrows():
-                row_html = f'<tr style="border-bottom: 1px solid #1e293b; font-size: 0.88rem;">'
+                row_html = '<tr style="border-bottom: 1px solid #1e293b; font-size: 0.88rem;">'
                 row_html += f"<td style=\"padding: 0.7rem 0.5rem; font-weight: 700; text-align: left; color: #f8fafc; font-family: 'JetBrains Mono', monospace;\">{year}</td>"
                 for m in [
                     "Jan",
@@ -1044,7 +1041,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 ]:
                     val = row[m]
                     if pd.isna(val):
-                        row_html += f"<td style=\"padding: 0.7rem 0.5rem; color: #475569; font-family: 'JetBrains Mono', monospace;\">-</td>"
+                        row_html += "<td style=\"padding: 0.7rem 0.5rem; color: #475569; font-family: 'JetBrains Mono', monospace;\">-</td>"
                     else:
                         color = (
                             "#4ade80"
@@ -1058,7 +1055,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
                 ytd_val = row["YTD"]
                 if pd.isna(ytd_val):
-                    row_html += f"<td style=\"padding: 0.7rem 0.5rem; border-left: 1px solid #1e293b; color: #475569; font-family: 'JetBrains Mono', monospace;\">-</td>"
+                    row_html += "<td style=\"padding: 0.7rem 0.5rem; border-left: 1px solid #1e293b; color: #475569; font-family: 'JetBrains Mono', monospace;\">-</td>"
                 else:
                     ytd_color = (
                         "#4ade80"

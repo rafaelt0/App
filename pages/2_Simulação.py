@@ -1,18 +1,10 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import datetime
-import warnings
 import plotly.express as px
 import plotly.graph_objects as go
-from pypfopt.hierarchical_portfolio import HRPOpt
-from quantstats.stats import sharpe, sortino, max_drawdown, var, cvar, tail_ratio
-from scipy.stats import kurtosis, skew
-import quantstats as qs
-import matplotlib.ticker as mtick
 from utils.charts import apply_plotly_theme
 
 
@@ -452,7 +444,6 @@ fig_fan.add_hline(
 st.plotly_chart(fig_fan, use_container_width=True)
 
 # Download simulation summary
-import io
 
 sim_summary = pd.DataFrame(
     [{"Métrica": k, "Valor": v} for k, v in sim_stats_dict.items()]
