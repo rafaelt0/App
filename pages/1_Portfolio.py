@@ -436,6 +436,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, returns, cleaned_weight
         template="plotly_dark",
     )
     apply_plotly_theme(fig)
+    fig.update_layout(height=550, margin=dict(b=140))
     return fig
 
 
