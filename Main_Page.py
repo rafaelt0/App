@@ -1098,6 +1098,11 @@ st.caption(
 if "selected_tickers" not in st.session_state:
     st.session_state["selected_tickers"] = []
 
+# Apply any ticker selection staged by widgets below (which run after this
+# key's widget is already instantiated, so they can't write to it directly)
+if "_pending_tickers" in st.session_state:
+    st.session_state["selected_tickers"] = st.session_state.pop("_pending_tickers")
+
 # Remove any stale tickers that are no longer in the filtered list
 st.session_state["selected_tickers"] = [
     t for t in st.session_state["selected_tickers"] if t in tickers_filtrados
@@ -1173,7 +1178,7 @@ if not tickers:
                 use_container_width=True,
                 help=f"Analisar {tkr} — {setor}",
             ):
-                st.session_state["selected_tickers"] = [tkr]
+                st.session_state["_pending_tickers"] = [tkr]
                 st.rerun()
 
     # Sector shortcuts
