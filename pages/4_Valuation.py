@@ -168,7 +168,9 @@ def get_koller_data(ticker_b3: str):
             dwc_v = dwc if dwc is not None else 0.0
             fcf = noplat + da_v - cap_v - dwc_v
             cash_op = (rev * CAIXA_OP_PCT) if rev else 0.0
-            wco = (ca or 0) - (cl or 0) - max((cash or 0) - cash_op, 0) - dbt_s
+            # Current Liabilities do yfinance já inclui a dívida de curto prazo (Current Debt);
+            # subtrair dbt_s de novo contaria a dívida duas vezes no WCO.
+            wco = (ca or 0) - (cl or 0) - max((cash or 0) - cash_op, 0)
             ic = wco + (ppe or 0) + gw
 
             years.append(
@@ -252,15 +254,18 @@ def calc_cv(noplat_next, g_pct, roic_cv_pct, wacc_dec):
     return noplat_next * max(1.0 - reinv, 0.01) / (r - g)
 
 
-def calc_dcf(noplat0, g1_pct, g2_pct, gt_pct, wacc_dec, roic_cv_pct):
+def calc_dcf(noplat0, g1_pct, g2_pct, gt_pct, wacc_dec, roic_cv_pct, roic_proj_pct=None):
     g1, g2, gt = g1_pct / 100, g2_pct / 100, gt_pct / 100
     rows, pv_exp = [], 0.0
     roic_cv = roic_cv_pct / 100
+    # ROIC do período explícito (anos 1-10) pode diferir do ROIC na perpetuidade —
+    # usar roic_cv para os dois conflita o reinvestimento atual com a premissa terminal.
+    roic_proj = (roic_proj_pct if roic_proj_pct is not None else roic_cv_pct) / 100
 
     for t in range(1, 11):
         noplat_t = noplat0 * (1 + g1) ** min(t, 5) * (1 + g2) ** max(0, t - 5)
         g_t = g1 if t <= 5 else g2
-        reinv = min(g_t / roic_cv, 0.95) if roic_cv > 0 else 0.0
+        reinv = min(g_t / roic_proj, 0.95) if roic_proj > 0 else 0.0
         fcf_t = noplat_t * max(1.0 - reinv, 0.05)
         pv_t = fcf_t / (1 + wacc_dec) ** t
         pv_exp += pv_t
@@ -310,13 +315,19 @@ st.markdown(
 # ─── Ticker input ──────────────────────────────────────────────────────────────
 col_t, col_hint = st.columns([2, 5])
 with col_t:
+    b3_stocks = sorted(pd.read_csv("acoes-listadas-b3.csv")["Ticker"].tolist())
     defaults = st.session_state.get("selected_tickers", [])
+    default_ticker = defaults[0] if defaults else None
+    default_idx = (
+        b3_stocks.index(default_ticker) + 1 if default_ticker in b3_stocks else 0
+    )
     ticker = (
-        st.text_input(
+        st.selectbox(
             "Ticker B3",
-            value=defaults[0] if defaults else "",
-            placeholder="Ex: WEGE3",
-            help="Código sem .SA — dados via yfinance (4 anos) + Selic BCB.",
+            options=[""] + b3_stocks,
+            index=default_idx,
+            format_func=lambda t: "Selecione um ticker..." if t == "" else t,
+            help="Dados via yfinance (4 anos) + Selic BCB.",
         )
         .strip()
         .upper()
@@ -376,6 +387,7 @@ if skey not in st.session_state:
         "g2": round(_g1 * 0.5, 1),
         "gt": 3.5,
         "roic_cv": round(min(_roic_hist, 20.0), 1),
+        "roic_proj": round(min(_roic_hist, 30.0), 1),
         "model": "Enterprise DCF",
     }
 ss = st.session_state[skey]
@@ -694,7 +706,7 @@ with tabs[3]:
     st.markdown("#### Projeção de Performance — 10 Anos")
     st.caption("Referência: Koller et al., Cap. 8 — *Forecasting Performance*")
 
-    col_sl1, col_sl2 = st.columns(2)
+    col_sl1, col_sl2, col_sl3 = st.columns(3)
     with col_sl1:
         g1 = st.slider(
             "Crescimento Anos 1–5 (%)",
@@ -719,6 +731,19 @@ with tabs[3]:
         )
         ss["g2"] = g2
 
+    with col_sl3:
+        roic_proj = st.slider(
+            "ROIC — Período de Projeção (%)",
+            1.0,
+            40.0,
+            value=float(ss["roic_proj"]),
+            step=0.5,
+            key=f"{skey}_roic_proj",
+            help="ROIC marginal usado para calcular o reinvestimento (g/ROIC) nos anos 1–10. "
+            "Pode diferir do ROIC na perpetuidade, definido na aba Valor Terminal.",
+        )
+        ss["roic_proj"] = roic_proj
+
     noplat0 = latest["noplat"]
     roic_cv = ss["roic_cv"]
 
@@ -729,7 +754,7 @@ with tabs[3]:
         )
     else:
         _, _, _, proj_rows, _, _ = calc_dcf(
-            noplat0, g1, g2, ss["gt"], wacc_dec, roic_cv
+            noplat0, g1, g2, ss["gt"], wacc_dec, roic_cv, roic_proj
         )
 
         df_proj = pd.DataFrame(
@@ -766,7 +791,7 @@ with tabs[3]:
 
         st.caption(
             f"NOPLAT base: {_fmt(noplat0)} | "
-            f"Reinvestimento = g / ROIC_cv ({roic_cv:.1f}%) por período"
+            f"Reinvestimento = g / ROIC_proj ({roic_proj:.1f}%) por período"
         )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -819,7 +844,7 @@ CV_T = NOPLAT_{T+1} × (1 − g / ROIC_cv) / (WACC − g)
 
         if cv is not None:
             pv_exp, pv_cv, ev_total, _, _, _ = calc_dcf(
-                noplat0, ss["g1"], ss["g2"], gt, wacc_dec, roic_cv
+                noplat0, ss["g1"], ss["g2"], gt, wacc_dec, roic_cv, ss["roic_proj"]
             )
             cv_pct = pv_cv / ev_total * 100 if ev_total > 0 else 0
 
@@ -1019,7 +1044,7 @@ with tabs[6]:
         )
     else:
         pv_exp, pv_cv, ev, proj_rows, cv, noplat_11 = calc_dcf(
-            noplat0, ss["g1"], ss["g2"], ss["gt"], wacc_dec, ss["roic_cv"]
+            noplat0, ss["g1"], ss["g2"], ss["gt"], wacc_dec, ss["roic_cv"], ss["roic_proj"]
         )
 
         net_debt = t_debt - cash_v
@@ -1177,7 +1202,7 @@ with tabs[6]:
                         row_t.append("N/A")
                         continue
                     _, _, ev_s, _, _, _ = calc_dcf(
-                        noplat0, ss["g1"], ss["g2"], g, w, ss["roic_cv"]
+                        noplat0, ss["g1"], ss["g2"], g, w, ss["roic_cv"], ss["roic_proj"]
                     )
                     eq_s = ev_s - net_debt
                     piv_s = eq_s / shares if shares > 0 else None
@@ -1269,7 +1294,7 @@ with tabs[7]:
     if noplat0 > 0 and ebit0 and rev0:
         # Implied multiples from our DCF
         _, _, ev_dcf, _, _, _ = calc_dcf(
-            noplat0, ss["g1"], ss["g2"], ss["gt"], wacc_dec, ss["roic_cv"]
+            noplat0, ss["g1"], ss["g2"], ss["gt"], wacc_dec, ss["roic_cv"], ss["roic_proj"]
         )
 
         ebitda_approx = ebit0 + latest["da"]  # EBITDA ≈ EBIT + D&A
