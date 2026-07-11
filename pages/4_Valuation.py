@@ -17,7 +17,11 @@ from utils.market_data import clean_numeric_column, get_full_market_data
 load_css()
 
 # ─── Constants ────────────────────────────────────────────────────────────────
-ERP_BR = 8.0  # ERP_EUA ~5% + CRP_Brasil ~3%
+ERP_MATURE = 5.0  # ERP de mercado maduro (EUA). Rf=Selic já embute o risco-país
+# (juros nominais brasileiros carregam prêmio de inflação/risco doméstico via a
+# reação do BCB), então somar um CRP à parte aqui contaria o risco Brasil duas
+# vezes no ke. Ver Damodaran: quando Rf é a taxa local (não o Treasury), usa-se
+# apenas o ERP do mercado maduro, sem CRP adicional.
 CAIXA_OP_PCT = 0.015  # caixa operacional ≈ 1.5% da receita
 
 
@@ -258,6 +262,7 @@ def get_sector_multiples():
             "ROE": "ROE",
             "ROIC": "ROIC",
             "Div.Yield": "DY",
+            "Patrim. Líq": "PATRLIQ",  # proxy de porte p/ filtrar peers comparáveis
         }
         df2 = pd.DataFrame(index=raw.index)
         for src, dst in cols.items():
@@ -396,7 +401,7 @@ cagr = kdata["rev_cagr"]
 skey = f"kval_{ticker}"
 if skey not in st.session_state:
     _b = max(min(beta, 2.5), 0.3)
-    _ke = round(min(selic * 100 + _b * ERP_BR, 22.0), 1)
+    _ke = round(min(selic * 100 + _b * ERP_MATURE, 22.0), 1)
     _kd = round(kd_est, 1) if kd_est else 8.0
     _ev0 = max(latest["equity"] + t_debt - cash_v, 1)
     _ew = round(max(min(latest["equity"] / _ev0, 0.95), 0.3), 2)
@@ -946,9 +951,9 @@ with tabs[5]:
             f'<div style="font-size:0.8rem;color:#94a3b8;padding:0.4rem 0;">'
             f'Rf (Selic): <b style="color:#00d2ff">{rf_pct:.2f}%</b> · '
             f'β (yfinance): <b style="color:#f8fafc">{beta:.2f}</b> · '
-            f'ERP (EUA+CRP): <b style="color:#ffd600">{ERP_BR:.1f}%</b><br>'
-            f"ke = Rf + β × ERP = {rf_pct:.1f}% + {_beta_c:.2f} × {ERP_BR:.0f}% ≈ "
-            f'<b style="color:#00ff87">{rf_pct + _beta_c * ERP_BR:.1f}%</b>'
+            f'ERP (mercado maduro, s/ CRP): <b style="color:#ffd600">{ERP_MATURE:.1f}%</b><br>'
+            f"ke = Rf + β × ERP = {rf_pct:.1f}% + {_beta_c:.2f} × {ERP_MATURE:.0f}% ≈ "
+            f'<b style="color:#00ff87">{rf_pct + _beta_c * ERP_MATURE:.1f}%</b>'
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -960,7 +965,8 @@ with tabs[5]:
             value=float(ss["ke"]),
             step=0.25,
             key=f"{skey}_ke",
-            help="CAPM: Rf + β × ERP. ERP = ERP_EUA ~5% + CRP_Brasil ~3%.",
+            help="CAPM: Rf + β × ERP. Rf=Selic já embute o risco-país; ERP é o "
+            "prêmio de mercado maduro (~5%), sem CRP adicional (evita dupla contagem).",
         )
         ss["ke"] = ke
 
@@ -1415,30 +1421,71 @@ with tabs[7]:
             _peers_in = [p for p in _peers_tickers if p in _peers_df.index]
             if _peers_in:
                 _comp = _peers_df.loc[_peers_in].copy()
+                _mult_cols = [c for c in _comp.columns if c != "PATRLIQ"]
                 for col in _comp.columns:
                     _comp[col] = pd.to_numeric(_comp[col], errors="coerce")
                     _comp.loc[_comp[col] == 0, col] = pd.NA
                     if col in ("PL", "PVP", "EV_EBITDA"):
                         _comp.loc[(_comp[col] < 0) | (_comp[col] > 500), col] = pd.NA
-                _comp = _comp.dropna(how="all")
+                _comp = _comp.dropna(subset=_mult_cols, how="all")
+
+                # Filtra peers por porte (0,3x–3x do patrimônio líquido do ticker
+                # analisado) — evita comparar uma small cap com uma blue chip só
+                # porque estão no mesmo setor. Só aplica o filtro se sobrarem
+                # peers suficientes; senão mantém a lista completa do setor.
+                _size_note = ""
+                if (
+                    ticker in _comp.index
+                    and pd.notna(_comp.loc[ticker, "PATRLIQ"])
+                    and _comp.loc[ticker, "PATRLIQ"] > 0
+                ):
+                    _target_size = _comp.loc[ticker, "PATRLIQ"]
+                    _lo, _hi = _target_size * 0.3, _target_size * 3.0
+                    _in_range = _comp[
+                        (_comp["PATRLIQ"] >= _lo) & (_comp["PATRLIQ"] <= _hi)
+                    ]
+                    if ticker not in _in_range.index:
+                        _in_range = pd.concat([_in_range, _comp.loc[[ticker]]])
+                    if len(_in_range) >= 5:
+                        _comp = _in_range
+                        _size_note = " · filtrado por porte (0,3x–3x patrimônio líquido)"
+
+                if len(_comp) < 5:
+                    st.caption(
+                        f"⚠️ Amostra pequena: {len(_comp)} peer(s) disponível(is) "
+                        "no setor (ideal Koller: 5–15) — use os múltiplos com cautela."
+                    )
+                elif _size_note:
+                    st.caption(f"{len(_comp)} peers{_size_note}")
+
+                _comp = _comp.drop(columns=["PATRLIQ"], errors="ignore")
 
                 # Highlight the analyzed ticker
                 _comp.index.name = "Ticker"
-                _disp = _comp.copy().rename(
-                    columns={
-                        "PL": "P/L",
-                        "PVP": "P/VP",
-                        "EV_EBITDA": "EV/EBITDA",
-                        "ROE": "ROE (%)",
-                        "ROIC": "ROIC (%)",
-                        "DY": "DY (%)",
-                    }
-                )
+                _rename = {
+                    "PL": "P/L",
+                    "PVP": "P/VP",
+                    "EV_EBITDA": "EV/EBITDA",
+                    "ROE": "ROE (%)",
+                    "ROIC": "ROIC (%)",
+                    "DY": "DY (%)",
+                }
+                _disp = _comp.copy().rename(columns=_rename)
+
+                # Mediana dos peers (exclui o próprio ticker) — estatística-resumo
+                # menos sensível a outliers do que a média (Koller).
+                _peer_rows = _disp.drop(index=ticker, errors="ignore")
+                if not _peer_rows.empty:
+                    _disp.loc["Mediana peers"] = _peer_rows.median(numeric_only=True)
 
                 def _highlight(row):
                     if row.name == ticker:
                         return [
                             "background-color: rgba(168,85,247,0.15); font-weight:bold"
+                        ] * len(row)
+                    if row.name == "Mediana peers":
+                        return [
+                            "background-color: rgba(255,214,0,0.08); font-style:italic"
                         ] * len(row)
                     return [""] * len(row)
 
@@ -1450,7 +1497,11 @@ with tabs[7]:
                 # Bar chart — EV/EBITDA peer comparison
                 _ev_col = "EV/EBITDA"
                 if _ev_col in _disp.columns:
-                    _chart_df = _disp[[_ev_col]].dropna().sort_values(_ev_col)
+                    _chart_df = (
+                        _disp.drop(index="Mediana peers", errors="ignore")[[_ev_col]]
+                        .dropna()
+                        .sort_values(_ev_col)
+                    )
                     _colors = [
                         "#a855f7" if i == ticker else "#334155" for i in _chart_df.index
                     ]
