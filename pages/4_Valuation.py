@@ -435,7 +435,6 @@ tabs = st.tabs(
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[0]:
     st.markdown("#### Escolha o modelo de valuation adequado")
-    st.caption("Referência: Koller et al., Cap. 5 — *Frameworks of Valuation*")
 
     model_data = [
         (
@@ -501,7 +500,6 @@ with tabs[0]:
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[1]:
     st.markdown("#### Análise Histórica — NOPLAT, Invested Capital, ROIC, FCF")
-    st.caption("Referência: Koller et al., Cap. 7 — *Analyzing Historical Performance*")
 
     if len(ys) < 2:
         st.warning("Dados históricos insuficientes no yfinance para este ticker.")
@@ -618,7 +616,6 @@ with tabs[1]:
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[2]:
     st.markdown("#### Drivers de Valor — Calibração com Evidências Empíricas")
-    st.caption("Referência: Koller et al., Cap. 6 — *Return on Invested Capital*")
 
     roic_vals_clean = [y["roic"] for y in ys if y.get("roic") is not None]
     roic_med = float(np.median(roic_vals_clean)) if roic_vals_clean else None
@@ -652,7 +649,7 @@ with tabs[2]:
     )
 
     # Benchmarks table
-    st.markdown("**Benchmarks Empíricos (Koller, Cap. 6):**")
+    st.markdown("**Benchmarks Empíricos (Koller):**")
     benchmarks = [
         (
             "ROIC mediano — mercado amplo",
@@ -722,7 +719,6 @@ with tabs[2]:
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[3]:
     st.markdown("#### Projeção de Performance — 10 Anos")
-    st.caption("Referência: Koller et al., Cap. 8 — *Forecasting Performance*")
 
     col_sl1, col_sl2, col_sl3 = st.columns(3)
     with col_sl1:
@@ -817,7 +813,6 @@ with tabs[3]:
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[4]:
     st.markdown("#### Valor Terminal — Continuing Value (Gordon Growth adaptado)")
-    st.caption("Referência: Koller et al., Cap. 9 — *Estimating Continuing Value*")
 
     st.markdown("""
 ```
@@ -934,7 +929,6 @@ CV_T = NOPLAT_{T+1} × (1 − g / ROIC_cv) / (WACC − g)
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[5]:
     st.markdown("#### Custo de Capital — WACC / CAPM")
-    st.caption("Referência: Koller et al., Cap. 10 — *Estimating the Cost of Capital*")
 
     col_ke, col_kd = st.columns(2)
 
@@ -1048,9 +1042,6 @@ with tabs[5]:
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[6]:
     st.markdown("#### Enterprise Value → Equity Value → Preço por Ação")
-    st.caption(
-        "Referência: Koller et al., Cap. 11 — *Calculating and Interpreting Results*"
-    )
 
     noplat0 = latest["noplat"]
 
@@ -1296,9 +1287,6 @@ with tabs[6]:
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[7]:
     st.markdown("#### Validação por Múltiplos de Mercado")
-    st.caption(
-        "Referência: Koller et al., Cap. 12 — *Using Multiples to Triangulate DCF*"
-    )
 
     st.info(
         "Múltiplos são **contexto**, não substitutos do DCF. "
@@ -1323,7 +1311,7 @@ with tabs[7]:
                 "EV/EBITDA",
                 ev_dcf / ebitda_approx if ebitda_approx > 0 else None,
                 "Mais comum; neutro para D&A",
-                "Koller Cap. 12: preferido para comparação entre empresas do mesmo setor",
+                "Koller: preferido para comparação entre empresas do mesmo setor",
             ),
             (
                 "EV/EBITA",

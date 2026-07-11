@@ -376,7 +376,7 @@ ticker_to_name = {
     'KLBN11': 'Klabin'
 }
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, show_spinner=False)
 def get_brazilian_news(ticker_name):
     # Clean up and combine company name to improve search query
     name = ticker_to_name.get(ticker_name, "")
@@ -428,7 +428,7 @@ def get_brazilian_news(ticker_name):
 
 
 # ─── DEEP LEARNING MODEL LOAD (FinBERT-PT-BR) ───────────────────────────────
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_finbert_pipeline():
     try:
         from transformers import AutoTokenizer, BertForSequenceClassification, pipeline
@@ -441,7 +441,10 @@ def load_finbert_pipeline():
         return None
 
 # Load FinBERT
-finbert_nlp = load_finbert_pipeline()
+if "finbert_nlp" not in st.session_state:
+    with loading_overlay("Carregando modelo de IA (FinBERT-PT-BR)..."):
+        st.session_state["finbert_nlp"] = load_finbert_pipeline()
+finbert_nlp = st.session_state["finbert_nlp"]
 
 
 def analise_sentimento_finbert(title, summary, nlp):
