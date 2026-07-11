@@ -712,6 +712,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         else:
             df_cotas["Peso Efetivo (%)"] = 0.0
 
+        cotas_rows_html = ""
         for idx, row_c in df_cotas.iterrows():
             ticker_name = row_c["Ativo"]
             pu = row_c["Preço Unitário"]
@@ -721,40 +722,47 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             val_ef = row_c["Valor Efetivo"]
             p_ef = row_c["Peso Efetivo (%)"]
 
-            st.markdown(
-                f"""
-            <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                        border: 1px solid #1e293b; 
-                        border-radius: 12px; 
-                        padding: 1rem; 
-                        margin-bottom: 1rem; 
+            cotas_rows_html += (
+                "<tr style=\"border-bottom: 1px solid #1e293b;\">"
+                f"<td style=\"padding: 0.45rem 0.5rem; text-align: left; color: #38bdf8; font-weight: 700; font-family: 'JetBrains Mono', monospace;\">{ticker_name}</td>"
+                f"<td style=\"padding: 0.45rem 0.5rem; color: #f8fafc; font-family: 'JetBrains Mono', monospace;\">R$ {pu:,.2f}</td>"
+                f"<td style=\"padding: 0.45rem 0.5rem; color: #4ade80; font-weight: 700; font-family: 'JetBrains Mono', monospace;\">{int(cotas):,}</td>"
+                f"<td style=\"padding: 0.45rem 0.5rem; color: #fbbf24; font-family: 'JetBrains Mono', monospace;\">R$ {val_ef:,.2f}</td>"
+                f"<td style=\"padding: 0.45rem 0.5rem; color: #a78bfa; font-family: 'JetBrains Mono', monospace;\">R$ {val_sug:,.2f}</td>"
+                f"<td style=\"padding: 0.45rem 0.5rem; color: #e2e8f0; font-family: 'JetBrains Mono', monospace;\">{p_sug:.2f}%</td>"
+                f"<td style=\"padding: 0.45rem 0.5rem; color: #e2e8f0; font-family: 'JetBrains Mono', monospace;\">{p_ef:.2f}%</td>"
+                "</tr>"
+            )
+
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, #0e1726, #070c14);
+                        border: 1px solid #1e293b;
+                        border-radius: 12px;
+                        padding: 0.8rem 1rem;
+                        overflow-x: auto;
+                        margin-bottom: 1rem;
                         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem; margin-bottom: 0.8rem;">
-                    <span style="font-size: 1.2rem; color: #38bdf8; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{ticker_name}</span>
-                    <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">Preço Unitário: <strong style="color: #f8fafc; font-family: 'JetBrains Mono', monospace;">R$ {pu:,.2f}</strong></span>
-                </div>
-                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; margin-bottom: 0.8rem;">
-                    <div style="flex: 1; min-width: 120px; background: rgba(30, 41, 59, 0.5); padding: 0.6rem; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Cotas a Comprar</div>
-                        <div style="font-size: 1.2rem; color: #4ade80; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{int(cotas):,}</div>
-                    </div>
-                    <div style="flex: 1; min-width: 120px; background: rgba(30, 41, 59, 0.5); padding: 0.6rem; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Valor Efetivo</div>
-                        <div style="font-size: 1.1rem; color: #fbbf24; font-weight: 800; font-family: 'JetBrains Mono', monospace;">R$ {val_ef:,.2f}</div>
-                    </div>
-                    <div style="flex: 1; min-width: 120px; background: rgba(30, 41, 59, 0.5); padding: 0.6rem; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Valor Sugerido</div>
-                        <div style="font-size: 1.1rem; color: #a78bfa; font-weight: 800; font-family: 'JetBrains Mono', monospace;">R$ {val_sug:,.2f}</div>
-                    </div>
-                </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8; padding-top: 0.2rem;">
-                    <span>Peso Sugerido: <strong style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">{p_sug:.2f}%</strong></span>
-                    <span>Peso Efetivo: <strong style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">{p_ef:.2f}%</strong></span>
-                </div>
+                <table style="width: 100%; border-collapse: collapse; text-align: right; font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #1e293b; color: #94a3b8; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                            <th style="padding: 0.4rem 0.5rem; text-align: left;">Ativo</th>
+                            <th style="padding: 0.4rem 0.5rem;">Preço Unit.</th>
+                            <th style="padding: 0.4rem 0.5rem;">Cotas</th>
+                            <th style="padding: 0.4rem 0.5rem;">Valor Efetivo</th>
+                            <th style="padding: 0.4rem 0.5rem;">Valor Sugerido</th>
+                            <th style="padding: 0.4rem 0.5rem;">Peso Sug.</th>
+                            <th style="padding: 0.4rem 0.5rem;">Peso Efet.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {cotas_rows_html}
+                    </tbody>
+                </table>
             </div>
             """,
-                unsafe_allow_html=True,
-            )
+            unsafe_allow_html=True,
+        )
 
         # Resumo financeiro do rebalanceamento/compra
         sobra_caixa = valor_inicial - total_efetivo
@@ -767,20 +775,6 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
         )
 
         st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True)
-
-        alloc_df = peso_manual_df.reset_index()
-        alloc_df.columns = ["Ativo", "Peso"]
-
-        fig_donut = px.pie(
-            alloc_df,
-            names="Ativo",
-            values="Peso",
-            hole=0.4,
-            title="Distribuição de Alocação da Carteira",
-            color_discrete_sequence=px.colors.qualitative.Safe,
-        )
-        apply_plotly_theme(fig_donut)
-        st.plotly_chart(fig_donut, use_container_width=True)
 
         if "Markowitz" in modo:
             section_header(ICO_FRONTIER, "Gráfico da Fronteira Eficiente", "h3")
