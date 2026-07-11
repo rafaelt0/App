@@ -10,7 +10,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 import email.utils
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css, loading_overlay
+from utils.ui import load_css, loading_overlay, svg_icon as _svg, section_header
 
 # CSS customizado
 load_css()
@@ -51,11 +51,6 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
-def _svg(body, size=14):
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-            f'viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:5px">'
-            f'{body}</svg>')
-
 ICO_OK      = _svg('<circle cx="12" cy="12" r="9" stroke="#00ff87" stroke-width="1.8"/>'
                    '<path d="M8 12l3 3 5-5" stroke="#00ff87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>')
 ICO_WARN    = _svg('<path d="M12 3L22 21H2L12 3Z" stroke="#ffd600" stroke-width="1.8" stroke-linejoin="round"/>'
@@ -80,21 +75,6 @@ ICO_IDEA    = _svg('<circle cx="12" cy="10" r="6" stroke="#ffd600" stroke-width=
 ICO_CPU     = _svg('<rect x="4" y="4" width="16" height="16" rx="2" stroke="#eab308" stroke-width="1.8"/>'
                    '<path d="M9 9h6v6H9z" fill="#eab308" opacity="0.3"/>'
                    '<path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3" stroke="#eab308" stroke-width="1.5"/>', 16)
-
-def section_header(icon_svg, text, tag="h3"):
-    st.markdown(
-        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
-        f'{icon_svg}<span>{text}</span></{tag}>',
-        unsafe_allow_html=True)
-
-def diag_row(icon_svg, text, color):
-    st.markdown(
-        f'<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;'
-        f'color:{color};font-size:0.88rem;line-height:1.4;">'
-        f'<div style="flex-shrink:0;margin-top:2px;display:flex;align-items:center;">{icon_svg}</div>'
-        f'<div style="flex-grow:1;">{text}</div>'
-        f'</div>',
-        unsafe_allow_html=True)
 
 def get_diag_row_html(icon_svg, text, color):
     return (

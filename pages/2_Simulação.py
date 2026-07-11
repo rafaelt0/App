@@ -6,7 +6,12 @@ import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css
+from utils.ui import (
+    load_css,
+    svg_icon as _svg,
+    section_header,
+    render_cards_grid,
+)
 
 
 # CSS customizado
@@ -52,14 +57,6 @@ st.sidebar.markdown(
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
-def _svg(body, size=14):
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-        f'viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:5px">'
-        f"{body}</svg>"
-    )
-
-
 ICO_CHART = _svg(
     '<rect x="3" y="12" width="3" height="9" rx="1" fill="#00ff87"/>'
     '<rect x="9" y="7"  width="3" height="14" rx="1" fill="#00d2ff"/>'
@@ -85,35 +82,6 @@ ICO_METRICS = _svg(
     '<line x1="7" y1="17" x2="15" y2="17" stroke="#94a3b8" stroke-width="1.2" stroke-linecap="round"/>',
     16,
 )
-
-
-def section_header(icon_svg, text, tag="h3"):
-    st.markdown(
-        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
-        f"{icon_svg}<span>{text}</span></{tag}>",
-        unsafe_allow_html=True,
-    )
-
-
-def render_cards_grid(data_dict, colors_sequence=None):
-    if not colors_sequence:
-        colors_sequence = [
-            "#38bdf8",
-            "#4ade80",
-            "#fbbf24",
-            "#fb7185",
-            "#c084fc",
-            "#f472b6",
-            "#34d399",
-            "#60a5fa",
-        ]
-    items = list(data_dict.items())
-    cards_html = "".join(
-        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
-        f'<div class="mcard-value" style="color:{colors_sequence[i % len(colors_sequence)]}">{val}</div></div>'
-        for i, (lbl, val) in enumerate(items)
-    )
-    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 
 # Configurar temas de plotagem escuros

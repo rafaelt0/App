@@ -14,19 +14,18 @@ from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
 from bcb import sgs
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css, loading_overlay
+from utils.ui import (
+    load_css,
+    loading_overlay,
+    svg_icon as _svg,
+    section_header,
+    diag_row,
+    render_cards_grid,
+)
 from utils.market_data import get_sorted_tickers_by_liquidity
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
-def _svg(body, size=14):
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-        f'viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:5px">'
-        f"{body}</svg>"
-    )
-
-
 ICO_OK = _svg(
     '<circle cx="12" cy="12" r="9" stroke="#00ff87" stroke-width="1.8"/>'
     '<path d="M8 12l3 3 5-5" stroke="#00ff87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
@@ -129,43 +128,6 @@ ICO_FLAT = _svg(
     '<path d="M16 8l4 4-4 4" stroke="#ffd600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
     14,
 )
-
-
-def section_header(icon_svg, text, tag="h3"):
-    st.markdown(
-        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
-        f"{icon_svg}<span>{text}</span></{tag}>",
-        unsafe_allow_html=True,
-    )
-
-
-def diag_row(icon_svg, text, color):
-    st.markdown(
-        f'<div style="display:flex;align-items:center;gap:6px;padding:3px 0;'
-        f'color:{color};font-size:0.88rem">{icon_svg}{text}</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def render_cards_grid(data_dict, colors_sequence=None):
-    if not colors_sequence:
-        colors_sequence = [
-            "#38bdf8",
-            "#4ade80",
-            "#fbbf24",
-            "#fb7185",
-            "#c084fc",
-            "#f472b6",
-            "#34d399",
-            "#60a5fa",
-        ]
-    items = list(data_dict.items())
-    cards_html = "".join(
-        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
-        f'<div class="mcard-value" style="color:{colors_sequence[i % len(colors_sequence)]}">{val}</div></div>'
-        for i, (lbl, val) in enumerate(items)
-    )
-    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 
 @st.cache_data(ttl=3600)

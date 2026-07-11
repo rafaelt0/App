@@ -10,7 +10,7 @@ import time
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css, loading_overlay
+from utils.ui import load_css, loading_overlay, svg_icon as _svg, section_header
 from utils.market_data import get_full_market_data, get_sorted_tickers_by_liquidity
 
 import plotly.graph_objects as go
@@ -811,14 +811,6 @@ st.logo("logo.svg", icon_image="favicon.svg")
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
-def _svg(body, size=14):
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-        f'viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:5px">'
-        f"{body}</svg>"
-    )
-
-
 ICO_COMPASS = _svg(
     '<circle cx="12" cy="12" r="10" stroke="#00ff87" stroke-width="1.8"/>'
     '<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" fill="#00ff87"/>',
@@ -895,14 +887,6 @@ ICO_NEWS = _svg(
     '<line x1="7" y1="16" x2="15" y2="16" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>',
     16,
 )
-
-
-def section_header(icon_svg, text, tag="h3"):
-    st.markdown(
-        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
-        f"{icon_svg}<span>{text}</span></{tag}>",
-        unsafe_allow_html=True,
-    )
 
 
 # Sidebar Principal
