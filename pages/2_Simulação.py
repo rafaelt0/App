@@ -214,6 +214,7 @@ with loading_placeholder.container():
     <div class="loading-container">
         <div class="loading-spinner"></div>
         <div class="loading-text">Rodando simulações Monte Carlo multivariadas...</div>
+        <div class="loading-bar-track"><div class="loading-bar-fill"></div></div>
     </div>
     """,
         unsafe_allow_html=True,

@@ -11,6 +11,7 @@ warnings.filterwarnings("ignore")
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
+from utils.ui import loading_overlay
 
 try:
     with open("style.css") as f:
@@ -341,7 +342,7 @@ if not ticker:
     st.stop()
 
 # ─── Load data ─────────────────────────────────────────────────────────────────
-with st.spinner(f"Carregando dados financeiros de {ticker}..."):
+with loading_overlay(f"Carregando dados financeiros de {ticker}...", tickers=[ticker]):
     selic = get_selic()
     kdata = get_koller_data(ticker)
 
@@ -1425,7 +1426,7 @@ with tabs[7]:
             f"Setor: **{_setor_ticker}** · {len(_peers_tickers)} empresas comparáveis"
         )
 
-        with st.spinner("Carregando múltiplos do setor..."):
+        with loading_overlay("Carregando múltiplos do setor..."):
             _peers_df = _get_peers_multiples()
 
         if not _peers_df.empty:

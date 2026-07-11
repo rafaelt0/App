@@ -10,6 +10,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 import email.utils
 from utils.charts import apply_plotly_theme
+from utils.ui import loading_overlay
 
 # CSS customizado
 with open("style.css") as f:
@@ -589,7 +590,7 @@ news_items = []
 random.seed(42)  # Semente estática para consistência entre renderizações da mesma sessão
 
 # Barra de progresso para download/fetch de notícias em tempo real
-with st.spinner("Buscando notícias e processando sentimento NLP..."):
+with loading_overlay("Buscando notícias e processando sentimento NLP...", tickers=tickers):
     for t in tickers:
         real_news = get_brazilian_news(t)
         

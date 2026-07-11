@@ -14,6 +14,7 @@ from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
 from bcb import sgs
 from utils.charts import apply_plotly_theme
+from utils.ui import loading_overlay
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
@@ -583,7 +584,7 @@ if "Manual" in modo:
     st.markdown("---")
 
 # Pré-carrega cotações (resultado cacheado após primeira execução)
-with st.spinner("Baixando cotações históricas..."):
+with loading_overlay("Baixando cotações históricas...", tickers=tickers):
     try:
         data_yf = get_portfolio_prices(tickers_yf, data_inicio)
     except Exception as _price_err:
@@ -606,8 +607,8 @@ returns = data_yf.pct_change().dropna()
 page_container = st.empty()
 
 if st.button("Carregar Portfolio", type="primary", use_container_width=True):
-    # Spinner global
-    with st.spinner("Carregando dados, aguarde..."):
+    # Overlay de carregamento global
+    with loading_overlay("Carregando dados, aguarde...", tickers=tickers):
         if "Manual" in modo:
             pesos_manuais = {}
             total = 0.0
@@ -814,7 +815,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
 
         if "Markowitz" in modo:
             section_header(ICO_FRONTIER, "Gráfico da Fronteira Eficiente", "h3")
-            with st.spinner("Gerando fronteira eficiente e simulando portfólios..."):
+            with loading_overlay("Gerando fronteira eficiente e simulando portfólios..."):
                 selic_anual = (1 + taxa_selic) ** 252 - 1
                 fig_frontier = plot_efficient_frontier_and_random_portfolios(
                     mu, S, returns, cleaned_weights, selic_anual
