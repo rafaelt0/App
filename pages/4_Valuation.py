@@ -269,7 +269,7 @@ def get_sector_multiples():
 # ─── DCF Engine (Koller) ───────────────────────────────────────────────────────
 def calc_cv(noplat_next, g_pct, roic_cv_pct, wacc_dec):
     g, r = g_pct / 100, wacc_dec
-    if abs(r - g) < 0.001:
+    if r <= g:
         return None
     roic_cv = roic_cv_pct / 100
     reinv = min(g / roic_cv, 0.99) if roic_cv > 0 else 0.0
