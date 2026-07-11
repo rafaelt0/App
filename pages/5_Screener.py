@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import datetime
 
+from utils.ui import loading_overlay
+
 st.set_page_config(page_title="Screener B3", page_icon="🔍", layout="wide")
 
 # ─── CSS opcional (dark theme via style.css do projeto) ───────────────────────
@@ -58,7 +60,7 @@ def carregar_dados():
 
 
 try:
-    with st.spinner("Carregando dados da B3..."):
+    with loading_overlay("Carregando dados da B3..."):
         df_raw = carregar_dados()
 except Exception as e:
     st.error(f"Não foi possível carregar os dados da Fundamentus: {e}")

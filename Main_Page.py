@@ -10,6 +10,7 @@ import time
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
+from utils.ui import loading_overlay
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -692,7 +693,7 @@ def _get_setor(df, ticker):
 
 def _render_hist_section(tkr):
     """Renderiza seção de histórico fundamentalista (receita, margens, ROE) para um ticker."""
-    with st.spinner(f"Buscando histórico de {tkr}..."):
+    with loading_overlay(f"Buscando histórico de {tkr}...", tickers=[tkr]):
         df_h = _build_hist_df(tkr)
     if df_h is None or df_h.empty:
         st.info(f"Dados históricos não disponíveis para {tkr} via yfinance.")
@@ -1252,31 +1253,13 @@ if tickers and not ready_to_analyze:
 
 if ready_to_analyze:
     try:
-        # 1. Exibir tela de carregamento glassmorphic
-        loading_placeholder = st.empty()
-        with loading_placeholder.container():
-            _loading_chips = "".join(
-                f'<span class="loading-ticker-chip">{t}</span>' for t in tickers
-            )
-            st.markdown(
-                f"""
-            <div class="loading-container">
-                <div class="loading-spinner"></div>
-                <div class="loading-text">Buscando indicadores fundamentalistas na B3...</div>
-                <div class="loading-tickers">{_loading_chips}</div>
-                <div class="loading-bar-track"><div class="loading-bar-fill"></div></div>
-            </div>
-            """,
-                unsafe_allow_html=True,
-            )
-
-        # 2. Buscar dados usando funções cacheadas
-        df = get_fundamentus_data(tickers)
+        # 1. Buscar dados usando funções cacheadas, com animação de carregamento
+        with loading_overlay(
+            "Buscando indicadores fundamentalistas na B3...", tickers=tickers
+        ):
+            df = get_fundamentus_data(tickers)
 
         tickers_yf = [t + ".SA" for t in tickers]
-
-        # 3. Limpar tela de carregamento
-        loading_placeholder.empty()
 
         # Export button for fundamental data
         try:
@@ -1660,7 +1643,7 @@ if ready_to_analyze:
             st.caption(f"Setores detectados: {setor_info}")
 
             # Busca todos os tickers do setor via fundamentus (função cacheada no nível do módulo)
-            with st.spinner("Buscando peers do setor..."):
+            with loading_overlay("Buscando peers do setor..."):
                 peers_raw = get_sector_peers(tuple(setores_ativas))
 
             if peers_raw.empty:
