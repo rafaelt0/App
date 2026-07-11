@@ -15,6 +15,7 @@ import quantstats as qs
 from bcb import sgs
 from utils.charts import apply_plotly_theme
 from utils.ui import loading_overlay
+from utils.market_data import get_sorted_tickers_by_liquidity
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
@@ -184,21 +185,6 @@ def get_portfolio_prices(tickers_yf, start_date):
 @st.cache_data(ttl=3600)
 def get_benchmark_prices(start_date):
     return yf.download("^BVSP", start=start_date, progress=False)["Close"].squeeze()
-
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def get_sorted_tickers_by_liquidity(tickers_list):
-    try:
-        import fundamentus.resultado as fzr
-
-        df = fzr.get_resultado_raw()
-        df = df.sort_values(by="Liq.2meses", ascending=False)
-        sorted_all = df.index.tolist()
-        sorted_filtered = [t for t in sorted_all if t in tickers_list]
-        remaining = [t for t in tickers_list if t not in sorted_filtered]
-        return sorted_filtered + remaining
-    except Exception:
-        return tickers_list
 
 
 # CSS customizado

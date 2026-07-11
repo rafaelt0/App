@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 
 from utils.ui import loading_overlay
+from utils.market_data import get_full_market_data
 
 st.set_page_config(page_title="Screener B3", page_icon="🔍", layout="wide")
 
@@ -24,9 +25,7 @@ st.markdown(
 # ─── Carregamento de dados ────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def carregar_dados():
-    import fundamentus.resultado as fzr
-
-    raw = fzr.get_resultado_raw()
+    raw = get_full_market_data()
 
     # Explicit rename map — avoids crashing when fundamentus.com.br changes a column name
     RENAMES = {
