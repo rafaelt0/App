@@ -2,17 +2,13 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-from utils.ui import loading_overlay
+from utils.ui import load_css, loading_overlay
 from utils.market_data import get_full_market_data
 
 st.set_page_config(page_title="Screener B3", page_icon="🔍", layout="wide")
 
 # ─── CSS opcional (dark theme via style.css do projeto) ───────────────────────
-try:
-    with open("style.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-except FileNotFoundError:
-    pass
+load_css()
 
 # ─── Cabeçalho ────────────────────────────────────────────────────────────────
 st.title("🔍 Screener B3")
