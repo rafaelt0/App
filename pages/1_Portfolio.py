@@ -458,6 +458,8 @@ except Exception as _selic_err:
 
 
 # Seleção de ações
+MAX_TICKERS = 20
+
 data = pd.read_csv("acoes-listadas-b3.csv")
 stocks = list(data["Ticker"].values)
 stocks = get_sorted_tickers_by_liquidity(stocks)
@@ -465,13 +467,18 @@ stocks = get_sorted_tickers_by_liquidity(stocks)
 if "selected_tickers" not in st.session_state:
     st.session_state["selected_tickers"] = []
 
-# Remove any stale tickers not in the current list
+# Remove any stale tickers not in the current list, and trim to the cap in
+# case it was lowered or the session predates the limit
 st.session_state["selected_tickers"] = [
     t for t in st.session_state["selected_tickers"] if t in stocks
-]
+][:MAX_TICKERS]
 
 tickers = st.multiselect(
-    "Selecione as ações do portfólio", options=stocks, key="selected_tickers"
+    "Selecione as ações do portfólio",
+    options=stocks,
+    key="selected_tickers",
+    max_selections=MAX_TICKERS,
+    help=f"Limite de {MAX_TICKERS} ativos para manter o download de cotações e a otimização estáveis.",
 )
 # Valor inicial
 valor_inicial = st.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
@@ -542,6 +549,29 @@ if isinstance(data_yf.columns, pd.MultiIndex):
     data_yf.columns = ["_".join(col).strip() for col in data_yf.columns.values]
 
 returns = data_yf.pct_change().dropna()
+
+MIN_RETURN_ROWS = 30
+if len(returns) < MIN_RETURN_ROWS:
+    # Rows with a gap in ANY ticker's price history get dropped by dropna()
+    # above, so one short-history ticker (recent IPO, delisting, missing
+    # data) can collapse `returns` to near-empty even when most tickers
+    # have plenty of data. Surface which ones before optimizers choke on it.
+    first_valid = data_yf.apply(lambda col: col.first_valid_index())
+    short_history = first_valid.sort_values(ascending=False).head(5)
+    culprits = ", ".join(
+        f"{col.replace('.SA', '')} (dados desde {date.strftime('%d/%m/%Y')})"
+        for col, date in short_history.items()
+        if pd.notna(date)
+    )
+    st.error(
+        f"Histórico de cotações em comum insuficiente entre os ativos selecionados "
+        f"(apenas {len(returns)} dia(s) com dados completos para todos os ativos). "
+        "Isso costuma acontecer quando um ou mais ativos têm histórico bem mais curto "
+        "que os demais (IPO recente, deslistagem, falha na fonte de dados)."
+        + (f" Possíveis responsáveis: {culprits}." if culprits else "")
+        + " Remova esses ativos ou reduza o período de lookback."
+    )
+    st.stop()
 
 page_container = st.empty()
 
