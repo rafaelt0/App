@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import os
 
 from utils.ui import load_css, loading_overlay
 from utils.market_data import get_full_market_data
@@ -101,83 +102,270 @@ def _calcular_score(df: pd.DataFrame) -> pd.Series:
 
 df["score"] = _calcular_score(df)
 
+# ─── Setor (para exclusão de financeiras/utilities na Magic Formula) ──────────
+_csv_path = os.path.join(os.path.dirname(__file__), "..", "acoes-listadas-b3.csv")
+try:
+    _setores = pd.read_csv(_csv_path).set_index("Ticker")["Setor"]
+    df["setor"] = df.index.map(_setores)
+except Exception:
+    df["setor"] = None
+
+# ─── Colunas calculadas (frameworks) ──────────────────────────────────────────
+# Graham Number: produto P/L × P/VP — Graham considera aceitável até 22,5
+# (equivalente a P/L≤15 e P/VP≤1,5 combinados, mas permite trade-off entre os dois).
+df["graham_number"] = df["pl"] * df["pvp"]
+df.loc[(df["pl"] <= 0) | (df["pvp"] <= 0), "graham_number"] = pd.NA
+
+# c5y já vem em decimal (0.15 = 15%) — usamos em pontos percentuais para o PEG.
+df["c5y_pct"] = df["c5y"] * 100
+
+# PEG (Lynch) = P/L ÷ crescimento de receita 5a (em pontos percentuais).
+df["peg"] = df["pl"] / df["c5y_pct"]
+df.loc[(df["pl"] <= 0) | (df["c5y_pct"] <= 0), "peg"] = pd.NA
+
+# Earnings Yield (Greenblatt) = EBIT/EV = inverso do EV/EBIT.
+if "evebit" in df.columns:
+    df["earnings_yield"] = 1 / df["evebit"]
+    df.loc[df["evebit"] <= 0, "earnings_yield"] = pd.NA
+else:
+    df["earnings_yield"] = pd.NA
+
+# Magic Formula score = média dos percentis de ROIC e Earnings Yield (maior = melhor).
+_mf_parts = []
+if "roic" in df.columns:
+    _mf_parts.append(df["roic"].rank(pct=True, na_option="keep") * 100)
+_mf_parts.append(df["earnings_yield"].rank(pct=True, na_option="keep") * 100)
+df["magic_score"] = pd.concat(_mf_parts, axis=1).mean(axis=1).round(1)
+
 # ─── Filtros na barra lateral ─────────────────────────────────────────────────
 st.sidebar.header("Filtros")
 st.sidebar.caption(
-    "Ajuste os parâmetros para encontrar ações que se encaixam no seu perfil."
+    "Ajuste os parâmetros para encontrar ações que se encaixam no seu perfil, "
+    "ou escolha um filtro pré-definido baseado em frameworks consagrados de stock picking."
 )
 
+# ─── Presets de frameworks consagrados ─────────────────────────────────────────
+DEFAULTS = {
+    "pl_min": 0.0, "pl_max": 30.0,
+    "pvp_min": 0.0, "pvp_max": 5.0,
+    "dy_min": 0.0,
+    "roe_min": 0.0,
+    "evebitda_max": 20.0,
+    "liq2m_min": 0,
+    "divbpatr_max": 5.0,
+    "liqc_min": 0.0,
+    "c5y_min": -100.0, "c5y_max": 500.0,
+    "peg_on": False, "peg_max": 1.0,
+    "graham_on": False,
+    "magic_exclude_fin": True,
+    "bazin_yield": 6.0,
+    "ordenar_por": "Score",
+}
+for _k, _v in DEFAULTS.items():
+    st.session_state.setdefault(_k, _v)
+st.session_state.setdefault("preset_select", "Personalizado")
+
+PRESETS = {
+    "Personalizado": {},
+    "Bazin / Barsi (Dividendos)": {
+        "dy_min": 6.0, "roe_min": 12.0, "divbpatr_max": 0.6,
+        "pl_min": 0.0, "pl_max": 30.0, "pvp_min": 0.0, "pvp_max": 5.0,
+        "liqc_min": 0.0, "peg_on": False, "graham_on": False,
+        "ordenar_por": "Div. Yield",
+    },
+    "Graham — Investidor Defensivo": {
+        "pl_min": 0.0, "pl_max": 15.0, "pvp_min": 0.0, "pvp_max": 1.5,
+        "liqc_min": 2.0, "divbpatr_max": 1.0, "graham_on": True,
+        "dy_min": 0.0, "roe_min": 0.0, "peg_on": False,
+        "ordenar_por": "Score",
+    },
+    "Peter Lynch (GARP)": {
+        "pl_min": 0.0, "pl_max": 40.0, "pvp_min": 0.0, "pvp_max": 10.0,
+        "divbpatr_max": 0.6, "liqc_min": 1.0, "peg_on": True, "peg_max": 1.0,
+        "c5y_min": 15.0, "c5y_max": 30.0, "graham_on": False,
+        "ordenar_por": "Score",
+    },
+    "Greenblatt — Magic Formula": {
+        "pl_min": -50.0, "pl_max": 100.0, "pvp_min": 0.0, "pvp_max": 20.0,
+        "dy_min": 0.0, "roe_min": 0.0, "divbpatr_max": 5.0, "liqc_min": 0.0,
+        "peg_on": False, "graham_on": False, "magic_exclude_fin": True,
+        "ordenar_por": "Magic Formula (Greenblatt)",
+    },
+}
+PRESET_DESC = {
+    "Personalizado": "Ajuste livre dos parâmetros abaixo.",
+    "Bazin / Barsi (Dividendos)": "DY ≥ 6%, ROE ≥ 12%, baixo endividamento — dividendos consistentes.",
+    "Graham — Investidor Defensivo": "P/L ≤ 15, P/VP ≤ 1,5, liquidez corrente ≥ 2, Graham Number ≤ 22,5.",
+    "Peter Lynch (GARP)": "PEG ≤ 1, crescimento de receita 15–30% a.a., dívida/patrimônio ≤ 0,6.",
+    "Greenblatt — Magic Formula": "Ranking por ROIC + Earnings Yield; exclui financeiras/utilities.",
+}
+
+
+def _apply_preset():
+    for k, v in PRESETS.get(st.session_state["preset_select"], {}).items():
+        st.session_state[k] = v
+
+
+st.sidebar.selectbox(
+    "📋 Filtro pré-definido",
+    list(PRESETS.keys()),
+    key="preset_select",
+    on_change=_apply_preset,
+    help="Aplica automaticamente os parâmetros do framework escolhido — "
+    "você pode ajustar cada campo individualmente depois.",
+)
+st.sidebar.caption(f"📌 {PRESET_DESC.get(st.session_state['preset_select'], '')}")
+st.sidebar.markdown("---")
+
+
+def _range_input(label, key_min, key_max, bounds, step, help_text=""):
+    st.sidebar.markdown(f"**{label}**")
+    c1, c2 = st.sidebar.columns(2)
+    with c1:
+        vmin = st.number_input(
+            "Mín.", bounds[0], bounds[1], step=step, key=key_min, help=help_text
+        )
+    with c2:
+        vmax = st.number_input("Máx.", bounds[0], bounds[1], step=step, key=key_max)
+    return vmin, vmax
+
+
 # P/L
-pl_range = st.sidebar.slider(
+pl_range = _range_input(
     "P/L (Preço / Lucro)",
-    min_value=-50.0,
-    max_value=100.0,
-    value=(0.0, 30.0),
-    step=0.5,
-    help="Exclui empresas com P/L negativo ou muito elevado. Faixas comuns: 0–15 (valor), 15–30 (crescimento).",
+    "pl_min",
+    "pl_max",
+    (-50.0, 200.0),
+    0.5,
+    "Exclui empresas fora da faixa. Graham: ≤15. Lynch tolera P/L mais alto se o "
+    "crescimento justificar (ver PEG).",
 )
 
 # P/VP
-pvp_range = st.sidebar.slider(
+pvp_range = _range_input(
     "P/VP (Preço / Valor Patrimonial)",
-    min_value=0.0,
-    max_value=20.0,
-    value=(0.0, 5.0),
-    step=0.1,
-    help="P/VP < 1 pode indicar desconto sobre o patrimônio. Acima de 3–5 exige alto crescimento.",
+    "pvp_min",
+    "pvp_max",
+    (0.0, 30.0),
+    0.1,
+    "Graham: ≤1,5. P/VP < 1 pode indicar desconto sobre o patrimônio.",
 )
 
 # Dividend Yield
-dy_min = st.sidebar.slider(
+dy_min = st.sidebar.number_input(
     "Dividend Yield mínimo (%)",
-    min_value=0.0,
-    max_value=20.0,
-    value=0.0,
+    0.0,
+    30.0,
     step=0.5,
-    help="Percentual mínimo de retorno em dividendos ao ano. Selic atual ~10%.",
+    key="dy_min",
+    help="Bazin: ≥6% a.a. — o 'número mágico'. Selic atual ~10%.",
 )
 
 # ROE
-roe_min = st.sidebar.slider(
+roe_min = st.sidebar.number_input(
     "ROE mínimo (%)",
-    min_value=0.0,
-    max_value=50.0,
-    value=0.0,
+    0.0,
+    80.0,
     step=1.0,
+    key="roe_min",
     help="Return on Equity. Acima de 15% é considerado bom; abaixo de 5% é fraco.",
 )
 
 # EV/EBITDA
-evebitda_max = st.sidebar.slider(
+evebitda_max = st.sidebar.number_input(
     "EV/EBITDA máximo",
-    min_value=0.0,
-    max_value=50.0,
-    value=20.0,
+    0.0,
+    100.0,
     step=0.5,
+    key="evebitda_max",
     help="Múltiplo de valuation que considera dívida. Menor = mais barato. Referência setorial: 6–12×.",
 )
 
 # Liquidez 2 meses
-liq2m_min = st.sidebar.slider(
+liq2m_min = st.sidebar.number_input(
     "Liquidez 2 meses mínima (R$)",
-    min_value=0,
-    max_value=10_000_000,
-    value=0,
+    0,
+    100_000_000,
     step=100_000,
-    format="%d",
+    key="liq2m_min",
     help="Volume médio negociado nos últimos 2 meses. Filtra ações ilíquidas difíceis de comprar/vender.",
+)
+
+# Dívida/Patrimônio
+divbpatr_max = st.sidebar.number_input(
+    "Dívida/Patrimônio máximo",
+    0.0,
+    10.0,
+    step=0.1,
+    key="divbpatr_max",
+    help="Lynch: <0,6 (idealmente <0,25). Graham: dívida de LP baixa em relação ao patrimônio.",
+)
+
+# Liquidez Corrente
+liqc_min = st.sidebar.number_input(
+    "Liquidez Corrente mínima",
+    0.0,
+    20.0,
+    step=0.1,
+    key="liqc_min",
+    help="Ativo circulante ÷ passivo circulante. Graham: ≥2. Lynch: ≥1.",
+)
+
+# Crescimento de receita 5a — faixa
+c5y_range = _range_input(
+    "Cresc. Receita 5a (%) — faixa",
+    "c5y_min",
+    "c5y_max",
+    (-100.0, 500.0),
+    1.0,
+    "Lynch: 15–30% a.a. é a faixa saudável — acima de 30% raramente é sustentável.",
+)
+
+st.sidebar.markdown("**Filtros calculados (frameworks)**")
+graham_on = st.sidebar.checkbox(
+    "Graham Number: P/L × P/VP ≤ 22,5",
+    key="graham_on",
+    help="Limite combinado de Graham — permite trade-off entre P/L e P/VP em vez "
+    "de exigir os dois limites simultaneamente.",
+)
+peg_on = st.sidebar.checkbox(
+    "Aplicar filtro PEG (Lynch)",
+    key="peg_on",
+    help="PEG = P/L ÷ crescimento de receita 5a (%). Lynch: <1 (idealmente <0,8).",
+)
+peg_max = st.sidebar.number_input(
+    "PEG máximo", 0.0, 20.0, step=0.1, key="peg_max", disabled=not peg_on
+)
+bazin_yield = st.sidebar.number_input(
+    "Yield desejado p/ Preço-teto Bazin (%)",
+    1.0,
+    20.0,
+    step=0.5,
+    key="bazin_yield",
+    help="Preço-teto Bazin = Dividendo/ação (12m) ÷ yield desejado. Padrão do método: 6%.",
 )
 
 st.sidebar.markdown("---")
 ordenar_por = st.sidebar.radio(
     "Ordenar por",
-    ["Score", "Liquidez 2m"],
-    help="Score: ranking composto de qualidade e valuation relativo ao universo B3. Liquidez: volume médio 2 meses.",
+    ["Score", "Liquidez 2m", "Div. Yield", "Magic Formula (Greenblatt)"],
+    key="ordenar_por",
+    help="Score: ranking composto de qualidade e valuation relativo ao universo B3. "
+    "Magic Formula: ROIC + Earnings Yield (Greenblatt).",
+)
+magic_exclude_fin = st.sidebar.checkbox(
+    "Excluir financeiras/utilities (regra Greenblatt)",
+    key="magic_exclude_fin",
+    help="Só se aplica quando 'Ordenar por' = Magic Formula. Greenblatt exclui "
+    "esses setores por terem contabilidade não comparável às demais empresas.",
 )
 
 st.sidebar.caption(
     f"Dados: Fundamentus · Atualização: {datetime.date.today().strftime('%d/%m/%Y')}"
 )
+
+# Preço-teto Bazin — depende do yield desejado escolhido acima.
+df["bazin_teto"] = (df["dy"] * df["cotacao"]) / (bazin_yield / 100.0)
 
 # ─── Aplicação dos filtros ────────────────────────────────────────────────────
 mask = pd.Series(True, index=df.index)
@@ -218,10 +406,55 @@ if "liq2m" in df.columns:
     liq_valid = df["liq2m"].notna() & (df["liq2m"] >= liq2m_min)
     mask = mask & liq_valid
 
+# Dívida/Patrimônio e Liquidez Corrente — filtros opcionais: linhas sem o dado
+# passam (benefício da dúvida), só filtram quando o valor está disponível.
+if "divbpatr" in df.columns:
+    dp_valid = df["divbpatr"].isna() | (df["divbpatr"] <= divbpatr_max)
+    mask = mask & dp_valid
+
+if "liqc" in df.columns:
+    liqc_valid = df["liqc"].isna() | (df["liqc"] >= liqc_min)
+    mask = mask & liqc_valid
+
+# Crescimento de receita 5a — faixa
+if "c5y_pct" in df.columns:
+    c5y_valid = df["c5y_pct"].isna() | (
+        (df["c5y_pct"] >= c5y_range[0]) & (df["c5y_pct"] <= c5y_range[1])
+    )
+    mask = mask & c5y_valid
+
+# Graham Number (P/L × P/VP ≤ 22,5)
+if graham_on:
+    gn_valid = df["graham_number"].isna() | (df["graham_number"] <= 22.5)
+    mask = mask & gn_valid
+
+# PEG (Lynch)
+if peg_on:
+    peg_valid = df["peg"].isna() | (df["peg"] <= peg_max)
+    mask = mask & peg_valid
+
+# Magic Formula — exclui financeiras/utilities (contabilidade não comparável)
+if ordenar_por == "Magic Formula (Greenblatt)" and magic_exclude_fin and "setor" in df.columns:
+    EXCLUDED_SECTORS_MAGIC = {
+        "Intermediários Financeiros",
+        "Previdência e Seguros",
+        "Serviços Financeiros Diversos",
+        "Energia Elétrica",
+        "Água e Saneamento",
+        "Gás",
+    }
+    mask = mask & (~df["setor"].isin(EXCLUDED_SECTORS_MAGIC))
+
 df_filtrado = df[mask].copy()
 
 if ordenar_por == "Score" and "score" in df_filtrado.columns:
     df_filtrado = df_filtrado.sort_values("score", ascending=False)
+elif ordenar_por == "Div. Yield" and "dy" in df_filtrado.columns:
+    df_filtrado = df_filtrado.sort_values("dy", ascending=False)
+elif (
+    ordenar_por == "Magic Formula (Greenblatt)" and "magic_score" in df_filtrado.columns
+):
+    df_filtrado = df_filtrado.sort_values("magic_score", ascending=False)
 elif "liq2m" in df_filtrado.columns:
     df_filtrado = df_filtrado.sort_values("liq2m", ascending=False)
 
@@ -282,7 +515,11 @@ if df_filtrado.empty:
     )
 else:
     n_exib = min(len(df_filtrado), 200)
-    sort_label = "score composto" if ordenar_por == "Score" else "liquidez (2 meses)"
+    sort_label = {
+        "Score": "score composto",
+        "Div. Yield": "dividend yield",
+        "Magic Formula (Greenblatt)": "Magic Formula (ROIC + Earnings Yield)",
+    }.get(ordenar_por, "liquidez (2 meses)")
     st.caption(
         f"Exibindo **{n_exib}** ação(ões) ordenadas por {sort_label}. "
         f"Clique no cabeçalho da coluna para reordenar."
@@ -306,6 +543,11 @@ else:
         "divbpatr": "Dív./Patrim.",
         "c5y": "Cresc. Rec. 5a (%)",
         "patrliq": "Patrim. Líq. (R$)",
+        "graham_number": "Graham Nº",
+        "peg": "PEG",
+        "magic_score": "Magic Score",
+        "bazin_teto": "Preço-teto Bazin (R$)",
+        "setor": "Setor",
     }
 
     cols_existentes = [c for c in col_map if c in df_filtrado.columns]
@@ -324,36 +566,52 @@ else:
         if col in df_exib.columns:
             df_exib[col] = df_exib[col] * 100
 
-    # Formatação de exibição
-    fmt = {}
-    for col in df_exib.columns:
-        if col == "Score":
-            fmt[col] = "{:.0f}"
-        elif col in pct_cols_dec:
-            fmt[col] = "{:.2f}%"
-        elif col in (
-            "P/L",
-            "P/VP",
-            "EV/EBITDA",
-            "EV/EBIT",
-            "Liq. Corrente",
-            "Dív./Patrim.",
-        ):
-            fmt[col] = "{:.2f}"
-        elif col == "Cotação (R$)":
-            fmt[col] = "R$ {:.2f}"
-        elif col in ("Liq. 2m (R$)", "Patrim. Líq. (R$)"):
-            fmt[col] = "{:,.0f}"
+    # CSV mantém os valores numéricos crus (útil para análise externa) — a
+    # formatação em texto abaixo é só para a tabela em tela.
+    csv_bytes = df_exib.to_csv(index=True).encode("utf-8")
 
-    styled = df_exib.style.format(fmt, na_rep="—")
+    # Formatação de exibição. Score e Magic Score ficam numéricos (para o
+    # gradiente de cor); as demais colunas viram texto já formatado — o
+    # st.dataframe() não aplica o na_rep do Styler em células nulas (mostra o
+    # literal "None"), então tratamos o "—" na própria célula em vez de confiar
+    # no Styler para isso.
+    _fmt_specs = {
+        "P/L": "{:.2f}",
+        "P/VP": "{:.2f}",
+        "EV/EBITDA": "{:.2f}",
+        "EV/EBIT": "{:.2f}",
+        "Liq. Corrente": "{:.2f}",
+        "Dív./Patrim.": "{:.2f}",
+        "Graham Nº": "{:.2f}",
+        "PEG": "{:.2f}",
+        "Cotação (R$)": "R$ {:.2f}",
+        "Preço-teto Bazin (R$)": "R$ {:.2f}",
+        "Liq. 2m (R$)": "{:,.0f}",
+        "Patrim. Líq. (R$)": "{:,.0f}",
+    }
+    for col in pct_cols_dec:
+        _fmt_specs[col] = "{:.2f}%"
+
+    for col, spec in _fmt_specs.items():
+        if col in df_exib.columns:
+            df_exib[col] = df_exib[col].apply(
+                lambda v, s=spec: "—" if pd.isna(v) else s.format(v)
+            )
+    if "Setor" in df_exib.columns:
+        df_exib["Setor"] = df_exib["Setor"].fillna("—")
+
+    styled = df_exib.style
     if "Score" in df_exib.columns:
         styled = styled.background_gradient(
             subset=["Score"], cmap="RdYlGn", vmin=0, vmax=100
-        )
+        ).format({"Score": "{:.0f}"}, subset=["Score"], na_rep="—")
+    if "Magic Score" in df_exib.columns:
+        styled = styled.background_gradient(
+            subset=["Magic Score"], cmap="RdYlGn", vmin=0, vmax=100
+        ).format({"Magic Score": "{:.0f}"}, subset=["Magic Score"], na_rep="—")
     st.dataframe(styled, use_container_width=True, height=500)
 
     # ─── Botão de download ────────────────────────────────────────────────────
-    csv_bytes = df_exib.to_csv(index=True).encode("utf-8")
     st.download_button(
         label="Exportar resultados como CSV",
         data=csv_bytes,
