@@ -14,18 +14,12 @@ from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
 from bcb import sgs
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css, loading_overlay
+from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
 from utils.market_data import get_sorted_tickers_by_liquidity
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
-def _svg(body, size=14):
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-        f'viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:5px">'
-        f"{body}</svg>"
-    )
-
+_svg = svg_icon
 
 ICO_OK = _svg(
     '<circle cx="12" cy="12" r="9" stroke="#00ff87" stroke-width="1.8"/>'
@@ -190,43 +184,7 @@ def get_benchmark_prices(start_date):
 # CSS customizado
 load_css()
 
-st.sidebar.markdown(
-    """
-<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
-  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>
-  <div style="display:flex;flex-direction:column;gap:0.35rem;">
-    <div style="display:flex;align-items:center;gap:0.6rem;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Análise Fundamentalista</span>
-    </div>
-    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
-    <div style="display:flex;align-items:center;gap:0.6rem;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#00d2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba(0,210,255,0.4);">
-        <span style="font-size:0.65rem;font-weight:800;color:#080c14;">2</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:700;color:#00d2ff;">Portfolio</span>
-    </div>
-    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
-    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.4;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">3</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Simulação</span>
-    </div>
-    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
-    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.25;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">4</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Notícias</span>
-    </div>
-  </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+render_flow_sidebar(active_step=2, pending_opacities=[0.4, 0.25])
 
 warnings.filterwarnings("ignore")
 
@@ -416,7 +374,6 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, returns, cleaned_weight
         title="Fronteira Eficiente de Markowitz · LAC · Carteira Tangente",
         xaxis_title="Volatilidade Anualizada (Desvio Padrão)",
         yaxis_title="Retorno Esperado Anualizado",
-        template="plotly_dark",
     )
     apply_plotly_theme(fig)
     fig.update_layout(height=550, margin=dict(b=140))
@@ -1438,7 +1395,6 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             fig_sml.update_layout(
                 xaxis_title="Beta (β) — Risco Sistemático vs IBOVESPA",
                 yaxis_title="Retorno Anualizado (%)",
-                template="plotly_dark",
                 showlegend=False,
                 annotations=[
                     dict(

@@ -5,7 +5,16 @@ tickers) and several pages need it independently — route them all through
 this single cache instead of each page maintaining its own copy.
 """
 
+import pandas as pd
 import streamlit as st
+
+
+def clean_numeric_column(col):
+    """Parse a Fundamentus numeric column (Brazilian `,` decimal, stray symbols) into floats."""
+    col = col.astype(str).str.strip()
+    col = col.str.replace(r"[^0-9,.\-]", "", regex=True)
+    col = col.str.replace(",", ".")
+    return pd.to_numeric(col, errors="coerce")
 
 
 @st.cache_data(ttl=3600, show_spinner=False)

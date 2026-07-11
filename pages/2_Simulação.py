@@ -6,59 +6,17 @@ import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css
+from utils.ui import load_css, render_flow_sidebar, svg_icon
 
 
 # CSS customizado
 load_css()
 
-st.sidebar.markdown(
-    """
-<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
-  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>
-  <div style="display:flex;flex-direction:column;gap:0.35rem;">
-    <div style="display:flex;align-items:center;gap:0.6rem;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Análise Fundamentalista</span>
-    </div>
-    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
-    <div style="display:flex;align-items:center;gap:0.6rem;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:0.7rem;color:#00ff87;">✓</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:600;color:#475569;">Portfolio</span>
-    </div>
-    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
-    <div style="display:flex;align-items:center;gap:0.6rem;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#ffd600;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba(255,214,0,0.4);">
-        <span style="font-size:0.65rem;font-weight:800;color:#080c14;">3</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:700;color:#ffd600;">Simulação</span>
-    </div>
-    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
-    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.35;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">4</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Notícias</span>
-    </div>
-  </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+render_flow_sidebar(active_step=3, pending_opacities=[0.35])
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
-def _svg(body, size=14):
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-        f'viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:5px">'
-        f"{body}</svg>"
-    )
-
+_svg = svg_icon
 
 ICO_CHART = _svg(
     '<rect x="3" y="12" width="3" height="9" rx="1" fill="#00ff87"/>'
