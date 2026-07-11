@@ -1925,30 +1925,24 @@ if ready_to_analyze:
             if usar_percentis:
                 # Usa percentis do setor já calculados
                 ticker_rank = rank_df[rank_df["Ação"] == t]
-                fonte_label = "vs. peers do setor"
+                fonte_label = "vs. peers"
                 for _, rr in ticker_rank.iterrows():
                     mult = rr["Múltiplo"]
                     pct = rr["Percentil"]
                     val = rr["Valor"]
                     med = rr["Mediana Setor"]
-                    vs = f"mediana do setor: {med:.2f}"
+                    tip = f'title="mediana do setor: {med:.2f}"'
                     if pct >= 70:
-                        pontos_pos.append(
-                            f"{mult} no percentil <b>{pct:.0f}°</b> do setor — {val:.2f} ({vs})"
-                        )
+                        pontos_pos.append((f"{mult} {val:.2f} · p{pct:.0f}", tip))
                     elif pct < 30:
-                        pontos_neg.append(
-                            f"{mult} no percentil <b>{pct:.0f}°</b> do setor — {val:.2f} ({vs})"
-                        )
+                        pontos_neg.append((f"{mult} {val:.2f} · p{pct:.0f}", tip))
                 # Alertas extras de P/L absoluto
                 pl = float(r.get("P/L", 0) or 0)
                 if pl < 0:
-                    alertas.append(
-                        f"P/L negativo ({pl:.1f}x) — empresa registrou prejuízo"
-                    )
+                    alertas.append((f"P/L {pl:.1f}x — prejuízo", ""))
             else:
                 # Fallback: thresholds absolutos com contexto
-                fonte_label = "thresholds de mercado"
+                fonte_label = "thresholds"
                 roe = float(r.get("ROE", 0) or 0)
                 roic = float(r.get("ROIC", 0) or 0)
                 pl = float(r.get("P/L", 0) or 0)
@@ -1957,38 +1951,36 @@ if ready_to_analyze:
                 cr = float(r.get("Crescimento Receita 5 anos", 0) or 0)
 
                 if roe > 15:
-                    pontos_pos.append(
-                        f"ROE forte ({roe:.1f}% — acima dos 15% de referência)"
-                    )
+                    pontos_pos.append((f"ROE {roe:.1f}%", 'title="acima dos 15% de referência"'))
                 elif roe < 5:
-                    pontos_neg.append(f"ROE fraco ({roe:.1f}% — abaixo dos 5% mínimos)")
+                    pontos_neg.append((f"ROE {roe:.1f}%", 'title="abaixo dos 5% mínimos"'))
 
                 if roic > 12:
-                    pontos_pos.append(f"ROIC sólido ({roic:.1f}% — acima dos 12%)")
+                    pontos_pos.append((f"ROIC {roic:.1f}%", 'title="acima dos 12% de referência"'))
                 elif roic < 5:
-                    pontos_neg.append(f"ROIC baixo ({roic:.1f}%)")
+                    pontos_neg.append((f"ROIC {roic:.1f}%", ""))
 
                 if 0 < pl < 15:
-                    pontos_pos.append(f"P/L atrativo ({pl:.1f}x — abaixo de 15x)")
+                    pontos_pos.append((f"P/L {pl:.1f}x", 'title="abaixo de 15x"'))
                 elif pl > 30:
-                    pontos_neg.append(f"P/L elevado ({pl:.1f}x — acima de 30x)")
+                    pontos_neg.append((f"P/L {pl:.1f}x", 'title="acima de 30x"'))
                 elif pl < 0:
-                    alertas.append(f"P/L negativo ({pl:.1f}x) — empresa com prejuízo")
+                    alertas.append((f"P/L {pl:.1f}x — prejuízo", ""))
 
                 if dy > 5:
-                    pontos_pos.append(f"Dividend Yield elevado ({dy:.1f}%)")
+                    pontos_pos.append((f"DY {dy:.1f}%", ""))
 
                 if cr > 10:
-                    pontos_pos.append(f"Crescimento de receita forte ({cr:.1f}% a.a.)")
+                    pontos_pos.append((f"Cresc.Rec {cr:.1f}%", ""))
                 elif cr < 0:
-                    pontos_neg.append(f"Receita em queda ({cr:.1f}% a.a.)")
+                    pontos_neg.append((f"Cresc.Rec {cr:.1f}%", ""))
 
                 if ml > 15:
-                    pontos_pos.append(f"Margem líquida saudável ({ml:.1f}%)")
+                    pontos_pos.append((f"Mrg.Líq {ml:.1f}%", ""))
                 elif 0 <= ml < 5:
-                    alertas.append(f"Margem líquida comprimida ({ml:.1f}%)")
+                    alertas.append((f"Mrg.Líq {ml:.1f}%", 'title="margem comprimida"'))
                 elif ml < 0:
-                    pontos_neg.append(f"Margem negativa ({ml:.1f}%)")
+                    pontos_neg.append((f"Mrg.Líq {ml:.1f}%", ""))
 
             n_pos = len(pontos_pos)
             n_neg = len(pontos_neg)
@@ -1999,45 +1991,32 @@ if ready_to_analyze:
             else:
                 veredicto = ("NEUTRO", "#ffd600")
 
-            pos_html = "".join(
-                [
-                    f'<li style="color:#00ff87;margin-bottom:4px;line-height:1.5;">{p}</li>'
-                    for p in pontos_pos
-                ]
-            )
-            neg_html = "".join(
-                [
-                    f'<li style="color:#ff3d5a;margin-bottom:4px;line-height:1.5;">{p}</li>'
-                    for p in pontos_neg
-                ]
-            )
-            ale_html = "".join(
-                [
-                    f'<li style="color:#ffd600;margin-bottom:4px;line-height:1.5;">{p}</li>'
-                    for p in alertas
-                ]
-            )
-            sem_dados = (
-                '<li style="color:#64748b;">Dados de peers insuficientes para análise completa.</li>'
-                if not pontos_pos and not pontos_neg and not alertas
-                else ""
-            )
+            def _chip(item, color):
+                text, tip = item
+                return (
+                    f'<span {tip} style="display:inline-block;background:{color}14;'
+                    f'border:1px solid {color}40;color:{color};border-radius:999px;'
+                    f'padding:1px 8px;font-size:0.7rem;font-weight:600;margin:0 4px 4px 0;'
+                    f'white-space:nowrap;">{text}</span>'
+                )
+
+            chips_html = "".join(_chip(p, "#00ff87") for p in pontos_pos)
+            chips_html += "".join(_chip(p, "#ff3d5a") for p in pontos_neg)
+            chips_html += "".join(_chip(p, "#ffd600") for p in alertas)
+            if not chips_html:
+                chips_html = '<span style="color:#64748b;font-size:0.72rem;">Dados de peers insuficientes.</span>'
 
             sintese_items.append(f"""
-<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:14px;padding:1.2rem 1.4rem;margin-bottom:1rem;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;flex-wrap:wrap;gap:0.5rem;">
+<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:10px;padding:0.55rem 0.85rem;margin-bottom:0.4rem;">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.3rem;">
     <div>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:1.05rem;">{t}</span>
-      <span style="font-size:0.78rem;color:#64748b;margin-left:0.5rem;">{nome}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:0.88rem;">{t}</span>
+      <span style="font-size:0.7rem;color:#64748b;margin-left:0.4rem;">{nome}</span>
+      <span style="font-size:0.62rem;color:#475569;font-style:italic;margin-left:0.4rem;">{fonte_label}</span>
     </div>
-    <div style="display:flex;align-items:center;gap:0.5rem;">
-      <span style="font-size:0.65rem;color:#475569;font-style:italic;">{fonte_label}</span>
-      <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto[1]}40;border-radius:6px;padding:0.2rem 0.75rem;font-size:0.72rem;font-weight:800;color:{veredicto[1]};letter-spacing:0.08em;">{veredicto[0]}</span>
-    </div>
+    <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto[1]}40;border-radius:6px;padding:0.1rem 0.6rem;font-size:0.66rem;font-weight:800;color:{veredicto[1]};letter-spacing:0.06em;">{veredicto[0]}</span>
   </div>
-  <ul style="margin:0;padding-left:1.2rem;font-size:0.82rem;list-style:disc;">
-    {pos_html}{neg_html}{ale_html}{sem_dados}
-  </ul>
+  <div>{chips_html}</div>
 </div>
 """)
 
