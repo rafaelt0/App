@@ -10,8 +10,12 @@ import time
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css, loading_overlay
-from utils.market_data import get_full_market_data, get_sorted_tickers_by_liquidity
+from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
+from utils.market_data import (
+    clean_numeric_column,
+    get_full_market_data,
+    get_sorted_tickers_by_liquidity,
+)
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -31,13 +35,6 @@ plt.rcParams["font.family"] = "sans-serif"
 
 
 # Customização do Plotly para o tema Obsidian Neo-Financial
-def clean_numeric_column(col):
-    col = col.astype(str).str.strip()
-    col = col.str.replace(r"[^0-9,.\-]", "", regex=True)
-    col = col.str.replace(",", ".")
-    return pd.to_numeric(col, errors="coerce")
-
-
 def get_ev_ebitda_context(setor: str):
     """Returns (alt_metric, reason) when EV/EBITDA doesn't apply, or None if it applies normally."""
     s = setor.lower() if setor else ""
@@ -811,13 +808,7 @@ st.logo("logo.svg", icon_image="favicon.svg")
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
-def _svg(body, size=14):
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-        f'viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:5px">'
-        f"{body}</svg>"
-    )
-
+_svg = svg_icon
 
 ICO_COMPASS = _svg(
     '<circle cx="12" cy="12" r="10" stroke="#00ff87" stroke-width="1.8"/>'
@@ -917,43 +908,7 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
-st.sidebar.markdown(
-    """
-<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">
-  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>
-  <div style="display:flex;flex-direction:column;gap:0.35rem;">
-    <div style="display:flex;align-items:center;gap:0.6rem;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba(0,255,135,0.4);">
-        <span style="font-size:0.65rem;font-weight:800;color:#080c14;">1</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:700;color:#00ff87;">Análise Fundamentalista</span>
-    </div>
-    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
-    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.45;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">2</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Portfolio</span>
-    </div>
-    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
-    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.35;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">3</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Simulação</span>
-    </div>
-    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>
-    <div style="display:flex;align-items:center;gap:0.6rem;opacity:0.25;">
-      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">4</span>
-      </div>
-      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">Notícias</span>
-    </div>
-  </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+render_flow_sidebar(active_step=1, pending_opacities=[0.45, 0.35, 0.25])
 
 # CSS customizado
 load_css()
@@ -1403,14 +1358,6 @@ if ready_to_analyze:
         # Remove duplicate indices if any
         df_ind = df_ind[~df_ind.index.duplicated(keep="last")]
 
-        def _get_setor(ticker):
-            if "Setor" not in df.columns or ticker not in df.index:
-                return ""
-            val = df.loc[ticker, "Setor"]
-            if isinstance(val, pd.Series):
-                val = val.iloc[-1]
-            return str(val) if not pd.isna(val) else ""
-
         # Exibição dos cards
         if len(tickers) > 1:
             tabs_tickers = st.tabs(tickers)
@@ -1419,13 +1366,13 @@ if ready_to_analyze:
                     _render_star_button(ticker)
                     if ticker in df_ind.index:
                         render_ticker_cards(
-                            df_ind.loc[ticker], setor=_get_setor(ticker)
+                            df_ind.loc[ticker], setor=_get_setor(df, ticker)
                         )
         else:
             ticker = tickers[0]
             _render_star_button(ticker)
             if ticker in df_ind.index:
-                render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(ticker))
+                render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(df, ticker))
 
         # ── Histórico Fundamentalista ─────────────────────────────────────────
         st.markdown("---")
@@ -1636,13 +1583,7 @@ if ready_to_analyze:
 
                 # Converte tudo para numérico
                 for col in cols_available:
-                    peers_df[col] = pd.to_numeric(
-                        peers_df[col]
-                        .astype(str)
-                        .str.replace(",", ".")
-                        .str.replace(r"[^\d.\-]", "", regex=True),
-                        errors="coerce",
-                    )
+                    peers_df[col] = clean_numeric_column(peers_df[col])
 
                 # Limpa outliers e valores não aplicáveis (por célula, sem remover a linha inteira)
                 # Fundamentus usa 0 para indicar "não aplicável" em muitos múltiplos

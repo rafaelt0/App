@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore")
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.ui import load_css, loading_overlay
-from utils.market_data import get_full_market_data
+from utils.market_data import clean_numeric_column, get_full_market_data
 
 load_css()
 
@@ -257,13 +257,7 @@ def get_sector_multiples():
         df2 = pd.DataFrame(index=raw.index)
         for src, dst in cols.items():
             if src in raw.columns:
-                df2[dst] = pd.to_numeric(
-                    raw[src]
-                    .astype(str)
-                    .str.replace(",", ".")
-                    .str.replace(r"[^\d.\-]", "", regex=True),
-                    errors="coerce",
-                )
+                df2[dst] = clean_numeric_column(raw[src])
         return df2
     except Exception:
         return pd.DataFrame()
@@ -282,7 +276,6 @@ def calc_cv(noplat_next, g_pct, roic_cv_pct, wacc_dec):
 def calc_dcf(noplat0, g1_pct, g2_pct, gt_pct, wacc_dec, roic_cv_pct, roic_proj_pct=None):
     g1, g2, gt = g1_pct / 100, g2_pct / 100, gt_pct / 100
     rows, pv_exp = [], 0.0
-    roic_cv = roic_cv_pct / 100
     # ROIC do período explícito (anos 1-10) pode diferir do ROIC na perpetuidade —
     # usar roic_cv para os dois conflita o reinvestimento atual com a premissa terminal.
     roic_proj = (roic_proj_pct if roic_proj_pct is not None else roic_cv_pct) / 100
