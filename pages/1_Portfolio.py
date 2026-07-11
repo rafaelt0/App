@@ -886,22 +886,6 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 unsafe_allow_html=True,
             )
 
-        # Heatmap de Correlação Interativo (Plotly)
-        section_header(ICO_HEATMAP, "Heatmap de Correlação entre Ativos", "h3")
-        corr_df = returns.corr()
-        fig_corr = px.imshow(
-            corr_df,
-            x=corr_df.index.str.replace(".SA", "", regex=False),
-            y=corr_df.columns.str.replace(".SA", "", regex=False),
-            color_continuous_scale="RdBu",
-            zmin=-1,
-            zmax=1,
-            title="Correlação de Retornos Históricos",
-            text_auto=".2f",
-        )
-        apply_plotly_theme(fig_corr)
-        st.plotly_chart(fig_corr, use_container_width=True)
-
         # Cálculo do portfólio com os pesos escolhidos
         portfolio_returns = returns.dot(pesos_manuais_arr)
 
@@ -1887,43 +1871,6 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         )
         apply_plotly_theme(fig_3)
         st.plotly_chart(fig_3, use_container_width=True)
-
-        st.markdown(
-            """
-<div style="background:linear-gradient(90deg,rgba(0,210,255,0.12) 0%,transparent 100%);height:2px;border-radius:2px;margin:2rem 0 1.5rem 0;"></div>
-""",
-            unsafe_allow_html=True,
-        )
-        section_header(ICO_RISK, "Análise de Contribuição de Risco", "h3")
-
-        cov_matrix_rc = returns.cov()
-        port_vol = np.sqrt(
-            np.dot(pesos_manuais_arr.T, np.dot(cov_matrix_rc, pesos_manuais_arr))
-        )
-        marginal_contrib = np.dot(cov_matrix_rc, pesos_manuais_arr) / port_vol
-        risk_contribution = (
-            pesos_manuais_arr * marginal_contrib
-        )  # risco absoluto de cada ativo
-        risk_contribution_pct = risk_contribution / risk_contribution.sum() * 100
-
-        risk_df = pd.DataFrame(
-            {
-                "Ativo": peso_manual_df.index,
-                "Peso (%)": (pesos_manuais_arr * 100).round(2),
-                "RC (%)": risk_contribution_pct.round(2),
-            }
-        )
-
-        fig_rc = px.bar(
-            risk_df,
-            x="Ativo",
-            y="RC (%)",
-            color="RC (%)",
-            color_continuous_scale="Viridis",
-            title="Contribuição de Risco por Ativo (%)",
-        )
-        apply_plotly_theme(fig_rc)
-        st.plotly_chart(fig_rc, use_container_width=True)
 
         # Salva variáveis para uso na aba Simulação e Relatório
         if "Manual" in modo:
