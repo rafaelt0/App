@@ -529,8 +529,11 @@ if "Manual" in modo:
         st.success(f"Soma dos pesos: {total_pesos:.2f}% ✓")
     st.markdown("---")
 
-# Pré-carrega cotações (resultado cacheado após primeira execução)
-with loading_overlay("Baixando cotações históricas...", tickers=tickers):
+# Pré-carrega cotações (resultado cacheado após primeira execução).
+# Usa um spinner discreto (não a animação cheia) para não disparar a
+# animação de carregamento só por selecionar um ativo — essa fica
+# reservada para o clique em "Carregar Portfolio".
+with st.spinner("Baixando cotações históricas..."):
     try:
         data_yf = get_portfolio_prices(tickers_yf, data_inicio)
     except Exception as _price_err:
