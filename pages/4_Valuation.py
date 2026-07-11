@@ -81,8 +81,10 @@ def get_selic():
     try:
         from bcb import sgs
 
+        # Série 432 (BCB) = Meta Selic definida pelo Copom, já em % a.a. — não é taxa
+        # diária, então não deve ser reanualizada com (1+r)^252.
         taxa = sgs.get(432, start=dt.date.today() - dt.timedelta(days=30))
-        return round((1 + taxa.iloc[-1, 0] / 100) ** 252 - 1, 4)
+        return round(taxa.iloc[-1, 0] / 100, 4)
     except Exception:
         return 0.105
 
