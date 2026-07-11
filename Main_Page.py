@@ -11,6 +11,7 @@ import time
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.ui import loading_overlay
+from utils.market_data import get_full_market_data, get_sorted_tickers_by_liquidity
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -118,21 +119,6 @@ def get_yfinance_data(tickers_yf, start, interval):
                 time.sleep(1)
                 continue
             raise
-
-
-@st.cache_data(ttl=86400)
-def get_sorted_tickers_by_liquidity(tickers_list):
-    try:
-        import fundamentus.resultado as fzr
-
-        df = fzr.get_resultado_raw()
-        df = df.sort_values(by="Liq.2meses", ascending=False)
-        sorted_all = df.index.tolist()
-        sorted_filtered = [t for t in sorted_all if t in tickers_list]
-        remaining = [t for t in tickers_list if t not in sorted_filtered]
-        return sorted_filtered + remaining
-    except Exception:
-        return tickers_list
 
 
 @st.cache_data(ttl=14400, show_spinner=False)
@@ -302,10 +288,8 @@ def get_sector_peers(_setores):
     na chave de cache; os dados retornados cobrem toda a B3 para permitir filtragem posterior
     por setor individual sem chamadas extras à API.
     """
-    import fundamentus.resultado as fzr
-
     try:
-        raw = fzr.get_resultado_raw()
+        raw = get_full_market_data()
         df2 = pd.DataFrame(index=raw.index)
         for src, dest in _FUNDAMENTUS_RENAME.items():
             if src in raw.columns:

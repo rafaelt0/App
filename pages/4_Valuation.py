@@ -12,6 +12,7 @@ warnings.filterwarnings("ignore")
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.ui import loading_overlay
+from utils.market_data import get_full_market_data
 
 try:
     with open("style.css") as f:
@@ -243,6 +244,33 @@ def get_koller_data(ticker_b3: str):
         }
     except Exception as e:
         return {"_error": str(e)}
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_sector_multiples():
+    try:
+        raw = get_full_market_data()
+        cols = {
+            "P/L": "PL",
+            "P/VP": "PVP",
+            "EV/EBITDA": "EV_EBITDA",
+            "ROE": "ROE",
+            "ROIC": "ROIC",
+            "Div.Yield": "DY",
+        }
+        df2 = pd.DataFrame(index=raw.index)
+        for src, dst in cols.items():
+            if src in raw.columns:
+                df2[dst] = pd.to_numeric(
+                    raw[src]
+                    .astype(str)
+                    .str.replace(",", ".")
+                    .str.replace(r"[^\d.\-]", "", regex=True),
+                    errors="coerce",
+                )
+        return df2
+    except Exception:
+        return pd.DataFrame()
 
 
 # ─── DCF Engine (Koller) ───────────────────────────────────────────────────────
@@ -1384,34 +1412,6 @@ with tabs[7]:
         "Contexto para calibrar se o valuation DCF é razoável."
     )
 
-    @st.cache_data(ttl=3600, show_spinner=False)
-    def _get_peers_multiples():
-        try:
-            import fundamentus.resultado as fzr
-
-            raw = fzr.get_resultado_raw()
-            cols = {
-                "P/L": "PL",
-                "P/VP": "PVP",
-                "EV/EBITDA": "EV_EBITDA",
-                "ROE": "ROE",
-                "ROIC": "ROIC",
-                "Div.Yield": "DY",
-            }
-            df2 = pd.DataFrame(index=raw.index)
-            for src, dst in cols.items():
-                if src in raw.columns:
-                    df2[dst] = pd.to_numeric(
-                        raw[src]
-                        .astype(str)
-                        .str.replace(",", ".")
-                        .str.replace(r"[^\d.\-]", "", regex=True),
-                        errors="coerce",
-                    )
-            return df2
-        except Exception:
-            return pd.DataFrame()
-
     _csv_path = os.path.join(os.path.dirname(__file__), "..", "acoes-listadas-b3.csv")
     _b3_data = pd.read_csv(_csv_path) if os.path.exists(_csv_path) else pd.DataFrame()
     _setor_ticker = (
@@ -1427,7 +1427,7 @@ with tabs[7]:
         )
 
         with loading_overlay("Carregando múltiplos do setor..."):
-            _peers_df = _get_peers_multiples()
+            _peers_df = get_sector_multiples()
 
         if not _peers_df.empty:
             _peers_in = [p for p in _peers_tickers if p in _peers_df.index]
