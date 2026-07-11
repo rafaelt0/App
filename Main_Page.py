@@ -1176,7 +1176,7 @@ if not tickers:
                 tkr,
                 key=f"qs_{tkr}",
                 use_container_width=True,
-                help=f"Analisar {tkr} — {setor}",
+                help=f"Selecionar {tkr} — {setor}",
             ):
                 st.session_state["_pending_tickers"] = [tkr]
                 st.rerun()
@@ -1235,17 +1235,36 @@ if tickers:
         unsafe_allow_html=True,
     )
 
-# Só executa análise se houver pelo menos uma ação selecionada
-if tickers:
+    if st.button(
+        "🔍 Analisar",
+        type="primary",
+        use_container_width=True,
+        key="btn_analisar",
+    ):
+        st.session_state["analyzed_tickers"] = list(tickers)
+
+# Só executa análise depois que o usuário clica em "Analisar" para a seleção atual
+analyzed_tickers = st.session_state.get("analyzed_tickers", [])
+ready_to_analyze = bool(tickers) and analyzed_tickers == tickers
+
+if tickers and not ready_to_analyze:
+    st.info("Clique em **🔍 Analisar** para buscar os indicadores das ações selecionadas.")
+
+if ready_to_analyze:
     try:
         # 1. Exibir tela de carregamento glassmorphic
         loading_placeholder = st.empty()
         with loading_placeholder.container():
+            _loading_chips = "".join(
+                f'<span class="loading-ticker-chip">{t}</span>' for t in tickers
+            )
             st.markdown(
-                """
+                f"""
             <div class="loading-container">
                 <div class="loading-spinner"></div>
                 <div class="loading-text">Buscando indicadores fundamentalistas na B3...</div>
+                <div class="loading-tickers">{_loading_chips}</div>
+                <div class="loading-bar-track"><div class="loading-bar-fill"></div></div>
             </div>
             """,
                 unsafe_allow_html=True,

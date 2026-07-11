@@ -523,6 +523,64 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
   50% { opacity: 1; text-shadow: 0 0 10px rgba(0, 210, 255, 0.4); }
 }
 
+.loading-tickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1.1rem;
+  max-width: 420px;
+}
+
+.loading-ticker-chip {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: rgba(0, 255, 135, 0.06);
+  border: 1px solid rgba(0, 255, 135, 0.18);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  animation: chip-glow 1.6s ease-in-out infinite;
+}
+.loading-ticker-chip:nth-child(2n) { animation-delay: 0.2s; }
+.loading-ticker-chip:nth-child(3n) { animation-delay: 0.4s; }
+.loading-ticker-chip:nth-child(4n) { animation-delay: 0.6s; }
+.loading-ticker-chip:nth-child(5n) { animation-delay: 0.8s; }
+
+@keyframes chip-glow {
+  0%, 100% { opacity: 0.55; border-color: rgba(0, 255, 135, 0.18); color: var(--text-muted); }
+  50% { opacity: 1; border-color: rgba(0, 255, 135, 0.5); color: var(--primary-color); }
+}
+
+.loading-bar-track {
+  position: relative;
+  width: 220px;
+  height: 4px;
+  margin-top: 1.4rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.15);
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 35%;
+  border-radius: 999px;
+  background: var(--brand-gradient);
+  box-shadow: 0 0 8px rgba(0, 255, 135, 0.4);
+  animation: bar-sweep 1.3s ease-in-out infinite;
+}
+
+@keyframes bar-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(385%); }
+}
+
 /* ─── Responsive Card Grid (CSS flex — replaces st.columns for cards) ───────*/
 .mcard-grid {
   display: flex;
