@@ -164,7 +164,10 @@ def get_koller_data(ticker_b3: str):
             da_v = da if da is not None else 0.0
             cap_v = abs(capex) if capex is not None else 0.0
             dwc_v = dwc if dwc is not None else 0.0
-            fcf = noplat + da_v - cap_v - dwc_v
+            # "Change In Working Capital" do yfinance já vem no sinal do efeito de caixa
+            # (DFC indireto): negativo quando o WC aumenta e consome caixa. Deve ser somado,
+            # não subtraído — subtrair inverteria o impacto do capital de giro no FCF.
+            fcf = noplat + da_v - cap_v + dwc_v
             cash_op = (rev * CAIXA_OP_PCT) if rev else 0.0
             # Current Liabilities do yfinance já inclui a dívida de curto prazo (Current Debt);
             # subtrair dbt_s de novo contaria a dívida duas vezes no WCO.
@@ -516,7 +519,7 @@ with tabs[1]:
                     "NOPLAT": _fmt(y["noplat"]),
                     "D&A": _fmt(y["da"]),
                     "CapEx": _fmt(-y["capex"]),
-                    "ΔWC": _fmt(-y["delta_wc"]),
+                    "ΔWC": _fmt(y["delta_wc"]),
                     "FCF": _fmt(y["fcf"]),
                     "IC": _fmt(y["ic"]),
                     "ROIC (%)": _pct(y.get("roic")),
