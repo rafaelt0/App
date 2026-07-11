@@ -11,14 +11,10 @@ warnings.filterwarnings("ignore")
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
-from utils.ui import loading_overlay
+from utils.ui import load_css, loading_overlay
 from utils.market_data import get_full_market_data
 
-try:
-    with open("style.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-except FileNotFoundError:
-    pass
+load_css()
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 ERP_BR = 8.0  # ERP_EUA ~5% + CRP_Brasil ~3%

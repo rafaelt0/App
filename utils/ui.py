@@ -5,6 +5,19 @@ from contextlib import contextmanager
 import streamlit as st
 
 
+def load_css(path: str = "style.css") -> None:
+    """Load a CSS file and inject it into the page via `st.markdown`.
+
+    Silently no-ops if the file is missing, so callers don't need their
+    own try/except boilerplate.
+    """
+    try:
+        with open(path) as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        pass
+
+
 @contextmanager
 def loading_overlay(text: str, tickers=None):
     """Glassmorphic loading animation — drop-in replacement for `st.spinner`.

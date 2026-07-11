@@ -6,11 +6,11 @@ import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.charts import apply_plotly_theme
+from utils.ui import load_css
 
 
 # CSS customizado
-with open("style.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+load_css()
 
 st.sidebar.markdown(
     """

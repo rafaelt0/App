@@ -10,11 +10,10 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 import email.utils
 from utils.charts import apply_plotly_theme
-from utils.ui import loading_overlay
+from utils.ui import load_css, loading_overlay
 
 # CSS customizado
-with open("style.css") as f:
-    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+load_css()
 
 st.sidebar.markdown("""
 <div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">

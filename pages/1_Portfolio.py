@@ -14,7 +14,7 @@ from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
 from bcb import sgs
 from utils.charts import apply_plotly_theme
-from utils.ui import loading_overlay
+from utils.ui import load_css, loading_overlay
 from utils.market_data import get_sorted_tickers_by_liquidity
 
 
@@ -188,11 +188,7 @@ def get_benchmark_prices(start_date):
 
 
 # CSS customizado
-try:
-    with open("style.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-except FileNotFoundError:
-    pass
+load_css()
 
 st.sidebar.markdown(
     """

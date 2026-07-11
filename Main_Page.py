@@ -10,7 +10,7 @@ import time
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
-from utils.ui import loading_overlay
+from utils.ui import load_css, loading_overlay
 from utils.market_data import get_full_market_data, get_sorted_tickers_by_liquidity
 
 import plotly.graph_objects as go
@@ -956,11 +956,7 @@ st.sidebar.markdown(
 )
 
 # CSS customizado
-try:
-    with open("style.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-except FileNotFoundError:
-    pass
+load_css()
 
 
 # ── Hero Header ─────────────────────────────────────────────────────────────
