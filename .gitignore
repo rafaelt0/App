@@ -14,6 +14,11 @@ env/
 
 # SQLite runtime database
 *.db
+*.sqlite
+*.sqlite3
+
+# Runtime logs
+*.log
 
 # OS
 .DS_Store
