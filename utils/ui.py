@@ -127,17 +127,19 @@ def loading_overlay(text: str, tickers=None):
         chips = "".join(f'<span class="loading-ticker-chip">{t}</span>' for t in tickers)
         chips_html = f'<div class="loading-tickers">{chips}</div>'
     with placeholder.container():
-        st.markdown(
-            f"""
-            <div class="loading-container">
-                <div class="loading-spinner"></div>
-                <div class="loading-text">{text}</div>
-                {chips_html}
-                <div class="loading-bar-track"><div class="loading-bar-fill"></div></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        # Built as a single unindented line — an indented multi-line f-string
+        # can leave a whitespace-only line where chips_html is empty, which
+        # breaks CommonMark's HTML-block detection and makes markdown render
+        # the remaining tags as literal text instead of passing them through.
+        html = (
+            '<div class="loading-container">'
+            '<div class="loading-spinner"></div>'
+            f'<div class="loading-text">{text}</div>'
+            f"{chips_html}"
+            '<div class="loading-bar-track"><div class="loading-bar-fill"></div></div>'
+            "</div>"
         )
+        st.markdown(html, unsafe_allow_html=True)
     try:
         yield
     finally:

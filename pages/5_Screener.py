@@ -3,13 +3,39 @@ import pandas as pd
 import datetime
 import os
 
-from utils.ui import load_css, loading_overlay
+from utils.ui import load_css, loading_overlay, svg_icon
 from utils.market_data import get_full_market_data
 
-st.set_page_config(page_title="Screener B3", page_icon="🔍", layout="wide")
+st.set_page_config(page_title="Screener B3", page_icon="favicon.svg", layout="wide")
 
 # ─── CSS opcional (dark theme via style.css do projeto) ───────────────────────
 load_css()
+
+# ─── SVG Icon Library (sidebar) ────────────────────────────────────────────────
+_svg = svg_icon
+ICO_FILTER = _svg(
+    '<path d="M3 4.5h18l-6.75 8v6.5l-4.5 2v-8.5z" stroke="#00d2ff" stroke-width="1.8" '
+    'stroke-linejoin="round" fill="none"/>',
+    13,
+)
+ICO_PIN = _svg(
+    '<path d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.5C5 14.9 12 21 12 21z" stroke="#64748b" '
+    'stroke-width="1.6" stroke-linejoin="round" fill="none"/>'
+    '<circle cx="12" cy="9.5" r="2.2" stroke="#64748b" stroke-width="1.6"/>',
+    12,
+)
+ICO_FORMULA = _svg(
+    '<path d="M6 4h11l-5 8 5 8H6" stroke="#a855f7" stroke-width="1.7" stroke-linejoin="round" '
+    'stroke-linecap="round" fill="none"/>',
+    13,
+)
+ICO_SORT = _svg(
+    '<path d="M7 4v16M7 4 3.5 7.5M7 4l3.5 3.5" stroke="#ffd600" stroke-width="1.7" '
+    'stroke-linecap="round" stroke-linejoin="round"/>'
+    '<path d="M17 20V4M17 20l-3.5-3.5M17 20l3.5-3.5" stroke="#ffd600" stroke-width="1.7" '
+    'stroke-linecap="round" stroke-linejoin="round"/>',
+    13,
+)
 
 # ─── Cabeçalho ────────────────────────────────────────────────────────────────
 st.title("🔍 Screener B3")
@@ -138,7 +164,10 @@ _mf_parts.append(df["earnings_yield"].rank(pct=True, na_option="keep") * 100)
 df["magic_score"] = pd.concat(_mf_parts, axis=1).mean(axis=1).round(1)
 
 # ─── Filtros na barra lateral ─────────────────────────────────────────────────
-st.sidebar.header("Filtros")
+st.sidebar.markdown(
+    f'<div class="sidebar-section-label">{ICO_FILTER} Filtros</div>',
+    unsafe_allow_html=True,
+)
 st.sidebar.caption(
     "Ajuste os parâmetros para encontrar ações que se encaixam no seu perfil, "
     "ou escolha um filtro pré-definido baseado em frameworks consagrados de stock picking."
@@ -207,19 +236,24 @@ def _apply_preset():
 
 
 st.sidebar.selectbox(
-    "📋 Filtro pré-definido",
+    "Filtro pré-definido",
     list(PRESETS.keys()),
     key="preset_select",
     on_change=_apply_preset,
     help="Aplica automaticamente os parâmetros do framework escolhido — "
     "você pode ajustar cada campo individualmente depois.",
 )
-st.sidebar.caption(f"📌 {PRESET_DESC.get(st.session_state['preset_select'], '')}")
+st.sidebar.caption(
+    f"{ICO_PIN} {PRESET_DESC.get(st.session_state['preset_select'], '')}",
+    unsafe_allow_html=True,
+)
 st.sidebar.markdown("---")
 
 
 def _range_input(label, key_min, key_max, bounds, step, help_text=""):
-    st.sidebar.markdown(f"**{label}**")
+    st.sidebar.markdown(
+        f'<div class="sidebar-filter-label">{label}</div>', unsafe_allow_html=True
+    )
     c1, c2 = st.sidebar.columns(2)
     with c1:
         vmin = st.number_input(
@@ -321,7 +355,10 @@ c5y_range = _range_input(
     "Lynch: 15–30% a.a. é a faixa saudável — acima de 30% raramente é sustentável.",
 )
 
-st.sidebar.markdown("**Filtros calculados (frameworks)**")
+st.sidebar.markdown(
+    f'<div class="sidebar-section-label">{ICO_FORMULA} Filtros calculados (frameworks)</div>',
+    unsafe_allow_html=True,
+)
 graham_on = st.sidebar.checkbox(
     "Graham Number: P/L × P/VP ≤ 22,5",
     key="graham_on",
@@ -345,7 +382,10 @@ bazin_yield = st.sidebar.number_input(
     help="Preço-teto Bazin = Dividendo/ação (12m) ÷ yield desejado. Padrão do método: 6%.",
 )
 
-st.sidebar.markdown("---")
+st.sidebar.markdown(
+    f'<div class="sidebar-section-label">{ICO_SORT} Ordenação</div>',
+    unsafe_allow_html=True,
+)
 ordenar_por = st.sidebar.radio(
     "Ordenar por",
     ["Score", "Liquidez 2m", "Div. Yield", "Magic Formula (Greenblatt)"],

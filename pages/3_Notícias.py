@@ -41,9 +41,11 @@ ICO_TARGET  = _svg('<circle cx="12" cy="12" r="9" stroke="#00d2ff" stroke-width=
 ICO_IDEA    = _svg('<circle cx="12" cy="10" r="6" stroke="#ffd600" stroke-width="1.8"/>'
                    '<path d="M9 16.5h6M10 19h4" stroke="#ffd600" stroke-width="1.8" stroke-linecap="round"/>'
                    '<line x1="12" y1="4" x2="12" y2="2" stroke="#ffd600" stroke-width="1.5" stroke-linecap="round"/>', 16)
-ICO_CPU     = _svg('<rect x="4" y="4" width="16" height="16" rx="2" stroke="#eab308" stroke-width="1.8"/>'
-                   '<path d="M9 9h6v6H9z" fill="#eab308" opacity="0.3"/>'
-                   '<path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3" stroke="#eab308" stroke-width="1.5"/>', 16)
+ICO_CPU     = _svg('<rect x="4" y="4" width="16" height="16" rx="2" stroke="#00ff87" stroke-width="1.8"/>'
+                   '<path d="M9 9h6v6H9z" fill="#00ff87" opacity="0.3"/>'
+                   '<path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3" stroke="#00ff87" stroke-width="1.5"/>', 14)
+ICO_LEXICON = _svg('<path d="M4 5.5A2 2 0 0 1 6 3.5h13V19H6a2 2 0 0 0-2 2z" stroke="#00d2ff" stroke-width="1.7" stroke-linejoin="round"/>'
+                   '<path d="M4 19.5A2 2 0 0 1 6 17.5h13" stroke="#00d2ff" stroke-width="1.7" stroke-linejoin="round"/>', 14)
 
 def section_header(icon_svg, text, tag="h3"):
     st.markdown(
@@ -547,9 +549,19 @@ pesos = {t.replace(".SA", ""): row.iloc[0] for t, row in peso_df.iterrows()}
 
 # Informar o estado do algoritmo NLP na barra lateral
 if finbert_nlp is not None:
-    st.sidebar.success("🤖 FinBERT-PT-BR Ativo")
+    st.sidebar.markdown(
+        f'<div style="margin:0.5rem 0;padding:0.6rem 0.85rem;background:rgba(0,255,135,0.06);'
+        f'border:1px solid rgba(0,255,135,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">'
+        f'{ICO_CPU}<span style="font-size:0.82rem;color:#b0ffe0;font-weight:600">FinBERT-PT-BR Ativo</span></div>',
+        unsafe_allow_html=True,
+    )
 else:
-    st.sidebar.info("📝 PLN Léxico Ativo (Fallback)")
+    st.sidebar.markdown(
+        f'<div style="margin:0.5rem 0;padding:0.6rem 0.85rem;background:rgba(0,210,255,0.06);'
+        f'border:1px solid rgba(0,210,255,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">'
+        f'{ICO_LEXICON}<span style="font-size:0.82rem;color:#b8eeff;font-weight:600">PLN Léxico Ativo (Fallback)</span></div>',
+        unsafe_allow_html=True,
+    )
 
 # Gerador dinâmico de notícias baseado nos ativos selecionados com avaliação PLN em tempo real
 news_items = []
