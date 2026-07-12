@@ -115,6 +115,60 @@
   font-family: var(--font-display) !important;
 }
 
+/* ─── Sidebar — page navigation (multipage links) ────────────────────────────*/
+[data-testid="stSidebarNav"] { padding-top: 0.25rem; }
+
+[data-testid="stSidebarNavLink"] {
+  border-radius: var(--border-radius-sm) !important;
+  margin: 1px 0.5rem !important;
+  width: calc(100% - 1rem) !important;
+  background: transparent !important;
+  border-left: 3px solid transparent !important;
+  transition: background 0.2s ease, border-color 0.2s ease !important;
+}
+
+[data-testid="stSidebarNavLink"] span {
+  font-family: var(--font-display) !important;
+  font-weight: 600 !important;
+  font-size: 0.88rem !important;
+  color: var(--text-muted) !important;
+  transition: color 0.2s ease !important;
+}
+
+[data-testid="stSidebarNavLink"]:hover {
+  background: rgba(0, 255, 135, 0.06) !important;
+}
+[data-testid="stSidebarNavLink"]:hover span {
+  color: var(--text-main) !important;
+}
+
+[data-testid="stSidebarNavLink"][aria-current="page"] {
+  background: linear-gradient(135deg, rgba(0, 255, 135, 0.14) 0%, rgba(0, 210, 255, 0.05) 100%) !important;
+  border-left-color: var(--primary-color) !important;
+}
+[data-testid="stSidebarNavLink"][aria-current="page"] span {
+  color: var(--primary-color) !important;
+  font-weight: 700 !important;
+}
+
+[data-testid="stSidebarNavSeparator"] {
+  background: var(--border-color) !important;
+  opacity: 0.7;
+  margin: 0.5rem 0 !important;
+}
+
+/* Small-caps section label used throughout the sidebar (setor filter, etc.) */
+.sidebar-section-label {
+  padding: 0.6rem 0 0.3rem 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
 /* Typography styles */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display) !important;

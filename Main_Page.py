@@ -896,18 +896,6 @@ def section_header(icon_svg, text, tag="h3"):
     )
 
 
-# Sidebar Principal
-st.sidebar.markdown(
-    """
-<div style="padding:0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem">
-  <span style="font-size:0.7rem;font-weight:600;letter-spacing:0.1em;color:#94a3b8;text-transform:uppercase">
-    Navegação
-  </span>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
 render_flow_sidebar(active_step=1, pending_opacities=[0.45, 0.35, 0.25])
 
 # CSS customizado
@@ -996,7 +984,10 @@ if _watchlist:
         "<div style='margin-bottom:0.75rem'></div>", unsafe_allow_html=True
     )
 
-st.sidebar.subheader("Escolha o setor.")
+st.sidebar.markdown(
+    '<div class="sidebar-section-label">Escolha o setor</div>',
+    unsafe_allow_html=True,
+)
 
 # Permite filtro por setor na barra lateral
 setores_selecionados = st.sidebar.multiselect(
