@@ -159,6 +159,9 @@
 
 /* Small-caps section label used throughout the sidebar (setor filter, etc.) */
 .sidebar-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 0.6rem 0 0.3rem 0;
   border-bottom: 1px solid var(--border-color);
   margin-bottom: 0.6rem;
@@ -168,6 +171,7 @@
   color: var(--text-muted);
   text-transform: uppercase;
 }
+.sidebar-section-label svg { flex-shrink: 0; }
 
 /* Typography styles */
 h1, h2, h3, h4, h5, h6 {
@@ -308,8 +312,10 @@ code, pre {
 }
 
 /* ─── Spinner / Progress ─────────────────────────────────────────────────────*/
-[data-testid="stSpinner"] > div {
-  border-top-color: var(--primary-color) !important;
+/* Native st.spinner is hidden everywhere — the app uses the glassmorphic
+   loading_overlay() component for user-facing loading feedback instead. */
+[data-testid="stSpinner"] {
+  display: none !important;
 }
 
 /* ─── Slider ─────────────────────────────────────────────────────────────────*/

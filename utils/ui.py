@@ -40,6 +40,14 @@ _FLOW_STEPS = [
 
 _FLOW_DIVIDER = '    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>\n'
 
+_ICO_FLOW = svg_icon(
+    '<circle cx="5" cy="6" r="2.2" stroke="#64748b" stroke-width="1.6"/>'
+    '<circle cx="19" cy="18" r="2.2" stroke="#64748b" stroke-width="1.6"/>'
+    '<path d="M7 7.2c0 4 3 4.6 5 5.8s5 1.8 5 5" stroke="#64748b" stroke-width="1.6" '
+    'fill="none" stroke-linecap="round"/>',
+    12,
+)
+
 
 def _flow_done_step_html(step):
     return (
@@ -97,7 +105,7 @@ def render_flow_sidebar(active_step: int, pending_opacities=None) -> None:
     body = "".join(parts)
     html = (
         '<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">\n'
-        '  <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">Fluxo de Análise</div>\n'
+        f'  <div style="display:flex;align-items:center;gap:6px;font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">{_ICO_FLOW} Fluxo de Análise</div>\n'
         '  <div style="display:flex;flex-direction:column;gap:0.35rem;">\n'
         f'{body}'
         '  </div>\n'

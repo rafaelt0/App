@@ -69,7 +69,7 @@ def get_ev_ebitda_context(setor: str):
     return None
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_fundamentus_data(tickers):
     """Busca dados fundamentalistas com SQLite cache (4h) + retry automático."""
     cache_key = f"fund_{'_'.join(sorted(tickers))}"
@@ -102,7 +102,7 @@ def get_fundamentus_data(tickers):
     raise last_exc
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_yfinance_data(tickers_yf, start, interval):
     """Busca cotações do Yahoo Finance com retry automático."""
     today = datetime.date.today()
@@ -579,35 +579,35 @@ def render_debt_panel(ticker_name, row):
         if db_val > 3:
             diags.append(
                 (
-                    "⚠️",
+                    ICO_ALERT,
                     f"Dívida/PL de {db_val:.1f}× é elevada — verifique capacidade de pagamento",
                     "#ff3d5a",
                 )
             )
         elif db_val > 1.5:
             diags.append(
-                ("⚡", f"Dívida/PL de {db_val:.1f}× é moderada — monitorar", "#ffd600")
+                (ICO_BOLT, f"Dívida/PL de {db_val:.1f}× é moderada — monitorar", "#ffd600")
             )
         else:
-            diags.append(("✓", f"Dívida/PL de {db_val:.1f}× é saudável", "#00ff87"))
+            diags.append((ICO_CHECK_SM, f"Dívida/PL de {db_val:.1f}× é saudável", "#00ff87"))
 
     if lc_val is not None:
         if lc_val < 1:
             diags.append(
                 (
-                    "⚠️",
+                    ICO_ALERT,
                     f"Liquidez Corrente {lc_val:.2f}× < 1 — risco de dificuldade de caixa",
                     "#ff3d5a",
                 )
             )
         elif lc_val < 1.5:
             diags.append(
-                ("⚡", f"Liquidez Corrente {lc_val:.2f}× — margem estreita", "#ffd600")
+                (ICO_BOLT, f"Liquidez Corrente {lc_val:.2f}× — margem estreita", "#ffd600")
             )
         else:
             diags.append(
                 (
-                    "✓",
+                    ICO_CHECK_SM,
                     f"Liquidez Corrente {lc_val:.2f}× — empresa com boa folga de caixa",
                     "#00ff87",
                 )
@@ -625,10 +625,11 @@ def render_debt_panel(ticker_name, row):
 def _render_star_button(tkr):
     """Renderiza botão de favoritar/desfavoritar da watchlist."""
     starred = _db.wl_has(tkr)
-    label = "★ Favoritado" if starred else "☆ Favoritar"
+    label = "Favoritado" if starred else "Favoritar"
     if st.button(
         label,
         key=f"star_{tkr}",
+        type="primary" if starred else "secondary",
         help="Remover dos favoritos" if starred else "Salvar nos favoritos",
     ):
         if starred:
@@ -886,6 +887,41 @@ ICO_NEWS = _svg(
     '<line x1="7" y1="16" x2="15" y2="16" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>',
     16,
 )
+ICO_STAR = _svg(
+    '<path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.7 1.2 6.6L12 17.6l-5.9 3.2 1.2-6.6-4.8-4.7 6.6-.9z" '
+    'fill="#ffd600" stroke="#ffd600" stroke-width="1" stroke-linejoin="round"/>',
+    13,
+)
+ICO_FILTER = _svg(
+    '<path d="M3 4.5h18l-6.75 8v6.5l-4.5 2v-8.5z" stroke="#00d2ff" stroke-width="1.8" '
+    'stroke-linejoin="round" fill="none"/>',
+    13,
+)
+ICO_BULB = _svg(
+    '<path d="M9 18.5h6M10 21h4M12 3a6 6 0 0 0-3.2 11.1c.5.35.7.9.7 1.5v.4h5v-.4c0-.6.2-1.15.7-1.5A6 6 0 0 0 12 3z" '
+    'stroke="#94a3b8" stroke-width="1.6" stroke-linejoin="round" fill="none"/>',
+    13,
+)
+ICO_ALERT = _svg(
+    '<path d="M12 3.2l9.3 16.3H2.7z" stroke="#ff3d5a" stroke-width="1.7" stroke-linejoin="round" fill="none"/>'
+    '<line x1="12" y1="9.5" x2="12" y2="14" stroke="#ff3d5a" stroke-width="1.9" stroke-linecap="round"/>'
+    '<circle cx="12" cy="16.8" r="1" fill="#ff3d5a"/>',
+    14,
+)
+ICO_BOLT = _svg(
+    '<path d="M13 2 4.5 13.5h5.7L11 22l8.5-11.5h-5.7z" fill="#ffd600"/>',
+    13,
+)
+ICO_CHECK_SM = _svg(
+    '<path d="M4 12.5l5 5L20 6" stroke="#00ff87" stroke-width="2.3" stroke-linecap="round" '
+    'stroke-linejoin="round" fill="none"/>',
+    13,
+)
+ICO_X_SM = _svg(
+    '<line x1="5" y1="5" x2="19" y2="19" stroke="#ff3d5a" stroke-width="2.3" stroke-linecap="round"/>'
+    '<line x1="19" y1="5" x2="5" y2="19" stroke="#ff3d5a" stroke-width="2.3" stroke-linecap="round"/>',
+    12,
+)
 
 
 def section_header(icon_svg, text, tag="h3"):
@@ -955,12 +991,7 @@ _ticker_setor = dict(zip(data["Ticker"], data["Setor"]))
 _watchlist = _db.wl_get()
 if _watchlist:
     st.sidebar.markdown(
-        """
-<div style="padding:0.6rem 0 0.3rem 0;border-bottom:1px solid #1e293b;margin-bottom:0.5rem">
-  <span style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#ffd600;text-transform:uppercase">
-    ⭐ Favoritos
-  </span>
-</div>""",
+        f'<div class="sidebar-section-label" style="color:#ffd600">{ICO_STAR} Favoritos</div>',
         unsafe_allow_html=True,
     )
     for _wt in _watchlist:
@@ -985,7 +1016,7 @@ if _watchlist:
     )
 
 st.sidebar.markdown(
-    '<div class="sidebar-section-label">Escolha o setor</div>',
+    f'<div class="sidebar-section-label">{ICO_FILTER} Escolha o setor</div>',
     unsafe_allow_html=True,
 )
 
@@ -995,7 +1026,7 @@ setores_selecionados = st.sidebar.multiselect(
 )
 
 if st.session_state.get("selected_tickers"):
-    if st.sidebar.button("🗑 Limpar seleção de ações", use_container_width=True):
+    if st.sidebar.button("Limpar seleção de ações", use_container_width=True):
         st.session_state["selected_tickers"] = []
         st.rerun()
 
@@ -1144,7 +1175,7 @@ if not tickers:
     st.markdown(
         '<div style="margin-top:1.2rem;padding:0.75rem 1rem;background:rgba(0,0,0,0.2);'
         'border-radius:8px;border-left:3px solid #334155">'
-        '<span style="font-size:0.78rem;color:#64748b">💡 <b style="color:#94a3b8">Dica:</b> '
+        f'<span style="font-size:0.78rem;color:#64748b">{ICO_BULB} <b style="color:#94a3b8">Dica:</b> '
         "Use o campo de busca acima para digitar qualquer ticker da B3. "
         "O filtro de setor na barra lateral reduz a lista para facilitar a escolha.</span>"
         "</div>",
@@ -1163,7 +1194,7 @@ if tickers:
     )
 
     if st.button(
-        "🔍 Analisar",
+        "Analisar",
         type="primary",
         use_container_width=True,
         key="btn_analisar",
@@ -1175,7 +1206,7 @@ analyzed_tickers = st.session_state.get("analyzed_tickers", [])
 ready_to_analyze = bool(tickers) and analyzed_tickers == tickers
 
 if tickers and not ready_to_analyze:
-    st.info("Clique em **🔍 Analisar** para buscar os indicadores das ações selecionadas.")
+    st.info("Clique em **Analisar** para buscar os indicadores das ações selecionadas.")
 
 if ready_to_analyze:
     try:
@@ -1210,7 +1241,7 @@ if ready_to_analyze:
             df_export = df[export_cols_exist].copy()
             csv_data = df_export.to_csv().encode("utf-8")
             st.download_button(
-                label="⬇ Exportar dados fundamentalistas (CSV)",
+                label="Exportar dados fundamentalistas (CSV)",
                 data=csv_data,
                 file_name=f"fundamentus_{'+'.join(tickers)}_{datetime.date.today()}.csv",
                 mime="text/csv",
@@ -1858,18 +1889,22 @@ if ready_to_analyze:
                         with score_cols[i]:
                             st.markdown(
                                 f"""
-<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:2px solid {sc};
-            border-radius:14px;padding:1.2rem;text-align:center;
-            box-shadow:0 0 18px {sc}33;margin-bottom:.5rem">
-  <div style="font-size:1.1rem;font-weight:700;color:#94a3b8;letter-spacing:.06em">{ticker_s}</div>
-  <div style="font-size:2.8rem;font-weight:900;color:{sc};font-family:'JetBrains Mono',monospace;
-              text-shadow:0 0 12px {sc}66;line-height:1.1">{total_score:.0f}</div>
-  <div style="font-size:0.6rem;color:#64748b;letter-spacing:.12em">PERCENTIL MÉDIO</div>
-  <div style="font-size:0.8rem;font-weight:700;color:{sc};margin-top:.4rem;letter-spacing:.06em">{label}</div>
-  <div style="font-size:0.72rem;color:#94a3b8;margin-top:.6rem;display:flex;justify-content:center;gap:.8rem">
-    <span style="color:#00ff87">✓ {fav} fav.</span>
-    <span style="color:#ffd600">~ {neut} neut.</span>
-    <span style="color:#ff3d5a">✗ {desf} desf.</span>
+<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1.5px solid {sc};
+            border-radius:10px;padding:0.65rem 0.85rem;margin-bottom:.5rem;
+            box-shadow:0 0 10px {sc}26">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+    <div>
+      <div style="font-size:0.85rem;font-weight:700;color:#94a3b8;letter-spacing:.04em">{ticker_s}</div>
+      <div style="font-size:0.6rem;font-weight:700;color:{sc};letter-spacing:.08em;margin-top:.15rem">{label}</div>
+    </div>
+    <div title="Percentil médio" style="font-size:1.7rem;font-weight:900;color:{sc};
+                font-family:'JetBrains Mono',monospace;text-shadow:0 0 8px {sc}55;line-height:1">{total_score:.0f}</div>
+  </div>
+  <div style="font-size:0.68rem;color:#94a3b8;margin-top:.45rem;display:flex;gap:.7rem;
+              border-top:1px solid rgba(255,255,255,0.06);padding-top:.4rem">
+    <span title="{fav} indicador(es) favorável(eis)" style="display:flex;align-items:center;gap:3px;color:#00ff87">{ICO_CHECK_SM} {fav}</span>
+    <span title="{neut} indicador(es) neutro(s)" style="color:#ffd600">~ {neut}</span>
+    <span title="{desf} indicador(es) desfavorável(eis)" style="display:flex;align-items:center;gap:3px;color:#ff3d5a">{ICO_X_SM} {desf}</span>
   </div>
 </div>
 """,
@@ -2034,7 +2069,7 @@ if ready_to_analyze:
         st.cache_data.clear()
         st.error("Erro de I/O ao buscar dados. O cache foi limpo automaticamente.")
         st.caption(f"Detalhe técnico: {e}")
-        if st.button("🔄 Tentar novamente", key="retry_os_error"):
+        if st.button("Tentar novamente", key="retry_os_error"):
             st.rerun()
     except Exception as e:
         st.error(f"Erro ao buscar dados: {e}")

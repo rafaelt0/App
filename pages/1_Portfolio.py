@@ -162,7 +162,7 @@ def render_cards_grid(data_dict, colors_sequence=None):
     st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_selic_rate(start_date):
     taxa_selic = sgs.get(432, start=start_date)
     val = (taxa_selic.iloc[-1, 0]) / 100
@@ -170,13 +170,13 @@ def get_selic_rate(start_date):
     return daily_val
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_portfolio_prices(tickers_yf, start_date):
     today = datetime.date.today()
     return yf.download(tickers_yf, start=start_date, end=today, progress=False)["Close"]
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_benchmark_prices(start_date):
     return yf.download("^BVSP", start=start_date, progress=False)["Close"].squeeze()
 
