@@ -9,13 +9,16 @@ import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
 import email.utils
+import logging
+
+logger = logging.getLogger(__name__)
 from utils.charts import apply_plotly_theme
 from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
 
 # CSS customizado
 load_css()
 
-render_flow_sidebar(active_step=4)
+render_flow_sidebar(active_step=4, pending_opacities=[0.35, 0.2])
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
 _svg = svg_icon
@@ -411,6 +414,7 @@ def get_brazilian_news(ticker_name):
                     dt = email.utils.parsedate_to_datetime(pub_date)
                     formatted_date = dt.strftime('%d/%m/%Y %H:%M')
                 except Exception:
+                    logger.debug("news pubDate parse failed for %r", pub_date, exc_info=True)
                     formatted_date = pub_date
             
             # Clean source name from title
@@ -426,6 +430,7 @@ def get_brazilian_news(ticker_name):
             })
         return news_items
     except Exception:
+        logger.warning("news RSS fetch/parse failed", exc_info=True)
         return []
 
 
@@ -440,6 +445,7 @@ def load_finbert_pipeline():
         nlp = pipeline("text-classification", model=model, tokenizer=tokenizer, top_k=None)
         return nlp
     except Exception:
+        logger.warning("FinBERT pipeline load failed", exc_info=True)
         return None
 
 # Load FinBERT
@@ -502,6 +508,7 @@ def analise_sentimento_finbert(title, summary, nlp):
         }
     except Exception:
         # Fallback on error
+        logger.warning("FinBERT sentiment inference failed, falling back to rule-based", exc_info=True)
         res_pln = analise_sentimento_pln(title, summary)
         scores = [
             {'label': 'POSITIVE', 'score': max(0.0, res_pln['score']) if res_pln['sentiment'] == 'Otimista' else 0.0},
@@ -767,6 +774,7 @@ def parse_pub_time(pub_time):
         try:
             return int(pub_time.split()[1])
         except Exception:
+            logger.debug("parse_pub_time relative-format parse failed for %r", pub_time, exc_info=True)
             return 24
     elif "/" in pub_time:
         try:
@@ -774,6 +782,7 @@ def parse_pub_time(pub_time):
             # return negative timestamp for descending sort
             return -int(dt.timestamp())
         except Exception:
+            logger.debug("parse_pub_time absolute-format parse failed for %r", pub_time, exc_info=True)
             return 0
     return 24
 

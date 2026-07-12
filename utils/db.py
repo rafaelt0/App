@@ -7,6 +7,9 @@ import sqlite3
 import json
 import time
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 _DB = os.path.join(os.path.dirname(__file__), '..', 'b3_data.db')
 
@@ -78,7 +81,7 @@ def cache_get(key: str, ttl: int = 3600):
             if row and time.time() - row[1] < ttl:
                 return json.loads(row[0])
     except Exception:
-        pass
+        logger.warning("cache_get failed for key=%s", key, exc_info=True)
     return None
 
 
@@ -91,7 +94,7 @@ def cache_set(key: str, data):
                 (key, json.dumps(data, default=str), time.time()),
             )
     except Exception:
-        pass
+        logger.warning("cache_set failed for key=%s", key, exc_info=True)
 
 
 def cache_clear_expired(max_age: int = 86400):
@@ -100,7 +103,7 @@ def cache_clear_expired(max_age: int = 86400):
         with _conn() as c:
             c.execute("DELETE FROM cache WHERE ts < ?", (time.time() - max_age,))
     except Exception:
-        pass
+        logger.warning("cache_clear_expired failed", exc_info=True)
 
 
 # ── Watchlist ──────────────────────────────────────────────────────────────────
@@ -115,6 +118,7 @@ def wl_get(uid: str) -> list[str]:
             ).fetchall()
             return [r[0] for r in rows]
     except Exception:
+        logger.warning("wl_get failed for uid=%s", uid, exc_info=True)
         return []
 
 
@@ -126,7 +130,7 @@ def wl_add(uid: str, ticker: str):
                 (uid, ticker.upper(), time.time()),
             )
     except Exception:
-        pass
+        logger.warning("wl_add failed for uid=%s ticker=%s", uid, ticker, exc_info=True)
 
 
 def wl_remove(uid: str, ticker: str):
@@ -137,7 +141,7 @@ def wl_remove(uid: str, ticker: str):
                 (uid, ticker.upper()),
             )
     except Exception:
-        pass
+        logger.warning("wl_remove failed for uid=%s ticker=%s", uid, ticker, exc_info=True)
 
 
 def wl_has(uid: str, ticker: str) -> bool:
@@ -149,6 +153,7 @@ def wl_has(uid: str, ticker: str) -> bool:
             ).fetchone()
             return row is not None
     except Exception:
+        logger.warning("wl_has failed for uid=%s ticker=%s", uid, ticker, exc_info=True)
         return False
 
 
@@ -166,7 +171,7 @@ def portfolio_get(uid: str) -> tuple[list[str], dict]:
                 weights = json.loads(row[1]) if row[1] else {}
                 return tickers, weights
     except Exception:
-        pass
+        logger.warning("portfolio_get failed for uid=%s", uid, exc_info=True)
     return [], {}
 
 
@@ -184,7 +189,7 @@ def portfolio_save(uid: str, tickers: list[str], weights: dict | None = None):
                 ),
             )
     except Exception:
-        pass
+        logger.warning("portfolio_save failed for uid=%s", uid, exc_info=True)
 
 
 def portfolio_clear(uid: str):
@@ -192,4 +197,4 @@ def portfolio_clear(uid: str):
         with _conn() as c:
             c.execute("DELETE FROM portfolio WHERE uid = ?", (uid,))
     except Exception:
-        pass
+        logger.warning("portfolio_clear failed for uid=%s", uid, exc_info=True)

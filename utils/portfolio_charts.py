@@ -1,11 +1,15 @@
 """Matplotlib/Plotly chart builders for pages/1_Portfolio.py."""
 
+import logging
+
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 from pypfopt.efficient_frontier import EfficientFrontier
 
 from utils.charts import apply_plotly_theme
+
+logger = logging.getLogger(__name__)
 
 
 def apply_matplotlib_theme(fig):
@@ -68,6 +72,7 @@ def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=
         min_return = np.sum(min_weights_arr * mu)
         min_stddev = np.sqrt(np.dot(min_weights_arr.T, np.dot(S, min_weights_arr)))
     except Exception:
+        logger.debug("efficient frontier min-volatility solve failed", exc_info=True)
         min_return = min(mu)
         min_stddev = np.sqrt(np.min(np.diag(S)))
 
@@ -81,7 +86,7 @@ def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=
             vol = np.sqrt(np.dot(w_target.T, np.dot(S, w_target)))
             efficient_vols.append(vol)
         except Exception:
-            pass
+            logger.debug("efficient frontier target-return point failed", exc_info=True)
 
     return (
         results,

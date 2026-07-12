@@ -5,6 +5,9 @@ import numpy as np
 import plotly.graph_objects as go
 import datetime as dt
 import warnings
+import logging
+
+logger = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -12,7 +15,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
-from utils.ui import load_css, loading_overlay
+from utils.ui import load_css, loading_overlay, render_flow_sidebar
 from utils.valuation import (
     calc_cv,
     calc_dcf,
@@ -24,6 +27,8 @@ from utils.home_render import color_pct, color_veredicto, render_hist_section
 from utils.market_data import clean_numeric_column
 
 load_css()
+
+render_flow_sidebar(active_step=5, pending_opacities=[0.35])
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 ERP_MATURE = 5.0  # ERP de mercado maduro (EUA). Rf=Selic já embute o risco-país
@@ -98,6 +103,7 @@ def get_selic():
         taxa = sgs.get(432, start=dt.date.today() - dt.timedelta(days=30))
         return round(taxa.iloc[-1, 0] / 100, 4)
     except Exception:
+        logger.warning("get_selic BCB fetch failed, using default rate", exc_info=True)
         return 0.105
 
 
@@ -120,6 +126,7 @@ def get_koller_data(ticker_b3: str):
                         if not pd.isna(v):
                             return float(v)
                     except Exception:
+                        logger.debug("_v key parse failed for key=%s", k, exc_info=True)
                         continue
             return None
 
@@ -225,6 +232,7 @@ def get_koller_data(ticker_b3: str):
             "rev_cagr": rev_cagr,
         }
     except Exception as e:
+        logger.exception("get_koller_data failed")
         return {"_error": str(e)}
 
 

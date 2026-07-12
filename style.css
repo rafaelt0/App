@@ -330,6 +330,30 @@ code, pre {
   display: none !important;
 }
 
+/* Discreet inline status line — for loading feedback lighter than
+   loading_overlay(), e.g. background quote fetches triggered by a
+   selection change rather than an explicit button click. */
+.discreet-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  padding: 0.4rem 0;
+}
+.discreet-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  animation: discreet-status-pulse 1.1s ease-in-out infinite;
+}
+@keyframes discreet-status-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
 /* ─── Slider ─────────────────────────────────────────────────────────────────*/
 [data-baseweb="slider"] [data-testid="stThumbValue"] {
   background: var(--primary-color) !important;

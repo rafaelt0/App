@@ -4,6 +4,9 @@ import pandas as pd
 import warnings
 import datetime
 import traceback
+import logging
+
+logger = logging.getLogger(__name__)
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
@@ -55,7 +58,7 @@ st.set_page_config(
 )
 st.logo("logo.svg", icon_image="favicon.svg")
 
-render_flow_sidebar(active_step=1, pending_opacities=[0.45, 0.35, 0.25])
+render_flow_sidebar(active_step=1, pending_opacities=[0.45, 0.35, 0.25, 0.18, 0.12])
 
 # CSS customizado
 load_css()
@@ -369,7 +372,7 @@ if ready_to_analyze:
                 mime="text/csv",
             )
         except Exception:
-            pass
+            logger.debug("fundamentus CSV export failed", exc_info=True)
 
         section_header(ICO_SECTOR, "Setor", "h3")
         df_sector = df[["Empresa", "Setor", "Subsetor"]]
@@ -632,8 +635,6 @@ if ready_to_analyze:
             apply_plotly_theme(fig_comp)
             st.plotly_chart(fig_comp, use_container_width=True)
 
-        rank_df = pd.DataFrame()  # peers do setor agora ficam em Valuation; mantém fallback por thresholds
-
         # ── Síntese do Analista ──────────────────────────────────────────────
         st.markdown("---")
         st.markdown(
@@ -648,8 +649,6 @@ if ready_to_analyze:
 """,
             unsafe_allow_html=True,
         )
-
-        usar_percentis = not rank_df.empty
 
         sintese_items = []
         for t in tickers:
@@ -667,65 +666,46 @@ if ready_to_analyze:
             alertas = []
             fonte_label = ""
 
-            if usar_percentis:
-                # Usa percentis do setor já calculados
-                ticker_rank = rank_df[rank_df["Ação"] == t]
-                fonte_label = "vs. peers"
-                for _, rr in ticker_rank.iterrows():
-                    mult = rr["Múltiplo"]
-                    pct = rr["Percentil"]
-                    val = rr["Valor"]
-                    med = rr["Mediana Setor"]
-                    tip = f'title="mediana do setor: {med:.2f}"'
-                    if pct >= 70:
-                        pontos_pos.append((f"{mult} {val:.2f} · p{pct:.0f}", tip))
-                    elif pct < 30:
-                        pontos_neg.append((f"{mult} {val:.2f} · p{pct:.0f}", tip))
-                # Alertas extras de P/L absoluto
-                pl = float(r.get("P/L", 0) or 0)
-                if pl < 0:
-                    alertas.append((f"P/L {pl:.1f}x — prejuízo", ""))
-            else:
-                # Fallback: thresholds absolutos com contexto
-                fonte_label = "thresholds"
-                roe = float(r.get("ROE", 0) or 0)
-                roic = float(r.get("ROIC", 0) or 0)
-                pl = float(r.get("P/L", 0) or 0)
-                dy = float(r.get("Dividend Yield", 0) or 0)
-                ml = float(r.get("Margem Líquida", 0) or 0)
-                cr = float(r.get("Crescimento Receita 5 anos", 0) or 0)
+            # Fallback: thresholds absolutos com contexto
+            fonte_label = "thresholds"
+            roe = float(r.get("ROE", 0) or 0)
+            roic = float(r.get("ROIC", 0) or 0)
+            pl = float(r.get("P/L", 0) or 0)
+            dy = float(r.get("Dividend Yield", 0) or 0)
+            ml = float(r.get("Margem Líquida", 0) or 0)
+            cr = float(r.get("Crescimento Receita 5 anos", 0) or 0)
 
-                if roe > 15:
-                    pontos_pos.append((f"ROE {roe:.1f}%", 'title="acima dos 15% de referência"'))
-                elif roe < 5:
-                    pontos_neg.append((f"ROE {roe:.1f}%", 'title="abaixo dos 5% mínimos"'))
+            if roe > 15:
+                pontos_pos.append((f"ROE {roe:.1f}%", 'title="acima dos 15% de referência"'))
+            elif roe < 5:
+                pontos_neg.append((f"ROE {roe:.1f}%", 'title="abaixo dos 5% mínimos"'))
 
-                if roic > 12:
-                    pontos_pos.append((f"ROIC {roic:.1f}%", 'title="acima dos 12% de referência"'))
-                elif roic < 5:
-                    pontos_neg.append((f"ROIC {roic:.1f}%", ""))
+            if roic > 12:
+                pontos_pos.append((f"ROIC {roic:.1f}%", 'title="acima dos 12% de referência"'))
+            elif roic < 5:
+                pontos_neg.append((f"ROIC {roic:.1f}%", ""))
 
-                if 0 < pl < 15:
-                    pontos_pos.append((f"P/L {pl:.1f}x", 'title="abaixo de 15x"'))
-                elif pl > 30:
-                    pontos_neg.append((f"P/L {pl:.1f}x", 'title="acima de 30x"'))
-                elif pl < 0:
-                    alertas.append((f"P/L {pl:.1f}x — prejuízo", ""))
+            if 0 < pl < 15:
+                pontos_pos.append((f"P/L {pl:.1f}x", 'title="abaixo de 15x"'))
+            elif pl > 30:
+                pontos_neg.append((f"P/L {pl:.1f}x", 'title="acima de 30x"'))
+            elif pl < 0:
+                alertas.append((f"P/L {pl:.1f}x — prejuízo", ""))
 
-                if dy > 5:
-                    pontos_pos.append((f"DY {dy:.1f}%", ""))
+            if dy > 5:
+                pontos_pos.append((f"DY {dy:.1f}%", ""))
 
-                if cr > 10:
-                    pontos_pos.append((f"Cresc.Rec {cr:.1f}%", ""))
-                elif cr < 0:
-                    pontos_neg.append((f"Cresc.Rec {cr:.1f}%", ""))
+            if cr > 10:
+                pontos_pos.append((f"Cresc.Rec {cr:.1f}%", ""))
+            elif cr < 0:
+                pontos_neg.append((f"Cresc.Rec {cr:.1f}%", ""))
 
-                if ml > 15:
-                    pontos_pos.append((f"Mrg.Líq {ml:.1f}%", ""))
-                elif 0 <= ml < 5:
-                    alertas.append((f"Mrg.Líq {ml:.1f}%", 'title="margem comprimida"'))
-                elif ml < 0:
-                    pontos_neg.append((f"Mrg.Líq {ml:.1f}%", ""))
+            if ml > 15:
+                pontos_pos.append((f"Mrg.Líq {ml:.1f}%", ""))
+            elif 0 <= ml < 5:
+                alertas.append((f"Mrg.Líq {ml:.1f}%", 'title="margem comprimida"'))
+            elif ml < 0:
+                pontos_neg.append((f"Mrg.Líq {ml:.1f}%", ""))
 
             n_pos = len(pontos_pos)
             n_neg = len(pontos_neg)
@@ -791,5 +771,6 @@ if ready_to_analyze:
         if st.button("Tentar novamente", key="retry_os_error"):
             st.rerun()
     except Exception as e:
+        logger.exception("failed to fetch/render main page data")
         st.error(f"Erro ao buscar dados: {e}")
         st.caption(f"```\n{traceback.format_exc()}\n```")

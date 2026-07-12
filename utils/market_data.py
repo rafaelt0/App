@@ -5,8 +5,12 @@ tickers) and several pages need it independently — route them all through
 this single cache instead of each page maintaining its own copy.
 """
 
+import logging
+
 import pandas as pd
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 
 def clean_numeric_column(col):
@@ -35,4 +39,5 @@ def get_sorted_tickers_by_liquidity(tickers_list):
         remaining = [t for t in tickers_list if t not in sorted_filtered]
         return sorted_filtered + remaining
     except Exception:
+        logger.warning("get_sorted_tickers_by_liquidity failed, returning unsorted list", exc_info=True)
         return tickers_list

@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 import datetime
 import warnings
+import logging
+
+logger = logging.getLogger(__name__)
 import plotly.express as px
 import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
@@ -54,7 +57,7 @@ from utils.portfolio_charts import (
 # CSS customizado
 load_css()
 
-render_flow_sidebar(active_step=2, pending_opacities=[0.4, 0.25])
+render_flow_sidebar(active_step=2, pending_opacities=[0.4, 0.3, 0.2, 0.12])
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -131,6 +134,7 @@ with col_config2:
 try:
     taxa_selic = get_selic_rate(data_inicio)
 except Exception as _selic_err:
+    logger.exception("get_selic_rate failed")
     st.warning(
         f"Não foi possível buscar a taxa Selic no BCB ({_selic_err}). Usando valor de referência: 13,75% a.a."
     )
@@ -228,14 +232,21 @@ if "Manual" in modo:
 # Usa um spinner discreto (não a animação cheia) para não disparar a
 # animação de carregamento só por selecionar um ativo — essa fica
 # reservada para o clique em "Carregar Portfolio".
-with st.spinner("Baixando cotações históricas..."):
-    try:
-        data_yf = get_portfolio_prices(tickers_yf, data_inicio)
-    except Exception as _price_err:
-        st.error(
-            f"Erro ao buscar cotações no Yahoo Finance: {_price_err}. Verifique sua conexão e tente novamente."
-        )
-        st.stop()
+_price_status = st.empty()
+_price_status.markdown(
+    '<div class="discreet-status">Baixando cotações históricas...</div>',
+    unsafe_allow_html=True,
+)
+try:
+    data_yf = get_portfolio_prices(tickers_yf, data_inicio)
+except Exception as _price_err:
+    logger.exception("get_portfolio_prices failed")
+    _price_status.empty()
+    st.error(
+        f"Erro ao buscar cotações no Yahoo Finance: {_price_err}. Verifique sua conexão e tente novamente."
+    )
+    st.stop()
+_price_status.empty()
 
 if data_yf.empty:
     st.error(
@@ -312,6 +323,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
                 raw_weights = ef.max_sharpe(risk_free_rate=selic_anual)
                 cleaned_weights = ef.clean_weights()
             except Exception as e:
+                logger.exception("max_sharpe optimization failed")
                 st.warning(
                     f"Otimização de Max Sharpe falhou (motivo: {str(e)}). Usando carteira de Mínima Volatilidade."
                 )
@@ -350,7 +362,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
                 mime="text/csv",
             )
         except Exception:
-            pass
+            logger.debug("portfolio allocation CSV export failed", exc_info=True)
 
         # ── Sugestão de Compra de Cotas (Alocação Discreta) ───────────────────
         st.subheader("Sugestão de Compra de Cotas")
@@ -753,6 +765,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             """
             st.markdown(table_html, unsafe_allow_html=True)
         except Exception as e:
+            logger.exception("monthly returns table generation failed")
             st.warning(f"Não foi possível gerar a tabela de retornos mensais: {str(e)}")
 
         # Cálculos de Métricas

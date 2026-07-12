@@ -78,6 +78,8 @@ _FLOW_STEPS = [
     {"label": "Portfolio", "color": "#00d2ff", "shadow": "0,210,255", "text_color": "#080c14"},
     {"label": "Simulação", "color": "#ffd600", "shadow": "255,214,0", "text_color": "#080c14"},
     {"label": "Notícias", "color": "#a855f7", "shadow": "168,85,247", "text_color": "#fff"},
+    {"label": "Valuation", "color": "#f472b6", "shadow": "244,114,182", "text_color": "#080c14"},
+    {"label": "Screener", "color": "#38bdf8", "shadow": "56,189,248", "text_color": "#080c14"},
 ]
 
 _FLOW_DIVIDER = '    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>\n'

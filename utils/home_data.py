@@ -2,7 +2,10 @@
 and pages/4_Valuation.py (fundamentus + yfinance).
 """
 
+import logging
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import fundamentus
 import pandas as pd
@@ -11,6 +14,19 @@ import yfinance as yf
 
 from utils import db as _db
 from utils.market_data import clean_numeric_column, get_full_market_data
+
+logger = logging.getLogger(__name__)
+
+_fundamentus_lock = threading.Lock()  # ponytail: fundamentus/requests_cache patches requests.Session
+                                       # globally and isn't thread-safe; serialize just this call.
+                                       # Upgrade path if real concurrency is needed: fetch with a
+                                       # private requests.Session instead of fundamentus's internal
+                                       # requests_cache.enabled().
+
+
+def _fetch_one(ticker):
+    with _fundamentus_lock:
+        return fundamentus.get_papel(ticker)
 
 # Mapa de renomeação de colunas do fundamentus para identificadores internos
 FUNDAMENTUS_RENAME = {
@@ -53,11 +69,12 @@ def get_fundamentus_data(tickers):
             if not df.empty:
                 return df
         except Exception:
-            pass
+            logger.debug("get_fundamentus_data cache parse failed for key=%s", cache_key, exc_info=True)
     last_exc = None
     for attempt in range(3):
         try:
-            raw = [fundamentus.get_papel(t) for t in tickers]
+            with ThreadPoolExecutor(max_workers=min(len(tickers), 5)) as ex:
+                raw = list(ex.map(_fetch_one, tickers))
             results = [r for r in raw if r is not None]
             if not results:
                 raise RuntimeError(
@@ -69,6 +86,7 @@ def get_fundamentus_data(tickers):
             return result
         except Exception as exc:
             last_exc = exc
+            logger.warning("fundamentus fetch attempt %d/3 failed for %s: %s", attempt + 1, tickers, exc)
             if attempt < 2:
                 time.sleep(1)
                 continue
@@ -103,13 +121,13 @@ def get_hist_fundamentals(ticker_sa: str):
         if fin is not None and not fin.empty:
             out["fin"] = fin.to_json()
     except Exception:
-        pass
+        logger.debug("get_hist_fundamentals financials fetch failed for %s", ticker_sa, exc_info=True)
     try:
         bs = t_yf.balance_sheet
         if bs is not None and not bs.empty:
             out["bs"] = bs.to_json()
     except Exception:
-        pass
+        logger.debug("get_hist_fundamentals balance_sheet fetch failed for %s", ticker_sa, exc_info=True)
     return out
 
 
@@ -119,10 +137,11 @@ def _hist_parse(json_str):
     try:
         df_p.columns = pd.to_datetime(df_p.columns.astype("int64"), unit="ms").year
     except Exception:
+        logger.debug("_hist_parse ms-epoch column parse failed, trying fallback", exc_info=True)
         try:
             df_p.columns = pd.to_datetime(df_p.columns).year
         except Exception:
-            pass
+            logger.debug("_hist_parse fallback column parse failed", exc_info=True)
     return df_p
 
 
@@ -145,12 +164,12 @@ def build_hist_df(tkr: str):
         try:
             fin_df = _hist_parse(raw["fin"])
         except Exception:
-            pass
+            logger.debug("build_hist_df fin parse failed for %s", tkr, exc_info=True)
     if "bs" in raw:
         try:
             bs_df = _hist_parse(raw["bs"])
         except Exception:
-            pass
+            logger.debug("build_hist_df bs parse failed for %s", tkr, exc_info=True)
 
     records = {}
 
@@ -239,6 +258,7 @@ def get_sector_peers(_setores):
         df2 = df2.drop_duplicates(keep="first")
         return df2
     except Exception:
+        logger.warning("get_sector_peers failed", exc_info=True)
         return pd.DataFrame()
 
 

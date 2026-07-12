@@ -12,7 +12,7 @@ from utils.ui import load_css, render_flow_sidebar, svg_icon
 # CSS customizado
 load_css()
 
-render_flow_sidebar(active_step=3, pending_opacities=[0.35])
+render_flow_sidebar(active_step=3, pending_opacities=[0.35, 0.22, 0.12])
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
@@ -129,6 +129,7 @@ for key in required_keys:
         st.warning(
             "Configure primeiro seu portfólio na aba **Portfolio** para liberar a Simulação Monte Carlo."
         )
+        st.page_link("pages/1_Portfolio.py", label="Ir para Portfolio", icon="➡️")
         st.stop()
 
 # Recupera as variáveis da aba 1
