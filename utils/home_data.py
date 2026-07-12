@@ -1,4 +1,6 @@
-"""Cached data-fetching helpers for Main_Page.py (fundamentus + yfinance)."""
+"""Cached data-fetching + sector-comparison helpers shared by Main_Page.py
+and pages/4_Valuation.py (fundamentus + yfinance).
+"""
 
 import time
 
@@ -8,7 +10,7 @@ import streamlit as st
 import yfinance as yf
 
 from utils import db as _db
-from utils.market_data import get_full_market_data
+from utils.market_data import clean_numeric_column, get_full_market_data
 
 # Mapa de renomeação de colunas do fundamentus para identificadores internos
 FUNDAMENTUS_RENAME = {
@@ -238,3 +240,82 @@ def get_sector_peers(_setores):
         return df2
     except Exception:
         return pd.DataFrame()
+
+
+def compute_sector_ranking(peers_raw: pd.DataFrame, ticker: str, setor: str, b3_data: pd.DataFrame) -> pd.DataFrame:
+    """Rank one ticker's multiples against its Fundamentus sector peers.
+
+    `peers_raw` is the (uncleaned) output of `get_sector_peers` — raw string
+    columns for the whole B3. `b3_data` is the acoes-listadas-b3.csv frame
+    (columns Ticker/Setor), used to restrict peers to the same sector.
+
+    Returns one row per available multiple in MULTIPLES_CFG: Múltiplo, Valor,
+    Mediana Setor, Média Setor, Peers (n), Percentil, Veredicto. Percentil is
+    the share of sector peers this ticker outperforms on that multiple
+    (100 = best in sector). Empty DataFrame if the ticker has no usable data.
+    """
+    cols_available = [c for c in COLS_NEEDED if c in peers_raw.columns]
+    peers_df = peers_raw[cols_available].copy()
+    for col in cols_available:
+        peers_df[col] = clean_numeric_column(peers_df[col])
+
+    # Fundamentus usa 0 para indicar "não aplicável" em muitos múltiplos;
+    # remove também outliers absurdos nos múltiplos onde menor = melhor.
+    for mult, _name, lower_better, _categoria in MULTIPLES_CFG:
+        if mult not in peers_df.columns:
+            continue
+        peers_df.loc[peers_df[mult] == 0, mult] = pd.NA
+        if lower_better:
+            peers_df.loc[
+                (peers_df[mult].notna())
+                & ((peers_df[mult] < 0) | (peers_df[mult] >= 500)),
+                mult,
+            ] = pd.NA
+
+    peers_df = peers_df.dropna(how="all")
+    if ticker not in peers_df.index:
+        return pd.DataFrame()
+
+    tickers_do_setor = b3_data[b3_data["Setor"] == setor]["Ticker"].tolist()
+    if ticker not in tickers_do_setor:
+        tickers_do_setor.append(ticker)
+
+    rows = []
+    for mult, name, lower_better, categoria in MULTIPLES_CFG:
+        if mult not in peers_df.columns or pd.isna(peers_df.loc[ticker, mult]):
+            continue
+        val = peers_df.loc[ticker, mult]
+        col_data = peers_df[mult].dropna()
+
+        col_data_sector = col_data[col_data.index.isin(tickers_do_setor)]
+        if col_data_sector.empty:
+            col_data_sector = col_data
+
+        n_peers = len(col_data_sector)
+        pct = (
+            (col_data_sector > val).sum() / n_peers * 100
+            if lower_better
+            else (col_data_sector < val).sum() / n_peers * 100
+        )
+
+        if pct >= 70:
+            veredicto = "Favorável"
+        elif pct >= 40:
+            veredicto = "Neutro"
+        else:
+            veredicto = "Desfavorável"
+
+        rows.append(
+            {
+                "Categoria": categoria,
+                "Múltiplo": name,
+                "Valor": round(val, 2),
+                "Mediana Setor": round(col_data_sector.median(), 2),
+                "Média Setor": round(col_data_sector.mean(), 2),
+                "Peers (n)": n_peers,
+                "Percentil": round(pct, 1),
+                "Veredicto": veredicto,
+            }
+        )
+
+    return pd.DataFrame(rows)

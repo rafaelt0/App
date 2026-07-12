@@ -1,5 +1,4 @@
 import streamlit as st
-import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
 import warnings
@@ -9,49 +8,21 @@ import traceback
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.ui import load_css, loading_overlay, render_flow_sidebar, section_header
-from utils.market_data import (
-    clean_numeric_column,
-    get_full_market_data,
-    get_sorted_tickers_by_liquidity,
-)
+from utils.market_data import clean_numeric_column, get_sorted_tickers_by_liquidity
 from utils.icons import (
-    ICO_ALERT,
-    ICO_BOLT,
     ICO_BULB,
-    ICO_CHART,
-    ICO_CHECK_SM,
     ICO_COMPASS,
     ICO_FILTER,
-    ICO_INFO,
     ICO_MARKET,
     ICO_METRICS,
-    ICO_NEWS,
-    ICO_RADAR,
     ICO_SECTOR,
     ICO_SHIELD,
     ICO_STAR,
-    ICO_STATS,
-    ICO_X_SM,
 )
-from utils.formatting import (
-    extract_debt_metric,
-    format_large_br_currency,
-    format_large_number,
-    get_ev_ebitda_context,
-)
-from utils.home_data import (
-    COLS_NEEDED,
-    MULTIPLES_CFG,
-    get_fundamentus_data,
-    get_sector_peers,
-    get_yfinance_data,
-)
+from utils.home_data import get_fundamentus_data
 from utils.home_render import (
-    color_pct,
-    color_veredicto,
     get_ticker_setor,
     render_debt_panel,
-    render_hist_section,
     render_price_cards,
     render_sector_cards,
     render_star_button,
@@ -59,7 +30,6 @@ from utils.home_render import (
 )
 
 import plotly.graph_objects as go
-import plotly.express as px
 
 warnings.filterwarnings("ignore")
 
@@ -544,21 +514,6 @@ if ready_to_analyze:
             if ticker in df_ind.index:
                 render_ticker_cards(df_ind.loc[ticker], setor=get_ticker_setor(df, ticker))
 
-        # ── Histórico Fundamentalista ─────────────────────────────────────────
-        st.markdown("---")
-        section_header(ICO_CHART, "Histórico Fundamentalista", "h3")
-        st.caption(
-            "Evolução anual de receita, lucro, margens e ROE — últimos 4 anos (fonte: yfinance / relatórios anuais)."
-        )
-
-        if len(tickers) > 1:
-            tabs_hist = st.tabs(tickers)
-            for _h_idx, _h_tkr in enumerate(tickers):
-                with tabs_hist[_h_idx]:
-                    render_hist_section(_h_tkr)
-        else:
-            render_hist_section(tickers[0])
-
         # ── Saúde Financeira ─────────────────────────────────────────────────
         st.markdown("---")
         section_header(ICO_SHIELD, "Saúde Financeira", "h3")
@@ -599,9 +554,9 @@ if ready_to_analyze:
             "</div>"
             '<p style="color:#94a3b8;font-size:0.82rem;margin:0">'
             "O módulo de valuation completo (Enterprise DCF, NOPLAT, ROIC, Continuing Value, WACC, "
-            'Sensitivity, Múltiplos) foi movido para a página <b style="color:#f8fafc">Valuation</b> '
-            "no menu lateral — implementado com a metodologia McKinsey/Koller "
-            "(<i>Measuring and Managing the Value of Companies</i>)."
+            "Sensitivity, Múltiplos, histórico fundamentalista e comparação com peers do setor) "
+            'está na página <b style="color:#f8fafc">Valuation</b> no menu lateral — implementado '
+            "com a metodologia McKinsey/Koller (<i>Measuring and Managing the Value of Companies</i>)."
             "</p>"
             "</div>",
             unsafe_allow_html=True,
@@ -694,374 +649,7 @@ if ready_to_analyze:
             apply_plotly_theme(fig_comp)
             st.plotly_chart(fig_comp, use_container_width=True)
 
-        # ── Comparação de Múltiplos do Setor ──────────────────────────────────
-        st.markdown("---")
-        st.markdown(
-            """
-<h3 style="display:flex;align-items:center;gap:8px;margin-bottom:.25rem">
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-       style="vertical-align:-3px">
-    <circle cx="7"  cy="12" r="3" stroke="#00d2ff" stroke-width="1.8"/>
-    <circle cx="17" cy="12" r="3" stroke="#00d2ff" stroke-width="1.8"/>
-    <line x1="10" y1="12" x2="14" y2="12" stroke="#00d2ff" stroke-width="1.8"/>
-    <rect x="4" y="3" width="6" height="4" rx="1" fill="#00ff87" opacity="0.7"/>
-    <rect x="14" y="3" width="6" height="4" rx="1" fill="#ffd600" opacity="0.7"/>
-    <rect x="4" y="17" width="6" height="4" rx="1" fill="#a855f7" opacity="0.7"/>
-    <rect x="14" y="17" width="6" height="4" rx="1" fill="#ff3d5a" opacity="0.7"/>
-  </svg>
-  Comparação de Múltiplos do Setor
-</h3>
-<p style="color:#94a3b8;font-size:0.85rem;margin-top:0;margin-bottom:1rem">
-  Posicionamento da(s) ação(ões) selecionada(s) em relação a todos os pares do setor na B3.
-</p>
-""",
-            unsafe_allow_html=True,
-        )
-
-        rank_df = pd.DataFrame()  # Inicializa; será populado se houver dados de peers
-
-        # Detecta setor(es) das ações selecionadas
-        setores_ativas = df["Setor"].dropna().unique().tolist()
-
-        # Mapa ticker -> setor individual
-        ticker_setor_map = {}
-        for t in tickers:
-            sr = data[data["Ticker"] == t]
-            if not sr.empty:
-                ticker_setor_map[t] = sr["Setor"].values[0]
-
-        if not setores_ativas:
-            st.info("Setor não identificado para comparação.")
-        else:
-            # Mostra setor de cada ativo individualmente
-            setor_info = " | ".join(
-                [f"**{t}**: {ticker_setor_map.get(t, '?')}" for t in tickers]
-            )
-            st.caption(f"Setores detectados: {setor_info}")
-
-            # Busca todos os tickers do setor via fundamentus (função cacheada no nível do módulo)
-            with loading_overlay("Buscando peers do setor..."):
-                peers_raw = get_sector_peers(tuple(setores_ativas))
-
-            if peers_raw.empty:
-                st.warning("Não foi possível buscar os pares do setor.")
-            else:
-                # fundamentus.get_resultado() retorna DataFrame com tickers como índice
-                # Filtra somente os múltiplos que existem
-                cols_available = [c for c in COLS_NEEDED if c in peers_raw.columns]
-                peers_df = peers_raw[cols_available].copy()
-
-                # Converte tudo para numérico
-                for col in cols_available:
-                    peers_df[col] = clean_numeric_column(peers_df[col])
-
-                # Limpa outliers e valores não aplicáveis (por célula, sem remover a linha inteira)
-                # Fundamentus usa 0 para indicar "não aplicável" em muitos múltiplos
-                for mult, name, lower_better, _ in MULTIPLES_CFG:
-                    if mult not in peers_df.columns:
-                        continue
-                    # Converte zeros exatos em NaN (0 = não aplicável no fundamentus)
-                    peers_df.loc[peers_df[mult] == 0, mult] = pd.NA
-                    if lower_better:
-                        # Remove apenas valores negativos ou absurdamente altos (> 500)
-                        peers_df.loc[
-                            (peers_df[mult].notna())
-                            & ((peers_df[mult] < 0) | (peers_df[mult] >= 500)),
-                            mult,
-                        ] = pd.NA
-
-                peers_df = peers_df.dropna(how="all")
-
-                # Tickers selecionados no setor
-                selected_in_peers = [t for t in tickers if t in peers_df.index]
-                if not selected_in_peers:
-                    # tenta com .SA removido
-                    selected_in_peers = tickers
-
-                # ── Tabela de percentis ─────────────────────────────────────
-                st.markdown("#### Posicionamento por Percentil")
-                st.caption(
-                    "Verde = favorável | Vermelho = desfavorável | Cinza = neutro. "
-                    "O percentil indica onde a ação está no ranking do setor (100 = melhor)."
-                )
-
-                rows = []
-                for mult, name, lower_better, categoria in MULTIPLES_CFG:
-                    if mult not in peers_df.columns:
-                        continue
-                    col_data = peers_df[mult].dropna()
-                    if col_data.empty:
-                        continue
-
-                    for t in selected_in_peers:
-                        if t not in peers_df.index or pd.isna(peers_df.loc[t, mult]):
-                            continue
-                        val = peers_df.loc[t, mult]
-
-                        # Obtém o setor da empresa individual
-                        setor_row = data[data["Ticker"] == t]
-                        if not setor_row.empty:
-                            setor_t = setor_row["Setor"].values[0]
-                            tickers_do_setor_t = data[data["Setor"] == setor_t][
-                                "Ticker"
-                            ].tolist()
-                            if t not in tickers_do_setor_t:
-                                tickers_do_setor_t.append(t)
-                            col_data_sector = col_data[
-                                col_data.index.isin(tickers_do_setor_t)
-                            ]
-                        else:
-                            col_data_sector = col_data
-
-                        if col_data_sector.empty:
-                            col_data_sector = col_data
-
-                        setor_med = col_data_sector.median()
-                        setor_mean = col_data_sector.mean()
-                        n_peers = len(col_data_sector)
-
-                        # Percentil: % de peers piores que esta ação neste múltiplo
-                        if lower_better:
-                            pct = (col_data_sector > val).sum() / n_peers * 100
-                        else:
-                            pct = (col_data_sector < val).sum() / n_peers * 100
-
-                        # Veredicto
-                        if pct >= 70:
-                            veredicto = "Favorável"
-                            cor = "#00ff87"
-                        elif pct >= 40:
-                            veredicto = "Neutro"
-                            cor = "#ffd600"
-                        else:
-                            veredicto = "Desfavorável"
-                            cor = "#ff3d5a"
-
-                        rows.append(
-                            {
-                                "Ação": t,
-                                "Setor": ticker_setor_map.get(t, "N/D"),
-                                "Categoria": categoria,
-                                "Múltiplo": name,
-                                "Valor": round(val, 2),
-                                "Mediana Setor": round(setor_med, 2),
-                                "Média Setor": round(setor_mean, 2),
-                                "Peers (n)": n_peers,
-                                "Percentil": round(pct, 1),
-                                "Veredicto": veredicto,
-                                "_cor": cor,
-                            }
-                        )
-
-                if rows:
-                    rank_df = pd.DataFrame(rows)
-
-                    display_df = rank_df.drop(columns=["_cor"])
-                    styled_rank = (
-                        display_df.style.map(color_veredicto, subset=["Veredicto"])
-                        .map(color_pct, subset=["Percentil"])
-                        .format(
-                            {
-                                "Valor": "{:.2f}",
-                                "Mediana Setor": "{:.2f}",
-                                "Média Setor": "{:.2f}",
-                                "Percentil": "{:.1f}%",
-                            }
-                        )
-                        .set_properties(
-                            **{
-                                "font-family": "JetBrains Mono, monospace",
-                                "font-size": "0.82rem",
-                            }
-                        )
-                    )
-                    st.dataframe(styled_rank, use_container_width=True, hide_index=True)
-
-                    # ── Gráfico Comparativo de Percentis no Setor ───────────
-                    st.markdown("#### Performance Relativa no Setor")
-                    st.caption(
-                        "Percentil de posicionamento no setor para cada indicador (100% representa o melhor posicionamento no setor)."
-                    )
-
-                    tab_labels_perf = [
-                        f"{t} ({ticker_setor_map.get(t, '?')})"
-                        for t in selected_in_peers
-                    ]
-                    tabs_perf = st.tabs(tab_labels_perf)
-                    for i, ticker_s in enumerate(selected_in_peers):
-                        with tabs_perf[i]:
-                            setor_name = ticker_setor_map.get(ticker_s, "N/D")
-                            sub_rank = rank_df[rank_df["Ação"] == ticker_s]
-                            n_peers_display = (
-                                sub_rank["Peers (n)"].max() if not sub_rank.empty else 0
-                            )
-                            st.caption(
-                                f"Comparado contra **{int(n_peers_display)} peers** do setor **{setor_name}**"
-                            )
-                            fig_pct = px.bar(
-                                sub_rank,
-                                x="Múltiplo",
-                                y="Percentil",
-                                color="Ação",
-                                color_discrete_sequence=["#00ff87"],
-                                title=None,
-                                labels={
-                                    "Percentil": "Percentil no Setor (%)",
-                                    "Múltiplo": "Múltiplo / Indicador",
-                                },
-                            )
-                            fig_pct.update_layout(
-                                yaxis=dict(range=[0, 105], ticksuffix="%"),
-                                height=380,
-                                margin=dict(t=30, b=40, l=40, r=40),
-                                showlegend=False,
-                            )
-                            apply_plotly_theme(fig_pct)
-                            st.plotly_chart(fig_pct, use_container_width=True)
-
-                    # ── Gráfico de barras por múltiplo ───────────────────────
-                    st.markdown("#### Distribuição do Setor por Múltiplo")
-                    mult_opcoes = [
-                        m[1] for m in MULTIPLES_CFG if m[0] in peers_df.columns
-                    ]
-                    mult_sel = st.selectbox(
-                        "Selecione o múltiplo para visualizar",
-                        mult_opcoes,
-                        key="mult_sel",
-                    )
-
-                    mult_key = next(
-                        (m[0] for m in MULTIPLES_CFG if m[1] == mult_sel), None
-                    )
-                    if mult_key and mult_key in peers_df.columns:
-                        tab_labels_dist = [
-                            f"{t} ({ticker_setor_map.get(t, '?')})"
-                            for t in selected_in_peers
-                        ]
-                        tabs_dist = st.tabs(tab_labels_dist)
-                        for i, ticker_s in enumerate(selected_in_peers):
-                            with tabs_dist[i]:
-                                setor_row = data[data["Ticker"] == ticker_s]
-                                if not setor_row.empty:
-                                    setor_t = setor_row["Setor"].values[0]
-                                    tickers_do_setor_t = data[data["Setor"] == setor_t][
-                                        "Ticker"
-                                    ].tolist()
-                                    if ticker_s not in tickers_do_setor_t:
-                                        tickers_do_setor_t.append(ticker_s)
-
-                                    col_plot = (
-                                        peers_df[
-                                            peers_df.index.isin(tickers_do_setor_t)
-                                        ][mult_key]
-                                        .dropna()
-                                        .sort_values()
-                                    )
-
-                                    if col_plot.empty:
-                                        st.warning(
-                                            f"Dados indisponíveis para o setor de {ticker_s}."
-                                        )
-                                        continue
-
-                                    bar_colors = ["#1e293b"] * len(col_plot)
-                                    if ticker_s in col_plot.index:
-                                        bar_colors[
-                                            list(col_plot.index).index(ticker_s)
-                                        ] = "#00ff87"
-
-                                    fig_mult = go.Figure(
-                                        go.Bar(
-                                            x=col_plot.index.tolist(),
-                                            y=col_plot.values,
-                                            marker_color=bar_colors,
-                                            marker_line_width=0,
-                                            text=[f"{v:.1f}" for v in col_plot.values],
-                                            textposition="outside",
-                                            textfont=dict(size=8, color="#94a3b8"),
-                                        )
-                                    )
-
-                                    # Mediana
-                                    med_val = col_plot.median()
-                                    fig_mult.add_hline(
-                                        y=med_val,
-                                        line_dash="dash",
-                                        line_color="#ffd600",
-                                        line_width=1.5,
-                                        annotation_text=f"Mediana: {med_val:.1f}",
-                                        annotation_position="top left",
-                                        annotation_font=dict(color="#ffd600", size=11),
-                                    )
-                                    fig_mult.update_layout(
-                                        title=f"{mult_sel} — Peers de {ticker_s} no Setor: {setor_t} ({len(col_plot)} empresas)",
-                                        xaxis_title="Ticker",
-                                        yaxis_title=mult_sel,
-                                        xaxis=dict(
-                                            tickangle=-45, tickfont=dict(size=9)
-                                        ),
-                                        height=420,
-                                        showlegend=False,
-                                    )
-                                    apply_plotly_theme(fig_mult)
-                                    st.plotly_chart(fig_mult, use_container_width=True)
-
-                    # ── Scorecard de valuation ────────────────────────────────
-                    st.markdown("#### Scorecard de Valuation do Setor")
-                    score_cols = st.columns(len(selected_in_peers))
-
-                    for i, ticker_s in enumerate(selected_in_peers):
-                        sub = rank_df[rank_df["Ação"] == ticker_s]
-                        if sub.empty:
-                            continue
-                        total_score = sub["Percentil"].mean()
-                        fav = (sub["Veredicto"] == "Favorável").sum()
-                        neut = (sub["Veredicto"] == "Neutro").sum()
-                        desf = (sub["Veredicto"] == "Desfavorável").sum()
-
-                        sc = (
-                            "#00ff87"
-                            if total_score >= 60
-                            else "#ffd600"
-                            if total_score >= 40
-                            else "#ff3d5a"
-                        )
-                        label = (
-                            "ATRATIVO"
-                            if total_score >= 60
-                            else "NEUTRO"
-                            if total_score >= 40
-                            else "CARO/FRACO"
-                        )
-
-                        with score_cols[i]:
-                            st.markdown(
-                                f"""
-<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1.5px solid {sc};
-            border-radius:10px;padding:0.65rem 0.85rem;margin-bottom:.5rem;
-            box-shadow:0 0 10px {sc}26">
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
-    <div>
-      <div style="font-size:0.85rem;font-weight:700;color:#94a3b8;letter-spacing:.04em">{ticker_s}</div>
-      <div style="font-size:0.6rem;font-weight:700;color:{sc};letter-spacing:.08em;margin-top:.15rem">{label}</div>
-    </div>
-    <div title="Percentil médio" style="font-size:1.7rem;font-weight:900;color:{sc};
-                font-family:'JetBrains Mono',monospace;text-shadow:0 0 8px {sc}55;line-height:1">{total_score:.0f}</div>
-  </div>
-  <div style="font-size:0.68rem;color:#94a3b8;margin-top:.45rem;display:flex;gap:.7rem;
-              border-top:1px solid rgba(255,255,255,0.06);padding-top:.4rem">
-    <span title="{fav} indicador(es) favorável(eis)" style="display:flex;align-items:center;gap:3px;color:#00ff87">{ICO_CHECK_SM} {fav}</span>
-    <span title="{neut} indicador(es) neutro(s)" style="color:#ffd600">~ {neut}</span>
-    <span title="{desf} indicador(es) desfavorável(eis)" style="display:flex;align-items:center;gap:3px;color:#ff3d5a">{ICO_X_SM} {desf}</span>
-  </div>
-</div>
-""",
-                                unsafe_allow_html=True,
-                            )
-                else:
-                    st.info(
-                        "Nenhum ticker selecionado encontrado nos dados de peers do setor."
-                    )
+        rank_df = pd.DataFrame()  # peers do setor agora ficam em Valuation; mantém fallback por thresholds
 
         # ── Síntese do Analista ──────────────────────────────────────────────
         st.markdown("---")
