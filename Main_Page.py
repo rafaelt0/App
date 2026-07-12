@@ -7,6 +7,7 @@ import traceback
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
+from utils.identity import get_browser_uid
 from utils.ui import load_css, loading_overlay, render_flow_sidebar, section_header
 from utils.market_data import clean_numeric_column, get_sorted_tickers_by_liquidity
 from utils.icons import (
@@ -109,8 +110,10 @@ setores = sorted(data["Setor"].dropna().unique())
 setores.insert(0, "Todos")
 _ticker_setor = dict(zip(data["Ticker"], data["Setor"]))
 
+_uid = get_browser_uid()
+
 # ── Watchlist (sidebar) ───────────────────────────────────────────────────────
-_watchlist = _db.wl_get()
+_watchlist = _db.wl_get(_uid)
 if _watchlist:
     st.sidebar.markdown(
         f'<div class="sidebar-section-label" style="color:#ffd600">{ICO_STAR} Favoritos</div>',
@@ -131,7 +134,7 @@ if _watchlist:
                 st.rerun()
         with _c2:
             if st.button("✕", key=f"wl_rm_{_wt}", help="Remover dos favoritos"):
-                _db.wl_remove(_wt)
+                _db.wl_remove(_uid, _wt)
                 st.rerun()
     st.sidebar.markdown(
         "<div style='margin-bottom:0.75rem'></div>", unsafe_allow_html=True
@@ -504,14 +507,14 @@ if ready_to_analyze:
             tabs_tickers = st.tabs(tickers)
             for idx, ticker in enumerate(tickers):
                 with tabs_tickers[idx]:
-                    render_star_button(ticker)
+                    render_star_button(ticker, _uid)
                     if ticker in df_ind.index:
                         render_ticker_cards(
                             df_ind.loc[ticker], setor=get_ticker_setor(df, ticker)
                         )
         else:
             ticker = tickers[0]
-            render_star_button(ticker)
+            render_star_button(ticker, _uid)
             if ticker in df_ind.index:
                 render_ticker_cards(df_ind.loc[ticker], setor=get_ticker_setor(df, ticker))
 

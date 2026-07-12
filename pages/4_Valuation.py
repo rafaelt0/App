@@ -11,6 +11,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
+from utils.identity import get_browser_uid
 from utils.ui import load_css, loading_overlay
 from utils.valuation import (
     calc_cv,
@@ -1461,14 +1462,15 @@ with tabs[7]:
 
     # ── Watchlist button ───────────────────────────────────────────────────────
     st.markdown("---")
-    _starred = _db.wl_has(ticker)
+    _uid = get_browser_uid()
+    _starred = _db.wl_has(_uid, ticker)
     if st.button(
         "★ Remover dos Favoritos" if _starred else "☆ Salvar nos Favoritos",
         key="val_watchlist_btn",
         help="Ticker salvo na watchlist da página principal",
     ):
         if _starred:
-            _db.wl_remove(ticker)
+            _db.wl_remove(_uid, ticker)
         else:
-            _db.wl_add(ticker)
+            _db.wl_add(_uid, ticker)
         st.rerun()

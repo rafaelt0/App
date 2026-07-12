@@ -11,7 +11,9 @@ from pypfopt import expected_returns, risk_models
 from pypfopt.efficient_frontier import EfficientFrontier
 from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
+from utils import db as _db
 from utils.charts import apply_plotly_theme
+from utils.identity import get_browser_uid
 from utils.ui import (
     diag_row,
     load_css,
@@ -142,8 +144,11 @@ data = pd.read_csv("acoes-listadas-b3.csv")
 stocks = list(data["Ticker"].values)
 stocks = get_sorted_tickers_by_liquidity(stocks)
 
+_uid = get_browser_uid()
+_saved_tickers, _saved_weights = _db.portfolio_get(_uid)
+
 if "selected_tickers" not in st.session_state:
-    st.session_state["selected_tickers"] = []
+    st.session_state["selected_tickers"] = [t for t in _saved_tickers if t in stocks]
 
 # Remove any stale tickers not in the current list, and trim to the cap in
 # case it was lowered or the session predates the limit
@@ -151,13 +156,23 @@ st.session_state["selected_tickers"] = [
     t for t in st.session_state["selected_tickers"] if t in stocks
 ][:MAX_TICKERS]
 
-tickers = st.multiselect(
-    "Selecione as ações do portfólio",
-    options=stocks,
-    key="selected_tickers",
-    max_selections=MAX_TICKERS,
-    help=f"Limite de {MAX_TICKERS} ativos para manter o download de cotações e a otimização estáveis.",
-)
+col_tickers, col_clear = st.columns([5, 1])
+with col_tickers:
+    tickers = st.multiselect(
+        "Selecione as ações do portfólio",
+        options=stocks,
+        key="selected_tickers",
+        max_selections=MAX_TICKERS,
+        help=f"Limite de {MAX_TICKERS} ativos para manter o download de cotações e a otimização estáveis.",
+    )
+with col_clear:
+    st.write("")
+    st.write("")
+    if st.button("Limpar salvo", use_container_width=True):
+        _db.portfolio_clear(_uid)
+        st.session_state["selected_tickers"] = []
+        st.rerun()
+
 # Valor inicial
 valor_inicial = st.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
 
@@ -188,11 +203,13 @@ if "Manual" in modo:
     section_header(ICO_BOX, "Alocação Manual dos Pesos", "h4")
     total_pesos = 0.0
     for ticker in tickers:
+        _saved_pct = _saved_weights.get(ticker + ".SA")
+        default_pct = _saved_pct * 100 if _saved_pct is not None else 100 / len(tickers)
         p = st.number_input(
             f"Peso % de {ticker}",
             min_value=0.0,
             max_value=100.0,
-            value=round(100 / len(tickers), 2),
+            value=round(default_pct, 2),
             step=0.01,
             key=f"peso_manual_{ticker}",
         )
@@ -306,7 +323,9 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             )
             pesos_manuais_arr = peso_manual_df["Peso"].values
 
-            # Mostrar pesos
+        _db.portfolio_save(_uid, tickers, pesos_manuais if "Manual" in modo else {})
+
+        # Mostrar pesos
         st.subheader("Pesos do Portfólio (%)")
         peso_manual_df.index = peso_manual_df.index.str.replace(".SA", "", regex=False)
         pesos_dict = {
