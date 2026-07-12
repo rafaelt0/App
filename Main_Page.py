@@ -1020,9 +1020,14 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
+# Aplica qualquer setor pré-selecionado pelos atalhos "Explorar por setor"
+# (que rodam depois deste widget ser instanciado, por isso usam staging)
+if "_pending_sectors" in st.session_state:
+    st.session_state["setores_selecionados"] = st.session_state.pop("_pending_sectors")
+
 # Permite filtro por setor na barra lateral
 setores_selecionados = st.sidebar.multiselect(
-    "Escolha um ou mais setores:", setores, default=[]
+    "Escolha um ou mais setores:", setores, default=[], key="setores_selecionados"
 )
 
 if st.session_state.get("selected_tickers"):
@@ -1145,32 +1150,24 @@ if not tickers:
         'text-transform:uppercase;margin:1.4rem 0 0.6rem 0">Explorar por setor</div>',
         unsafe_allow_html=True,
     )
+    # Rótulos amigáveis mapeados para os valores reais da coluna "Setor" do CSV
     _SETORES_DEST = [
-        "Bancos",
-        "Petróleo e Gás",
-        "Mineração",
-        "Energia Elétrica",
-        "Tecnologia",
-        "Bebidas",
-        "Saúde",
-        "Varejo",
+        ("Bancos", "Intermediários Financeiros"),
+        ("Petróleo e Gás", "Petróleo, Gás e Biocombustíveis"),
+        ("Mineração", "Mineração"),
+        ("Energia Elétrica", "Energia Elétrica"),
+        ("Tecnologia", "Programas e Serviços"),
+        ("Bebidas", "Bebidas"),
+        ("Saúde", "Serv.Méd.Hospit. Análises e Diagnósticos"),
+        ("Varejo", "Comércio"),
     ]
     _sc = st.columns(4)
-    for i, _s in enumerate(_SETORES_DEST):
+    for i, (_label, _real_setor) in enumerate(_SETORES_DEST):
         with _sc[i % 4]:
-            if st.button(_s, key=f"setor_qs_{_s}", use_container_width=True):
-                # Match against available sectors (partial match)
-                _match = [
-                    s
-                    for s in setores
-                    if _s.lower() in s.lower() or s.lower() in _s.lower()
-                ]
-                if _match:
-                    st.session_state["selected_sectors_hint"] = _match[0]
-                st.toast(
-                    f'Filtre por "{_s}" no seletor de setores na barra lateral →',
-                    icon="↙",
-                )
+            if st.button(_label, key=f"setor_qs_{_label}", use_container_width=True):
+                if _real_setor in setores:
+                    st.session_state["_pending_sectors"] = [_real_setor]
+                st.rerun()
 
     st.markdown(
         '<div style="margin-top:1.2rem;padding:0.75rem 1rem;background:rgba(0,0,0,0.2);'
