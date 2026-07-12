@@ -31,7 +31,8 @@ from utils.home_render import (
 
 import plotly.graph_objects as go
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Configurar temas de plotagem escuros
 plt.style.use("dark_background")

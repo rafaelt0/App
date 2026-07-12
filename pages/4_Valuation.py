@@ -6,7 +6,8 @@ import plotly.graph_objects as go
 import datetime as dt
 import warnings
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme

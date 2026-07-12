@@ -67,7 +67,7 @@ def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=
         min_weights_arr = np.array(list(min_weights.values()))
         min_return = np.sum(min_weights_arr * mu)
         min_stddev = np.sqrt(np.dot(min_weights_arr.T, np.dot(S, min_weights_arr)))
-    except:
+    except Exception:
         min_return = min(mu)
         min_stddev = np.sqrt(np.min(np.diag(S)))
 
@@ -80,7 +80,7 @@ def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=
             w_target = np.array(list(ef_target.clean_weights().values()))
             vol = np.sqrt(np.dot(w_target.T, np.dot(S, w_target)))
             efficient_vols.append(vol)
-        except:
+        except Exception:
             pass
 
     return (

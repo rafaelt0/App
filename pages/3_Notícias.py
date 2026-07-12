@@ -410,7 +410,7 @@ def get_brazilian_news(ticker_name):
                 try:
                     dt = email.utils.parsedate_to_datetime(pub_date)
                     formatted_date = dt.strftime('%d/%m/%Y %H:%M')
-                except:
+                except Exception:
                     formatted_date = pub_date
             
             # Clean source name from title
@@ -766,14 +766,14 @@ def parse_pub_time(pub_time):
     if "Há" in pub_time:
         try:
             return int(pub_time.split()[1])
-        except:
+        except Exception:
             return 24
     elif "/" in pub_time:
         try:
             dt = datetime.datetime.strptime(pub_time, '%d/%m/%Y %H:%M')
             # return negative timestamp for descending sort
             return -int(dt.timestamp())
-        except:
+        except Exception:
             return 0
     return 24
 

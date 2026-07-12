@@ -54,7 +54,8 @@ load_css()
 
 render_flow_sidebar(active_step=2, pending_opacities=[0.4, 0.25])
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 # ── Hero Header ─────────────────────────────────────────────────────────────
