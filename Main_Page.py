@@ -541,27 +541,6 @@ if ready_to_analyze:
                     row_debt = row_debt.iloc[-1]
                 render_debt_panel(ticker, row_debt)
 
-        # ── Link para página de Valuation ────────────────────────────────────
-        st.markdown("---")
-        st.markdown(
-            '<div style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);'
-            'border-radius:10px;padding:1rem 1.25rem;margin:0.5rem 0">'
-            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
-            '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" '
-            'stroke="#a855f7" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/>'
-            '<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" fill="none"/></svg>'
-            '<span style="color:#a855f7;font-weight:700;font-size:0.95rem">Valuation McKinsey/Koller</span>'
-            "</div>"
-            '<p style="color:#94a3b8;font-size:0.82rem;margin:0">'
-            "O módulo de valuation completo (Enterprise DCF, NOPLAT, ROIC, Continuing Value, WACC, "
-            "Sensitivity, Múltiplos, histórico fundamentalista e comparação com peers do setor) "
-            'está na página <b style="color:#f8fafc">Valuation</b> no menu lateral — implementado '
-            "com a metodologia McKinsey/Koller (<i>Measuring and Managing the Value of Companies</i>)."
-            "</p>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
         # ── Comparação Visual de Múltiplos ───────────────────────────────────
         if len(tickers) > 1:
             st.markdown(
