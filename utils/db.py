@@ -22,6 +22,14 @@ def _conn():
             added_at  REAL NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS portfolio (
+            id         INTEGER PRIMARY KEY CHECK (id = 1),
+            tickers    TEXT NOT NULL,
+            weights    TEXT,
+            updated_at REAL NOT NULL
+        )
+    """)
     conn.commit()
     return conn
 
@@ -105,3 +113,45 @@ def wl_has(ticker: str) -> bool:
             return row is not None
     except Exception:
         return False
+
+
+# ── Portfolio (última carteira montada) ────────────────────────────────────────
+
+def portfolio_get() -> tuple[list[str], dict]:
+    """Return (tickers, weights) from the last saved portfolio, or ([], {})."""
+    try:
+        with _conn() as c:
+            row = c.execute(
+                "SELECT tickers, weights FROM portfolio WHERE id = 1"
+            ).fetchone()
+            if row:
+                tickers = json.loads(row[0])
+                weights = json.loads(row[1]) if row[1] else {}
+                return tickers, weights
+    except Exception:
+        pass
+    return [], {}
+
+
+def portfolio_save(tickers: list[str], weights: dict | None = None):
+    """Persist the current ticker selection and (optional) manual weights."""
+    try:
+        with _conn() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO portfolio VALUES (1, ?, ?, ?)",
+                (
+                    json.dumps(tickers),
+                    json.dumps(weights) if weights else None,
+                    time.time(),
+                ),
+            )
+    except Exception:
+        pass
+
+
+def portfolio_clear():
+    try:
+        with _conn() as c:
+            c.execute("DELETE FROM portfolio WHERE id = 1")
+    except Exception:
+        pass
