@@ -2,7 +2,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import datetime
 import warnings
 import plotly.express as px
@@ -12,173 +11,42 @@ from pypfopt import expected_returns, risk_models
 from pypfopt.efficient_frontier import EfficientFrontier
 from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
-from bcb import sgs
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
+from utils.ui import (
+    diag_row,
+    load_css,
+    loading_overlay,
+    render_cards_grid,
+    render_flow_sidebar,
+    section_header,
+)
 from utils.market_data import get_sorted_tickers_by_liquidity
-
-
-# ─── SVG Icon Library ─────────────────────────────────────────────────────────
-_svg = svg_icon
-
-ICO_OK = _svg(
-    '<circle cx="12" cy="12" r="9" stroke="#00ff87" stroke-width="1.8"/>'
-    '<path d="M8 12l3 3 5-5" stroke="#00ff87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+from utils.icons import (
+    ICO_BOX,
+    ICO_CAPM,
+    ICO_CHART,
+    ICO_CRIT,
+    ICO_DOWN,
+    ICO_FLAT,
+    ICO_FRONTIER,
+    ICO_HEATMAP,
+    ICO_IDEA,
+    ICO_LINK,
+    ICO_METRICS,
+    ICO_OK,
+    ICO_RISK,
+    ICO_RULER,
+    ICO_SIGNAL,
+    ICO_STRESS,
+    ICO_TARGET,
+    ICO_UP,
+    ICO_WARN,
 )
-ICO_WARN = _svg(
-    '<path d="M12 3L22 21H2L12 3Z" stroke="#ffd600" stroke-width="1.8" stroke-linejoin="round"/>'
-    '<line x1="12" y1="10" x2="12" y2="14" stroke="#ffd600" stroke-width="2" stroke-linecap="round"/>'
-    '<circle cx="12" cy="17.5" r="1" fill="#ffd600"/>'
+from utils.portfolio_data import get_benchmark_prices, get_portfolio_prices, get_selic_rate
+from utils.portfolio_charts import (
+    apply_matplotlib_theme,
+    plot_efficient_frontier_and_random_portfolios,
 )
-ICO_CRIT = _svg(
-    '<circle cx="12" cy="12" r="9" stroke="#ff3d5a" stroke-width="1.8"/>'
-    '<line x1="9" y1="9" x2="15" y2="15" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>'
-    '<line x1="15" y1="9" x2="9" y2="15" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>'
-)
-ICO_CHART = _svg(
-    '<rect x="3" y="12" width="3" height="9" rx="1" fill="#00ff87"/>'
-    '<rect x="9" y="7"  width="3" height="14" rx="1" fill="#00d2ff"/>'
-    '<rect x="15" y="9" width="3" height="12" rx="1" fill="#ffd600"/>',
-    16,
-)
-ICO_TARGET = _svg(
-    '<circle cx="12" cy="12" r="9" stroke="#00d2ff" stroke-width="1.8"/>'
-    '<circle cx="12" cy="12" r="5" stroke="#ffd600" stroke-width="1.5"/>'
-    '<circle cx="12" cy="12" r="2" fill="#00ff87"/>',
-    16,
-)
-ICO_SIGNAL = _svg(
-    '<path d="M2 12 Q6 4 12 12 Q18 20 22 12" stroke="#00d2ff" stroke-width="2" '
-    'stroke-linecap="round" fill="none"/>'
-    '<circle cx="12" cy="12" r="2" fill="#ffd600"/>',
-    16,
-)
-ICO_RISK = _svg(
-    '<path d="M12 3l9 18H3L12 3z" stroke="#ff3d5a" stroke-width="1.8" stroke-linejoin="round"/>'
-    '<line x1="12" y1="9" x2="12" y2="14" stroke="#ff3d5a" stroke-width="1.8" stroke-linecap="round"/>'
-    '<circle cx="12" cy="17" r="1" fill="#ff3d5a"/>',
-    16,
-)
-ICO_METRICS = _svg(
-    '<rect x="3" y="3" width="18" height="18" rx="3" stroke="#94a3b8" stroke-width="1.5"/>'
-    '<line x1="7" y1="9"  x2="17" y2="9"  stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
-    '<line x1="7" y1="13" x2="14" y2="13" stroke="#94a3b8" stroke-width="1.2" stroke-linecap="round"/>'
-    '<line x1="7" y1="17" x2="15" y2="17" stroke="#94a3b8" stroke-width="1.2" stroke-linecap="round"/>',
-    16,
-)
-ICO_HEATMAP = _svg(
-    '<rect x="3"  y="3"  width="4" height="4" rx="1" fill="#00ff87" opacity="0.9"/>'
-    '<rect x="10" y="3"  width="4" height="4" rx="1" fill="#00d2ff" opacity="0.6"/>'
-    '<rect x="17" y="3"  width="4" height="4" rx="1" fill="#ffd600" opacity="0.4"/>'
-    '<rect x="3"  y="10" width="4" height="4" rx="1" fill="#00d2ff" opacity="0.5"/>'
-    '<rect x="10" y="10" width="4" height="4" rx="1" fill="#00ff87" opacity="0.9"/>'
-    '<rect x="17" y="10" width="4" height="4" rx="1" fill="#a855f7" opacity="0.5"/>'
-    '<rect x="3"  y="17" width="4" height="4" rx="1" fill="#ffd600" opacity="0.3"/>'
-    '<rect x="17" y="17" width="4" height="4" rx="1" fill="#00ff87" opacity="0.9"/>',
-    16,
-)
-ICO_FRONTIER = _svg(
-    '<path d="M3 20 Q8 8 14 10 Q18 12 21 4" stroke="#00ff87" stroke-width="2" stroke-linecap="round" fill="none"/>'
-    '<circle cx="18" cy="6" r="2.5" fill="#ff3d5a"/>'
-    '<circle cx="10" cy="17" r="2" fill="#ffd600"/>',
-    16,
-)
-ICO_LINK = _svg(
-    '<circle cx="7"  cy="12" r="3" stroke="#00d2ff" stroke-width="1.8"/>'
-    '<circle cx="17" cy="12" r="3" stroke="#00d2ff" stroke-width="1.8"/>'
-    '<line x1="10" y1="12" x2="14" y2="12" stroke="#00d2ff" stroke-width="1.8"/>',
-    16,
-)
-ICO_BOX = _svg(
-    '<rect x="3" y="7" width="18" height="14" rx="2" stroke="#94a3b8" stroke-width="1.8"/>'
-    '<path d="M8 7V5a4 4 0 018 0v2" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>'
-    '<line x1="12" y1="12" x2="12" y2="16" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
-    '<line x1="10" y1="14" x2="14" y2="14" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>',
-    16,
-)
-ICO_RULER = _svg(
-    '<rect x="2" y="7" width="20" height="10" rx="2" stroke="#ffd600" stroke-width="1.8"/>'
-    '<line x1="6"  y1="7" x2="6"  y2="12" stroke="#ffd600" stroke-width="1.5"/>'
-    '<line x1="10" y1="7" x2="10" y2="10" stroke="#ffd600" stroke-width="1.2"/>'
-    '<line x1="14" y1="7" x2="14" y2="10" stroke="#ffd600" stroke-width="1.2"/>'
-    '<line x1="18" y1="7" x2="18" y2="12" stroke="#ffd600" stroke-width="1.5"/>',
-    16,
-)
-ICO_IDEA = _svg(
-    '<circle cx="12" cy="10" r="6" stroke="#ffd600" stroke-width="1.8"/>'
-    '<path d="M9 16.5h6M10 19h4" stroke="#ffd600" stroke-width="1.8" stroke-linecap="round"/>'
-    '<line x1="12" y1="4" x2="12" y2="2" stroke="#ffd600" stroke-width="1.5" stroke-linecap="round"/>',
-    16,
-)
-ICO_UP = _svg(
-    '<path d="M12 20V4M5 11l7-7 7 7" stroke="#00ff87" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
-    14,
-)
-ICO_DOWN = _svg(
-    '<path d="M12 4v16M5 13l7 7 7-7" stroke="#ff3d5a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
-    14,
-)
-ICO_FLAT = _svg(
-    '<line x1="4" y1="12" x2="20" y2="12" stroke="#ffd600" stroke-width="2.2" stroke-linecap="round"/>'
-    '<path d="M16 8l4 4-4 4" stroke="#ffd600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
-    14,
-)
-
-
-def section_header(icon_svg, text, tag="h3"):
-    st.markdown(
-        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
-        f"{icon_svg}<span>{text}</span></{tag}>",
-        unsafe_allow_html=True,
-    )
-
-
-def diag_row(icon_svg, text, color):
-    st.markdown(
-        f'<div style="display:flex;align-items:center;gap:6px;padding:3px 0;'
-        f'color:{color};font-size:0.88rem">{icon_svg}{text}</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def render_cards_grid(data_dict, colors_sequence=None):
-    if not colors_sequence:
-        colors_sequence = [
-            "#38bdf8",
-            "#4ade80",
-            "#fbbf24",
-            "#fb7185",
-            "#c084fc",
-            "#f472b6",
-            "#34d399",
-            "#60a5fa",
-        ]
-    items = list(data_dict.items())
-    cards_html = "".join(
-        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
-        f'<div class="mcard-value" style="color:{colors_sequence[i % len(colors_sequence)]}">{val}</div></div>'
-        for i, (lbl, val) in enumerate(items)
-    )
-    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_selic_rate(start_date):
-    taxa_selic = sgs.get(432, start=start_date)
-    val = (taxa_selic.iloc[-1, 0]) / 100
-    daily_val = (1 + val) ** (1 / 252) - 1
-    return daily_val
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_portfolio_prices(tickers_yf, start_date):
-    today = datetime.date.today()
-    return yf.download(tickers_yf, start=start_date, end=today, progress=False)["Close"]
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_benchmark_prices(start_date):
-    return yf.download("^BVSP", start=start_date, progress=False)["Close"].squeeze()
 
 
 # CSS customizado
@@ -187,197 +55,6 @@ load_css()
 render_flow_sidebar(active_step=2, pending_opacities=[0.4, 0.25])
 
 warnings.filterwarnings("ignore")
-
-# Customização do Matplotlib para o tema Obsidian Neo-Financial
-plt.style.use("dark_background")
-plt.rcParams["figure.facecolor"] = "#080c14"
-plt.rcParams["axes.facecolor"] = "#0e1524"
-plt.rcParams["text.color"] = "#f8fafc"
-plt.rcParams["axes.labelcolor"] = "#f8fafc"
-plt.rcParams["xtick.color"] = "#94a3b8"
-plt.rcParams["ytick.color"] = "#94a3b8"
-plt.rcParams["grid.color"] = "#1e293b"
-plt.rcParams["font.family"] = "sans-serif"
-
-
-def apply_matplotlib_theme(fig):
-    fig.set_facecolor("#080c14")
-    for ax in fig.axes:
-        ax.set_facecolor("#0e1524")
-        ax.tick_params(colors="#94a3b8", which="both")
-        ax.yaxis.label.set_color("#f8fafc")
-        ax.xaxis.label.set_color("#f8fafc")
-        if ax.title:
-            ax.title.set_color("#f8fafc")
-        for spine in ax.spines.values():
-            spine.set_color("#1e293b")
-        legend = ax.get_legend()
-        if legend:
-            legend.get_frame().set_facecolor("#0e1524")
-            legend.get_frame().set_edgecolor("#1e293b")
-            for text in legend.get_texts():
-                text.set_color("#f8fafc")
-    return fig
-
-
-# Customização do Plotly para o tema Obsidian Neo-Financial
-def plot_efficient_frontier_and_random_portfolios(mu, S, returns, cleaned_weights, rf):
-    num_portfolios = 5000
-    results = np.zeros((3, num_portfolios))
-
-    for i in range(num_portfolios):
-        weights = np.random.random(len(mu))
-        weights /= np.sum(weights)
-
-        portfolio_return = np.sum(weights * mu)
-        portfolio_stddev = np.sqrt(np.dot(weights.T, np.dot(S, weights)))
-
-        results[0, i] = portfolio_stddev
-        results[1, i] = portfolio_return
-        results[2, i] = (
-            (portfolio_return - rf) / portfolio_stddev if portfolio_stddev > 0 else 0
-        )
-
-    opt_weights = np.array(list(cleaned_weights.values()))
-    opt_return = np.sum(opt_weights * mu)
-    opt_stddev = np.sqrt(np.dot(opt_weights.T, np.dot(S, opt_weights)))
-    opt_sharpe = (opt_return - rf) / opt_stddev if opt_stddev > 0 else 0
-
-    try:
-        ef_min = EfficientFrontier(mu, S)
-        min_weights = ef_min.min_volatility()
-        min_weights_arr = np.array(list(min_weights.values()))
-        min_return = np.sum(min_weights_arr * mu)
-        min_stddev = np.sqrt(np.dot(min_weights_arr.T, np.dot(S, min_weights_arr)))
-    except:
-        min_return = min(mu)
-        min_stddev = np.sqrt(np.min(np.diag(S)))
-
-    efficient_vols = []
-    target_returns = np.linspace(min_return, max(mu), 25)
-    for target in target_returns:
-        try:
-            ef_target = EfficientFrontier(mu, S)
-            ef_target.efficient_return(target)
-            w_target = np.array(list(ef_target.clean_weights().values()))
-            vol = np.sqrt(np.dot(w_target.T, np.dot(S, w_target)))
-            efficient_vols.append(vol)
-        except:
-            pass
-
-    fig = go.Figure()
-
-    fig.add_trace(
-        go.Scatter(
-            x=results[0, :],
-            y=results[1, :],
-            mode="markers",
-            marker=dict(
-                size=4,
-                color=results[2, :],
-                colorscale="Viridis",
-                showscale=True,
-                colorbar=dict(
-                    title=dict(text="Índice Sharpe", font=dict(color="#f8fafc")),
-                    tickfont=dict(color="#f8fafc"),
-                ),
-                opacity=0.6,
-            ),
-            name="Portfólios Aleatórios",
-            text=[
-                f"Retorno Anual: {r:.2%}<br>Vol Anual: {v:.2%}<br>Sharpe: {s:.2f}"
-                for v, r, s in zip(results[0, :], results[1, :], results[2, :])
-            ],
-            hoverinfo="text",
-        )
-    )
-
-    if len(efficient_vols) > 0:
-        fig.add_trace(
-            go.Scatter(
-                x=efficient_vols,
-                y=target_returns[: len(efficient_vols)],
-                mode="lines",
-                line=dict(color="#00ff87", width=3),
-                name="Fronteira Eficiente",
-            )
-        )
-
-    fig.add_trace(
-        go.Scatter(
-            x=[opt_stddev],
-            y=[opt_return],
-            mode="markers",
-            marker=dict(
-                color="#ff1744",
-                size=12,
-                symbol="star",
-                line=dict(color="#f8fafc", width=2),
-            ),
-            name="Max Sharpe (Markowitz)",
-            text=[
-                f"Max Sharpe<br>Retorno: {opt_return:.2%}<br>Vol: {opt_stddev:.2%}<br>Sharpe: {opt_sharpe:.2f}"
-            ],
-            hoverinfo="text",
-        )
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=[min_stddev],
-            y=[min_return],
-            mode="markers",
-            marker=dict(
-                color="#ffd600",
-                size=10,
-                symbol="diamond",
-                line=dict(color="#f8fafc", width=1.5),
-            ),
-            name="Mínima Volatilidade",
-            text=[
-                f"Mínima Volatilidade<br>Retorno: {min_return:.2%}<br>Vol: {min_stddev:.2%}"
-            ],
-            hoverinfo="text",
-        )
-    )
-
-    # LAC — Linha de Alocação de Capital (EAE1242 — Tobin, 1958)
-    # Parte do Rf (volatilidade=0) e passa pela carteira tangente (Max Sharpe)
-    if opt_stddev > 0:
-        lac_slope = (opt_return - rf) / opt_stddev
-        lac_x_end = opt_stddev * 1.8
-        fig.add_trace(
-            go.Scatter(
-                x=[0, lac_x_end],
-                y=[rf, rf + lac_slope * lac_x_end],
-                mode="lines",
-                line=dict(color="#ffd600", width=2, dash="dash"),
-                name="LAC — Linha de Alocação de Capital",
-                hovertemplate="LAC<br>Vol: %{x:.2%}<br>Retorno: %{y:.2%}<extra></extra>",
-            )
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=[0],
-                y=[rf],
-                mode="markers+text",
-                marker=dict(color="#ffd600", size=8, symbol="circle"),
-                text=["Rf (Selic)"],
-                textposition="top right",
-                textfont=dict(color="#ffd600", size=10),
-                name="Taxa Livre de Risco (Rf)",
-                hovertemplate=f"Rf (Selic) = {rf:.2%}<extra></extra>",
-            )
-        )
-
-    fig.update_layout(
-        title="Fronteira Eficiente de Markowitz · LAC · Carteira Tangente",
-        xaxis_title="Volatilidade Anualizada (Desvio Padrão)",
-        yaxis_title="Retorno Esperado Anualizado",
-    )
-    apply_plotly_theme(fig)
-    fig.update_layout(height=550, margin=dict(b=140))
-    return fig
 
 
 # ── Hero Header ─────────────────────────────────────────────────────────────
@@ -1241,14 +918,6 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         # ── Análise CAPM por Ativo — EAE1242 (Sharpe, 1964) ─────────────────
         st.markdown("---")
-        ICO_CAPM = _svg(
-            '<line x1="3" y1="21" x2="21" y2="3" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/>'
-            '<circle cx="8" cy="16" r="2.5" fill="#00ff87"/>'
-            '<circle cx="14" cy="10" r="2.5" fill="#ff3d5a"/>'
-            '<circle cx="18" cy="6" r="2.5" fill="#ffd600"/>'
-            '<line x1="3" y1="21" x2="21" y2="3" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 2"/>',
-            16,
-        )
         section_header(ICO_CAPM, "Análise CAPM por Ativo", "h3")
         st.caption(
             "**CAPM (Sharpe, 1964):** E[Rᵢ] = Rƒ + βᵢ × (E[Rₘ] − Rƒ)  ·  "
@@ -1457,13 +1126,6 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         # ── Stress Test — Crises Históricas ──────────────────────────────────
         st.markdown("---")
-        ICO_STRESS = _svg(
-            '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" '
-            'stroke="#ff3d5a" stroke-width="1.8" fill="none"/>'
-            '<line x1="12" y1="9" x2="12" y2="13" stroke="#ff3d5a" stroke-width="1.8" stroke-linecap="round"/>'
-            '<line x1="12" y1="17" x2="12.01" y2="17" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>',
-            16,
-        )
         section_header(ICO_STRESS, "Stress Test — Crises Históricas", "h3")
         st.caption(
             "Desempenho estimado do portfólio durante períodos de turbulência histórica. "

@@ -18,6 +18,48 @@ def svg_icon(body: str, size: int = 14) -> str:
     )
 
 
+def section_header(icon_svg: str, text: str, tag: str = "h3") -> None:
+    """Render a section title with a leading inline SVG icon."""
+    st.markdown(
+        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
+        f"{icon_svg}<span>{text}</span></{tag}>",
+        unsafe_allow_html=True,
+    )
+
+
+def diag_row(icon_svg: str, text: str, color: str) -> None:
+    """Render a one-line diagnostic message with a leading icon."""
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:6px;padding:3px 0;'
+        f'color:{color};font-size:0.88rem">{icon_svg}{text}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+_CARD_GRID_COLORS = [
+    "#38bdf8",
+    "#4ade80",
+    "#fbbf24",
+    "#fb7185",
+    "#c084fc",
+    "#f472b6",
+    "#34d399",
+    "#60a5fa",
+]
+
+
+def render_cards_grid(data_dict: dict, colors_sequence=None) -> None:
+    """Render a `label -> value` dict as a grid of `.mcard` divs."""
+    colors_sequence = colors_sequence or _CARD_GRID_COLORS
+    items = list(data_dict.items())
+    cards_html = "".join(
+        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
+        f'<div class="mcard-value" style="color:{colors_sequence[i % len(colors_sequence)]}">{val}</div></div>'
+        for i, (lbl, val) in enumerate(items)
+    )
+    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+
 def load_css(path: str = "style.css") -> None:
     """Load a CSS file and inject it into the page via `st.markdown`.
 

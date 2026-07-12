@@ -1,20 +1,61 @@
 import streamlit as st
 import yfinance as yf
 import matplotlib.pyplot as plt
-import fundamentus
 import pandas as pd
 import warnings
 import datetime
 import traceback
-import time
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
+from utils.ui import load_css, loading_overlay, render_flow_sidebar, section_header
 from utils.market_data import (
     clean_numeric_column,
     get_full_market_data,
     get_sorted_tickers_by_liquidity,
+)
+from utils.icons import (
+    ICO_ALERT,
+    ICO_BOLT,
+    ICO_BULB,
+    ICO_CHART,
+    ICO_CHECK_SM,
+    ICO_COMPASS,
+    ICO_FILTER,
+    ICO_INFO,
+    ICO_MARKET,
+    ICO_METRICS,
+    ICO_NEWS,
+    ICO_RADAR,
+    ICO_SECTOR,
+    ICO_SHIELD,
+    ICO_STAR,
+    ICO_STATS,
+    ICO_X_SM,
+)
+from utils.formatting import (
+    extract_debt_metric,
+    format_large_br_currency,
+    format_large_number,
+    get_ev_ebitda_context,
+)
+from utils.home_data import (
+    COLS_NEEDED,
+    MULTIPLES_CFG,
+    get_fundamentus_data,
+    get_sector_peers,
+    get_yfinance_data,
+)
+from utils.home_render import (
+    color_pct,
+    color_veredicto,
+    get_ticker_setor,
+    render_debt_panel,
+    render_hist_section,
+    render_price_cards,
+    render_sector_cards,
+    render_star_button,
+    render_ticker_cards,
 )
 
 import plotly.graph_objects as go
@@ -34,771 +75,6 @@ plt.rcParams["grid.color"] = "#1e293b"
 plt.rcParams["font.family"] = "sans-serif"
 
 
-# Customização do Plotly para o tema Obsidian Neo-Financial
-def get_ev_ebitda_context(setor: str):
-    """Returns (alt_metric, reason) when EV/EBITDA doesn't apply, or None if it applies normally."""
-    s = setor.lower() if setor else ""
-    if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio")):
-        return (
-            "P/L · P/VP",
-            "Bancos: resultado financeiro é a atividade-fim — EV/EBITDA não se aplica.",
-        )
-    if any(k in s for k in ("seguro", "previdência", "previdencia", "resseguro")):
-        return (
-            "P/L · P/VP",
-            "Seguradoras: lucro atrelado ao resultado financeiro (float) — EV/EBITDA não se aplica.",
-        )
-    if any(k in s for k in ("holding", "participação", "participacao")):
-        return (
-            "Desconto sobre NAV",
-            "Holdings: receita de equivalência patrimonial — EBITDA é quase nulo ou negativo.",
-        )
-    if any(k in s for k in ("tecnologia", "software", "internet")):
-        return (
-            "EV/Sales",
-            "Tech em crescimento: EBITDA frequentemente negativo pelo reinvestimento agressivo.",
-        )
-    if any(
-        k in s
-        for k in ("exploração", "exploracao", "pré-operacional", "pre-operacional")
-    ):
-        return (
-            "EV/Recursos · DCF",
-            "Empresa pré-operacional: sem receita, EBITDA estruturalmente negativo.",
-        )
-    return None
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_fundamentus_data(tickers):
-    """Busca dados fundamentalistas com SQLite cache (4h) + retry automático."""
-    cache_key = f"fund_{'_'.join(sorted(tickers))}"
-    cached = _db.cache_get(cache_key, ttl=14400)
-    if cached:
-        try:
-            df = pd.read_json(cached)
-            if not df.empty:
-                return df
-        except Exception:
-            pass
-    last_exc = None
-    for attempt in range(3):
-        try:
-            raw = [fundamentus.get_papel(t) for t in tickers]
-            results = [r for r in raw if r is not None]
-            if not results:
-                raise RuntimeError(
-                    f"Nenhum dado retornado pelo Fundamentus para: {', '.join(tickers)}. "
-                    "Verifique se os tickers estão corretos."
-                )
-            result = pd.concat(results)
-            _db.cache_set(cache_key, result.to_json())
-            return result
-        except Exception as exc:
-            last_exc = exc
-            if attempt < 2:
-                time.sleep(1)
-                continue
-    raise last_exc
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_yfinance_data(tickers_yf, start, interval):
-    """Busca cotações do Yahoo Finance com retry automático."""
-    today = datetime.date.today()
-    for attempt in range(3):
-        try:
-            return yf.download(tickers_yf, start=start, end=today, interval=interval)[
-                "Close"
-            ]
-        except OSError:
-            if attempt < 2:
-                time.sleep(1)
-                continue
-            raise
-
-
-@st.cache_data(ttl=14400, show_spinner=False)
-def get_hist_fundamentals(ticker_sa: str):
-    """Fetch annual income statement + balance sheet from yfinance (4h cache)."""
-    t_yf = yf.Ticker(ticker_sa)
-    out = {}
-    try:
-        fin = t_yf.financials
-        if fin is not None and not fin.empty:
-            out["fin"] = fin.to_json()
-    except Exception:
-        pass
-    try:
-        bs = t_yf.balance_sheet
-        if bs is not None and not bs.empty:
-            out["bs"] = bs.to_json()
-    except Exception:
-        pass
-    return out
-
-
-def _hist_parse(json_str):
-    """Parse a yfinance JSON financials/balance-sheet string into a year-indexed DataFrame."""
-    df_p = pd.read_json(json_str)
-    try:
-        df_p.columns = pd.to_datetime(df_p.columns.astype("int64"), unit="ms").year
-    except Exception:
-        try:
-            df_p.columns = pd.to_datetime(df_p.columns).year
-        except Exception:
-            pass
-    return df_p
-
-
-def _hist_row(df_p, *keys):
-    """Return the first matching row from df_p by trying each key in order."""
-    for k in keys:
-        if k in df_p.index:
-            return df_p.loc[k]
-    return None
-
-
-def _build_hist_df(tkr: str):
-    """Returns a DataFrame indexed by year with Receita, Lucro, Margens, ROE."""
-    raw = get_hist_fundamentals(tkr + ".SA")
-    if not raw:
-        return None
-
-    fin_df = bs_df = None
-    if "fin" in raw:
-        try:
-            fin_df = _hist_parse(raw["fin"])
-        except Exception:
-            pass
-    if "bs" in raw:
-        try:
-            bs_df = _hist_parse(raw["bs"])
-        except Exception:
-            pass
-
-    records = {}
-
-    if fin_df is not None:
-        rev = _hist_row(fin_df, "Total Revenue", "Revenue")
-        ni = _hist_row(
-            fin_df,
-            "Net Income",
-            "Net Income Common Stockholders",
-            "Net Income Applicable To Common Shares",
-            "Net Income Including Noncontrolling Interests",
-        )
-        eb = _hist_row(fin_df, "EBIT", "Operating Income", "Ebit")
-
-        for y in sorted(fin_df.columns.tolist()):
-            y = int(y)
-            rec = records.setdefault(y, {})
-            r_v = (
-                float(rev[y])
-                if (rev is not None and y in rev.index and pd.notna(rev[y]))
-                else None
-            )
-            n_v = (
-                float(ni[y])
-                if (ni is not None and y in ni.index and pd.notna(ni[y]))
-                else None
-            )
-            e_v = (
-                float(eb[y])
-                if (eb is not None and y in eb.index and pd.notna(eb[y]))
-                else None
-            )
-            if r_v is not None:
-                rec["Receita"] = r_v
-            if n_v is not None:
-                rec["Lucro Líquido"] = n_v
-            if r_v and n_v is not None and abs(r_v) > 0:
-                rec["Margem Líquida (%)"] = n_v / r_v * 100
-            if r_v and e_v is not None and abs(r_v) > 0:
-                rec["Margem EBIT (%)"] = e_v / r_v * 100
-
-    if bs_df is not None and fin_df is not None:
-        eq = _hist_row(
-            bs_df,
-            "Stockholders Equity",
-            "Common Stock Equity",
-            "Total Stockholder Equity",
-            "Total Equity Gross Minority Interest",
-        )
-        ni = _hist_row(
-            fin_df,
-            "Net Income",
-            "Net Income Common Stockholders",
-            "Net Income Applicable To Common Shares",
-            "Net Income Including Noncontrolling Interests",
-        )
-        if eq is not None and ni is not None:
-            for y in sorted(bs_df.columns.tolist()):
-                y = int(y)
-                e_v = float(eq[y]) if y in eq.index and pd.notna(eq[y]) else None
-                n_v = float(ni[y]) if y in ni.index and pd.notna(ni[y]) else None
-                if e_v and n_v is not None and abs(e_v) > 0:
-                    records.setdefault(y, {})["ROE (%)"] = n_v / e_v * 100
-
-    if not records:
-        return None
-    df_h = pd.DataFrame(records).T.sort_index()
-    df_h.index.name = "Ano"
-    return df_h
-
-
-# Mapa de renomeação de colunas do fundamentus para identificadores internos
-_FUNDAMENTUS_RENAME = {
-    "P/L": "PL",
-    "P/VP": "PVP",
-    "EV/EBITDA": "EV_EBITDA",
-    "EV/EBIT": "EV_EBIT",
-    "PSR": "PSR",
-    "ROE": "ROE",
-    "ROIC": "ROIC",
-    "Mrg Ebit": "Marg_EBIT",
-    "Mrg. Líq.": "Marg_Liquida",
-    "Div.Yield": "Div_Yield",
-}
-
-# Múltiplos a comparar na seção de peers: (coluna interna, nome display, menor=melhor?, categoria)
-MULTIPLES_CFG = [
-    ("PL", "P/L", True, "Valuation"),
-    ("PVP", "P/VP", True, "Valuation"),
-    ("EV_EBITDA", "EV/EBITDA", True, "Valuation"),
-    ("EV_EBIT", "EV/EBIT", True, "Valuation"),
-    ("PSR", "PSR", True, "Valuation"),
-    ("ROE", "ROE (%)", False, "Rentabilidade"),
-    ("ROIC", "ROIC (%)", False, "Rentabilidade"),
-    ("Marg_EBIT", "Margem EBIT (%)", False, "Rentabilidade"),
-    ("Marg_Liquida", "Marg. Líq. (%)", False, "Rentabilidade"),
-    ("Div_Yield", "Div. Yield (%)", False, "Yield"),
-]
-COLS_NEEDED = [c[0] for c in MULTIPLES_CFG]
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_sector_peers(_setores):
-    """Busca todos os tickers listados no fundamentus e mapeia colunas para identificadores internos.
-
-    O argumento ``_setores`` é recebido (como tupla) apenas para que o Streamlit inclua o setor
-    na chave de cache; os dados retornados cobrem toda a B3 para permitir filtragem posterior
-    por setor individual sem chamadas extras à API.
-    """
-    try:
-        raw = get_full_market_data()
-        df2 = pd.DataFrame(index=raw.index)
-        for src, dest in _FUNDAMENTUS_RENAME.items():
-            if src in raw.columns:
-                df2[dest] = raw[src]
-        df2 = df2.drop_duplicates(keep="first")
-        return df2
-    except Exception:
-        return pd.DataFrame()
-
-
-# ── Funções utilitárias de formatação e renderização ──────────────────────────
-
-
-def format_large_br_currency(value):
-    """Formata valor em R$ com sufixo B/M."""
-    if value >= 1e9:
-        return f"R$ {value / 1e9:,.2f} B"
-    elif value >= 1e6:
-        return f"R$ {value / 1e6:,.2f} M"
-    else:
-        return f"R$ {value:,.2f}"
-
-
-def format_large_number(value):
-    """Formata número grande com sufixo B/M/K."""
-    if value >= 1e9:
-        return f"{value / 1e9:,.2f} B"
-    elif value >= 1e6:
-        return f"{value / 1e6:,.2f} M"
-    elif value >= 1e3:
-        return f"{value / 1e3:,.1f} K"
-    else:
-        return f"{value:,.0f}"
-
-
-def extract_debt_metric(row, aliases):
-    """Tenta extrair uma métrica testando vários nomes de coluna possíveis."""
-    for name in aliases:
-        if name in row.index:
-            v = pd.to_numeric(
-                str(row[name]).replace(",", ".").strip("%").strip(), errors="coerce"
-            )
-            if not pd.isna(v):
-                return v
-    return None
-
-
-def render_sector_cards(ticker_name, row):
-    """Renderiza cards de setor/subsetor para um ticker."""
-    emp = row["Empresa"]
-    setor = row["Setor"]
-    sub = row["Subsetor"]
-    metrics = [
-        ("Empresa", emp, "#38bdf8"),
-        ("Setor", setor, "#4ade80"),
-        ("Subsetor", sub, "#fbbf24"),
-    ]
-    cards_html = "".join(
-        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
-        f'<div class="mcard-value" style="color:{clr};font-size:0.95rem">{val}</div></div>'
-        for lbl, val, clr in metrics
-    )
-    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
-
-
-def render_price_cards(ticker_name, row):
-    """Renderiza cards de preço/mercado para um ticker."""
-    cot = row["Cotação"]
-    min_52 = row["Mínimo (52 semanas)"]
-    max_52 = row["Máximo (52 semanas)"]
-    vol = row["Volume Médio (2 meses)"]
-    val_merc = row["Valor de Mercado"]
-    data_ult = row["Data Última Cotação"]
-    metrics = [
-        ("Cotação", f"R$ {cot:,.2f}", "#38bdf8"),
-        ("Mín. 52 Sem.", f"R$ {min_52:,.2f}", "#f87171"),
-        ("Máx. 52 Sem.", f"R$ {max_52:,.2f}", "#4ade80"),
-        ("Vol. Médio", format_large_number(vol), "#fb7185"),
-        ("Val. de Mercado", format_large_br_currency(val_merc), "#fbbf24"),
-    ]
-    cards_html = "".join(
-        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
-        f'<div class="mcard-value" style="color:{clr}">{val}</div></div>'
-        for lbl, val, clr in metrics
-    )
-    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
-    st.caption(f"Última cotação registrada: {data_ult} para {ticker_name}")
-
-
-def render_ticker_cards(row, setor=""):
-    """Renderiza cards de indicadores fundamentalistas para um ticker."""
-    # 1. Valuation Section
-    st.markdown(
-        """
-<div style="margin: 1.2rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="12" y1="1" x2="12" y2="23"></line>
-        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-    </svg>
-    <span style="font-weight: 700; color: #00d2ff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Valuation</span>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.metric(
-            "P/L",
-            f"{row['P/L']:.2f}",
-            help="Preço/Lucro: quantas vezes o mercado paga pelo lucro anual. Menor = mais barato.",
-        )
-    with c2:
-        st.metric(
-            "P/VP",
-            f"{row['P/VP']:.2f}",
-            help="Preço/Valor Patrimonial: compara o preço de mercado com o valor contábil. <1 pode indicar desconto.",
-        )
-    with c3:
-        ev_val = row["EV/EBITDA"]
-        if pd.isna(ev_val) or abs(ev_val) < 0.01:
-            ctx = get_ev_ebitda_context(setor)
-            if ctx:
-                alt, reason = ctx
-                st.metric(
-                    "EV/EBITDA", "—", delta="→ " + alt, delta_color="off", help=reason
-                )
-            else:
-                st.metric(
-                    "EV/EBITDA",
-                    "N/D",
-                    help="Dado não disponível para este ticker via Fundamentus.",
-                )
-        else:
-            st.metric(
-                "EV/EBITDA",
-                f"{ev_val:.2f}",
-                help="Enterprise Value / EBITDA: múltiplo de valuation que considera a dívida. Menor = mais barato.",
-            )
-
-    # 2. Rentabilidade Section
-    st.markdown(
-        """
-<div style="margin: 1.5rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-        <polyline points="17 6 23 6 23 12"></polyline>
-    </svg>
-    <span style="font-weight: 700; color: #00ff87; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Rentabilidade</span>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        roe_val = row["ROE"]
-        st.metric(
-            "ROE",
-            f"{roe_val:.2f}%",
-            delta="Forte" if roe_val > 15 else ("Fraco" if roe_val < 5 else "Moderado"),
-            delta_color="normal"
-            if roe_val > 15
-            else ("inverse" if roe_val < 5 else "off"),
-            help="Return on Equity: lucro gerado para cada R$ de patrimônio. Acima de 15% é considerado bom.",
-        )
-    with c2:
-        roic_val = row["ROIC"]
-        st.metric(
-            "ROIC",
-            f"{roic_val:.2f}%",
-            delta="Forte"
-            if roic_val > 12
-            else ("Fraco" if roic_val < 5 else "Moderado"),
-            delta_color="normal"
-            if roic_val > 12
-            else ("inverse" if roic_val < 5 else "off"),
-            help="Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida).",
-        )
-    with c3:
-        ml_val = row["Margem Líquida"]
-        st.metric(
-            "Margem Líquida",
-            f"{ml_val:.2f}%",
-            delta="Alta" if ml_val > 15 else ("Baixa" if ml_val < 5 else "Média"),
-            delta_color="normal"
-            if ml_val > 15
-            else ("inverse" if ml_val < 5 else "off"),
-            help="Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa.",
-        )
-    with c4:
-        mebit_val = row["Margem EBIT"]
-        st.metric(
-            "Margem EBIT",
-            f"{mebit_val:.2f}%",
-            delta="Alta" if mebit_val > 15 else ("Baixa" if mebit_val < 5 else "Média"),
-            delta_color="normal"
-            if mebit_val > 15
-            else ("inverse" if mebit_val < 5 else "off"),
-            help="Margem operacional antes de juros e impostos. Mede a eficiência operacional.",
-        )
-
-    # 3. Crescimento & Yield Section
-    st.markdown(
-        """
-<div style="margin: 1.5rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffd600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-    </svg>
-    <span style="font-weight: 700; color: #ffd600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Crescimento & Yield</span>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-    c1, c2 = st.columns(2)
-    with c1:
-        dy_val = row["Dividend Yield"]
-        st.metric(
-            "Dividend Yield",
-            f"{dy_val:.2f}%",
-            delta="Alto" if dy_val > 6 else ("Baixo" if dy_val < 2 else "Moderado"),
-            delta_color="normal" if dy_val > 4 else "off",
-            help="Dividendos pagos divididos pelo preço. Percentual de retorno em dividendos ao ano.",
-        )
-    with c2:
-        cr_val = row["Crescimento Receita 5 anos"]
-        st.metric(
-            "Crescimento Receita (5 anos)",
-            f"{cr_val:.2f}%",
-            delta="Forte"
-            if cr_val > 10
-            else ("Negativo" if cr_val < 0 else "Moderado"),
-            delta_color="normal"
-            if cr_val > 10
-            else ("inverse" if cr_val < 0 else "off"),
-            help="Taxa de crescimento anual composta da receita nos últimos 5 anos.",
-        )
-
-
-def render_debt_panel(ticker_name, row):
-    """Renderiza painel de saúde financeira (endividamento) para um ticker."""
-    DEBT_COL_ALIASES = {
-        "div_brut_patrim": ["Dív.Brut/Patrim.", "Div_Brut_Patrim", "Div.Brut/Patrim."],
-        "liq_corrente": ["Liq. Corr.", "Liq_Corr", "Liq. Corr"],
-        "ev_ebit": ["EV_EBIT", "EV/EBIT"],
-    }
-    db_val = extract_debt_metric(row, DEBT_COL_ALIASES["div_brut_patrim"])
-    lc_val = extract_debt_metric(row, DEBT_COL_ALIASES["liq_corrente"])
-    ev_ebit_val = extract_debt_metric(row, DEBT_COL_ALIASES["ev_ebit"])
-    # Fundamentus remove o decimal de múltiplos (EV/EBIT 12,5× → armazenado como 1250)
-    if ev_ebit_val is not None:
-        ev_ebit_val = ev_ebit_val / 100.0
-
-    if db_val is None and lc_val is None and ev_ebit_val is None:
-        st.info(
-            "Dados de endividamento não disponíveis via Fundamentus para este ticker."
-        )
-        return
-
-    debt_cards = {}
-    debt_colors = {}
-
-    if db_val is not None:
-        debt_cards["Dívida / Patrimônio"] = f"{db_val:.2f}×"
-        debt_colors["Dívida / Patrimônio"] = (
-            "#ff3d5a" if db_val > 3 else ("#ffd600" if db_val > 1.5 else "#00ff87")
-        )
-
-    if lc_val is not None:
-        debt_cards["Liquidez Corrente"] = f"{lc_val:.2f}×"
-        debt_colors["Liquidez Corrente"] = (
-            "#ff3d5a" if lc_val < 1 else ("#ffd600" if lc_val < 1.5 else "#00ff87")
-        )
-
-    if ev_ebit_val is not None:
-        debt_cards["EV / EBIT"] = f"{ev_ebit_val:.1f}×"
-        debt_colors["EV / EBIT"] = (
-            "#ff3d5a"
-            if ev_ebit_val > 20
-            else ("#ffd600" if ev_ebit_val > 12 else "#00ff87")
-        )
-
-    cards_html = "".join(
-        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
-        f'<div class="mcard-value" style="color:{debt_colors[lbl]}">{val}</div></div>'
-        for lbl, val in debt_cards.items()
-    )
-    st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
-
-    diags = []
-    if db_val is not None:
-        if db_val > 3:
-            diags.append(
-                (
-                    ICO_ALERT,
-                    f"Dívida/PL de {db_val:.1f}× é elevada — verifique capacidade de pagamento",
-                    "#ff3d5a",
-                )
-            )
-        elif db_val > 1.5:
-            diags.append(
-                (ICO_BOLT, f"Dívida/PL de {db_val:.1f}× é moderada — monitorar", "#ffd600")
-            )
-        else:
-            diags.append((ICO_CHECK_SM, f"Dívida/PL de {db_val:.1f}× é saudável", "#00ff87"))
-
-    if lc_val is not None:
-        if lc_val < 1:
-            diags.append(
-                (
-                    ICO_ALERT,
-                    f"Liquidez Corrente {lc_val:.2f}× < 1 — risco de dificuldade de caixa",
-                    "#ff3d5a",
-                )
-            )
-        elif lc_val < 1.5:
-            diags.append(
-                (ICO_BOLT, f"Liquidez Corrente {lc_val:.2f}× — margem estreita", "#ffd600")
-            )
-        else:
-            diags.append(
-                (
-                    ICO_CHECK_SM,
-                    f"Liquidez Corrente {lc_val:.2f}× — empresa com boa folga de caixa",
-                    "#00ff87",
-                )
-            )
-
-    for icon, msg, color in diags:
-        st.markdown(
-            f'<div style="display:flex;align-items:flex-start;gap:8px;padding:0.35rem 0;'
-            f'font-size:0.83rem;color:{color};">'
-            f'<span style="flex-shrink:0">{icon}</span><span>{msg}</span></div>',
-            unsafe_allow_html=True,
-        )
-
-
-def _render_star_button(tkr):
-    """Renderiza botão de favoritar/desfavoritar da watchlist."""
-    starred = _db.wl_has(tkr)
-    label = "Favoritado" if starred else "Favoritar"
-    if st.button(
-        label,
-        key=f"star_{tkr}",
-        type="primary" if starred else "secondary",
-        help="Remover dos favoritos" if starred else "Salvar nos favoritos",
-    ):
-        if starred:
-            _db.wl_remove(tkr)
-        else:
-            _db.wl_add(tkr)
-        st.rerun()
-
-
-def color_veredicto(val):
-    """Estilo CSS para coluna Veredicto na tabela de percentis."""
-    m = {"Favorável": "#00ff8722", "Neutro": "#ffd60022", "Desfavorável": "#ff3d5a22"}
-    c = {"Favorável": "#00ff87", "Neutro": "#ffd600", "Desfavorável": "#ff3d5a"}
-    return f"background-color:{m.get(val, '')};color:{c.get(val, '')};font-weight:600"
-
-
-def color_pct(val):
-    """Estilo CSS para coluna Percentil na tabela de percentis."""
-    if val >= 70:
-        return "color:#00ff87;font-weight:700"
-    if val >= 40:
-        return "color:#ffd600;font-weight:700"
-    return "color:#ff3d5a;font-weight:700"
-
-
-def _get_setor(df, ticker):
-    """Retorna o setor de um ticker a partir do DataFrame fundamentus.
-
-    Parâmetros
-    ----------
-    df : pd.DataFrame
-        DataFrame retornado por ``get_fundamentus_data``.
-    ticker : str
-        Código do ticker (sem sufixo .SA).
-    """
-    if "Setor" not in df.columns or ticker not in df.index:
-        return ""
-    val = df.loc[ticker, "Setor"]
-    if isinstance(val, pd.Series):
-        val = val.iloc[-1]
-    return str(val) if not pd.isna(val) else ""
-
-
-def _render_hist_section(tkr):
-    """Renderiza seção de histórico fundamentalista (receita, margens, ROE) para um ticker."""
-    with loading_overlay(f"Buscando histórico de {tkr}...", tickers=[tkr]):
-        df_h = _build_hist_df(tkr)
-    if df_h is None or df_h.empty:
-        st.info(f"Dados históricos não disponíveis para {tkr} via yfinance.")
-        return
-
-    tab_rev, tab_marg, tab_roe = st.tabs(["Receita & Lucro", "Margens", "ROE"])
-
-    with tab_rev:
-        cols_rev = [c for c in ["Receita", "Lucro Líquido"] if c in df_h.columns]
-        if not cols_rev:
-            st.info("Dados de receita não disponíveis.")
-        else:
-            df_rev = df_h[cols_rev].dropna(how="all")
-            max_abs = df_rev.abs().max().max()
-            scale, unit = (
-                (1e9, "R$ Bilhões")
-                if max_abs >= 1e9
-                else (1e6, "R$ Milhões")
-                if max_abs >= 1e6
-                else (1, "R$")
-            )
-            df_rev = df_rev / scale
-            clr = {"Receita": "#00d2ff", "Lucro Líquido": "#00ff87"}
-            fig_rev = go.Figure()
-            for col in cols_rev:
-                vals = df_rev[col].fillna(0)
-                fig_rev.add_trace(
-                    go.Bar(
-                        name=col,
-                        x=df_rev.index.astype(str),
-                        y=vals,
-                        marker_color=clr.get(col, "#94a3b8"),
-                        text=[f"{v:.1f}" if v != 0 else "" for v in vals],
-                        textposition="outside",
-                        textfont=dict(size=10, color="#f8fafc"),
-                    )
-                )
-            fig_rev.update_layout(
-                barmode="group",
-                xaxis_title="Ano",
-                yaxis_title=unit,
-                height=360,
-                margin=dict(t=20, b=40, l=40, r=20),
-            )
-            apply_plotly_theme(fig_rev)
-            st.plotly_chart(fig_rev, use_container_width=True)
-
-    with tab_marg:
-        cols_m = [
-            c for c in ["Margem Líquida (%)", "Margem EBIT (%)"] if c in df_h.columns
-        ]
-        if not cols_m:
-            st.info("Dados de margem não disponíveis.")
-        else:
-            df_m = df_h[cols_m].dropna(how="all")
-            clr_m = {"Margem Líquida (%)": "#00ff87", "Margem EBIT (%)": "#ffd600"}
-            fig_m = go.Figure()
-            for col in cols_m:
-                vals = df_m[col]
-                fig_m.add_trace(
-                    go.Scatter(
-                        name=col,
-                        x=df_m.index.astype(str),
-                        y=vals,
-                        mode="lines+markers+text",
-                        line=dict(color=clr_m.get(col, "#94a3b8"), width=2.5),
-                        marker=dict(size=8),
-                        text=[f"{v:.1f}%" if pd.notna(v) else "" for v in vals],
-                        textposition="top center",
-                        textfont=dict(size=10, color="#f8fafc"),
-                    )
-                )
-            fig_m.update_layout(
-                xaxis_title="Ano",
-                yaxis_title="Margem (%)",
-                yaxis=dict(ticksuffix="%"),
-                height=360,
-                margin=dict(t=20, b=40, l=40, r=20),
-            )
-            apply_plotly_theme(fig_m)
-            st.plotly_chart(fig_m, use_container_width=True)
-
-    with tab_roe:
-        if "ROE (%)" not in df_h.columns or df_h["ROE (%)"].dropna().empty:
-            st.info("Dados de ROE histórico não disponíveis.")
-        else:
-            df_roe = df_h[["ROE (%)"]].dropna()
-            fig_roe = go.Figure(
-                go.Scatter(
-                    x=df_roe.index.astype(str),
-                    y=df_roe["ROE (%)"],
-                    mode="lines+markers+text",
-                    line=dict(color="#a855f7", width=2.5),
-                    marker=dict(size=9, color="#a855f7"),
-                    fill="tozeroy",
-                    fillcolor="rgba(168,85,247,0.08)",
-                    text=[
-                        f"{v:.1f}%" if pd.notna(v) else "" for v in df_roe["ROE (%)"]
-                    ],
-                    textposition="top center",
-                    textfont=dict(size=10, color="#f8fafc"),
-                )
-            )
-            fig_roe.add_hline(
-                y=15,
-                line_dash="dash",
-                line_color="#00ff87",
-                line_width=1.5,
-                annotation_text="Referência: 15%",
-                annotation_position="top right",
-                annotation_font=dict(color="#00ff87", size=10),
-            )
-            fig_roe.update_layout(
-                xaxis_title="Ano",
-                yaxis_title="ROE (%)",
-                yaxis=dict(ticksuffix="%"),
-                height=360,
-                margin=dict(t=20, b=40, l=40, r=20),
-            )
-            apply_plotly_theme(fig_roe)
-            st.plotly_chart(fig_roe, use_container_width=True)
-
-
 st.set_page_config(
     page_title="B3Lab — Análise Quantitativa de Ações",
     page_icon="favicon.svg",
@@ -806,131 +82,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 st.logo("logo.svg", icon_image="favicon.svg")
-
-
-# ─── SVG Icon Library ─────────────────────────────────────────────────────────
-_svg = svg_icon
-
-ICO_COMPASS = _svg(
-    '<circle cx="12" cy="12" r="10" stroke="#00ff87" stroke-width="1.8"/>'
-    '<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" fill="#00ff87"/>',
-    16,
-)
-ICO_SECTOR = _svg(
-    '<rect x="3" y="3" width="7" height="9" rx="1" stroke="#00d2ff" stroke-width="1.8"/>'
-    '<rect x="14" y="3" width="7" height="5" rx="1" stroke="#00d2ff" stroke-width="1.8"/>'
-    '<rect x="3" y="16" width="7" height="5" rx="1" stroke="#00d2ff" stroke-width="1.8"/>'
-    '<rect x="14" y="12" width="7" height="9" rx="1" stroke="#00d2ff" stroke-width="1.8"/>',
-    16,
-)
-ICO_MARKET = _svg(
-    '<path d="M3 3v18h18" stroke="#ffd600" stroke-width="1.8" stroke-linecap="round"/>'
-    '<path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="#ffd600" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
-    16,
-)
-ICO_METRICS = _svg(
-    '<rect x="3" y="3" width="18" height="18" rx="3" stroke="#94a3b8" stroke-width="1.5"/>'
-    '<line x1="7" y1="9"  x2="17" y2="9"  stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
-    '<line x1="7" y1="13" x2="14" y2="13" stroke="#94a3b8" stroke-width="1.2" stroke-linecap="round"/>'
-    '<line x1="7" y1="17" x2="15" y2="17" stroke="#94a3b8" stroke-width="1.2" stroke-linecap="round"/>',
-    16,
-)
-ICO_CHART = _svg(
-    '<rect x="3" y="12" width="3" height="9" rx="1" fill="#00ff87"/>'
-    '<rect x="9" y="7"  width="3" height="14" rx="1" fill="#00d2ff"/>'
-    '<rect x="15" y="9" width="3" height="12" rx="1" fill="#ffd600"/>',
-    16,
-)
-ICO_STATS = _svg(
-    '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" stroke="#a855f7" stroke-width="1.8"/>'
-    '<line x1="4" y1="22" x2="4" y2="15" stroke="#a855f7" stroke-width="1.8"/>',
-    16,
-)
-ICO_RULER = _svg(
-    '<rect x="2" y="7" width="20" height="10" rx="2" stroke="#ffd600" stroke-width="1.8"/>'
-    '<line x1="6"  y1="7" x2="6"  y2="12" stroke="#ffd600" stroke-width="1.5"/>'
-    '<line x1="10" y1="7" x2="10" y2="10" stroke="#ffd600" stroke-width="1.2"/>'
-    '<line x1="14" y1="7" x2="14" y2="10" stroke="#ffd600" stroke-width="1.2"/>'
-    '<line x1="18" y1="7" x2="18" y2="12" stroke="#ffd600" stroke-width="1.5"/>',
-    16,
-)
-ICO_SHIELD = _svg(
-    '<path d="M12 2l8 4v6c0 5-4 8.5-8 10C8 20.5 4 17 4 12V6l8-4z" stroke="#00ff87" stroke-width="1.8" fill="none"/>'
-    '<path d="M9 12l2 2 4-4" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
-    16,
-)
-ICO_BOX = _svg(
-    '<rect x="3" y="7" width="18" height="14" rx="2" stroke="#94a3b8" stroke-width="1.8"/>'
-    '<path d="M8 7V5a4 4 0 018 0v2" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>'
-    '<line x1="12" y1="12" x2="12" y2="16" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
-    '<line x1="10" y1="14" x2="14" y2="14" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>',
-    16,
-)
-ICO_RADAR = _svg(
-    '<polygon points="12 2 22 8.5 22 19.5 12 22 2 19.5 2 8.5" stroke="#a855f7" stroke-width="1.8" fill="none"/>'
-    '<polygon points="12 6 18 10 18 17 12 19 6 17 6 10" stroke="#a855f7" stroke-width="1.2" fill="none" opacity="0.6"/>'
-    '<line x1="12" y1="2" x2="12" y2="22" stroke="#a855f7" stroke-width="1.2" opacity="0.6"/>'
-    '<line x1="2" y1="8.5" x2="22" y2="19.5" stroke="#a855f7" stroke-width="1.2" opacity="0.6"/>'
-    '<line x1="2" y1="19.5" x2="22" y2="8.5" stroke="#a855f7" stroke-width="1.2" opacity="0.6"/>',
-    16,
-)
-ICO_INFO = _svg(
-    '<circle cx="12" cy="12" r="10" stroke="#00d2ff" stroke-width="1.8"/>'
-    '<line x1="12" y1="16" x2="12" y2="12" stroke="#00d2ff" stroke-width="2" stroke-linecap="round"/>'
-    '<line x1="12" y1="8" x2="12" y2="8.01" stroke="#00d2ff" stroke-width="2" stroke-linecap="round"/>',
-    16,
-)
-ICO_NEWS = _svg(
-    '<rect x="3" y="4" width="18" height="16" rx="2" stroke="#00ff87" stroke-width="1.8"/>'
-    '<line x1="7" y1="8" x2="17" y2="8" stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
-    '<line x1="7" y1="12" x2="13" y2="12" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>'
-    '<line x1="7" y1="16" x2="15" y2="16" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>',
-    16,
-)
-ICO_STAR = _svg(
-    '<path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.7 1.2 6.6L12 17.6l-5.9 3.2 1.2-6.6-4.8-4.7 6.6-.9z" '
-    'fill="#ffd600" stroke="#ffd600" stroke-width="1" stroke-linejoin="round"/>',
-    13,
-)
-ICO_FILTER = _svg(
-    '<path d="M3 4.5h18l-6.75 8v6.5l-4.5 2v-8.5z" stroke="#00d2ff" stroke-width="1.8" '
-    'stroke-linejoin="round" fill="none"/>',
-    13,
-)
-ICO_BULB = _svg(
-    '<path d="M9 18.5h6M10 21h4M12 3a6 6 0 0 0-3.2 11.1c.5.35.7.9.7 1.5v.4h5v-.4c0-.6.2-1.15.7-1.5A6 6 0 0 0 12 3z" '
-    'stroke="#94a3b8" stroke-width="1.6" stroke-linejoin="round" fill="none"/>',
-    13,
-)
-ICO_ALERT = _svg(
-    '<path d="M12 3.2l9.3 16.3H2.7z" stroke="#ff3d5a" stroke-width="1.7" stroke-linejoin="round" fill="none"/>'
-    '<line x1="12" y1="9.5" x2="12" y2="14" stroke="#ff3d5a" stroke-width="1.9" stroke-linecap="round"/>'
-    '<circle cx="12" cy="16.8" r="1" fill="#ff3d5a"/>',
-    14,
-)
-ICO_BOLT = _svg(
-    '<path d="M13 2 4.5 13.5h5.7L11 22l8.5-11.5h-5.7z" fill="#ffd600"/>',
-    13,
-)
-ICO_CHECK_SM = _svg(
-    '<path d="M4 12.5l5 5L20 6" stroke="#00ff87" stroke-width="2.3" stroke-linecap="round" '
-    'stroke-linejoin="round" fill="none"/>',
-    13,
-)
-ICO_X_SM = _svg(
-    '<line x1="5" y1="5" x2="19" y2="19" stroke="#ff3d5a" stroke-width="2.3" stroke-linecap="round"/>'
-    '<line x1="19" y1="5" x2="5" y2="19" stroke="#ff3d5a" stroke-width="2.3" stroke-linecap="round"/>',
-    12,
-)
-
-
-def section_header(icon_svg, text, tag="h3"):
-    st.markdown(
-        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
-        f"{icon_svg}<span>{text}</span></{tag}>",
-        unsafe_allow_html=True,
-    )
-
 
 render_flow_sidebar(active_step=1, pending_opacities=[0.45, 0.35, 0.25])
 
@@ -1382,16 +533,16 @@ if ready_to_analyze:
             tabs_tickers = st.tabs(tickers)
             for idx, ticker in enumerate(tickers):
                 with tabs_tickers[idx]:
-                    _render_star_button(ticker)
+                    render_star_button(ticker)
                     if ticker in df_ind.index:
                         render_ticker_cards(
-                            df_ind.loc[ticker], setor=_get_setor(df, ticker)
+                            df_ind.loc[ticker], setor=get_ticker_setor(df, ticker)
                         )
         else:
             ticker = tickers[0]
-            _render_star_button(ticker)
+            render_star_button(ticker)
             if ticker in df_ind.index:
-                render_ticker_cards(df_ind.loc[ticker], setor=_get_setor(df, ticker))
+                render_ticker_cards(df_ind.loc[ticker], setor=get_ticker_setor(df, ticker))
 
         # ── Histórico Fundamentalista ─────────────────────────────────────────
         st.markdown("---")
@@ -1404,9 +555,9 @@ if ready_to_analyze:
             tabs_hist = st.tabs(tickers)
             for _h_idx, _h_tkr in enumerate(tickers):
                 with tabs_hist[_h_idx]:
-                    _render_hist_section(_h_tkr)
+                    render_hist_section(_h_tkr)
         else:
-            _render_hist_section(tickers[0])
+            render_hist_section(tickers[0])
 
         # ── Saúde Financeira ─────────────────────────────────────────────────
         st.markdown("---")
