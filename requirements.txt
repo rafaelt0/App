@@ -6,23 +6,16 @@ pandas==2.3.1
 plotly==5.9.0
 scikit_learn==1.3.0
 QuantStats==0.0.62
-SciencePlots==2.1.0
 scipy==1.12.0
 seaborn==0.13.2
 streamlit==1.36.0
 yfinance==0.2.65
 PyPortfolioOpt==1.5.5
-fpdf==1.7.2
 kaleido==0.2.1
-GoogleNews==1.6.8
-newspaper3k==0.2.8
-nltk==3.9
 lxml==5.2.2
 beautifulsoup4==4.12.3
 requests==2.32.3
-pandas_datareader==0.10
-python-bcb
-sgs
-torch
-transformers
+python-bcb==0.4.0
+torch==2.4.1
+transformers==4.44.2
 
