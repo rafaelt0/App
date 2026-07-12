@@ -13,6 +13,12 @@ from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.ui import load_css, loading_overlay
 from utils.market_data import clean_numeric_column, get_full_market_data
+from utils.valuation import (
+    calc_cv,
+    calc_dcf,
+    compute_roic_series,
+    compute_year_metrics,
+)
 
 load_css()
 
@@ -22,7 +28,6 @@ ERP_MATURE = 5.0  # ERP de mercado maduro (EUA). Rf=Selic já embute o risco-pa�
 # reação do BCB), então somar um CRP à parte aqui contaria o risco Brasil duas
 # vezes no ke. Ver Damodaran: quando Rf é a taxa local (não o Treasury), usa-se
 # apenas o ERP do mercado maduro, sem CRP adicional.
-CAIXA_OP_PCT = 0.015  # caixa operacional ≈ 1.5% da receita
 
 
 # ─── Shared helpers ────────────────────────────────────────────────────────────
@@ -161,61 +166,30 @@ def get_koller_data(ticker_b3: str):
             if ebit is None or rev is None:
                 continue
 
-            t_rate = (
-                min(max(abs(taxex) / abs(pretx), 0.10), 0.40)
-                if pretx and taxex and abs(pretx) > 0
-                else 0.34
+            metrics = compute_year_metrics(
+                revenue=rev,
+                ebit=ebit,
+                pretax_income=pretx,
+                tax_expense=taxex,
+                da=da,
+                capex=capex,
+                delta_wc=dwc,
+                ppe=ppe,
+                goodwill=gw,
+                current_assets=ca,
+                current_liabilities=cl,
+                cash=cash,
+                debt_short=dbt_s,
+                debt_long=dbt_l,
+                equity=equity,
+                interest_expense=intr,
             )
-            noplat = ebit * (1 - t_rate)
-            da_v = da if da is not None else 0.0
-            cap_v = abs(capex) if capex is not None else 0.0
-            dwc_v = dwc if dwc is not None else 0.0
-            # "Change In Working Capital" do yfinance já vem no sinal do efeito de caixa
-            # (DFC indireto): negativo quando o WC aumenta e consome caixa. Deve ser somado,
-            # não subtraído — subtrair inverteria o impacto do capital de giro no FCF.
-            fcf = noplat + da_v - cap_v + dwc_v
-            cash_op = (rev * CAIXA_OP_PCT) if rev else 0.0
-            # Current Liabilities do yfinance já inclui a dívida de curto prazo (Current Debt);
-            # subtrair dbt_s de novo contaria a dívida duas vezes no WCO.
-            wco = (ca or 0) - (cl or 0) - max((cash or 0) - cash_op, 0)
-            ic = wco + (ppe or 0) + gw
-
-            years.append(
-                {
-                    "year": ylbl,
-                    "revenue": rev,
-                    "ebit": ebit,
-                    "tax_rate": t_rate,
-                    "noplat": noplat,
-                    "da": da_v,
-                    "capex": cap_v,
-                    "delta_wc": dwc_v,
-                    "fcf": fcf,
-                    "wco": wco,
-                    "ppe": ppe or 0,
-                    "goodwill": gw,
-                    "ic": ic,
-                    "debt": dbt_s + dbt_l,
-                    "equity": equity or 0,
-                    "cash": cash or 0,
-                    "interest": intr,
-                }
-            )
+            years.append({"year": ylbl, "revenue": rev, "ebit": ebit, **metrics})
 
         if not years:
             return None
 
-        ys = sorted(years, key=lambda x: x["year"])
-        for i, y in enumerate(ys):
-            ic_prev = ys[i - 1]["ic"] if i > 0 else None
-            y["roic"] = (
-                (y["noplat"] / ic_prev * 100) if (ic_prev and ic_prev > 1e4) else None
-            )
-            y["roic_no_gw"] = (
-                y["noplat"] / (ic_prev - ys[i - 1]["goodwill"]) * 100
-                if (ic_prev and ic_prev - ys[i - 1]["goodwill"] > 1e4)
-                else None
-            )
+        ys = compute_roic_series(sorted(years, key=lambda x: x["year"]))
 
         shares = (
             info.get("sharesOutstanding") or info.get("impliedSharesOutstanding") or 1
@@ -271,47 +245,6 @@ def get_sector_multiples():
         return df2
     except Exception:
         return pd.DataFrame()
-
-
-# ─── DCF Engine (Koller) ───────────────────────────────────────────────────────
-def calc_cv(noplat_next, g_pct, roic_cv_pct, wacc_dec):
-    g, r = g_pct / 100, wacc_dec
-    if r <= g:
-        return None
-    roic_cv = roic_cv_pct / 100
-    reinv = min(g / roic_cv, 0.99) if roic_cv > 0 else 0.0
-    return noplat_next * max(1.0 - reinv, 0.01) / (r - g)
-
-
-def calc_dcf(noplat0, g1_pct, g2_pct, gt_pct, wacc_dec, roic_cv_pct, roic_proj_pct=None):
-    g1, g2, gt = g1_pct / 100, g2_pct / 100, gt_pct / 100
-    rows, pv_exp = [], 0.0
-    # ROIC do período explícito (anos 1-10) pode diferir do ROIC na perpetuidade —
-    # usar roic_cv para os dois conflita o reinvestimento atual com a premissa terminal.
-    roic_proj = (roic_proj_pct if roic_proj_pct is not None else roic_cv_pct) / 100
-
-    for t in range(1, 11):
-        noplat_t = noplat0 * (1 + g1) ** min(t, 5) * (1 + g2) ** max(0, t - 5)
-        g_t = g1 if t <= 5 else g2
-        reinv = min(g_t / roic_proj, 0.95) if roic_proj > 0 else 0.0
-        fcf_t = noplat_t * max(1.0 - reinv, 0.05)
-        pv_t = fcf_t / (1 + wacc_dec) ** t
-        pv_exp += pv_t
-        rows.append(
-            {
-                "t": t,
-                "g_pct": g_t * 100,
-                "noplat": noplat_t,
-                "reinv_pct": reinv * 100,
-                "fcf": fcf_t,
-                "pv": pv_t,
-            }
-        )
-
-    noplat_11 = noplat0 * (1 + g1) ** 5 * (1 + g2) ** 5 * (1 + gt)
-    cv = calc_cv(noplat_11, gt_pct, roic_cv_pct, wacc_dec)
-    pv_cv = (cv / (1 + wacc_dec) ** 10) if cv is not None else 0.0
-    return pv_exp, pv_cv, pv_exp + pv_cv, rows, cv, noplat_11
 
 
 # ─── Hero ──────────────────────────────────────────────────────────────────────
