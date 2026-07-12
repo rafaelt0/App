@@ -403,8 +403,10 @@ if skey not in st.session_state:
     _b = max(min(beta, 2.5), 0.3)
     _ke = round(min(selic * 100 + _b * ERP_MATURE, 22.0), 1)
     _kd = round(kd_est, 1) if kd_est else 8.0
-    _ev0 = max(latest["equity"] + t_debt - cash_v, 1)
-    _ew = round(max(min(latest["equity"] / _ev0, 0.95), 0.3), 2)
+    _mkt_equity = price * shares if price and shares else 0
+    _equity_for_weight = _mkt_equity if _mkt_equity > 0 else latest["equity"]
+    _ev0 = max(_equity_for_weight + t_debt - cash_v, 1)
+    _ew = round(max(min(_equity_for_weight / _ev0, 0.95), 0.3), 2)
     _roic_hist = next((y["roic"] for y in reversed(ys) if y.get("roic")), 12.0) or 12.0
     _g1 = round(min(max(cagr or 5.0, 0.0), 20.0), 1)
     st.session_state[skey] = {
@@ -1272,7 +1274,7 @@ with tabs[6]:
                 ),
                 (ss["e_weight"] > 0.2, "Pesos de mercado usados (não contábeis)"),
                 (
-                    net_debt == t_debt - cash_v,
+                    cash_v > 0,
                     "Ativos não-operacionais (caixa) separados do FCF",
                 ),
                 (
