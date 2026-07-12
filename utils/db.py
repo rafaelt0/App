@@ -1,10 +1,39 @@
-"""SQLite-backed persistent cache and watchlist for B3 Explorer."""
+"""SQLite-backed persistent cache, watchlist and portfolio for B3 Explorer.
+
+Watchlist and portfolio are keyed by an anonymous per-browser `uid`
+(see utils/identity.py) so different visitors don't share the same data.
+"""
 import sqlite3
 import json
 import time
 import os
 
 _DB = os.path.join(os.path.dirname(__file__), '..', 'b3_data.db')
+
+
+def _migrate_legacy_watchlist(conn):
+    """Add the `uid` column to a pre-existing single-user watchlist table.
+
+    Older deployments created `watchlist(ticker PRIMARY KEY, added_at)`
+    shared by every visitor. Existing rows are kept under a "legacy" uid
+    instead of being dropped.
+    """
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(watchlist)").fetchall()}
+    if cols and "uid" not in cols:
+        conn.execute("ALTER TABLE watchlist RENAME TO watchlist_legacy")
+        conn.execute("""
+            CREATE TABLE watchlist (
+                uid       TEXT NOT NULL,
+                ticker    TEXT NOT NULL,
+                added_at  REAL NOT NULL,
+                PRIMARY KEY (uid, ticker)
+            )
+        """)
+        conn.execute("""
+            INSERT INTO watchlist (uid, ticker, added_at)
+            SELECT 'legacy', ticker, added_at FROM watchlist_legacy
+        """)
+        conn.execute("DROP TABLE watchlist_legacy")
 
 
 def _conn():
@@ -18,13 +47,16 @@ def _conn():
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS watchlist (
-            ticker    TEXT PRIMARY KEY,
-            added_at  REAL NOT NULL
+            uid       TEXT NOT NULL,
+            ticker    TEXT NOT NULL,
+            added_at  REAL NOT NULL,
+            PRIMARY KEY (uid, ticker)
         )
     """)
+    _migrate_legacy_watchlist(conn)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portfolio (
-            id         INTEGER PRIMARY KEY CHECK (id = 1),
+            uid        TEXT PRIMARY KEY,
             tickers    TEXT NOT NULL,
             weights    TEXT,
             updated_at REAL NOT NULL
@@ -73,42 +105,47 @@ def cache_clear_expired(max_age: int = 86400):
 
 # ── Watchlist ──────────────────────────────────────────────────────────────────
 
-def wl_get() -> list[str]:
-    """Return watchlist tickers ordered by insertion time."""
+def wl_get(uid: str) -> list[str]:
+    """Return this visitor's watchlist tickers ordered by insertion time."""
     try:
         with _conn() as c:
             rows = c.execute(
-                "SELECT ticker FROM watchlist ORDER BY added_at"
+                "SELECT ticker FROM watchlist WHERE uid = ? ORDER BY added_at",
+                (uid,),
             ).fetchall()
             return [r[0] for r in rows]
     except Exception:
         return []
 
 
-def wl_add(ticker: str):
+def wl_add(uid: str, ticker: str):
     try:
         with _conn() as c:
             c.execute(
-                "INSERT OR IGNORE INTO watchlist VALUES (?, ?)",
-                (ticker.upper(), time.time()),
+                "INSERT OR IGNORE INTO watchlist VALUES (?, ?, ?)",
+                (uid, ticker.upper(), time.time()),
             )
     except Exception:
         pass
 
 
-def wl_remove(ticker: str):
+def wl_remove(uid: str, ticker: str):
     try:
         with _conn() as c:
-            c.execute("DELETE FROM watchlist WHERE ticker = ?", (ticker.upper(),))
+            c.execute(
+                "DELETE FROM watchlist WHERE uid = ? AND ticker = ?",
+                (uid, ticker.upper()),
+            )
     except Exception:
         pass
 
 
-def wl_has(ticker: str) -> bool:
+def wl_has(uid: str, ticker: str) -> bool:
     try:
         with _conn() as c:
             row = c.execute(
-                "SELECT 1 FROM watchlist WHERE ticker = ?", (ticker.upper(),)
+                "SELECT 1 FROM watchlist WHERE uid = ? AND ticker = ?",
+                (uid, ticker.upper()),
             ).fetchone()
             return row is not None
     except Exception:
@@ -117,12 +154,12 @@ def wl_has(ticker: str) -> bool:
 
 # ── Portfolio (última carteira montada) ────────────────────────────────────────
 
-def portfolio_get() -> tuple[list[str], dict]:
-    """Return (tickers, weights) from the last saved portfolio, or ([], {})."""
+def portfolio_get(uid: str) -> tuple[list[str], dict]:
+    """Return (tickers, weights) from this visitor's last saved portfolio."""
     try:
         with _conn() as c:
             row = c.execute(
-                "SELECT tickers, weights FROM portfolio WHERE id = 1"
+                "SELECT tickers, weights FROM portfolio WHERE uid = ?", (uid,)
             ).fetchone()
             if row:
                 tickers = json.loads(row[0])
@@ -133,13 +170,14 @@ def portfolio_get() -> tuple[list[str], dict]:
     return [], {}
 
 
-def portfolio_save(tickers: list[str], weights: dict | None = None):
-    """Persist the current ticker selection and (optional) manual weights."""
+def portfolio_save(uid: str, tickers: list[str], weights: dict | None = None):
+    """Persist this visitor's current ticker selection and manual weights."""
     try:
         with _conn() as c:
             c.execute(
-                "INSERT OR REPLACE INTO portfolio VALUES (1, ?, ?, ?)",
+                "INSERT OR REPLACE INTO portfolio VALUES (?, ?, ?, ?)",
                 (
+                    uid,
                     json.dumps(tickers),
                     json.dumps(weights) if weights else None,
                     time.time(),
@@ -149,9 +187,9 @@ def portfolio_save(tickers: list[str], weights: dict | None = None):
         pass
 
 
-def portfolio_clear():
+def portfolio_clear(uid: str):
     try:
         with _conn() as c:
-            c.execute("DELETE FROM portfolio WHERE id = 1")
+            c.execute("DELETE FROM portfolio WHERE uid = ?", (uid,))
     except Exception:
         pass

@@ -13,6 +13,7 @@ from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
 from utils import db as _db
 from utils.charts import apply_plotly_theme
+from utils.identity import get_browser_uid
 from utils.ui import (
     diag_row,
     load_css,
@@ -143,7 +144,8 @@ data = pd.read_csv("acoes-listadas-b3.csv")
 stocks = list(data["Ticker"].values)
 stocks = get_sorted_tickers_by_liquidity(stocks)
 
-_saved_tickers, _saved_weights = _db.portfolio_get()
+_uid = get_browser_uid()
+_saved_tickers, _saved_weights = _db.portfolio_get(_uid)
 
 if "selected_tickers" not in st.session_state:
     st.session_state["selected_tickers"] = [t for t in _saved_tickers if t in stocks]
@@ -167,7 +169,7 @@ with col_clear:
     st.write("")
     st.write("")
     if st.button("Limpar salvo", use_container_width=True):
-        _db.portfolio_clear()
+        _db.portfolio_clear(_uid)
         st.session_state["selected_tickers"] = []
         st.rerun()
 
@@ -321,7 +323,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             )
             pesos_manuais_arr = peso_manual_df["Peso"].values
 
-        _db.portfolio_save(tickers, pesos_manuais if "Manual" in modo else {})
+        _db.portfolio_save(_uid, tickers, pesos_manuais if "Manual" in modo else {})
 
         # Mostrar pesos
         st.subheader("Pesos do Portfólio (%)")
