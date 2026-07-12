@@ -461,7 +461,7 @@ if st.button("Carregar Portfolio", type="primary", use_container_width=True):
             with loading_overlay("Gerando fronteira eficiente e simulando portfólios..."):
                 selic_anual = (1 + taxa_selic) ** 252 - 1
                 fig_frontier = plot_efficient_frontier_and_random_portfolios(
-                    mu, S, returns, cleaned_weights, selic_anual
+                    mu, S, cleaned_weights, selic_anual
                 )
                 st.plotly_chart(fig_frontier, use_container_width=True)
 

@@ -2,6 +2,7 @@
 
 import numpy as np
 import plotly.graph_objects as go
+import streamlit as st
 from pypfopt.efficient_frontier import EfficientFrontier
 
 from utils.charts import apply_plotly_theme
@@ -27,24 +28,35 @@ def apply_matplotlib_theme(fig):
     return fig
 
 
-def plot_efficient_frontier_and_random_portfolios(mu, S, returns, cleaned_weights, rf):
-    num_portfolios = 5000
-    results = np.zeros((3, num_portfolios))
+@st.cache_data(ttl=3600, show_spinner=False)
+def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=5000):
+    """Numeric core of the efficient-frontier chart — cached because it's
+    expensive (5,000 simulated portfolios + 25 quadratic programs) and its
+    inputs (mu/S/weights/rf) are identical across unrelated widget reruns.
+    Takes plain tuples instead of pandas/dict objects so Streamlit hashes
+    the cache key cheaply and deterministically.
+    """
+    mu = np.array(mu_tuple)
+    S = np.array(S_tuple)
 
-    for i in range(num_portfolios):
-        weights = np.random.random(len(mu))
-        weights /= np.sum(weights)
+    # Vectorized Monte Carlo: draw all 5,000 portfolios' weights at once
+    # instead of looping in Python, then compute return/vol/Sharpe for the
+    # whole batch with matrix ops (np.einsum for the quadratic form w'Sw).
+    rng = np.random.default_rng(42)
+    weights = rng.random((num_portfolios, len(mu)))
+    weights /= weights.sum(axis=1, keepdims=True)
+    port_returns = weights @ mu
+    port_variances = np.einsum("ij,jk,ik->i", weights, S, weights)
+    port_stddevs = np.sqrt(port_variances)
+    port_sharpe = np.divide(
+        port_returns - rf,
+        port_stddevs,
+        out=np.zeros_like(port_returns),
+        where=port_stddevs > 0,
+    )
+    results = np.vstack([port_stddevs, port_returns, port_sharpe])
 
-        portfolio_return = np.sum(weights * mu)
-        portfolio_stddev = np.sqrt(np.dot(weights.T, np.dot(S, weights)))
-
-        results[0, i] = portfolio_stddev
-        results[1, i] = portfolio_return
-        results[2, i] = (
-            (portfolio_return - rf) / portfolio_stddev if portfolio_stddev > 0 else 0
-        )
-
-    opt_weights = np.array(list(cleaned_weights.values()))
+    opt_weights = np.array(weights_tuple)
     opt_return = np.sum(opt_weights * mu)
     opt_stddev = np.sqrt(np.dot(opt_weights.T, np.dot(S, opt_weights)))
     opt_sharpe = (opt_return - rf) / opt_stddev if opt_stddev > 0 else 0
@@ -70,6 +82,35 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, returns, cleaned_weight
             efficient_vols.append(vol)
         except:
             pass
+
+    return (
+        results,
+        np.array(efficient_vols),
+        target_returns,
+        opt_return,
+        opt_stddev,
+        opt_sharpe,
+        min_return,
+        min_stddev,
+    )
+
+
+def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
+    (
+        results,
+        efficient_vols,
+        target_returns,
+        opt_return,
+        opt_stddev,
+        opt_sharpe,
+        min_return,
+        min_stddev,
+    ) = _compute_frontier_data(
+        tuple(mu.values if hasattr(mu, "values") else mu),
+        tuple(map(tuple, S.values if hasattr(S, "values") else S)),
+        tuple(cleaned_weights.values()),
+        rf,
+    )
 
     fig = go.Figure()
 
