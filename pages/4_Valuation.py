@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import datetime as dt
-import os
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -12,13 +11,15 @@ warnings.filterwarnings("ignore")
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.ui import load_css, loading_overlay
-from utils.market_data import clean_numeric_column, get_full_market_data
 from utils.valuation import (
     calc_cv,
     calc_dcf,
     compute_roic_series,
     compute_year_metrics,
 )
+from utils.home_data import MULTIPLES_CFG, compute_sector_ranking, get_sector_peers
+from utils.home_render import color_pct, color_veredicto, render_hist_section
+from utils.market_data import clean_numeric_column
 
 load_css()
 
@@ -223,28 +224,6 @@ def get_koller_data(ticker_b3: str):
         }
     except Exception as e:
         return {"_error": str(e)}
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_sector_multiples():
-    try:
-        raw = get_full_market_data()
-        cols = {
-            "P/L": "PL",
-            "P/VP": "PVP",
-            "EV/EBITDA": "EV_EBITDA",
-            "ROE": "ROE",
-            "ROIC": "ROIC",
-            "Div.Yield": "DY",
-            "Patrim. Líq": "PATRLIQ",  # proxy de porte p/ filtrar peers comparáveis
-        }
-        df2 = pd.DataFrame(index=raw.index)
-        for src, dst in cols.items():
-            if src in raw.columns:
-                df2[dst] = clean_numeric_column(raw[src])
-        return df2
-    except Exception:
-        return pd.DataFrame()
 
 
 # ─── Hero ──────────────────────────────────────────────────────────────────────
@@ -555,6 +534,15 @@ with tabs[1]:
             )
         )
         st.markdown(f'<div class="mcard-grid">{ic_cards}</div>', unsafe_allow_html=True)
+
+        # Histórico Fundamentalista (Receita, Lucro, Margens, ROE)
+        st.markdown("---")
+        st.markdown("**Evolução Anual — Receita, Lucro, Margens e ROE**")
+        st.caption(
+            "Últimos 4 anos (fonte: yfinance / relatórios anuais). "
+            "Complementa o NOPLAT/ROIC acima com a visão contábil tradicional."
+        )
+        render_hist_section(ticker)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — Drivers de Valor
@@ -1327,142 +1315,148 @@ with tabs[7]:
             "NOPLAT, EBIT ou Receita indisponíveis para calcular os múltiplos implícitos."
         )
 
-    # ── Peer Comparison automático ─────────────────────────────────────────────
+    # ── Comparação de Múltiplos do Setor ─────────────────────────────────────────
     st.markdown("---")
-    st.markdown("#### Peers do Setor — Comparação Automática")
+    st.markdown("#### Comparação de Múltiplos do Setor")
     st.caption(
-        "Múltiplos de mercado de empresas do mesmo setor via Fundamentus. "
-        "Contexto para calibrar se o valuation DCF é razoável."
+        "Posicionamento por percentil em relação a todos os pares do setor na B3 "
+        "(fonte: Fundamentus). Verde = favorável · Vermelho = desfavorável · Cinza = neutro."
     )
 
-    _csv_path = os.path.join(os.path.dirname(__file__), "..", "acoes-listadas-b3.csv")
-    _b3_data = pd.read_csv(_csv_path) if os.path.exists(_csv_path) else pd.DataFrame()
+    _b3_data = pd.read_csv("acoes-listadas-b3.csv")
     _setor_ticker = (
         _b3_data[_b3_data["Ticker"] == ticker]["Setor"].values[0]
-        if not _b3_data.empty and ticker in _b3_data["Ticker"].values
+        if ticker in _b3_data["Ticker"].values
         else None
     )
 
-    if _setor_ticker:
+    if not _setor_ticker:
+        st.info("Setor não identificado no CSV B3 — comparação de peers indisponível.")
+    else:
         _peers_tickers = _b3_data[_b3_data["Setor"] == _setor_ticker]["Ticker"].tolist()
         st.caption(
             f"Setor: **{_setor_ticker}** · {len(_peers_tickers)} empresas comparáveis"
         )
 
         with loading_overlay("Carregando múltiplos do setor..."):
-            _peers_df = get_sector_multiples()
+            _peers_raw = get_sector_peers((_setor_ticker,))
 
-        if not _peers_df.empty:
-            _peers_in = [p for p in _peers_tickers if p in _peers_df.index]
-            if _peers_in:
-                _comp = _peers_df.loc[_peers_in].copy()
-                _mult_cols = [c for c in _comp.columns if c != "PATRLIQ"]
-                for col in _comp.columns:
-                    _comp[col] = pd.to_numeric(_comp[col], errors="coerce")
-                    _comp.loc[_comp[col] == 0, col] = pd.NA
-                    if col in ("PL", "PVP", "EV_EBITDA"):
-                        _comp.loc[(_comp[col] < 0) | (_comp[col] > 500), col] = pd.NA
-                _comp = _comp.dropna(subset=_mult_cols, how="all")
-
-                # Filtra peers por porte (0,3x–3x do patrimônio líquido do ticker
-                # analisado) — evita comparar uma small cap com uma blue chip só
-                # porque estão no mesmo setor. Só aplica o filtro se sobrarem
-                # peers suficientes; senão mantém a lista completa do setor.
-                _size_note = ""
-                if (
-                    ticker in _comp.index
-                    and pd.notna(_comp.loc[ticker, "PATRLIQ"])
-                    and _comp.loc[ticker, "PATRLIQ"] > 0
-                ):
-                    _target_size = _comp.loc[ticker, "PATRLIQ"]
-                    _lo, _hi = _target_size * 0.3, _target_size * 3.0
-                    _in_range = _comp[
-                        (_comp["PATRLIQ"] >= _lo) & (_comp["PATRLIQ"] <= _hi)
-                    ]
-                    if ticker not in _in_range.index:
-                        _in_range = pd.concat([_in_range, _comp.loc[[ticker]]])
-                    if len(_in_range) >= 5:
-                        _comp = _in_range
-                        _size_note = " · filtrado por porte (0,3x–3x patrimônio líquido)"
-
-                if len(_comp) < 5:
+        if _peers_raw.empty:
+            st.warning("Não foi possível carregar dados de peers do Fundamentus.")
+        else:
+            _rank_df = compute_sector_ranking(
+                _peers_raw, ticker, _setor_ticker, _b3_data
+            )
+            if _rank_df.empty:
+                st.info("Dados de múltiplos não disponíveis para os peers deste setor.")
+            else:
+                n_peers_display = int(_rank_df["Peers (n)"].max())
+                if n_peers_display < 5:
                     st.caption(
-                        f"⚠️ Amostra pequena: {len(_comp)} peer(s) disponível(is) "
+                        f"⚠️ Amostra pequena: {n_peers_display} peer(s) disponível(is) "
                         "no setor (ideal Koller: 5–15) — use os múltiplos com cautela."
                     )
-                elif _size_note:
-                    st.caption(f"{len(_comp)} peers{_size_note}")
 
-                _comp = _comp.drop(columns=["PATRLIQ"], errors="ignore")
-
-                # Highlight the analyzed ticker
-                _comp.index.name = "Ticker"
-                _rename = {
-                    "PL": "P/L",
-                    "PVP": "P/VP",
-                    "EV_EBITDA": "EV/EBITDA",
-                    "ROE": "ROE (%)",
-                    "ROIC": "ROIC (%)",
-                    "DY": "DY (%)",
-                }
-                _disp = _comp.copy().rename(columns=_rename)
-
-                # Mediana dos peers (exclui o próprio ticker) — estatística-resumo
-                # menos sensível a outliers do que a média (Koller).
-                _peer_rows = _disp.drop(index=ticker, errors="ignore")
-                if not _peer_rows.empty:
-                    _disp.loc["Mediana peers"] = _peer_rows.median(numeric_only=True)
-
-                def _highlight(row):
-                    if row.name == ticker:
-                        return [
-                            "background-color: rgba(168,85,247,0.15); font-weight:bold"
-                        ] * len(row)
-                    if row.name == "Mediana peers":
-                        return [
-                            "background-color: rgba(255,214,0,0.08); font-style:italic"
-                        ] * len(row)
-                    return [""] * len(row)
-
-                _styled = _disp.style.apply(_highlight, axis=1).format(
-                    "{:.1f}", na_rep="—"
+                st.markdown("**Posicionamento por Percentil**")
+                _styled_rank = (
+                    _rank_df.style.map(color_veredicto, subset=["Veredicto"])
+                    .map(color_pct, subset=["Percentil"])
+                    .format(
+                        {
+                            "Valor": "{:.2f}",
+                            "Mediana Setor": "{:.2f}",
+                            "Média Setor": "{:.2f}",
+                            "Percentil": "{:.1f}%",
+                        }
+                    )
                 )
-                st.dataframe(_styled, use_container_width=True)
+                st.dataframe(_styled_rank, use_container_width=True, hide_index=True)
 
-                # Bar chart — EV/EBITDA peer comparison
-                _ev_col = "EV/EBITDA"
-                if _ev_col in _disp.columns:
-                    _chart_df = (
-                        _disp.drop(index="Mediana peers", errors="ignore")[[_ev_col]]
-                        .dropna()
-                        .sort_values(_ev_col)
+                # ── Performance relativa no setor ────────────────────────────────
+                st.markdown("**Performance Relativa no Setor**")
+                _fig_pct = go.Figure(
+                    go.Bar(
+                        x=_rank_df["Múltiplo"],
+                        y=_rank_df["Percentil"],
+                        marker_color=[
+                            "#00ff87" if p >= 70 else ("#ffd600" if p >= 40 else "#ff3d5a")
+                            for p in _rank_df["Percentil"]
+                        ],
+                        text=[f"{p:.0f}%" for p in _rank_df["Percentil"]],
+                        textposition="outside",
                     )
-                    _colors = [
-                        "#a855f7" if i == ticker else "#334155" for i in _chart_df.index
-                    ]
-                    _fig_peers = go.Figure(
-                        go.Bar(
-                            x=_chart_df.index.tolist(),
-                            y=_chart_df[_ev_col].tolist(),
-                            marker_color=_colors,
-                            text=[f"{v:.1f}×" for v in _chart_df[_ev_col]],
-                            textposition="outside",
+                )
+                _fig_pct.update_layout(
+                    title=f"{ticker} vs. {n_peers_display} peers do setor {_setor_ticker}",
+                    yaxis_title="Percentil no Setor (%)",
+                    yaxis=dict(range=[0, 105], ticksuffix="%"),
+                    height=320,
+                    margin=dict(t=40, b=40, l=40, r=20),
+                )
+                apply_plotly_theme(_fig_pct)
+                st.plotly_chart(_fig_pct, use_container_width=True)
+
+                # ── Distribuição do setor por múltiplo ───────────────────────────
+                st.markdown("**Distribuição do Setor por Múltiplo**")
+                _mult_sel = st.selectbox(
+                    "Selecione o múltiplo para visualizar",
+                    _rank_df["Múltiplo"].tolist(),
+                    key="val_mult_dist_sel",
+                )
+                _mult_key = next(
+                    (m[0] for m in MULTIPLES_CFG if m[1] == _mult_sel), None
+                )
+                if _mult_key and _mult_key in _peers_raw.columns:
+                    _tickers_do_setor = _b3_data[_b3_data["Setor"] == _setor_ticker][
+                        "Ticker"
+                    ].tolist()
+                    _col_plot = (
+                        clean_numeric_column(
+                            _peers_raw.loc[
+                                _peers_raw.index.isin(_tickers_do_setor), _mult_key
+                            ]
                         )
+                        .dropna()
+                        .sort_values()
                     )
-                    _fig_peers.update_layout(
-                        title=f"EV/EBITDA — Peers ({_setor_ticker})",
-                        height=260,
-                        yaxis_title="EV/EBITDA (×)",
-                        xaxis_tickangle=-35,
-                    )
-                    apply_plotly_theme(_fig_peers)
-                    st.plotly_chart(_fig_peers, use_container_width=True)
-            else:
-                st.info("Dados de múltiplos não disponíveis para os peers deste setor.")
-        else:
-            st.warning("Não foi possível carregar dados de peers do Fundamentus.")
-    else:
-        st.info("Setor não identificado no CSV B3 — comparação de peers indisponível.")
+                    if _col_plot.empty:
+                        st.warning(f"Dados indisponíveis para o setor de {ticker}.")
+                    else:
+                        _bar_colors = [
+                            "#a855f7" if i == ticker else "#334155"
+                            for i in _col_plot.index
+                        ]
+                        _fig_mult = go.Figure(
+                            go.Bar(
+                                x=_col_plot.index.tolist(),
+                                y=_col_plot.values,
+                                marker_color=_bar_colors,
+                                marker_line_width=0,
+                                text=[f"{v:.1f}" for v in _col_plot.values],
+                                textposition="outside",
+                                textfont=dict(size=8, color="#94a3b8"),
+                            )
+                        )
+                        _med_val = _col_plot.median()
+                        _fig_mult.add_hline(
+                            y=_med_val,
+                            line_dash="dash",
+                            line_color="#ffd600",
+                            line_width=1.5,
+                            annotation_text=f"Mediana: {_med_val:.1f}",
+                            annotation_position="top left",
+                            annotation_font=dict(color="#ffd600", size=11),
+                        )
+                        _fig_mult.update_layout(
+                            title=f"{_mult_sel} — Peers de {ticker} no Setor: {_setor_ticker} ({len(_col_plot)} empresas)",
+                            xaxis_title="Ticker",
+                            yaxis_title=_mult_sel,
+                            xaxis=dict(tickangle=-45, tickfont=dict(size=9)),
+                            height=420,
+                            showlegend=False,
+                        )
+                        apply_plotly_theme(_fig_mult)
+                        st.plotly_chart(_fig_mult, use_container_width=True)
 
     # ── Watchlist button ───────────────────────────────────────────────────────
     st.markdown("---")
