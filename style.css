@@ -217,12 +217,20 @@ h1:not(.page-hero-title) {
   border-color: rgba(0, 210, 255, 0.35) !important;
   color: #b8eeff !important;
 }
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) {
+  background: rgba(0, 210, 255, 0.06) !important;
+  border-radius: inherit !important;
+}
 
 /* Warning */
 [data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) {
   background: rgba(255, 214, 0, 0.06) !important;
   border-color: rgba(255, 214, 0, 0.35) !important;
   color: #fff3b0 !important;
+}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {
+  background: rgba(255, 214, 0, 0.06) !important;
+  border-radius: inherit !important;
 }
 
 /* Success */
@@ -231,12 +239,20 @@ h1:not(.page-hero-title) {
   border-color: rgba(0, 255, 135, 0.35) !important;
   color: #b0ffe0 !important;
 }
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) {
+  background: rgba(0, 255, 135, 0.06) !important;
+  border-radius: inherit !important;
+}
 
 /* Error */
 [data-testid="stAlert"]:has([data-testid="stAlertContentError"]) {
   background: rgba(255, 61, 90, 0.06) !important;
   border-color: rgba(255, 61, 90, 0.35) !important;
   color: #ffc0c8 !important;
+}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) {
+  background: rgba(255, 61, 90, 0.06) !important;
+  border-radius: inherit !important;
 }
 
 /* ─── Radio Buttons ───────────────────────────────────────────────────────────*/
