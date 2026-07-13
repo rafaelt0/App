@@ -6,7 +6,7 @@ import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css, render_flow_sidebar, svg_icon
+from utils.ui import empty_state_card, load_css, render_flow_sidebar, svg_icon
 
 
 # CSS customizado
@@ -126,10 +126,18 @@ st.markdown(
 required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
 for key in required_keys:
     if key not in st.session_state:
-        st.warning(
-            "Configure primeiro seu portfólio na aba **Portfolio** para liberar a Simulação Monte Carlo."
+        empty_state_card(
+            icon_svg="""<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
+                <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" stroke="#94a3b8" stroke-width="1.5"/>
+                <path d="M14 4v4h4" stroke="#94a3b8" stroke-width="1.5"/>
+                <line x1="7" y1="13" x2="17" y2="13" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="7" y1="17" x2="17" y2="17" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>""",
+            title="Portfólio não configurado",
+            message='Configure primeiro seu portfólio na página <strong style="color:#00ff87">Portfolio</strong> para liberar a Simulação Monte Carlo.',
+            cta_label="Ir para Portfolio",
+            cta_page="pages/1_Portfolio.py",
         )
-        st.page_link("pages/1_Portfolio.py", label="Ir para Portfolio", icon="➡️")
         st.stop()
 
 # Recupera as variáveis da aba 1
