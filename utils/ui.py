@@ -60,6 +60,26 @@ def render_cards_grid(data_dict: dict, colors_sequence=None) -> None:
     st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 
+def empty_state_card(icon_svg: str, title: str, message: str, cta_label: str, cta_page: str) -> None:
+    """Render a centered empty-state card (icon, title, message) with a CTA link below it.
+
+    `icon_svg` is full standalone SVG markup (not wrapped via `svg_icon`).
+    `message` may contain inline HTML (e.g. `<strong>`) and is inserted as-is.
+    `cta_page` is a page path suitable for `st.page_link` (e.g. "pages/1_Portfolio.py").
+    """
+    st.markdown(
+        f"""
+    <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:16px;padding:2.5rem;text-align:center;margin-top:2rem;">
+        {icon_svg}
+        <div style="font-size:1.15rem;font-weight:700;color:#f8fafc;margin-bottom:0.5rem">{title}</div>
+        <div style="font-size:0.875rem;color:#94a3b8;max-width:400px;margin:0 auto 1.2rem;">{message}</div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
+    st.page_link(cta_page, label=cta_label, icon="➡️")
+
+
 def load_css(path: str = "style.css") -> None:
     """Load a CSS file and inject it into the page via `st.markdown`.
 

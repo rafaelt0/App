@@ -13,7 +13,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 from utils.charts import apply_plotly_theme
-from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
+from utils.ui import empty_state_card, load_css, loading_overlay, render_flow_sidebar, svg_icon
 
 # CSS customizado
 load_css()
@@ -530,23 +530,18 @@ def analise_sentimento_finbert(title, summary, nlp):
 
 # Verifica se a carteira está carregada
 if "peso_manual_df" not in st.session_state or st.session_state["peso_manual_df"] is None:
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:16px;padding:2.5rem;text-align:center;margin-top:2rem;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
+    empty_state_card(
+        icon_svg="""<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
             <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" stroke="#94a3b8" stroke-width="1.5"/>
             <path d="M14 4v4h4" stroke="#94a3b8" stroke-width="1.5"/>
             <line x1="7" y1="13" x2="17" y2="13" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
             <line x1="7" y1="17" x2="17" y2="17" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        <div style="font-size:1.15rem;font-weight:700;color:#f8fafc;margin-bottom:0.5rem">Portfólio não configurado</div>
-        <div style="font-size:0.875rem;color:#94a3b8;max-width:400px;margin:0 auto 1.2rem;">
-            Configure e carregue seu portfólio na página <strong style="color:#00ff87">Portfolio</strong> para que as notícias sejam filtradas para os ativos da sua carteira.
-        </div>
-        <div style="display:inline-block;background:rgba(0,255,135,0.08);border:1px solid rgba(0,255,135,0.25);border-radius:8px;padding:0.5rem 1.2rem;font-size:0.85rem;color:#00ff87;font-weight:600;">
-            → Acesse Portfolio na barra lateral
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        </svg>""",
+        title="Portfólio não configurado",
+        message='Configure e carregue seu portfólio na página <strong style="color:#00ff87">Portfolio</strong> para que as notícias sejam filtradas para os ativos da sua carteira.',
+        cta_label="Ir para Portfolio",
+        cta_page="pages/1_Portfolio.py",
+    )
     st.stop()
 
 # Recupera ativos e pesos
