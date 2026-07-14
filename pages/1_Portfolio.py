@@ -284,7 +284,15 @@ if len(returns) < MIN_RETURN_ROWS:
 
 page_container = st.empty()
 
+# Latch the "loaded" state in session_state. Without this, the whole analysis
+# lived inside `if st.button(...)`, which is only True on the click run — any
+# widget interaction below (e.g. the LAC "% em ativos de risco" slider) reruns
+# the script, the button reads False, and the entire block (slider included)
+# disappears. Persisting the flag keeps the analysis rendered across reruns.
 if st.button("Carregar Portfolio", type="primary", use_container_width=True):
+    st.session_state["portfolio_loaded"] = True
+
+if st.session_state.get("portfolio_loaded"):
     # Overlay de carregamento global
     with loading_overlay("Carregando dados, aguarde...", tickers=tickers):
         if "Manual" in modo:
