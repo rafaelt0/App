@@ -160,6 +160,14 @@ st.session_state["selected_tickers"] = [
     t for t in st.session_state["selected_tickers"] if t in stocks
 ][:MAX_TICKERS]
 
+def _clear_saved_portfolio():
+    # Runs as a button callback, i.e. BEFORE the widgets are instantiated on the
+    # next run. Clearing "selected_tickers" here is allowed; doing it inline after
+    # the multiselect below already exists raises a StreamlitAPIException.
+    _db.portfolio_clear(_uid)
+    st.session_state["selected_tickers"] = []
+
+
 col_tickers, col_clear = st.columns([5, 1])
 with col_tickers:
     tickers = st.multiselect(
@@ -172,10 +180,11 @@ with col_tickers:
 with col_clear:
     st.write("")
     st.write("")
-    if st.button("Limpar salvo", use_container_width=True):
-        _db.portfolio_clear(_uid)
-        st.session_state["selected_tickers"] = []
-        st.rerun()
+    st.button(
+        "Limpar salvo",
+        use_container_width=True,
+        on_click=_clear_saved_portfolio,
+    )
 
 # Valor inicial
 valor_inicial = st.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
