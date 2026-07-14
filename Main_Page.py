@@ -158,6 +158,12 @@ setores_selecionados = st.sidebar.multiselect(
     "Escolha um ou mais setores:", setores, default=[], key="setores_selecionados"
 )
 
+# Detecta se o usuário mudou a seleção de setores nesta interação. Quando muda,
+# os tickers do(s) setor(es) são autoselecionados abaixo (após a filtragem).
+_prev_setores = st.session_state.get("_prev_setores_selecionados")
+_sector_changed = _prev_setores is not None and _prev_setores != setores_selecionados
+st.session_state["_prev_setores_selecionados"] = list(setores_selecionados)
+
 if st.session_state.get("selected_tickers"):
     if st.sidebar.button("Limpar seleção de ações", use_container_width=True):
         st.session_state["selected_tickers"] = []
@@ -173,6 +179,12 @@ else:
 
 # Ordenar por liquidez para colocar maiores empresas no topo
 tickers_filtrados = get_sorted_tickers_by_liquidity(tickers_filtrados)
+
+# Ao escolher um setor, autoselecionar as ações referentes a ele. O widget de
+# tickers ainda não foi instanciado, então escrevemos direto no session_state.
+# "Todos"/vazio não autoseleciona para evitar marcar a base inteira.
+if _sector_changed and setores_selecionados and "Todos" not in setores_selecionados:
+    st.session_state["selected_tickers"] = list(tickers_filtrados)
 
 section_header(ICO_COMPASS, "Escolha ações para explorar", "h3")
 n_disponíveis = len(tickers_filtrados)
