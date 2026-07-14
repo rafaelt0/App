@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 import plotly.express as px
 import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
-from pypfopt import expected_returns, risk_models
+from pypfopt import expected_returns, risk_models, objective_functions
 from pypfopt.efficient_frontier import EfficientFrontier
 from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
@@ -237,6 +237,28 @@ if "Manual" in modo:
         st.success(f"Soma dos pesos: {total_pesos:.2f}% ✓")
     st.markdown("---")
 
+# Controle de diversificação para Markowitz. A otimização média-variância é um
+# problema de canto: ela concentra o capital em poucos ativos e zera o resto.
+# A regularização L2 (add_objective(L2_reg, gamma)) penaliza a concentração,
+# reduzindo os pesos zerados de forma suave — gamma maior = mais distribuído.
+gamma_l2 = 0.0
+if "Markowitz" in modo:
+    st.markdown("---")
+    gamma_l2 = st.slider(
+        "Diversificação (regularização L2)",
+        min_value=0.0,
+        max_value=3.0,
+        value=1.0,
+        step=0.1,
+        help=(
+            "Penaliza a concentração para evitar pesos zerados. "
+            "0 = Markowitz puro (concentra em poucos ativos); valores maiores "
+            "distribuem o capital entre mais ativos, aproximando-se da carteira "
+            "igualmente ponderada."
+        ),
+    )
+    st.markdown("---")
+
 # Pré-carrega cotações (resultado cacheado após primeira execução).
 # Usa um spinner discreto (não a animação cheia) para não disparar a
 # animação de carregamento só por selecionar um ativo — essa fica
@@ -338,6 +360,18 @@ if st.session_state.get("portfolio_loaded"):
             try:
                 ef = EfficientFrontier(mu, S)
                 raw_weights = ef.max_sharpe(risk_free_rate=selic_anual)
+                if gamma_l2 > 0:
+                    # L2_reg does not compose with max_sharpe (it internally
+                    # transforms the problem, so the penalty is ignored). To
+                    # regularize while preserving the Max-Sharpe return, re-solve
+                    # for that same target return with L2 active — this spreads
+                    # the weight across more assets and avoids zeros.
+                    tangency_return = ef.portfolio_performance(
+                        risk_free_rate=selic_anual
+                    )[0]
+                    ef = EfficientFrontier(mu, S)
+                    ef.add_objective(objective_functions.L2_reg, gamma=gamma_l2)
+                    raw_weights = ef.efficient_return(target_return=tangency_return)
                 cleaned_weights = ef.clean_weights()
             except Exception as e:
                 logger.exception("max_sharpe optimization failed")
@@ -345,6 +379,8 @@ if st.session_state.get("portfolio_loaded"):
                     f"Otimização de Max Sharpe falhou (motivo: {str(e)}). Usando carteira de Mínima Volatilidade."
                 )
                 ef = EfficientFrontier(mu, S)
+                if gamma_l2 > 0:
+                    ef.add_objective(objective_functions.L2_reg, gamma=gamma_l2)
                 raw_weights = ef.min_volatility()
                 cleaned_weights = ef.clean_weights()
             peso_manual_df = pd.DataFrame.from_dict(
