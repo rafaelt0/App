@@ -77,6 +77,7 @@ def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=
         min_stddev = np.sqrt(np.min(np.diag(S)))
 
     efficient_vols = []
+    efficient_returns = []
     target_returns = np.linspace(min_return, max(mu), 25)
     for target in target_returns:
         try:
@@ -85,13 +86,16 @@ def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=
             w_target = np.array(list(ef_target.clean_weights().values()))
             vol = np.sqrt(np.dot(w_target.T, np.dot(S, w_target)))
             efficient_vols.append(vol)
+            # Keep each solved volatility paired with the target return that
+            # produced it — otherwise skipped (failed) targets shift the curve.
+            efficient_returns.append(target)
         except Exception:
             logger.debug("efficient frontier target-return point failed", exc_info=True)
 
     return (
         results,
         np.array(efficient_vols),
-        target_returns,
+        np.array(efficient_returns),
         opt_return,
         opt_stddev,
         opt_sharpe,
@@ -104,7 +108,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
     (
         results,
         efficient_vols,
-        target_returns,
+        efficient_returns,
         opt_return,
         opt_stddev,
         opt_sharpe,
@@ -148,7 +152,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
         fig.add_trace(
             go.Scatter(
                 x=efficient_vols,
-                y=target_returns[: len(efficient_vols)],
+                y=efficient_returns,
                 mode="lines",
                 line=dict(color="#00ff87", width=3),
                 name="Fronteira Eficiente",
@@ -204,7 +208,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
                 y=[rf, rf + lac_slope * lac_x_end],
                 mode="lines",
                 line=dict(color="#ffd600", width=2, dash="dash"),
-                name="LAC — Linha de Alocação de Capital",
+                name="LAC (Alocação de Capital)",
                 hovertemplate="LAC<br>Vol: %{x:.2%}<br>Retorno: %{y:.2%}<extra></extra>",
             )
         )
@@ -228,5 +232,20 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
         yaxis_title="Retorno Esperado Anualizado",
     )
     apply_plotly_theme(fig)
-    fig.update_layout(height=550, margin=dict(b=140))
+    # apply_plotly_theme() places a horizontal legend at y=-0.3, which collides
+    # with the x-axis title and clips the last legend rows. Give the x-axis
+    # title breathing room, drop the legend below it, and reserve enough bottom
+    # margin for the wrapped multi-row legend so nothing is cut off.
+    fig.update_layout(
+        height=620,
+        margin=dict(b=200, t=70),
+        xaxis=dict(title=dict(standoff=18)),
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.28,
+            xanchor="center",
+            x=0.5,
+        ),
+    )
     return fig
