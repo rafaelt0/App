@@ -244,7 +244,7 @@ if "Manual" in modo:
 gamma_l2 = 0.0
 if "Markowitz" in modo:
     st.markdown("---")
-    gamma_l2 = st.slider(
+    gamma_l2 = st.number_input(
         "Diversificação (regularização L2)",
         min_value=0.0,
         max_value=3.0,
@@ -595,13 +595,13 @@ border:1px solid rgba(245,158,11,0.25);border-radius:14px;padding:1rem 1.2rem;ma
             )
 
             _w = (
-                st.slider(
+                st.number_input(
                     "% em ativos de risco (Carteira Tangente)",
                     min_value=0,
                     max_value=150,
                     value=100,
                     step=5,
-                    format="%d%%",
+                    format="%d",
                     help="0% = 100% na Selic (sem risco). 100% = Carteira Tangente pura. >100% = alavancagem.",
                 )
                 / 100.0

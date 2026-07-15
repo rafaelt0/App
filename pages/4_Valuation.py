@@ -665,7 +665,7 @@ with tabs[3]:
 
     col_sl1, col_sl2, col_sl3 = st.columns(3)
     with col_sl1:
-        g1 = st.slider(
+        g1 = st.number_input(
             "Crescimento Anos 1–5 (%)",
             0.0,
             30.0,
@@ -677,7 +677,7 @@ with tabs[3]:
         ss["g1"] = g1
 
     with col_sl2:
-        g2 = st.slider(
+        g2 = st.number_input(
             "Crescimento Anos 6–10 (%)",
             0.0,
             20.0,
@@ -689,7 +689,7 @@ with tabs[3]:
         ss["g2"] = g2
 
     with col_sl3:
-        roic_proj = st.slider(
+        roic_proj = st.number_input(
             "ROIC — Período de Projeção (%)",
             1.0,
             40.0,
@@ -765,7 +765,7 @@ CV_T = NOPLAT_{T+1} × (1 − g / ROIC_cv) / (WACC − g)
 
     col_cv1, col_cv2 = st.columns(2)
     with col_cv1:
-        gt = st.slider(
+        gt = st.number_input(
             "Crescimento Terminal — g (%)",
             1.0,
             6.0,
@@ -777,7 +777,7 @@ CV_T = NOPLAT_{T+1} × (1 − g / ROIC_cv) / (WACC − g)
         ss["gt"] = gt
 
     with col_cv2:
-        roic_cv = st.slider(
+        roic_cv = st.number_input(
             "ROIC na Perpetuidade — ROIC_cv (%)",
             5.0,
             35.0,
@@ -891,7 +891,7 @@ with tabs[5]:
             unsafe_allow_html=True,
         )
 
-        ke = st.slider(
+        ke = st.number_input(
             "ke — Custo do Equity (%)",
             6.0,
             25.0,
@@ -913,7 +913,7 @@ with tabs[5]:
                 unsafe_allow_html=True,
             )
 
-        kd = st.slider(
+        kd = st.number_input(
             "kd — Custo da Dívida (%)",
             4.0,
             20.0,
@@ -926,7 +926,7 @@ with tabs[5]:
 
     st.markdown("**6c. Estrutura de Capital (pesos de mercado)**")
     e_weight = (
-        st.slider(
+        st.number_input(
             "Participação do Equity — E/(E+D) (%)",
             20.0,
             95.0,

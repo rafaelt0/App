@@ -148,7 +148,7 @@ peso_manual_df = st.session_state["peso_manual_df"]
 
 
 with st.form("form_simulacao"):
-    n_simulations = st.slider(
+    n_simulations = st.number_input(
         "Número de Simulações",
         10,
         500,
@@ -315,7 +315,7 @@ with col_exp2:
 # Gráfico com algumas trajetórias individuais para ilustrar a dispersão
 section_header(ICO_SIGNAL, "Trajetórias Individuais das Simulações", "h3")
 n_plot_max = min(50, n_simulations)
-n_plot = st.slider(
+n_plot = st.number_input(
     "Número de trajetórias exibidas",
     min_value=5,
     max_value=n_plot_max,
