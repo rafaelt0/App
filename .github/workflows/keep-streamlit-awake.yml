@@ -1,6 +1,3 @@
-# Solução 1: Configurar Permissões no Workflow (RECOMENDADO)
-# Arquivo: .github/workflows/keep-alive.yml ou seu workflow
-
 name: Keep Streamlit Awake
 on:
   schedule:
@@ -10,27 +7,31 @@ on:
 jobs:
   keep-alive:
     runs-on: ubuntu-latest
-    
-    # ✅ ADICIONAR ESSAS PERMISSÕES
+
     permissions:
       contents: write
-      actions: write
-      
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # ✅ USAR TOKEN COM PERMISSÕES
           token: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
       - name: Keep alive
         run: |
-          echo "$(date): Keep alive ping" >> keep_alive.log
-          git add keep_alive.log
-          git commit -m "Keep Streamlit awake - $(date)"
+          # Usa um arquivo rastreado (keep_alive.txt) — NÃO um *.log,
+          # que é ignorado pelo .gitignore e fazia o "git add" falhar.
+          # Sobrescreve com o timestamp atual para manter o diff mínimo.
+          date -u +"Last keep-alive ping: %Y-%m-%dT%H:%M:%SZ" > keep_alive.txt
+          git add keep_alive.txt
+          if git diff --cached --quiet; then
+            echo "Nada para commitar; nenhuma mudança neste ciclo."
+            exit 0
+          fi
+          git commit -m "chore: keep Streamlit awake"
           git push
