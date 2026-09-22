@@ -590,6 +590,43 @@ with col_m4:
         help="Score composto mais alto entre as ações filtradas. Média dos percentis de ROIC, ROE, DY, Mrg.Líq., Cresc.5a (maiores = melhor) e P/L, P/VP, EV/EBITDA invertidos (menores = melhor).",
     )
 
+_filter_summary = []
+if st.session_state["preset_select"] != "Personalizado":
+    _filter_summary.append(f"Preset: {st.session_state['preset_select']}")
+if pl_range != (DEFAULTS["pl_min"], DEFAULTS["pl_max"]):
+    _filter_summary.append(f"P/L {pl_range[0]:g}–{pl_range[1]:g}")
+if pvp_range != (DEFAULTS["pvp_min"], DEFAULTS["pvp_max"]):
+    _filter_summary.append(f"P/VP {pvp_range[0]:g}–{pvp_range[1]:g}")
+if dy_min:
+    _filter_summary.append(f"DY ≥ {dy_min:g}%")
+if roe_min:
+    _filter_summary.append(f"ROE ≥ {roe_min:g}%")
+if evebitda_max != DEFAULTS["evebitda_max"]:
+    _filter_summary.append(f"EV/EBITDA ≤ {evebitda_max:g}")
+if liq2m_min:
+    _filter_summary.append(f"Liquidez ≥ R$ {liq2m_min:,.0f}")
+if divbpatr_max != DEFAULTS["divbpatr_max"]:
+    _filter_summary.append(f"Dív./PL ≤ {divbpatr_max:g}")
+if liqc_min:
+    _filter_summary.append(f"Liq. corrente ≥ {liqc_min:g}")
+if c5y_range != (DEFAULTS["c5y_min"], DEFAULTS["c5y_max"]):
+    _filter_summary.append(f"Cresc. 5a {c5y_range[0]:g}–{c5y_range[1]:g}%")
+if graham_on:
+    _filter_summary.append("Graham Number")
+if peg_on:
+    _filter_summary.append(f"PEG ≤ {peg_max:g}")
+if ordenar_por != DEFAULTS["ordenar_por"]:
+    _filter_summary.append(f"ordenação: {ordenar_por}")
+if not _filter_summary:
+    _filter_summary.append("configuração padrão")
+
+_coverage = total_passaram / len(df) * 100 if len(df) else 0
+st.caption(
+    "Filtros ativos · "
+    + " · ".join(_filter_summary)
+    + f" · {_coverage:.0f}% do universo"
+)
+
 st.markdown("---")
 
 # ─── Tabela de resultados ─────────────────────────────────────────────────────
