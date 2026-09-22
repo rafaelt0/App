@@ -176,12 +176,12 @@ def _restore_saved_portfolio_context() -> None:
             value = float(weight)
         except (TypeError, ValueError):
             continue
-        if np.isfinite(value) and value > 0:
+        if np.isfinite(value) and value >= 0:
             raw_weights[str(ticker).replace(".SA", "")] = value
 
     default_weight = 1.0 / len(tickers)
     weights = {
-        ticker: raw_weights.get(ticker, default_weight)
+        ticker: raw_weights[ticker] if ticker in raw_weights else default_weight
         for ticker in tickers
     }
     weight_total = sum(weights.values())
@@ -285,6 +285,17 @@ modo = st.session_state["modo"]
 returns = st.session_state["returns"]
 pesos_manuais = st.session_state["pesos_manuais"]
 peso_manual_df = st.session_state["peso_manual_df"]
+
+section_header(ICO_METRICS, "Alocação usada na simulação", "h2")
+_weight_preview = {
+    str(index).replace(".SA", ""): f"{float(weight):.1%}"
+    for index, weight in peso_manual_df["Peso"].items()
+}
+render_cards_grid(_weight_preview)
+st.caption(
+    "Pesos normalizados a partir da carteira carregada; ativos com peso zero "
+    "permanecem zerados."
+)
 
 
 _SIMULATION_PRESETS = (

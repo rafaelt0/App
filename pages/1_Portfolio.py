@@ -527,7 +527,12 @@ if (
             )
             pesos_manuais_arr = peso_manual_df["Peso"].values
 
-        _db.portfolio_save(_uid, tickers, pesos_manuais if "Manual" in modo else {})
+        _persisted_weights = {
+            str(index): float(weight)
+            for index, weight in peso_manual_df["Peso"].items()
+            if pd.notna(weight)
+        }
+        _db.portfolio_save(_uid, tickers, _persisted_weights)
 
         # Mostrar pesos
         st.subheader("Pesos do Portfólio (%)")
