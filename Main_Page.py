@@ -116,6 +116,7 @@ stocks = list(data["Ticker"].values)
 setores = sorted(data["Setor"].dropna().unique())
 setores.insert(0, "Todos")
 SECTOR_AUTOPICK_LIMIT = 8
+MAX_ANALYSIS_TICKERS = 20
 _ticker_setor = dict(zip(data["Ticker"], data["Setor"]))
 
 _uid = get_browser_uid()
@@ -127,6 +128,8 @@ if "selected_tickers" not in st.session_state:
         for ticker in _saved_tickers
         if str(ticker).replace(".SA", "") in stocks
     ]
+    if len(_saved_tickers) > MAX_ANALYSIS_TICKERS:
+        st.session_state["_analysis_limit_notice"] = len(_saved_tickers)
     st.session_state["selected_tickers"] = _saved_tickers
     if _saved_tickers:
         st.session_state["_saved_selection_notice"] = True
@@ -284,7 +287,7 @@ if "_pending_tickers" in st.session_state:
 # Remove any stale tickers that are no longer in the filtered list
 st.session_state["selected_tickers"] = [
     t for t in st.session_state["selected_tickers"] if t in tickers_filtrados
-]
+][:MAX_ANALYSIS_TICKERS]
 
 tickers = st.multiselect(
     "Escolha ações para analisar",
@@ -293,7 +296,11 @@ tickers = st.multiselect(
         f"{t}  ·  {_ticker_setor[t]}" if _ticker_setor.get(t) else t
     ),
     placeholder="Digite o ticker ou selecione na lista…",
-    help="Você pode selecionar uma ou mais ações. Use o filtro de setor na barra lateral para reduzir a lista.",
+    max_selections=MAX_ANALYSIS_TICKERS,
+    help=(
+        f"Selecione até {MAX_ANALYSIS_TICKERS} ações. "
+        "Use o filtro de setor para reduzir a lista."
+    ),
     key="selected_tickers",
 )
 
@@ -301,6 +308,13 @@ if st.session_state.pop("_saved_selection_notice", False):
     st.info(
         "Seleção da carteira salva carregada. "
         "Revise os ativos e clique em **Analisar** para atualizar os fundamentos."
+    )
+
+_saved_count = st.session_state.pop("_analysis_limit_notice", None)
+if _saved_count:
+    st.info(
+        f"A seleção salva tinha {_saved_count} ações. "
+        f"Carregamos as primeiras {MAX_ANALYSIS_TICKERS} para manter a análise estável."
     )
 
 # A new selection must always require an explicit analysis click. This avoids
