@@ -176,21 +176,80 @@ pesos_manuais = st.session_state["pesos_manuais"]
 peso_manual_df = st.session_state["peso_manual_df"]
 
 
+_SIMULATION_PRESETS = (
+    (
+        "Rápida",
+        {
+            "sim_n_simulations_input": 100,
+            "sim_valor_input": 10_000,
+            "sim_years_input": 1,
+        },
+        "100 trajetórias · 1 ano",
+    ),
+    (
+        "Padrão",
+        {
+            "sim_n_simulations_input": 200,
+            "sim_valor_input": 10_000,
+            "sim_years_input": 1,
+        },
+        "200 trajetórias · 1 ano",
+    ),
+    (
+        "Longo prazo",
+        {
+            "sim_n_simulations_input": 300,
+            "sim_valor_input": 10_000,
+            "sim_years_input": 5,
+        },
+        "300 trajetórias · 5 anos",
+    ),
+)
+
+
+def _apply_simulation_preset(values: dict[str, int]) -> None:
+    for key, value in values.items():
+        st.session_state[key] = value
+
+
+st.caption("Escolha um ponto de partida; você pode ajustar os valores abaixo.")
+_preset_cols = st.columns(3)
+for _index, (_label, _values, _description) in enumerate(_SIMULATION_PRESETS):
+    with _preset_cols[_index]:
+        st.button(
+            _label,
+            key=f"simulation_preset_{_label}",
+            use_container_width=True,
+            help=_description,
+            on_click=_apply_simulation_preset,
+            args=(_values,),
+        )
+
+
 with st.form("form_simulacao"):
     n_simulations = st.number_input(
         "Número de Simulações",
-        10,
-        500,
-        200,
+        min_value=10,
+        max_value=500,
+        value=200,
         help="Quantidade de trajetórias simuladas para o portfólio.",
+        key="sim_n_simulations_input",
     )
     valor = st.number_input(
         "Capital Inicial (R$)",
         min_value=100,
+        value=10_000,
         help="Valor inicial investido no portfólio.",
+        key="sim_valor_input",
     )
     years = int(
-        st.number_input("Anos", min_value=1, help="Horizonte da simulação em anos.")
+        st.number_input(
+            "Anos",
+            min_value=1,
+            value=1,
+            help="Horizonte da simulação em anos.",
+            key="sim_years_input",
+        )
     )
 
     submitted = st.form_submit_button(
