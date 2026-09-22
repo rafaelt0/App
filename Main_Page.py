@@ -140,16 +140,28 @@ if _watchlist:
     for _wt in _watchlist:
         _c1, _c2 = st.sidebar.columns([5, 1])
         with _c1:
-            if st.button(
-                _wt,
-                key=f"wl_load_{_wt}",
+            if _wt in stocks:
+                if st.button(
+                    _wt,
+                    key=f"wl_load_{_wt}",
+                    use_container_width=True,
+                    help=_ticker_setor.get(_wt, ""),
+                ):
+                    _cur = st.session_state.get("selected_tickers", [])
+                    if _wt not in _cur:
+                        st.session_state["selected_tickers"] = _cur + [_wt]
+                    st.rerun()
+            elif st.button(
+                f"{_wt} · Valuation",
+                key=f"wl_val_{_wt}",
                 use_container_width=True,
-                help=_ticker_setor.get(_wt, ""),
+                help="Ticker fora da lista local; abrir valuation para continuar.",
             ):
-                _cur = st.session_state.get("selected_tickers", [])
-                if _wt not in _cur:
-                    st.session_state["selected_tickers"] = _cur + [_wt]
-                st.rerun()
+                st.session_state["_valuation_handoff_ticker"] = _wt
+                st.session_state["valuation_ticker"] = _wt
+                st.query_params["uid"] = _uid
+                st.query_params["valuation_ticker"] = _wt
+                st.switch_page("pages/4_Valuation.py")
         with _c2:
             if st.button("✕", key=f"wl_rm_{_wt}", help="Remover dos favoritos"):
                 _db.wl_remove(_uid, _wt)
@@ -210,6 +222,7 @@ else:
 
 # Ordenar por liquidez para colocar maiores empresas no topo
 tickers_filtrados = get_sorted_tickers_by_liquidity(tickers_filtrados)
+
 
 # Ao escolher um setor, autoselecionar apenas os ativos mais líquidos. O widget
 # de tickers ainda não foi instanciado, então escrevemos direto no session_state.
@@ -275,7 +288,9 @@ st.session_state["selected_tickers"] = [
 tickers = st.multiselect(
     "Escolha ações para analisar",
     options=tickers_filtrados,
-    format_func=lambda t: f"{t}  ·  {_ticker_setor.get(t, '')}",
+    format_func=lambda t: (
+        f"{t}  ·  {_ticker_setor[t]}" if _ticker_setor.get(t) else t
+    ),
     placeholder="Digite o ticker ou selecione na lista…",
     help="Você pode selecionar uma ou mais ações. Use o filtro de setor na barra lateral para reduzir a lista.",
     key="selected_tickers",
