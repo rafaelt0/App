@@ -170,7 +170,11 @@ if "_pending_sectors" in st.session_state:
 
 # Permite filtro por setor na barra lateral
 setores_selecionados = st.sidebar.multiselect(
-    "Escolha um ou mais setores:", setores, default=[], key="setores_selecionados"
+    "Escolha um ou mais setores:",
+    setores,
+    default=[],
+    key="setores_selecionados",
+    placeholder="Selecione os setores…",
 )
 
 if st.sidebar.button(
