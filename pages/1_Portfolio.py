@@ -243,17 +243,36 @@ pesos_manuais_inputs = {}
 if "Manual" in modo:
     st.markdown("---")
     section_header(ICO_BOX, "Alocação Manual dos Pesos", "h3")
+
+    def _equalize_manual_weights():
+        n_assets = len(tickers)
+        base_pct = round(100 / n_assets, 2)
+        last_pct = round(100 - base_pct * (n_assets - 1), 2)
+        for index, ticker in enumerate(tickers):
+            st.session_state[f"peso_manual_{ticker}"] = (
+                last_pct if index == n_assets - 1 else base_pct
+            )
+
+    st.button(
+        "Distribuir igualmente",
+        key="equalize_manual_weights",
+        on_click=_equalize_manual_weights,
+        help="Divide o capital igualmente entre os ativos e ajusta o arredondamento para totalizar 100%.",
+        use_container_width=True,
+    )
+
     total_pesos = 0.0
     for ticker in tickers:
         _saved_pct = _saved_weights.get(ticker + ".SA")
         default_pct = _saved_pct * 100 if _saved_pct is not None else 100 / len(tickers)
+        _weight_key = f"peso_manual_{ticker}"
+        st.session_state.setdefault(_weight_key, round(default_pct, 2))
         p = st.number_input(
             f"Peso % de {ticker}",
             min_value=0.0,
             max_value=100.0,
-            value=round(default_pct, 2),
             step=0.01,
-            key=f"peso_manual_{ticker}",
+            key=_weight_key,
         )
         pesos_manuais_inputs[ticker + ".SA"] = p / 100
         total_pesos += p
