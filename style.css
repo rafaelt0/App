@@ -2729,3 +2729,32 @@ body,
 [data-testid="stNotification"] [data-testid="stMarkdownContainer"] {
   color: inherit !important;
 }
+/* Empty-state navigation should read as the next action, not a raw link. */
+[data-testid="stPageLink"] {
+  margin: 0.35rem 0 1.4rem !important;
+}
+
+[data-testid="stPageLink"] a {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 2.35rem !important;
+  padding: 0.5rem 0.9rem !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 7px !important;
+  background: var(--control-bg) !important;
+  color: var(--brand-secondary) !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease !important;
+}
+
+[data-testid="stPageLink"] a:hover {
+  border-color: var(--brand-secondary) !important;
+  background: var(--surface-hover) !important;
+  color: var(--text-main) !important;
+}
+
+[data-testid="stPageLink"] a:focus-visible {
+  outline: none !important;
+  box-shadow: var(--focus-ring) !important;
+}

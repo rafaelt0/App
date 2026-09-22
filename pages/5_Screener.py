@@ -268,6 +268,12 @@ def _apply_preset():
         st.session_state[k] = v
 
 
+def _reset_filters():
+    for key, value in DEFAULTS.items():
+        st.session_state[key] = value
+    st.session_state["preset_select"] = "Personalizado"
+
+
 st.sidebar.selectbox(
     "Filtro pré-definido",
     list(PRESETS.keys()),
@@ -279,6 +285,12 @@ st.sidebar.selectbox(
 st.sidebar.caption(
     f"{ICO_PIN} {PRESET_DESC.get(st.session_state['preset_select'], '')}",
     unsafe_allow_html=True,
+)
+st.sidebar.button(
+    "Limpar filtros",
+    on_click=_reset_filters,
+    help="Restaura os limites padrão e volta à ordenação por Score.",
+    use_container_width=True,
 )
 st.sidebar.markdown("---")
 

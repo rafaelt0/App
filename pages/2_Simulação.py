@@ -75,13 +75,13 @@ def render_cards_grid(data_dict, colors_sequence=None):
 
 # Configurar temas de plotagem escuros
 plt.style.use("dark_background")
-plt.rcParams["figure.facecolor"] = "#080c14"
-plt.rcParams["axes.facecolor"] = "#0e1524"
-plt.rcParams["text.color"] = "#f8fafc"
-plt.rcParams["axes.labelcolor"] = "#94a3b8"
-plt.rcParams["xtick.color"] = "#94a3b8"
-plt.rcParams["ytick.color"] = "#94a3b8"
-plt.rcParams["grid.color"] = "#1e293b"
+plt.rcParams["figure.facecolor"] = "#0b111a"
+plt.rcParams["axes.facecolor"] = "#151d2a"
+plt.rcParams["text.color"] = "#f0f4f8"
+plt.rcParams["axes.labelcolor"] = "#aebaca"
+plt.rcParams["xtick.color"] = "#aebaca"
+plt.rcParams["ytick.color"] = "#aebaca"
+plt.rcParams["grid.color"] = "#34465b"
 plt.rcParams["font.family"] = "sans-serif"
 
 # Customização do Plotly para o tema Obsidian Neo-Financial
