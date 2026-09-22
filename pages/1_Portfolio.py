@@ -333,6 +333,29 @@ if "Manual" in modo:
 # reduzindo os pesos zerados de forma suave — gamma maior = mais distribuído.
 gamma_l2 = 0.0
 if "Markowitz" in modo:
+    st.session_state.setdefault("portfolio_gamma_l2_input", 1.0)
+
+    def _set_gamma_preset(value: float) -> None:
+        st.session_state["portfolio_gamma_l2_input"] = value
+
+    st.caption("Escolha rapidamente quanto a otimização deve evitar concentração:")
+    _gamma_presets = (
+        ("Concentrada", 0.0, "Markowitz puro; pode concentrar em poucos ativos."),
+        ("Equilibrada", 1.0, "Ponto de partida balanceado entre retorno e diversificação."),
+        ("Diversificada", 2.0, "Penaliza mais a concentração e distribui melhor os pesos."),
+    )
+    _gamma_cols = st.columns(len(_gamma_presets))
+    for _index, (_label, _value, _help) in enumerate(_gamma_presets):
+        with _gamma_cols[_index]:
+            st.button(
+                _label,
+                key=f"gamma_preset_{_index}",
+                use_container_width=True,
+                help=_help,
+                on_click=_set_gamma_preset,
+                args=(_value,),
+            )
+
     st.markdown("---")
     gamma_l2 = st.number_input(
         "Diversificação (regularização L2)",
@@ -340,6 +363,7 @@ if "Markowitz" in modo:
         max_value=3.0,
         value=1.0,
         step=0.1,
+        key="portfolio_gamma_l2_input",
         help=(
             "Penaliza a concentração para evitar pesos zerados. "
             "0 = Markowitz puro (concentra em poucos ativos); valores maiores "
