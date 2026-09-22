@@ -119,6 +119,17 @@ _ticker_setor = dict(zip(data["Ticker"], data["Setor"]))
 
 _uid = get_browser_uid()
 
+if "selected_tickers" not in st.session_state:
+    _saved_tickers, _ = _db.portfolio_get(_uid)
+    _saved_tickers = [
+        str(ticker).replace(".SA", "")
+        for ticker in _saved_tickers
+        if str(ticker).replace(".SA", "") in stocks
+    ]
+    st.session_state["selected_tickers"] = _saved_tickers
+    if _saved_tickers:
+        st.session_state["_saved_selection_notice"] = True
+
 # ── Watchlist (sidebar) ───────────────────────────────────────────────────────
 _watchlist = _db.wl_get(_uid)
 if _watchlist:
@@ -265,6 +276,12 @@ tickers = st.multiselect(
     help="Você pode selecionar uma ou mais ações. Use o filtro de setor na barra lateral para reduzir a lista.",
     key="selected_tickers",
 )
+
+if st.session_state.pop("_saved_selection_notice", False):
+    st.info(
+        "Seleção da carteira salva carregada. "
+        "Revise os ativos e clique em **Analisar** para atualizar os fundamentos."
+    )
 
 # A new selection must always require an explicit analysis click. This avoids
 # reusing results from an earlier selection when the user returns to it later.
