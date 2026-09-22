@@ -101,6 +101,29 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+def _refresh_portfolio_data() -> None:
+    get_portfolio_prices.clear()
+    get_benchmark_prices.clear()
+    get_selic_rate.clear()
+    st.session_state["portfolio_loaded"] = False
+    st.session_state["portfolio_loaded_tickers"] = []
+    st.session_state["portfolio_analysis_tickers"] = []
+    st.session_state["_portfolio_refresh_notice"] = True
+
+
+st.button(
+    "Atualizar cotações",
+    key="portfolio_refresh",
+    use_container_width=True,
+    on_click=_refresh_portfolio_data,
+    help=(
+        "Limpa o cache de cotações, benchmark e Selic. "
+        "A análise precisa ser carregada novamente."
+    ),
+)
+if st.session_state.pop("_portfolio_refresh_notice", False):
+    st.info("Cotações atualizadas. Clique em **Carregar portfólio** para recalcular a análise.")
+
 # Configurações
 col_config1, col_config2 = st.columns(2)
 with col_config1:
