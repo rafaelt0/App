@@ -187,8 +187,28 @@ stocks = get_sorted_tickers_by_liquidity(stocks)
 _uid = get_browser_uid()
 _saved_tickers, _saved_weights = _db.portfolio_get(_uid)
 
+_query_handoff = str(st.query_params.get("portfolio_tickers", "")).strip()
+_handoff_tickers = [
+    ticker
+    for ticker in (
+        item.strip().upper().replace(".SA", "")
+        for item in _query_handoff.split(",")
+    )
+    if ticker in stocks
+][:MAX_TICKERS]
+_handoff_value = ",".join(_handoff_tickers)
+if _handoff_value and st.session_state.get("_portfolio_handoff_value") != _handoff_value:
+    st.session_state["_portfolio_handoff_value"] = _handoff_value
+    st.session_state["selected_tickers"] = _handoff_tickers
+    st.session_state["portfolio_loaded"] = False
+    st.session_state["portfolio_loaded_tickers"] = []
+    st.session_state["portfolio_analysis_tickers"] = []
+    st.session_state["_portfolio_handoff_notice"] = _handoff_tickers
+
 if "selected_tickers" not in st.session_state:
-    st.session_state["selected_tickers"] = [t for t in _saved_tickers if t in stocks]
+    st.session_state["selected_tickers"] = [
+        t for t in _saved_tickers if t in stocks
+    ]
     if st.session_state["selected_tickers"]:
         st.session_state["_portfolio_restore_notice"] = True
 
@@ -252,6 +272,12 @@ with col_tickers:
         key="selected_tickers",
         max_selections=MAX_TICKERS,
         help=f"Limite de {MAX_TICKERS} ativos para manter o download de cotações e a otimização estáveis.",
+    )
+
+if st.session_state.pop("_portfolio_handoff_notice", None):
+    st.info(
+        "Seleção da análise carregada no Portfolio. "
+        "Confira os ativos e clique em **Carregar portfólio**."
     )
 
 if st.session_state.pop("_portfolio_restore_notice", False):

@@ -4,6 +4,7 @@ import pandas as pd
 import warnings
 import datetime
 import logging
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
@@ -864,6 +865,11 @@ if ready_to_analyze:
             accent="var(--brand-primary)",
             cta_label="Abrir Portfolio",
             cta_page="pages/1_Portfolio.py",
+            cta_url=(
+                "Portfolio?"
+                f"uid={quote(_uid, safe='')}"
+                f"&portfolio_tickers={quote(','.join(tickers), safe='')}"
+            ),
         )
 
     except OSError as e:
