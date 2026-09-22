@@ -801,6 +801,11 @@ with col_g2:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     apply_plotly_theme(fig)
+    fig.update_layout(
+        title=dict(text="Notícias por ativo", x=0, xanchor="left"),
+        height=max(280, 190 + len(tickers) * 40),
+        margin=dict(l=48, r=12, t=46, b=90),
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")
