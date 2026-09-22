@@ -826,8 +826,13 @@ st.markdown("---")
 
 # Filtro lateral/superior de notícias
 section_header(ICO_NEWS, "Feed Qualitativo de Notícias da Carteira", "h2")
+st.caption(
+    "O sentimento consolidado e o gráfico consideram todas as notícias; "
+    "os filtros abaixo afetam apenas o feed."
+)
 
-col_filter, col_sort, col_sentiment = st.columns([1, 1, 1])
+
+col_filter, col_sort, col_sentiment, col_impact = st.columns([1, 1, 1, 1])
 with col_filter:
     selected_ticker = st.selectbox(
         "Filtrar por ativo",
@@ -846,6 +851,13 @@ with col_sentiment:
         ["Todos", "Otimistas", "Neutras", "Pessimistas"],
         help="Mostra apenas notícias classificadas pelo PLN com o sentimento escolhido.",
     )
+with col_impact:
+    impact_filter = st.selectbox(
+        "Filtrar por impacto",
+        ["Todos", "Alto", "Médio-Alto", "Médio", "Baixo-Médio", "Baixo"],
+        help="Mostra apenas notícias com o nível de impacto escolhido.",
+    )
+
 
 filtered_news = news_items if selected_ticker_clean == "Todos os Ativos" else [x for x in news_items if x["ticker"] == selected_ticker_clean]
 if sentiment_filter != "Todos":
@@ -855,6 +867,10 @@ if sentiment_filter != "Todos":
         "Pessimistas": "Pessimista",
     }[sentiment_filter]
     filtered_news = [x for x in filtered_news if x["sentiment"] == _sentiment_value]
+if impact_filter != "Todos":
+    filtered_news = [
+        x for x in filtered_news if x["impact"] == impact_filter
+    ]
 
 # Ordenar notícias
 def parse_pub_time(pub_time):
@@ -894,13 +910,13 @@ st.caption(f"Exibindo {total_news} notícias — {pos_f} otimistas · {neu_f} ne
 if not filtered_news:
     st.info(
         "Nenhuma notícia corresponde aos filtros atuais. "
-        "Tente selecionar outro ativo ou sentimento."
+        "Tente selecionar outro ativo, sentimento ou impacto."
     )
 
 
 # Paginação
 ITEMS_PER_PAGE = 15
-page_key = f"{selected_ticker}_{sort_mode}_{sentiment_filter}"
+page_key = f"{selected_ticker}_{sort_mode}_{sentiment_filter}_{impact_filter}"
 if st.session_state.get("_noticias_filter_key") != page_key:
     st.session_state["noticias_page"] = 1
     st.session_state["_noticias_filter_key"] = page_key
