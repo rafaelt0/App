@@ -305,6 +305,23 @@ with col_t:
         .upper()
     )
 
+def _refresh_valuation_data(ticker_value: str) -> None:
+    get_selic.clear()
+    get_koller_data.clear()
+    st.session_state.pop(f"kval_{ticker_value}", None)
+
+
+if ticker:
+    with col_hint:
+        st.button(
+            "Atualizar dados",
+            key=f"valuation_refresh_{ticker}",
+            use_container_width=True,
+            on_click=_refresh_valuation_data,
+            args=(ticker,),
+            help="Limpa o cache financeiro e busca os dados mais recentes do yfinance e do BCB.",
+        )
+
 if st.session_state.pop("_valuation_ticker_restored", False):
     st.info(f"Ticker {ticker} restaurado da carteira salva.")
 
