@@ -448,11 +448,6 @@ def load_finbert_pipeline():
         logger.warning("FinBERT pipeline load failed", exc_info=True)
         return None
 
-# Load FinBERT
-if "finbert_nlp" not in st.session_state:
-    with loading_overlay("Carregando modelo de IA (FinBERT-PT-BR)…"):
-        st.session_state["finbert_nlp"] = load_finbert_pipeline()
-finbert_nlp = st.session_state["finbert_nlp"]
 
 
 def analise_sentimento_finbert(title, summary, nlp):
@@ -528,8 +523,38 @@ def analise_sentimento_finbert(title, summary, nlp):
 
 # ─── CORE STREAMLIT PAGE LOGIC ───────────────────────────────────────────────
 
-# Verifica se a carteira está carregada
-if "peso_manual_df" not in st.session_state or st.session_state["peso_manual_df"] is None:
+# ─── Validação do portfólio antes de carregar o modelo NLP ───────────────────
+_current_tickers = list(st.session_state.get("selected_tickers", []))
+_loaded_tickers = list(st.session_state.get("portfolio_loaded_tickers", []))
+_analyzed_tickers = list(st.session_state.get("portfolio_analysis_tickers", []))
+_has_portfolio_state = (
+    "peso_manual_df" in st.session_state
+    and st.session_state["peso_manual_df"] is not None
+)
+_portfolio_ready = (
+    _has_portfolio_state
+    and bool(st.session_state.get("portfolio_loaded"))
+    and bool(_current_tickers)
+    and _current_tickers == _loaded_tickers == _analyzed_tickers
+)
+if not _portfolio_ready:
+    _selection_changed = bool(_current_tickers) and (
+        _current_tickers != _loaded_tickers
+        or _current_tickers != _analyzed_tickers
+    )
+    if _selection_changed:
+        _empty_title = "Atualize o portfólio"
+        _empty_message = (
+            "A seleção de ativos mudou desde a última análise. "
+            "Volte para <strong style=\"color:#61d4c6\">Portfolio</strong> e clique em "
+            "<strong>Carregar portfólio</strong> antes de consultar as notícias."
+        )
+    else:
+        _empty_title = "Portfólio não configurado"
+        _empty_message = (
+            "Configure seu portfólio na página <strong style=\"color:#61d4c6\">Portfolio</strong> "
+            "e carregue a análise para filtrar as notícias dos seus ativos."
+        )
     empty_state_card(
         icon_svg="""<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
             <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" stroke="#94a3b8" stroke-width="1.5"/>
@@ -537,12 +562,18 @@ if "peso_manual_df" not in st.session_state or st.session_state["peso_manual_df"
             <line x1="7" y1="13" x2="17" y2="13" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
             <line x1="7" y1="17" x2="17" y2="17" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
         </svg>""",
-        title="Portfólio não configurado",
-        message='Configure e carregue seu portfólio na página <strong style="color:#00ff87">Portfolio</strong> para que as notícias sejam filtradas para os ativos da sua carteira.',
+        title=_empty_title,
+        message=_empty_message,
         cta_label="Ir para Portfolio",
         cta_page="pages/1_Portfolio.py",
     )
     st.stop()
+
+# O modelo pesado só é carregado quando há uma carteira válida para analisar.
+if "finbert_nlp" not in st.session_state:
+    with loading_overlay("Carregando modelo de IA (FinBERT-PT-BR)…"):
+        st.session_state["finbert_nlp"] = load_finbert_pipeline()
+finbert_nlp = st.session_state["finbert_nlp"]
 
 # Recupera ativos e pesos
 peso_df = st.session_state["peso_manual_df"]
