@@ -189,6 +189,24 @@ def analise_sentimento_pln(title, summary):
         "raw_text_length": len(words)
     }
 
+_IMPACT_LEVELS = ("Alto", "Médio-Alto", "Médio", "Baixo-Médio", "Baixo")
+
+
+def _impacto_por_score(score):
+    try:
+        intensity = abs(float(score))
+    except (TypeError, ValueError):
+        return "Baixo"
+    if intensity >= 0.8:
+        return "Alto"
+    if intensity >= 0.6:
+        return "Médio-Alto"
+    if intensity >= 0.3:
+        return "Médio"
+    if intensity >= 0.1:
+        return "Baixo-Médio"
+    return "Baixo"
+
 # Dados de notícias pré-definidas por papel principal (Fallback offline)
 news_database = {
     "PETR": [
@@ -666,7 +684,7 @@ with loading_overlay("Buscando notícias e processando sentimento NLP…", ticke
                     "neg_terms": sentiment_res.get("neg_terms", []),
                     "raw_text_length": sentiment_res.get("raw_text_length", 0),
                     "provider": item["provider"],
-                    "impact": "Alto" if abs(sentiment_res["score"]) > 0.6 else "Médio" if abs(sentiment_res["score"]) > 0.3 else "Baixo",
+                    "impact": _impacto_por_score(sentiment_res["score"]),
                     "pub_time": item["date"],
                     "link": item["link"],
                     "peso": pesos[t]
@@ -864,9 +882,9 @@ with col_sentiment:
     )
     impact_filter = st.selectbox(
         "Filtrar por impacto",
-        ["Todos", "Alto", "Médio", "Baixo"],
+        ["Todos", *_IMPACT_LEVELS],
         help=(
-            "Mostra apenas notícias nos três níveis de impacto "
+            "Mostra apenas notícias nos cinco níveis de impacto "
             "calculados pelo score de sentimento."
         ),
     )
@@ -907,7 +925,7 @@ def parse_pub_time(pub_time):
 if sort_mode == "Mais recentes":
     filtered_news = sorted(filtered_news, key=lambda x: parse_pub_time(x["pub_time"]))
 elif sort_mode == "Mais impactantes":
-    impact_rank = {"Alto": 0, "Médio-Alto": 1, "Médio": 2, "Baixo-Médio": 3, "Baixo": 4}
+    impact_rank = {impact: rank for rank, impact in enumerate(_IMPACT_LEVELS)}
     filtered_news = sorted(filtered_news, key=lambda x: impact_rank.get(x["impact"], 5))
 elif sort_mode == "Mais otimistas":
     filtered_news = sorted(filtered_news, key=lambda x: -x["score"])
