@@ -3,14 +3,25 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
+import logging
 import plotly.express as px
 import plotly.graph_objects as go
 from urllib.parse import quote
 
-from utils.identity import get_browser_uid
-
+from utils import db as _db
 from utils.charts import apply_plotly_theme
-from utils.ui import empty_state_card, load_css, next_step_card, render_flow_sidebar, svg_icon
+from utils.identity import get_browser_uid
+from utils.portfolio_data import get_portfolio_prices
+from utils.ui import (
+    empty_state_card,
+    load_css,
+    loading_overlay,
+    next_step_card,
+    render_flow_sidebar,
+    svg_icon,
+)
+
+logger = logging.getLogger(__name__)
 
 
 # CSS customizado
@@ -125,6 +136,95 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+def _restore_saved_portfolio_context() -> None:
+    """Restore a saved portfolio when this page opens in a fresh session."""
+    if "selected_tickers" in st.session_state:
+        return
+
+    saved_tickers, saved_weights = _db.portfolio_get(get_browser_uid())
+    tickers = [str(ticker).replace(".SA", "") for ticker in saved_tickers]
+    if len(tickers) < 2:
+        return
+
+    try:
+        start_date = datetime.date.today() - datetime.timedelta(days=365 * 2)
+        with loading_overlay("Restaurando carteira salva…", tickers=tickers):
+            prices = get_portfolio_prices(
+                [f"{ticker}.SA" for ticker in tickers],
+                start_date,
+            )
+    except Exception:
+        logger.warning("simulation saved portfolio restore failed", exc_info=True)
+        st.session_state["_simulation_restore_error"] = True
+        return
+
+    if prices is None or prices.empty:
+        st.session_state["_simulation_restore_error"] = True
+        return
+    if isinstance(prices.columns, pd.MultiIndex):
+        prices.columns = ["_".join(col).strip() for col in prices.columns.values]
+
+    returns = prices.pct_change().dropna()
+    if returns.empty:
+        st.session_state["_simulation_restore_error"] = True
+        return
+
+    raw_weights = {}
+    for ticker, weight in (saved_weights or {}).items():
+        try:
+            value = float(weight)
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(value) and value > 0:
+            raw_weights[str(ticker).replace(".SA", "")] = value
+
+    default_weight = 1.0 / len(tickers)
+    weights = {
+        ticker: raw_weights.get(ticker, default_weight)
+        for ticker in tickers
+    }
+    weight_total = sum(weights.values())
+    if weight_total <= 0:
+        weights = {ticker: default_weight for ticker in tickers}
+    else:
+        weights = {
+            ticker: weight / weight_total for ticker, weight in weights.items()
+        }
+
+    st.session_state.update(
+        {
+            "selected_tickers": tickers,
+            "portfolio_loaded_tickers": tickers,
+            "portfolio_analysis_tickers": tickers,
+            "portfolio_loaded": True,
+            "modo": "Otimização de Markowitz (restaurada)",
+            "returns": returns,
+            "pesos_manuais": {
+                f"{ticker}.SA": weight for ticker, weight in weights.items()
+            },
+            "peso_manual_df": pd.DataFrame(
+                {"Peso": [weights[ticker] for ticker in tickers]},
+                index=tickers,
+            ),
+            "_simulation_restore_notice": (
+                "Carteira salva restaurada. Confira os ativos e pesos antes de "
+                "rodar a simulação."
+            ),
+        }
+    )
+
+
+_restore_saved_portfolio_context()
+_simulation_restore_error = st.session_state.pop(
+    "_simulation_restore_error", False
+)
+_simulation_restore_notice = st.session_state.pop(
+    "_simulation_restore_notice", None
+)
+
+
+
 # Verifica se o portfólio atual foi carregado e analisado nesta sessão.
 required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
 _current_tickers = list(st.session_state.get("selected_tickers", []))
@@ -137,6 +237,10 @@ _portfolio_ready = (
     and bool(_current_tickers)
     and _current_tickers == _loaded_tickers == _analyzed_tickers
 )
+
+if _portfolio_ready and _simulation_restore_notice:
+    st.info(_simulation_restore_notice)
+
 if not _portfolio_ready:
     _selection_changed = bool(_current_tickers) and (
         _current_tickers != _loaded_tickers
@@ -148,6 +252,13 @@ if not _portfolio_ready:
             "A seleção de ativos mudou desde a última análise. "
             "Volte para <strong style=\"color:#61d4c6\">Portfolio</strong> e clique em "
             "<strong>Carregar portfólio</strong> antes de rodar a simulação."
+        )
+    elif _simulation_restore_error:
+        _empty_title = "Não foi possível restaurar a carteira"
+        _empty_message = (
+            "A carteira salva foi encontrada, mas as cotações históricas não "
+            "puderam ser carregadas. Abra <strong style=\"color:#61d4c6\">Portfolio</strong> "
+            "e carregue a análise novamente."
         )
     else:
         _empty_title = "Portfólio não configurado"
