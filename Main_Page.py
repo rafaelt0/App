@@ -114,6 +114,7 @@ if "Setor" not in data.columns:
 stocks = list(data["Ticker"].values)
 setores = sorted(data["Setor"].dropna().unique())
 setores.insert(0, "Todos")
+SECTOR_AUTOPICK_LIMIT = 8
 _ticker_setor = dict(zip(data["Ticker"], data["Setor"]))
 
 _uid = get_browser_uid()
@@ -195,11 +196,17 @@ else:
 # Ordenar por liquidez para colocar maiores empresas no topo
 tickers_filtrados = get_sorted_tickers_by_liquidity(tickers_filtrados)
 
-# Ao escolher um setor, autoselecionar as ações referentes a ele. O widget de
-# tickers ainda não foi instanciado, então escrevemos direto no session_state.
-# "Todos"/vazio não autoseleciona para evitar marcar a base inteira.
+# Ao escolher um setor, autoselecionar apenas os ativos mais líquidos. O widget
+# de tickers ainda não foi instanciado, então escrevemos direto no session_state.
+# O usuário continua podendo adicionar outros ativos manualmente.
 if _sector_changed and setores_selecionados and "Todos" not in setores_selecionados:
-    st.session_state["selected_tickers"] = list(tickers_filtrados)
+    _auto_selected = tickers_filtrados[:SECTOR_AUTOPICK_LIMIT]
+    st.session_state["selected_tickers"] = list(_auto_selected)
+    if len(tickers_filtrados) > len(_auto_selected):
+        st.session_state["_sector_autopick_notice"] = (
+            len(_auto_selected),
+            len(tickers_filtrados),
+        )
 
 section_header(ICO_COMPASS, "Selecione ativos para analisar", "h2")
 n_disponíveis = len(tickers_filtrados)
@@ -221,6 +228,14 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+_sector_autopick_notice = st.session_state.pop("_sector_autopick_notice", None)
+if _sector_autopick_notice:
+    _selected_count, _available_count = _sector_autopick_notice
+    st.info(
+        f"Selecionamos os {_selected_count} ativos mais líquidos de "
+        f"{_available_count} disponíveis. Você pode adicionar outros pelo campo abaixo."
+    )
 
 if "selected_tickers" not in st.session_state:
     st.session_state["selected_tickers"] = []
