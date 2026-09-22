@@ -2698,3 +2698,34 @@ body,
 [style*="radial-gradient"] {
   background: var(--panel-bg) !important;
 }
+/* ─── Streamlit notifications: semantic color, quiet contrast ─────────────── */
+[data-testid="stAlert"] {
+  border-color: var(--border-subtle) !important;
+}
+
+[data-testid="stNotification"] {
+  background: var(--panel-raised) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 8px !important;
+  color: var(--text-main) !important;
+}
+
+[data-testid="stNotificationContentInfo"] {
+  color: var(--brand-secondary) !important;
+}
+
+[data-testid="stNotificationContentWarning"] {
+  color: var(--brand-accent) !important;
+}
+
+[data-testid="stNotificationContentError"] {
+  color: var(--brand-danger) !important;
+}
+
+[data-testid="stNotificationContentSuccess"] {
+  color: var(--brand-primary) !important;
+}
+
+[data-testid="stNotification"] [data-testid="stMarkdownContainer"] {
+  color: inherit !important;
+}

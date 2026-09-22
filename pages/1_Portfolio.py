@@ -19,6 +19,7 @@ from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
 from utils.ui import (
     diag_row,
+    empty_state_card,
     load_css,
     loading_overlay,
     render_cards_grid,
@@ -215,11 +216,23 @@ modo = st.radio(
 )
 
 if len(tickers) == 0:
-    st.warning("Selecione pelo menos uma ação.")
+    empty_state_card(
+        ICO_BOX,
+        "Monte seu portfólio",
+        "Selecione pelo menos duas ações para comparar risco, retorno e diversificação.",
+        "Voltar para análise de ativos",
+        "Main_Page.py",
+    )
     st.stop()
 
 if len(tickers) == 1:
-    st.warning("Selecione pelo menos dois ativos para montar o portfólio.")
+    empty_state_card(
+        ICO_BOX,
+        "Adicione mais um ativo",
+        "A otimização precisa de pelo menos dois ativos para calcular uma carteira.",
+        "Voltar para análise de ativos",
+        "Main_Page.py",
+    )
     st.stop()
 
 tickers_yf = [t + ".SA" for t in tickers]

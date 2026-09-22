@@ -1,18 +1,27 @@
 def apply_plotly_theme(fig):
     fig.update_layout(
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Space Grotesk, sans-serif", color="#f8fafc"),
+        template="plotly_dark",
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+        font=dict(
+            family='-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            color="#f0f4f8",
+        ),
         xaxis=dict(
-            gridcolor='#1e293b',
-            linecolor='#1e293b',
-            tickfont=dict(family="JetBrains Mono, monospace", color="#94a3b8")
+            gridcolor="#34465b",
+            linecolor="#34465b",
+            tickfont=dict(
+                family='"SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace',
+                color="#aebaca",
+            ),
         ),
         yaxis=dict(
-            gridcolor='#1e293b',
-            linecolor='#1e293b',
-            tickfont=dict(family="JetBrains Mono, monospace", color="#94a3b8")
+            gridcolor="#34465b",
+            linecolor="#34465b",
+            tickfont=dict(
+                family='"SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace',
+                color="#aebaca",
+            ),
         ),
         legend=dict(
             orientation="h",
@@ -20,10 +29,10 @@ def apply_plotly_theme(fig):
             y=-0.3,
             xanchor="center",
             x=0.5,
-            bgcolor='rgba(14, 21, 36, 0.8)',
-            bordercolor='#1e293b',
-            borderwidth=1
+            bgcolor="rgba(21, 29, 42, 0.9)",
+            bordercolor="#34465b",
+            borderwidth=1,
         ),
-        margin=dict(b=80)
+        margin=dict(b=80),
     )
     return fig
