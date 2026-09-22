@@ -270,6 +270,18 @@ with col_t:
         st.stop()
     defaults = st.session_state.get("selected_tickers", [])
     default_ticker = defaults[0] if defaults else None
+    if default_ticker not in b3_stocks:
+        saved_tickers, _ = _db.portfolio_get(get_browser_uid())
+        saved_tickers = [
+            str(saved_ticker).replace(".SA", "")
+            for saved_ticker in saved_tickers
+        ]
+        default_ticker = next(
+            (saved_ticker for saved_ticker in saved_tickers if saved_ticker in b3_stocks),
+            None,
+        )
+        if default_ticker:
+            st.session_state["_valuation_ticker_restored"] = True
     ticker_options = [""] + b3_stocks
     if "valuation_ticker" not in st.session_state:
         st.session_state["valuation_ticker"] = (
@@ -292,6 +304,9 @@ with col_t:
         .strip()
         .upper()
     )
+
+if st.session_state.pop("_valuation_ticker_restored", False):
+    st.info(f"Ticker {ticker} restaurado da carteira salva.")
 
 if not ticker:
     with col_hint:
