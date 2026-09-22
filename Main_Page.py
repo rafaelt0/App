@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import warnings
 import datetime
-import traceback
 import logging
 
 logger = logging.getLogger(__name__)
@@ -813,7 +812,12 @@ if ready_to_analyze:
         st.caption(f"Detalhe técnico: {e}")
         if st.button("Tentar novamente", key="retry_os_error"):
             st.rerun()
-    except Exception as e:
+    except Exception:
         logger.exception("failed to fetch/render main page data")
-        st.error(f"Erro ao buscar dados: {e}")
-        st.caption(f"```\n{traceback.format_exc()}\n```")
+        st.error("Não foi possível concluir a análise agora.")
+        st.caption(
+            "A fonte de dados pode estar temporariamente indisponível. "
+            "Verifique a seleção e tente novamente."
+        )
+        if st.button("Tentar novamente", key="retry_main_analysis"):
+            st.rerun()
