@@ -268,8 +268,12 @@ with col_t:
     except (OSError, ValueError) as exc:
         st.error(f"Não foi possível carregar a lista de ações da B3: {exc}")
         st.stop()
+    _query_handoff_ticker = str(
+        st.query_params.get("valuation_ticker", "")
+    ).strip().upper()
     _handoff_ticker = str(
         st.session_state.pop("_valuation_handoff_ticker", "")
+        or _query_handoff_ticker
     ).strip().upper()
     if _handoff_ticker:
         b3_stocks = sorted(set(b3_stocks) | {_handoff_ticker})
@@ -312,6 +316,10 @@ with col_t:
         .strip()
         .upper()
     )
+    if ticker:
+        st.query_params["valuation_ticker"] = ticker
+    elif "valuation_ticker" in st.query_params:
+        del st.query_params["valuation_ticker"]
 
 def _refresh_valuation_data(ticker_value: str) -> None:
     get_selic.clear()

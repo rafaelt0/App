@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
 from utils.home_data import clear_fundamentus_cache
 from utils.market_data import get_full_market_data, get_listed_stocks
+from utils.identity import get_browser_uid
 
 st.set_page_config(page_title="Screener B3", page_icon="favicon.svg", layout="wide")
 
@@ -714,6 +715,8 @@ else:
             ):
                 st.session_state["_valuation_handoff_ticker"] = str(_ticker)
                 st.session_state["valuation_ticker"] = str(_ticker)
+                st.query_params["uid"] = get_browser_uid()
+                st.query_params["valuation_ticker"] = str(_ticker)
                 st.switch_page("pages/4_Valuation.py")
 
     # Seleciona e renomeia colunas relevantes para exibição
