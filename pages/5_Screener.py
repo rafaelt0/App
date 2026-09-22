@@ -263,15 +263,45 @@ PRESET_DESC = {
 }
 
 
-def _apply_preset():
-    for k, v in PRESETS.get(st.session_state["preset_select"], {}).items():
-        st.session_state[k] = v
 
 
 def _reset_filters():
     for key, value in DEFAULTS.items():
         st.session_state[key] = value
     st.session_state["preset_select"] = "Personalizado"
+
+def _apply_preset_name(preset_name):
+    st.session_state["preset_select"] = preset_name
+    for key, value in PRESETS.get(preset_name, {}).items():
+        st.session_state[key] = value
+
+
+with st.expander("Filtros rápidos", expanded=False):
+    st.caption(
+        "Aplique um ponto de partida sem abrir a barra lateral. "
+        "Os limites continuam editáveis depois."
+    )
+    _quick_preset_options = (
+        ("Bazin / Barsi", "Bazin / Barsi (Dividendos)"),
+        ("Graham", "Graham — Investidor Defensivo"),
+        ("Peter Lynch", "Peter Lynch (GARP)"),
+        ("Magic Formula", "Greenblatt — Magic Formula"),
+    )
+    _quick_preset_cols = st.columns(len(_quick_preset_options))
+    for _index, (_label, _preset_name) in enumerate(_quick_preset_options):
+        with _quick_preset_cols[_index]:
+            st.button(
+                _label,
+                key=f"screener_quick_preset_{_index}",
+                use_container_width=True,
+                help=PRESET_DESC[_preset_name],
+                on_click=_apply_preset_name,
+                args=(_preset_name,),
+            )
+
+
+def _apply_preset():
+    _apply_preset_name(st.session_state["preset_select"])
 
 
 st.sidebar.selectbox(
