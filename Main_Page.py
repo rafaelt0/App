@@ -225,6 +225,13 @@ st.markdown(
 if "selected_tickers" not in st.session_state:
     st.session_state["selected_tickers"] = []
 
+def _clear_main_selection():
+    """Clear the visible home-page selection before the next widget rerun."""
+    st.session_state["selected_tickers"] = []
+    st.session_state["analyzed_tickers"] = []
+
+
+
 # Apply any ticker selection staged by widgets below (which run after this
 # key's widget is already instantiated, so they can't write to it directly)
 if "_pending_tickers" in st.session_state:
@@ -359,15 +366,24 @@ if tickers:
         unsafe_allow_html=True,
     )
 
-    if st.button(
-        "Analisar",
-        type="primary",
-        use_container_width=True,
-        key="btn_analisar",
-        help="Busca os indicadores fundamentalistas dos ativos selecionados.",
-    ):
-        st.session_state["analyzed_tickers"] = list(tickers)
-
+    col_analyze, col_clear = st.columns([4, 1])
+    with col_analyze:
+        if st.button(
+            "Analisar",
+            type="primary",
+            use_container_width=True,
+            key="btn_analisar",
+            help="Busca os indicadores fundamentalistas dos ativos selecionados.",
+        ):
+            st.session_state["analyzed_tickers"] = list(tickers)
+    with col_clear:
+        st.button(
+            "Limpar",
+            use_container_width=True,
+            key="btn_limpar_selecao",
+            on_click=_clear_main_selection,
+            help="Remove os ativos selecionados e volta ao início.",
+        )
 # Só executa análise depois que o usuário clica em "Analisar" para a seleção atual
 analyzed_tickers = st.session_state.get("analyzed_tickers", [])
 ready_to_analyze = bool(tickers) and analyzed_tickers == tickers
