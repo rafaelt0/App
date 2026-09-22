@@ -166,6 +166,8 @@ _saved_tickers, _saved_weights = _db.portfolio_get(_uid)
 
 if "selected_tickers" not in st.session_state:
     st.session_state["selected_tickers"] = [t for t in _saved_tickers if t in stocks]
+    if st.session_state["selected_tickers"]:
+        st.session_state["_portfolio_restore_notice"] = True
 
 # Remove any stale tickers not in the current list, and trim to the cap in
 # case it was lowered or the session predates the limit
@@ -227,6 +229,12 @@ with col_tickers:
         key="selected_tickers",
         max_selections=MAX_TICKERS,
         help=f"Limite de {MAX_TICKERS} ativos para manter o download de cotações e a otimização estáveis.",
+    )
+
+if st.session_state.pop("_portfolio_restore_notice", False):
+    st.info(
+        "Carteira salva restaurada na seleção. "
+        "Clique em **Carregar portfólio** para atualizar a análise."
     )
 with col_clear:
     st.write("")
