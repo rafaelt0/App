@@ -816,7 +816,7 @@ st.markdown("---")
 # Filtro lateral/superior de notícias
 section_header(ICO_NEWS, "Feed Qualitativo de Notícias da Carteira", "h2")
 
-col_filter, col_sort = st.columns([1, 1])
+col_filter, col_sort, col_sentiment = st.columns([1, 1, 1])
 with col_filter:
     selected_ticker = st.selectbox(
         "Filtrar por ativo",
@@ -829,8 +829,21 @@ with col_sort:
         "Ordenar por",
         ["Mais recentes", "Mais impactantes", "Mais otimistas", "Mais pessimistas"]
     )
+with col_sentiment:
+    sentiment_filter = st.selectbox(
+        "Filtrar por sentimento",
+        ["Todos", "Otimistas", "Neutras", "Pessimistas"],
+        help="Mostra apenas notícias classificadas pelo PLN com o sentimento escolhido.",
+    )
 
 filtered_news = news_items if selected_ticker_clean == "Todos os Ativos" else [x for x in news_items if x["ticker"] == selected_ticker_clean]
+if sentiment_filter != "Todos":
+    _sentiment_value = {
+        "Otimistas": "Otimista",
+        "Neutras": "Neutro",
+        "Pessimistas": "Pessimista",
+    }[sentiment_filter]
+    filtered_news = [x for x in filtered_news if x["sentiment"] == _sentiment_value]
 
 # Ordenar notícias
 def parse_pub_time(pub_time):
@@ -867,9 +880,16 @@ neg_f = sum(1 for x in filtered_news if x["sentiment"] == "Pessimista")
 neu_f = total_news - pos_f - neg_f
 st.caption(f"Exibindo {total_news} notícias — {pos_f} otimistas · {neu_f} neutras · {neg_f} pessimistas")
 
+if not filtered_news:
+    st.info(
+        "Nenhuma notícia corresponde aos filtros atuais. "
+        "Tente selecionar outro ativo ou sentimento."
+    )
+
+
 # Paginação
 ITEMS_PER_PAGE = 15
-page_key = f"{selected_ticker}_{sort_mode}"
+page_key = f"{selected_ticker}_{sort_mode}_{sentiment_filter}"
 if st.session_state.get("_noticias_filter_key") != page_key:
     st.session_state["noticias_page"] = 1
     st.session_state["_noticias_filter_key"] = page_key
