@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 import datetime
 import plotly.express as px
 import plotly.graph_objects as go
+from urllib.parse import quote
+
+from utils.identity import get_browser_uid
+
 from utils.charts import apply_plotly_theme
 from utils.ui import empty_state_card, load_css, next_step_card, render_flow_sidebar, svg_icon
 
@@ -630,6 +634,7 @@ next_step_card(
     accent="var(--brand-info)",
     cta_label="Abrir Notícias",
     cta_page="pages/3_Notícias.py",
+    cta_url=f"Not%C3%ADcias?uid={quote(get_browser_uid(), safe='')}",
 )
 
 st.session_state["sim_estatisticas"] = estatisticas

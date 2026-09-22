@@ -2790,3 +2790,33 @@ body,
   font-size: 0.8rem;
   line-height: 1.45;
 }
+
+.next-step-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.5rem;
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--next-step-accent) 45%, var(--panel-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--next-step-accent) 13%, var(--panel-bg));
+  color: var(--text-main) !important;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none !important;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.next-step-link:hover {
+  border-color: var(--next-step-accent);
+  background: color-mix(in srgb, var(--next-step-accent) 20%, var(--panel-bg));
+  color: var(--text-main) !important;
+}
+
+.next-step-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

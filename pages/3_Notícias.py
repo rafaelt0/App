@@ -13,6 +13,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 from utils.charts import apply_plotly_theme
+from utils import db as _db
+from utils.identity import get_browser_uid
+
 from utils.ui import empty_state_card, load_css, loading_overlay, render_flow_sidebar, svg_icon
 
 # CSS customizado
@@ -519,6 +522,37 @@ def analise_sentimento_finbert(title, summary, nlp):
             "neg_terms": res_pln["neg_terms"],
             "raw_text_length": res_pln["raw_text_length"]
         }
+
+def _restore_saved_portfolio_context() -> None:
+    """Restore the last analyzed portfolio after a full-page handoff."""
+    if "selected_tickers" in st.session_state:
+        return
+
+    saved_tickers, saved_weights = _db.portfolio_get(get_browser_uid())
+    tickers = [str(ticker).replace(".SA", "") for ticker in saved_tickers]
+    if not tickers:
+        return
+
+    normalized_weights = {
+        str(ticker).replace(".SA", ""): float(weight)
+        for ticker, weight in (saved_weights or {}).items()
+    }
+    default_weight = 1.0 / len(tickers)
+    weights = {
+        ticker: normalized_weights.get(ticker, default_weight) for ticker in tickers
+    }
+    st.session_state["selected_tickers"] = tickers
+    st.session_state["portfolio_loaded_tickers"] = tickers
+    st.session_state["portfolio_analysis_tickers"] = tickers
+    st.session_state["portfolio_loaded"] = True
+    st.session_state["peso_manual_df"] = pd.DataFrame(
+        {"Peso": [weights[ticker] for ticker in tickers]},
+        index=tickers,
+    )
+
+
+_restore_saved_portfolio_context()
+
 
 
 # ─── CORE STREAMLIT PAGE LOGIC ───────────────────────────────────────────────

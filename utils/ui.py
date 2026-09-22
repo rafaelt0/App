@@ -4,6 +4,8 @@ from contextlib import contextmanager
 from html import escape
 from pathlib import Path
 
+from urllib.parse import parse_qsl, urlsplit
+
 import streamlit as st
 
 
@@ -76,7 +78,13 @@ def empty_state_card(icon_svg: str, title: str, message: str, cta_label: str, ct
     )
     st.page_link(cta_page, label=cta_label)
 
-def next_step_card(message: str, accent: str, cta_label: str, cta_page: str) -> None:
+def next_step_card(
+    message: str,
+    accent: str,
+    cta_label: str,
+    cta_page: str,
+    cta_url: str | None = None,
+) -> None:
     """Render a compact, clickable hand-off to the next analysis page."""
     st.markdown(
         f"""
@@ -88,7 +96,20 @@ def next_step_card(message: str, accent: str, cta_label: str, cta_page: str) -> 
 """,
         unsafe_allow_html=True,
     )
-    st.page_link(cta_page, label=cta_label)
+    if cta_url:
+        cta_target = urlsplit(cta_url)
+        hidden_inputs = "".join(
+            f'<input type="hidden" name="{escape(name)}" value="{escape(value)}">'
+            for name, value in parse_qsl(cta_target.query, keep_blank_values=True)
+        )
+        st.html(
+            f'<form class="next-step-form" action="{escape(cta_target.path)}" method="get">'
+            f"{hidden_inputs}"
+            f'<button class="next-step-link" type="submit">{escape(cta_label)}</button>'
+            "</form>"
+        )
+    else:
+        st.page_link(cta_page, label=cta_label)
 
 
 def load_css(path: str = "style.css") -> None:
