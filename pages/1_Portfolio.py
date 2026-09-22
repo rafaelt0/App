@@ -184,6 +184,40 @@ def _clear_saved_portfolio():
     st.session_state["portfolio_analysis_tickers"] = []
 
 
+def _apply_portfolio_preset(preset: tuple[str, ...]) -> None:
+    """Select a small example portfolio before the widgets rerun."""
+    st.session_state["selected_tickers"] = list(preset)
+    st.session_state["portfolio_loaded"] = False
+    st.session_state["portfolio_loaded_tickers"] = []
+    st.session_state["portfolio_analysis_tickers"] = []
+
+
+def _render_portfolio_presets() -> None:
+    presets = [
+        ("PETR4 + VALE3", ("PETR4", "VALE3")),
+        ("WEGE3 + ITUB4", ("WEGE3", "ITUB4")),
+        ("ABEV3 + EGIE3", ("ABEV3", "EGIE3")),
+    ]
+    available = [
+        (label, preset)
+        for label, preset in presets
+        if all(ticker in stocks for ticker in preset)
+    ]
+    if not available:
+        return
+
+    st.caption("Exemplos para explorar — não são recomendações:")
+    preset_cols = st.columns(3)
+    for index, (label, preset) in enumerate(available):
+        with preset_cols[index % 3]:
+            st.button(
+                label,
+                key=f"portfolio_preset_{'_'.join(preset)}",
+                use_container_width=True,
+                on_click=_apply_portfolio_preset,
+                args=(preset,),
+            )
+
 col_tickers, col_clear = st.columns([5, 1])
 with col_tickers:
     tickers = st.multiselect(
@@ -225,6 +259,7 @@ if len(tickers) == 0:
         "Voltar para análise de ativos",
         "Main_Page.py",
     )
+    _render_portfolio_presets()
     st.stop()
 
 if len(tickers) == 1:
@@ -235,6 +270,7 @@ if len(tickers) == 1:
         "Voltar para análise de ativos",
         "Main_Page.py",
     )
+    _render_portfolio_presets()
     st.stop()
 
 
