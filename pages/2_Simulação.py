@@ -121,23 +121,49 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Verifica se as variáveis necessárias já estão no session_state
+# Verifica se o portfólio atual foi carregado e analisado nesta sessão.
 required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
-for key in required_keys:
-    if key not in st.session_state:
-        empty_state_card(
-            icon_svg="""<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
-                <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" stroke="#94a3b8" stroke-width="1.5"/>
-                <path d="M14 4v4h4" stroke="#94a3b8" stroke-width="1.5"/>
-                <line x1="7" y1="13" x2="17" y2="13" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="7" y1="17" x2="17" y2="17" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>""",
-            title="Portfólio não configurado",
-            message='Configure primeiro seu portfólio na página <strong style="color:#00ff87">Portfolio</strong> para liberar a Simulação Monte Carlo.',
-            cta_label="Ir para Portfolio",
-            cta_page="pages/1_Portfolio.py",
+_current_tickers = list(st.session_state.get("selected_tickers", []))
+_loaded_tickers = list(st.session_state.get("portfolio_loaded_tickers", []))
+_analyzed_tickers = list(st.session_state.get("portfolio_analysis_tickers", []))
+_has_analysis_state = all(key in st.session_state for key in required_keys)
+_portfolio_ready = (
+    _has_analysis_state
+    and bool(st.session_state.get("portfolio_loaded"))
+    and bool(_current_tickers)
+    and _current_tickers == _loaded_tickers == _analyzed_tickers
+)
+if not _portfolio_ready:
+    _selection_changed = bool(_current_tickers) and (
+        _current_tickers != _loaded_tickers
+        or _current_tickers != _analyzed_tickers
+    )
+    if _selection_changed:
+        _empty_title = "Atualize o portfólio"
+        _empty_message = (
+            "A seleção de ativos mudou desde a última análise. "
+            "Volte para <strong style=\"color:#61d4c6\">Portfolio</strong> e clique em "
+            "<strong>Carregar portfólio</strong> antes de rodar a simulação."
         )
-        st.stop()
+    else:
+        _empty_title = "Portfólio não configurado"
+        _empty_message = (
+            "Configure seu portfólio na página <strong style=\"color:#61d4c6\">Portfolio</strong> "
+            "e carregue a análise para liberar a Simulação Monte Carlo."
+        )
+    empty_state_card(
+        icon_svg="""<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
+            <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" stroke="#94a3b8" stroke-width="1.5"/>
+            <path d="M14 4v4h4" stroke="#94a3b8" stroke-width="1.5"/>
+            <line x1="7" y1="13" x2="17" y2="13" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="7" y1="17" x2="17" y2="17" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>""",
+        title=_empty_title,
+        message=_empty_message,
+        cta_label="Ir para Portfolio",
+        cta_page="pages/1_Portfolio.py",
+    )
+    st.stop()
 
 # Recupera as variáveis da aba 1
 modo = st.session_state["modo"]

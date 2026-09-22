@@ -180,6 +180,7 @@ def _clear_saved_portfolio():
     st.session_state["selected_tickers"] = []
     st.session_state["portfolio_loaded"] = False
     st.session_state["portfolio_loaded_tickers"] = []
+    st.session_state["portfolio_analysis_tickers"] = []
 
 
 col_tickers, col_clear = st.columns([5, 1])
@@ -1675,9 +1676,9 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             clean_modo = "Otimização Hierarchical Risk Parity (HRP)"
         else:
             clean_modo = "Otimização de Markowitz (Média-Variância)"
-
         st.session_state["modo"] = clean_modo
         st.session_state["returns"] = returns
+        st.session_state["portfolio_analysis_tickers"] = list(tickers)
         st.session_state["peso_manual_df"] = peso_manual_df
         st.session_state["portfolio_returns"] = portfolio_returns
         st.session_state["retorno_bench"] = retorno_bench
