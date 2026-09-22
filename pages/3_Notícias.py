@@ -603,6 +603,17 @@ if not _portfolio_ready:
     )
     st.stop()
 
+if st.button(
+    "Atualizar notícias",
+    key="news_refresh",
+    use_container_width=True,
+    help="Limpa o cache de 10 minutos e busca novas notícias para os ativos da carteira.",
+):
+    get_brazilian_news.clear()
+    st.session_state["noticias_page"] = 1
+    st.session_state.pop("_noticias_filter_key", None)
+    st.rerun()
+
 # O modelo pesado só é carregado quando há uma carteira válida para analisar.
 if "finbert_nlp" not in st.session_state:
     with loading_overlay("Carregando modelo de IA (FinBERT-PT-BR)…"):
