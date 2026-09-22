@@ -270,16 +270,24 @@ with col_t:
         st.stop()
     defaults = st.session_state.get("selected_tickers", [])
     default_ticker = defaults[0] if defaults else None
-    default_idx = (
-        b3_stocks.index(default_ticker) + 1 if default_ticker in b3_stocks else 0
-    )
+    ticker_options = [""] + b3_stocks
+    if "valuation_ticker" not in st.session_state:
+        st.session_state["valuation_ticker"] = (
+            default_ticker if default_ticker in b3_stocks else ""
+        )
+    elif st.session_state["valuation_ticker"] not in ticker_options:
+        st.session_state["valuation_ticker"] = ""
+
+    def _set_valuation_ticker(value: str) -> None:
+        st.session_state["valuation_ticker"] = value
+
     ticker = (
         st.selectbox(
             "Ticker B3",
-            options=[""] + b3_stocks,
-            index=default_idx,
+            options=ticker_options,
             format_func=lambda t: "Selecione um ticker…" if t == "" else t,
             help="Dados via yfinance (4 anos) + Selic BCB.",
+            key="valuation_ticker",
         )
         .strip()
         .upper()
@@ -290,6 +298,22 @@ if not ticker:
         st.info(
             "Digite um ticker B3 para iniciar o valuation completo (metodologia Koller)."
         )
+        st.caption("Comece rápido com um exemplo:")
+        _quick_tickers = [
+            ticker
+            for ticker in ("PETR4", "WEGE3", "VALE3", "RENT3")
+            if ticker in b3_stocks
+        ]
+        _quick_cols = st.columns(2)
+        for _idx, _quick_ticker in enumerate(_quick_tickers):
+            with _quick_cols[_idx % 2]:
+                st.button(
+                    _quick_ticker,
+                    key=f"valuation_quick_{_quick_ticker}",
+                    use_container_width=True,
+                    on_click=_set_valuation_ticker,
+                    args=(_quick_ticker,),
+                )
     st.stop()
 
 # ─── Load data ─────────────────────────────────────────────────────────────────
