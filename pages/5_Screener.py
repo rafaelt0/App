@@ -276,6 +276,8 @@ def _reset_filters():
 
 def _apply_preset_name(preset_name):
     st.session_state["preset_select"] = preset_name
+    for key, value in DEFAULTS.items():
+        st.session_state[key] = value
     for key, value in PRESETS.get(preset_name, {}).items():
         st.session_state[key] = value
 
