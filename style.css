@@ -827,6 +827,7 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
     max-width: 100% !important;
     overflow: hidden !important;
   }
+  .modebar { display: none !important; }
 
   /* Colunas Streamlit: wrap mas sem forçar 100% ainda */
   [data-testid="stHorizontalBlock"] {
