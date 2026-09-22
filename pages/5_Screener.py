@@ -9,6 +9,7 @@ from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
 from utils.home_data import clear_fundamentus_cache
 from utils.market_data import get_full_market_data, get_listed_stocks
 from utils.identity import get_browser_uid
+from utils import db as _db
 
 st.set_page_config(page_title="Screener B3", page_icon="favicon.svg", layout="wide")
 
@@ -16,6 +17,8 @@ st.set_page_config(page_title="Screener B3", page_icon="favicon.svg", layout="wi
 load_css()
 
 render_flow_sidebar(active_step=6)
+
+_screener_uid = get_browser_uid()
 
 # ─── SVG Icon Library (sidebar) ────────────────────────────────────────────────
 _svg = svg_icon
@@ -718,6 +721,23 @@ else:
                 st.query_params["uid"] = get_browser_uid()
                 st.query_params["valuation_ticker"] = str(_ticker)
                 st.switch_page("pages/4_Valuation.py")
+            _ticker_label = str(_ticker)
+            _is_favorited = _db.wl_has(_screener_uid, _ticker_label)
+            if st.button(
+                "★ Favoritado" if _is_favorited else "☆ Favoritar",
+                key=f"screener_watchlist_{_ticker_label}",
+                use_container_width=True,
+                help=(
+                    "Remover dos favoritos"
+                    if _is_favorited
+                    else "Salvar este ticker na watchlist da página principal."
+                ),
+            ):
+                if _is_favorited:
+                    _db.wl_remove(_screener_uid, _ticker_label)
+                else:
+                    _db.wl_add(_screener_uid, _ticker_label)
+                st.rerun()
 
     # Seleciona e renomeia colunas relevantes para exibição
     col_map = {
