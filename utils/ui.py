@@ -1,6 +1,8 @@
 """Shared UI helpers for consistent look & feel across pages."""
 
 from contextlib import contextmanager
+from html import escape
+from pathlib import Path
 
 import streamlit as st
 
@@ -13,16 +15,16 @@ def svg_icon(body: str, size: int = 14) -> str:
     """
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-        f'viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:5px">'
+        f'viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false" '
+        f'style="vertical-align:-2px;margin-right:5px">'
         f"{body}</svg>"
     )
 
 
-def section_header(icon_svg: str, text: str, tag: str = "h3") -> None:
+def section_header(icon_svg: str, text: str, tag: str = "h2") -> None:
     """Render a section title with a leading inline SVG icon."""
     st.markdown(
-        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
-        f"{icon_svg}<span>{text}</span></{tag}>",
+        f'<{tag} class="ui-section-heading">{icon_svg}<span>{text}</span></{tag}>',
         unsafe_allow_html=True,
     )
 
@@ -53,31 +55,26 @@ def render_cards_grid(data_dict: dict, colors_sequence=None) -> None:
     colors_sequence = colors_sequence or _CARD_GRID_COLORS
     items = list(data_dict.items())
     cards_html = "".join(
-        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
-        f'<div class="mcard-value" style="color:{colors_sequence[i % len(colors_sequence)]}">{val}</div></div>'
+        f'<div class="mcard"><div class="mcard-label">{escape(str(lbl))}</div>'
+        f'<div class="mcard-value" style="color:{colors_sequence[i % len(colors_sequence)]}">{escape(str(val))}</div></div>'
         for i, (lbl, val) in enumerate(items)
     )
     st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 
 def empty_state_card(icon_svg: str, title: str, message: str, cta_label: str, cta_page: str) -> None:
-    """Render a centered empty-state card (icon, title, message) with a CTA link below it.
-
-    `icon_svg` is full standalone SVG markup (not wrapped via `svg_icon`).
-    `message` may contain inline HTML (e.g. `<strong>`) and is inserted as-is.
-    `cta_page` is a page path suitable for `st.page_link` (e.g. "pages/1_Portfolio.py").
-    """
+    """Render a restrained empty state with a separate navigation action."""
     st.markdown(
         f"""
-    <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:16px;padding:2.5rem;text-align:center;margin-top:2rem;">
-        {icon_svg}
-        <div style="font-size:1.15rem;font-weight:700;color:#f8fafc;margin-bottom:0.5rem">{title}</div>
-        <div style="font-size:0.875rem;color:#94a3b8;max-width:400px;margin:0 auto 1.2rem;">{message}</div>
-    </div>
-    """,
+<div class="empty-state-card">
+  {icon_svg}
+  <div class="empty-state-title">{title}</div>
+  <div class="empty-state-message">{message}</div>
+</div>
+""",
         unsafe_allow_html=True,
     )
-    st.page_link(cta_page, label=cta_label, icon="➡️")
+    st.page_link(cta_page, label=cta_label)
 
 
 def load_css(path: str = "style.css") -> None:
@@ -87,103 +84,89 @@ def load_css(path: str = "style.css") -> None:
     own try/except boilerplate.
     """
     try:
-        with open(path) as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+        css_path = Path(path)
+        if not css_path.is_absolute():
+            css_path = Path(__file__).resolve().parent.parent / css_path
+        with css_path.open(encoding="utf-8") as css_file:
+            st.markdown(f"<style>{css_file.read()}</style>", unsafe_allow_html=True)
     except FileNotFoundError:
         pass
 
 
 _FLOW_STEPS = [
-    {"label": "Análise Fundamentalista", "color": "#00ff87", "shadow": "0,255,135", "text_color": "#080c14"},
-    {"label": "Portfolio", "color": "#00d2ff", "shadow": "0,210,255", "text_color": "#080c14"},
-    {"label": "Simulação", "color": "#ffd600", "shadow": "255,214,0", "text_color": "#080c14"},
-    {"label": "Notícias", "color": "#a855f7", "shadow": "168,85,247", "text_color": "#fff"},
-    {"label": "Valuation", "color": "#f472b6", "shadow": "244,114,182", "text_color": "#080c14"},
-    {"label": "Screener", "color": "#38bdf8", "shadow": "56,189,248", "text_color": "#080c14"},
+    "Análise Fundamentalista",
+    "Portfolio",
+    "Simulação",
+    "Notícias",
+    "Valuation",
+    "Screener",
 ]
 
-_FLOW_DIVIDER = '    <div style="width:1px;height:12px;background:#1e293b;margin-left:11px;"></div>\n'
-
 _ICO_FLOW = svg_icon(
-    '<circle cx="5" cy="6" r="2.2" stroke="#64748b" stroke-width="1.6"/>'
-    '<circle cx="19" cy="18" r="2.2" stroke="#64748b" stroke-width="1.6"/>'
-    '<path d="M7 7.2c0 4 3 4.6 5 5.8s5 1.8 5 5" stroke="#64748b" stroke-width="1.6" '
+    '<circle cx="5" cy="6" r="2.2" stroke="#829196" stroke-width="1.6"/>'
+    '<circle cx="19" cy="18" r="2.2" stroke="#829196" stroke-width="1.6"/>'
+    '<path d="M7 7.2c0 4 3 4.6 5 5.8s5 1.8 5 5" stroke="#829196" stroke-width="1.6" '
     'fill="none" stroke-linecap="round"/>',
     12,
 )
 
 
-def _flow_done_step_html(step):
+def _flow_done_step_html(label: str) -> str:
     return (
-        '    <div style="display:flex;align-items:center;gap:0.6rem;">\n'
-        '      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #00ff87;display:flex;align-items:center;justify-content:center;flex-shrink:0;">\n'
-        '        <span style="font-size:0.7rem;color:#00ff87;">✓</span>\n'
-        '      </div>\n'
-        f'      <span style="font-size:0.8rem;font-weight:600;color:#475569;">{step["label"]}</span>\n'
-        '    </div>\n'
+        '<div class="flow-step flow-step-done">'
+        '<span class="flow-step-marker">✓</span>'
+        f"<span>{label}</span>"
+        "</div>"
     )
 
 
-def _flow_active_step_html(step, num):
+def _flow_active_step_html(label: str, num: int) -> str:
     return (
-        '    <div style="display:flex;align-items:center;gap:0.6rem;">\n'
-        f'      <div style="width:22px;height:22px;border-radius:50%;background:{step["color"]};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px rgba({step["shadow"]},0.4);">\n'
-        f'        <span style="font-size:0.65rem;font-weight:800;color:{step["text_color"]};">{num}</span>\n'
-        '      </div>\n'
-        f'      <span style="font-size:0.8rem;font-weight:700;color:{step["color"]};">{step["label"]}</span>\n'
-        '    </div>\n'
+        '<div class="flow-step flow-step-current">'
+        f'<span class="flow-step-marker">{num}</span>'
+        f"<span>{label}</span>"
+        "</div>"
     )
 
 
-def _flow_pending_step_html(step, num, opacity):
+def _flow_pending_step_html(label: str, num: int, opacity: float) -> str:
+    del opacity
     return (
-        f'    <div style="display:flex;align-items:center;gap:0.6rem;opacity:{opacity};">\n'
-        '      <div style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;">\n'
-        f'        <span style="font-size:0.65rem;font-weight:700;color:#64748b;">{num}</span>\n'
-        '      </div>\n'
-        f'      <span style="font-size:0.8rem;font-weight:600;color:#64748b;">{step["label"]}</span>\n'
-        '    </div>\n'
+        '<div class="flow-step flow-step-pending">'
+        f'<span class="flow-step-marker">{num}</span>'
+        f"<span>{label}</span>"
+        "</div>"
     )
 
 
 def render_flow_sidebar(active_step: int, pending_opacities=None) -> None:
-    """Render the "Fluxo de Análise" step-tracker in the sidebar.
-
-    `active_step` is 1-indexed (1=Análise Fundamentalista, 2=Portfolio,
-    3=Simulação, 4=Notícias). Steps before it render as done (checkmark),
-    the active step is highlighted, and steps after it render as pending,
-    using the opacities in `pending_opacities` (one value per pending step,
-    in order) to match each page's original fade-out styling.
-    """
+    """Render the compact analysis flow in the sidebar."""
     opacities = list(pending_opacities or [])
     parts = []
-    for i, step in enumerate(_FLOW_STEPS, start=1):
-        if i > 1:
-            parts.append(_FLOW_DIVIDER)
+    for i, label in enumerate(_FLOW_STEPS, start=1):
         if i < active_step:
-            parts.append(_flow_done_step_html(step))
+            parts.append(_flow_done_step_html(label))
         elif i == active_step:
-            parts.append(_flow_active_step_html(step, i))
+            parts.append(_flow_active_step_html(label, i))
         else:
-            parts.append(_flow_pending_step_html(step, i, opacities.pop(0)))
-    body = "".join(parts)
+            parts.append(_flow_pending_step_html(label, i, opacities.pop(0) if opacities else 1))
     html = (
-        '<div style="padding:1rem 0 0.5rem 0;border-bottom:1px solid #1e293b;margin-bottom:1rem;">\n'
-        f'  <div style="display:flex;align-items:center;gap:6px;font-size:0.65rem;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-bottom:0.75rem;">{_ICO_FLOW} Fluxo de Análise</div>\n'
-        '  <div style="display:flex;flex-direction:column;gap:0.35rem;">\n'
-        f'{body}'
-        '  </div>\n'
-        '</div>\n'
+        '<div class="flow-sidebar">'
+        f'<div class="flow-sidebar-label">{_ICO_FLOW}<span>Fluxo de análise</span></div>'
+        f'<div class="flow-steps">{"".join(parts)}</div>'
+        "</div>"
     )
     st.sidebar.markdown(html, unsafe_allow_html=True)
 
 
+
+
 @contextmanager
 def loading_overlay(text: str, tickers=None):
-    """Glassmorphic loading animation — drop-in replacement for `st.spinner`.
+    """Explicit loading feedback for network and compute work.
 
-    Usage: `with loading_overlay("Carregando..."):` instead of
-    `with st.spinner("Carregando..."):`.
+    Usage: `with loading_overlay("Carregando…"):` instead of
+    `with st.spinner("Carregando…"):`.
     """
     placeholder = st.empty()
     chips_html = ""
@@ -196,7 +179,7 @@ def loading_overlay(text: str, tickers=None):
         # breaks CommonMark's HTML-block detection and makes markdown render
         # the remaining tags as literal text instead of passing them through.
         html = (
-            '<div class="loading-container">'
+            '<div class="loading-container" role="status" aria-live="polite">'
             '<div class="loading-spinner"></div>'
             f'<div class="loading-text">{text}</div>'
             f"{chips_html}"

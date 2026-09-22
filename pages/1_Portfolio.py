@@ -25,7 +25,7 @@ from utils.ui import (
     render_flow_sidebar,
     section_header,
 )
-from utils.market_data import get_sorted_tickers_by_liquidity
+from utils.market_data import get_listed_stocks, get_sorted_tickers_by_liquidity
 from utils.icons import (
     ICO_BOX,
     ICO_CAPM,
@@ -47,7 +47,12 @@ from utils.icons import (
     ICO_UP,
     ICO_WARN,
 )
-from utils.portfolio_data import get_benchmark_prices, get_portfolio_prices, get_selic_rate
+from utils.portfolio_data import (
+    bound_efficient_return,
+    get_benchmark_prices,
+    get_portfolio_prices,
+    get_selic_rate,
+)
 from utils.portfolio_charts import (
     apply_matplotlib_theme,
     plot_efficient_frontier_and_random_portfolios,
@@ -67,7 +72,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 st.markdown(
     """
 <div class="page-hero">
-    <div class="page-hero-icon">
+    <div class="page-hero-icon" aria-hidden="true">
         <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" fill="none">
           <!-- Donut allocation chart — 4 arcs representing diversified assets -->
           <path d="M30 6 A24 24 0 0 1 54 30" stroke="#00ff87" stroke-width="5.5" stroke-linecap="round"/>
@@ -86,8 +91,8 @@ st.markdown(
         </svg>
     </div>
     <div class="page-hero-content">
-        <h1 class="page-hero-title">Análise &amp; Otimização de Portfólio</h1>
-        <p class="page-hero-subtitle">Construa carteiras de alta performance com Markowitz, HRP e métricas institucionais de risco/retorno.</p>
+        <h1 class="page-hero-title">Otimização de portfólio</h1>
+        <p class="page-hero-subtitle">Monte uma carteira, compare risco e retorno e revise os pesos antes de investir.</p>
     </div>
 </div>
 """,
@@ -144,7 +149,13 @@ except Exception as _selic_err:
 # Seleção de ações
 MAX_TICKERS = 20
 
-data = pd.read_csv("acoes-listadas-b3.csv")
+data = pd.DataFrame()
+try:
+    data = get_listed_stocks()
+except (OSError, ValueError) as exc:
+    st.error(f"Não foi possível carregar a lista de ações da B3: {exc}")
+    st.stop()
+
 stocks = list(data["Ticker"].values)
 stocks = get_sorted_tickers_by_liquidity(stocks)
 
@@ -166,6 +177,8 @@ def _clear_saved_portfolio():
     # the multiselect below already exists raises a StreamlitAPIException.
     _db.portfolio_clear(_uid)
     st.session_state["selected_tickers"] = []
+    st.session_state["portfolio_loaded"] = False
+    st.session_state["portfolio_loaded_tickers"] = []
 
 
 col_tickers, col_clear = st.columns([5, 1])
@@ -173,6 +186,7 @@ with col_tickers:
     tickers = st.multiselect(
         "Selecione as ações do portfólio",
         options=stocks,
+        placeholder="Digite tickers (ex.: PETR4, VALE3)",
         key="selected_tickers",
         max_selections=MAX_TICKERS,
         help=f"Limite de {MAX_TICKERS} ativos para manter o download de cotações e a otimização estáveis.",
@@ -181,8 +195,9 @@ with col_clear:
     st.write("")
     st.write("")
     st.button(
-        "Limpar salvo",
+        "Limpar carteira",
         use_container_width=True,
+        help="Remove os ativos salvos desta carteira e limpa a seleção atual.",
         on_click=_clear_saved_portfolio,
     )
 
@@ -213,7 +228,7 @@ tickers_yf = [t + ".SA" for t in tickers]
 pesos_manuais_inputs = {}
 if "Manual" in modo:
     st.markdown("---")
-    section_header(ICO_BOX, "Alocação Manual dos Pesos", "h4")
+    section_header(ICO_BOX, "Alocação Manual dos Pesos", "h3")
     total_pesos = 0.0
     for ticker in tickers:
         _saved_pct = _saved_weights.get(ticker + ".SA")
@@ -265,7 +280,7 @@ if "Markowitz" in modo:
 # reservada para o clique em "Carregar Portfolio".
 _price_status = st.empty()
 _price_status.markdown(
-    '<div class="discreet-status">Baixando cotações históricas...</div>',
+    '<div class="discreet-status">Baixando cotações históricas…</div>',
     unsafe_allow_html=True,
 )
 try:
@@ -320,12 +335,21 @@ page_container = st.empty()
 # widget interaction below (e.g. the LAC "% em ativos de risco" slider) reruns
 # the script, the button reads False, and the entire block (slider included)
 # disappears. Persisting the flag keeps the analysis rendered across reruns.
-if st.button("Carregar Portfolio", type="primary", use_container_width=True):
+if st.button("Carregar portfólio", type="primary", use_container_width=True):
     st.session_state["portfolio_loaded"] = True
+    st.session_state["portfolio_loaded_tickers"] = list(tickers)
 
-if st.session_state.get("portfolio_loaded"):
+_loaded_tickers = st.session_state.get("portfolio_loaded_tickers", [])
+if st.session_state.get("portfolio_loaded") and _loaded_tickers != list(tickers):
+    st.info("A seleção mudou. Clique em **Carregar portfólio** para atualizar a análise.")
+
+if (
+    st.session_state.get("portfolio_loaded")
+    and st.session_state.get("portfolio_loaded_tickers", []) == list(tickers)
+):
+    st.caption(f"Análise ativa para {len(tickers)} ativos: {', '.join(tickers)}")
     # Overlay de carregamento global
-    with loading_overlay("Carregando dados, aguarde...", tickers=tickers):
+    with loading_overlay("Carregando dados, aguarde…", tickers=tickers):
         if "Manual" in modo:
             pesos_manuais = {}
             total = 0.0
@@ -369,9 +393,17 @@ if st.session_state.get("portfolio_loaded"):
                     tangency_return = ef.portfolio_performance(
                         risk_free_rate=selic_anual
                     )[0]
+                    target_return = bound_efficient_return(
+                        tangency_return, float(mu.min()), float(mu.max())
+                    )
                     ef = EfficientFrontier(mu, S)
-                    ef.add_objective(objective_functions.L2_reg, gamma=gamma_l2)
-                    raw_weights = ef.efficient_return(target_return=tangency_return)
+                    if target_return is None:
+                        # With effectively identical expected returns there is
+                        # no meaningful target-return frontier to solve.
+                        raw_weights = ef.min_volatility()
+                    else:
+                        ef.add_objective(objective_functions.L2_reg, gamma=gamma_l2)
+                        raw_weights = ef.efficient_return(target_return=target_return)
                 cleaned_weights = ef.clean_weights()
             except Exception as e:
                 logger.exception("max_sharpe optimization failed")
@@ -542,8 +574,8 @@ if st.session_state.get("portfolio_loaded"):
         st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True)
 
         if "Markowitz" in modo:
-            section_header(ICO_FRONTIER, "Gráfico da Fronteira Eficiente", "h3")
-            with loading_overlay("Gerando fronteira eficiente e simulando portfólios..."):
+            section_header(ICO_FRONTIER, "Gráfico da Fronteira Eficiente", "h2")
+            with loading_overlay("Gerando fronteira eficiente e simulando portfólios…"):
                 selic_anual = (1 + taxa_selic) ** 252 - 1
                 fig_frontier = plot_efficient_frontier_and_random_portfolios(
                     mu, S, cleaned_weights, selic_anual
@@ -698,7 +730,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         apply_plotly_theme(fig)
         st.plotly_chart(fig, use_container_width=True)
         # Retornos mensais
-        section_header(ICO_HEATMAP, "Tabela de Retornos Mensais do Portfólio", "h3")
+        section_header(ICO_HEATMAP, "Tabela de Retornos Mensais do Portfólio", "h2")
         try:
             monthly_ret = portfolio_returns.resample("ME").apply(
                 lambda x: (1 + x).prod() - 1
@@ -840,7 +872,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         information_ratio = qs.stats.information_ratio(portfolio_returns, retorno_bench)
 
         # Desempenho Resumido em Cards (st.metric)
-        section_header(ICO_CHART, "Desempenho Resumido da Carteira", "h3")
+        section_header(ICO_CHART, "Desempenho Resumido da Carteira", "h2")
         col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
         col_m1.metric(
             "Retorno Total",
@@ -892,7 +924,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         # ── Painel de Decisão do Investidor ───────────────────────────────────
         st.markdown("---")
-        section_header(ICO_TARGET, "Painel de Decisão do Investidor", "h3")
+        section_header(ICO_TARGET, "Painel de Decisão do Investidor", "h2")
 
         # ── Score de Saúde do Portfólio ──────────────────────────────────────
         score = 0
@@ -1004,7 +1036,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         # ── Análise CAPM por Ativo — EAE1242 (Sharpe, 1964) ─────────────────
         st.markdown("---")
-        section_header(ICO_CAPM, "Análise CAPM por Ativo", "h3")
+        section_header(ICO_CAPM, "Análise CAPM por Ativo", "h2")
         st.caption(
             "**CAPM (Sharpe, 1964):** E[Rᵢ] = Rƒ + βᵢ × (E[Rₘ] − Rƒ)  ·  "
             "β > 1 = mais volátil que o mercado  ·  α > 0 = retorno acima do esperado pelo risco"
@@ -1212,7 +1244,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         # ── Stress Test — Crises Históricas ──────────────────────────────────
         st.markdown("---")
-        section_header(ICO_STRESS, "Stress Test — Crises Históricas", "h3")
+        section_header(ICO_STRESS, "Stress Test — Crises Históricas", "h2")
         st.caption(
             "Desempenho estimado do portfólio durante períodos de turbulência histórica. "
             "Exibe apenas crises dentro do período de dados selecionado."
@@ -1345,7 +1377,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 st.plotly_chart(fig_stress, use_container_width=True)
 
         # ── Regime de Mercado (últimos 21 dias) ──────────────────────────────
-        section_header(ICO_SIGNAL, "Regime de Mercado (Últimos 21 Dias)", "h4")
+        section_header(ICO_SIGNAL, "Regime de Mercado (Últimos 21 Dias)", "h3")
         retorno_recente = (1 + portfolio_returns.tail(21)).prod() - 1
         retorno_recente_bench = (1 + retorno_bench.tail(21)).prod() - 1
         outperformance_recente = (retorno_recente - retorno_recente_bench) * 100
@@ -1472,7 +1504,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 ],
             }
         )
-        section_header(ICO_METRICS, "Métricas Consolidadas do Portfólio", "h3")
+        section_header(ICO_METRICS, "Métricas Consolidadas do Portfólio", "h2")
         stats_dict = dict(zip(detailed_stats["Métrica"], detailed_stats["Valor"]))
         render_cards_grid(stats_dict)
 
@@ -1482,7 +1514,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 """,
             unsafe_allow_html=True,
         )
-        section_header(ICO_RISK, "Análise de Drawdown", "h3")
+        section_header(ICO_RISK, "Análise de Drawdown", "h2")
 
         # 1. Gráfico de Drawdown do Portfólio
         cum_returns = (1 + portfolio_returns).cumprod()

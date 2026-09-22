@@ -12,7 +12,7 @@ from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
 from utils.ui import load_css, loading_overlay, render_flow_sidebar, section_header
-from utils.market_data import clean_numeric_column, get_sorted_tickers_by_liquidity
+from utils.market_data import clean_numeric_column, get_listed_stocks, get_sorted_tickers_by_liquidity
 from utils.icons import (
     ICO_BULB,
     ICO_COMPASS,
@@ -23,7 +23,7 @@ from utils.icons import (
     ICO_SHIELD,
     ICO_STAR,
 )
-from utils.home_data import get_fundamentus_data
+from utils.home_data import clear_fundamentus_cache, get_fundamentus_data
 from utils.home_render import (
     get_ticker_setor,
     render_debt_panel,
@@ -54,7 +54,7 @@ st.set_page_config(
     page_title="B3Lab — Análise Quantitativa de Ações",
     page_icon="favicon.svg",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 st.logo("logo.svg", icon_image="favicon.svg")
 
@@ -68,7 +68,7 @@ load_css()
 st.markdown(
     """
 <div class="page-hero main-hero">
-    <div class="page-hero-icon">
+    <div class="page-hero-icon" aria-hidden="true">
         <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" fill="none">
           <!-- X-axis baseline -->
           <line x1="4" y1="54" x2="56" y2="54" stroke="#1e293b" stroke-width="1.5"/>
@@ -91,7 +91,7 @@ st.markdown(
     </div>
     <div class="page-hero-content">
         <h1 class="page-hero-title">B3 Explorer</h1>
-        <p class="page-hero-subtitle">Plataforma quantitativa de análise de ações brasileiras — Fundamentalismo, Otimização de Portfólio e Simulação Monte Carlo.</p>
+        <p class="page-hero-subtitle">Consulte fundamentos, compare empresas e avance para portfolio, simulação e valuation.</p>
     </div>
 </div>
 """,
@@ -100,8 +100,12 @@ st.markdown(
 
 
 # Carrega lista de ações da B3 com setores para filtragem inicial
-
-data = pd.read_csv("acoes-listadas-b3.csv")
+data = pd.DataFrame()
+try:
+    data = get_listed_stocks()
+except (OSError, ValueError) as exc:
+    st.error(f"Não foi possível carregar a lista de ações da B3: {exc}")
+    st.stop()
 
 if "Setor" not in data.columns:
     st.error("O arquivo CSV precisa conter a coluna 'Setor' para o filtro funcionar.")
@@ -158,6 +162,18 @@ setores_selecionados = st.sidebar.multiselect(
     "Escolha um ou mais setores:", setores, default=[], key="setores_selecionados"
 )
 
+if st.sidebar.button(
+    "Atualizar dados Fundamentus",
+    help="Limpa o cache dos indicadores e busca dados atualizados na próxima análise.",
+):
+    removed = clear_fundamentus_cache()
+    st.session_state["fund_refresh_removed"] = removed
+    st.rerun()
+
+_refresh_removed = st.session_state.pop("fund_refresh_removed", None)
+if _refresh_removed is not None:
+    st.sidebar.success(f"Cache Fundamentus atualizado ({_refresh_removed} entradas removidas).")
+
 # Detecta se o usuário mudou a seleção de setores nesta interação. Quando muda,
 # os tickers do(s) setor(es) são autoselecionados abaixo (após a filtragem).
 _prev_setores = st.session_state.get("_prev_setores_selecionados")
@@ -186,16 +202,25 @@ tickers_filtrados = get_sorted_tickers_by_liquidity(tickers_filtrados)
 if _sector_changed and setores_selecionados and "Todos" not in setores_selecionados:
     st.session_state["selected_tickers"] = list(tickers_filtrados)
 
-section_header(ICO_COMPASS, "Escolha ações para explorar", "h3")
+section_header(ICO_COMPASS, "Selecione ativos para analisar", "h2")
 n_disponíveis = len(tickers_filtrados)
 setor_label = (
     "todos os setores"
     if (not setores_selecionados or "Todos" in setores_selecionados)
     else ", ".join(setores_selecionados[:2])
-    + ("..." if len(setores_selecionados) > 2 else "")
+    + ("…" if len(setores_selecionados) > 2 else "")
 )
-st.caption(
-    f"{n_disponíveis} ações disponíveis em {setor_label}, ordenadas por liquidez."
+st.markdown(
+    f"""
+<div class="selection-summary" role="status">
+  <div class="selection-summary-main">
+    <span class="selection-summary-count">{n_disponíveis} ações</span>
+    <span class="selection-summary-context">disponíveis em {setor_label}</span>
+  </div>
+  <span class="selection-summary-source">Fundamentus <i>·</i> ordenação por liquidez</span>
+</div>
+""",
+    unsafe_allow_html=True,
 )
 
 if "selected_tickers" not in st.session_state:
@@ -212,36 +237,48 @@ st.session_state["selected_tickers"] = [
 ]
 
 tickers = st.multiselect(
-    "Escolha sua ação. Selecione a página desejada e as configurações na barra lateral.",
+    "Escolha ações para analisar",
     options=tickers_filtrados,
     format_func=lambda t: f"{t}  ·  {_ticker_setor.get(t, '')}",
+    placeholder="Digite o ticker ou selecione na lista…",
+    help="Você pode selecionar uma ou mais ações. Use o filtro de setor na barra lateral para reduzir a lista.",
     key="selected_tickers",
 )
+
+# A new selection must always require an explicit analysis click. This avoids
+# reusing results from an earlier selection when the user returns to it later.
+if st.session_state.get("analyzed_tickers", []) != list(tickers):
+    st.session_state["analyzed_tickers"] = []
 
 if not tickers:
     # ── Onboarding ─────────────────────────────────────────────────────────────
     st.markdown(
         """
-<div style="margin:1.5rem 0 0.5rem 0;padding:1.5rem;background:linear-gradient(135deg,rgba(0,255,135,0.04) 0%,rgba(0,210,255,0.04) 100%);border:1px solid rgba(0,255,135,0.12);border-radius:14px;">
-  <h3 style="margin:0 0 0.3rem 0;font-size:1.1rem;background:linear-gradient(135deg,#f8fafc 40%,#00ff87 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
-    Bem-vindo ao B3 Explorer
-  </h3>
-  <p style="color:#94a3b8;font-size:0.85rem;margin:0 0 1.2rem 0;line-height:1.6">
-    Plataforma de análise quantitativa de ações da B3. Escolha um ticker no campo acima
-    ou clique em uma ação abaixo para começar.
-  </p>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;">
-    <div style="background:rgba(14,23,38,0.6);border:1px solid #1e293b;border-radius:10px;padding:0.85rem;">
-      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#00ff87;text-transform:uppercase;margin-bottom:0.5rem"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#00ff8722;border:1px solid #00ff87;color:#00ff87;font-size:0.62rem;font-weight:800;margin-right:4px;">1</span>Escolha</div>
-      <div style="font-size:0.8rem;color:#cbd5e1;line-height:1.5">Filtre por setor na barra lateral ou digite o código da ação no campo de busca acima.</div>
+<div class="onboarding-card">
+  <div class="onboarding-card-header">
+    <div>
+      <div class="onboarding-eyebrow">Primeiro acesso</div>
+      <div class="onboarding-title">Monte sua primeira análise</div>
+      <p class="onboarding-description">
+        Selecione um ticker no campo acima ou use um dos atalhos para abrir os indicadores fundamentais.
+      </p>
     </div>
-    <div style="background:rgba(14,23,38,0.6);border:1px solid #1e293b;border-radius:10px;padding:0.85rem;">
-      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#00d2ff;text-transform:uppercase;margin-bottom:0.5rem"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#00d2ff22;border:1px solid #00d2ff;color:#00d2ff;font-size:0.62rem;font-weight:800;margin-right:4px;">2</span>Analise</div>
-      <div style="font-size:0.8rem;color:#cbd5e1;line-height:1.5">Veja P/L, EV/EBITDA, ROE, ROIC, endividamento e posição no setor vs peers automaticamente.</div>
+    <div class="onboarding-signal" aria-hidden="true">
+      <span></span><span></span><span></span>
     </div>
-    <div style="background:rgba(14,23,38,0.6);border:1px solid #1e293b;border-radius:10px;padding:0.85rem;">
-      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#a855f7;text-transform:uppercase;margin-bottom:0.5rem"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#a855f722;border:1px solid #a855f7;color:#a855f7;font-size:0.62rem;font-weight:800;margin-right:4px;">3</span>Valoração</div>
-      <div style="font-size:0.8rem;color:#cbd5e1;line-height:1.5">Use a página <b style="color:#a855f7">Valuation</b> para o DCF completo McKinsey/Koller em 8 etapas.</div>
+  </div>
+  <div class="onboarding-tip-grid">
+    <div class="onboarding-tip onboarding-tip-green">
+      <div class="onboarding-tip-label"><span class="onboarding-tip-badge">1</span>Escolha</div>
+      <div class="onboarding-tip-copy">Filtre por setor ou digite o código da ação no campo de busca.</div>
+    </div>
+    <div class="onboarding-tip onboarding-tip-blue">
+      <div class="onboarding-tip-label"><span class="onboarding-tip-badge">2</span>Compare</div>
+      <div class="onboarding-tip-copy">Leia valuation, rentabilidade, crescimento e endividamento lado a lado.</div>
+    </div>
+    <div class="onboarding-tip onboarding-tip-purple">
+      <div class="onboarding-tip-label"><span class="onboarding-tip-badge">3</span>Aprofunde</div>
+      <div class="onboarding-tip-copy">Use Portfolio e Valuation quando quiser sair da análise inicial.</div>
     </div>
   </div>
 </div>
@@ -251,28 +288,25 @@ if not tickers:
 
     # Quick-start grid
     st.markdown(
-        '<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#64748b;'
-        'text-transform:uppercase;margin:1.2rem 0 0.6rem 0">Início rápido — ações populares</div>',
+        '<div class="onboarding-subheading">Seleção rápida <span>· ações líquidas</span></div>',
         unsafe_allow_html=True,
     )
 
     _QUICK = [
-        ("WEGE3", "Máquinas", "#00ff87"),
-        ("PETR4", "Petróleo", "#ffd600"),
-        ("VALE3", "Mineração", "#f87171"),
-        ("ITUB4", "Banco", "#00d2ff"),
-        ("RENT3", "Locação", "#a855f7"),
-        ("ABEV3", "Bebidas", "#fb923c"),
-        ("EGIE3", "Energia", "#34d399"),
-        ("RADL3", "Farmácia", "#60a5fa"),
+        ("WEGE3", "Máquinas", "#61d4c6"),
+        ("PETR4", "Petróleo", "#e7b96b"),
+        ("VALE3", "Mineração", "#e58a93"),
+        ("ITUB4", "Banco", "#8cb4f2"),
+        ("RENT3", "Locação", "#b7a2e6"),
+        ("ABEV3", "Bebidas", "#d79b6f"),
+        ("EGIE3", "Energia", "#7fcea3"),
+        ("RADL3", "Farmácia", "#84b8e8"),
     ]
     _cols = st.columns(4)
     for i, (tkr, setor, cor) in enumerate(_QUICK):
         with _cols[i % 4]:
             st.markdown(
-                f'<div style="text-align:center;padding:0.2rem 0 0.1rem 0;'
-                f"font-size:0.62rem;color:{cor};font-weight:700;text-transform:uppercase;"
-                f'letter-spacing:0.06em">{setor}</div>',
+                f'<div class="quick-start-sector" style="--quick-color:{cor}">{setor}</div>',
                 unsafe_allow_html=True,
             )
             if st.button(
@@ -286,8 +320,7 @@ if not tickers:
 
     # Sector shortcuts
     st.markdown(
-        '<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#64748b;'
-        'text-transform:uppercase;margin:1.4rem 0 0.6rem 0">Explorar por setor</div>',
+        '<div class="onboarding-subheading onboarding-subheading-spaced">Explorar <span>· setores</span></div>',
         unsafe_allow_html=True,
     )
     # Rótulos amigáveis mapeados para os valores reais da coluna "Setor" do CSV
@@ -310,11 +343,8 @@ if not tickers:
                 st.rerun()
 
     st.markdown(
-        '<div style="margin-top:1.2rem;padding:0.75rem 1rem;background:rgba(0,0,0,0.2);'
-        'border-radius:8px;border-left:3px solid #334155">'
-        f'<span style="font-size:0.78rem;color:#64748b">{ICO_BULB} <b style="color:#94a3b8">Dica:</b> '
-        "Use o campo de busca acima para digitar qualquer ticker da B3. "
-        "O filtro de setor na barra lateral reduz a lista para facilitar a escolha.</span>"
+        '<div class="onboarding-hint">'
+        f"{ICO_BULB} <b>Atalho</b><span>Digite qualquer ticker da B3 no campo de busca ou filtre por setor na barra lateral.</span>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -322,9 +352,9 @@ if not tickers:
 if tickers:
     st.markdown(
         f"""
-    <div style="background:rgba(0,255,135,0.05);border:1px solid rgba(0,255,135,0.2);border-radius:10px;padding:0.6rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
-        <span style="font-size:0.85rem;color:#94a3b8;">{len(tickers)} ação(ões) selecionada(s) — analise o portfólio completo na página <strong style="color:#00ff87">Portfolio</strong></span>
-        <span style="font-size:0.75rem;color:#00ff87;font-family:'JetBrains Mono',monospace;font-weight:700;">← barra lateral</span>
+    <div class="selection-active-note">
+      <span>{len(tickers)} ação(ões) selecionada(s) — use <strong>Portfolio</strong> para analisar a carteira completa.</span>
+      <span class="selection-active-note-hint">seleção atual</span>
     </div>
     """,
         unsafe_allow_html=True,
@@ -335,6 +365,7 @@ if tickers:
         type="primary",
         use_container_width=True,
         key="btn_analisar",
+        help="Busca os indicadores fundamentalistas dos ativos selecionados.",
     ):
         st.session_state["analyzed_tickers"] = list(tickers)
 
@@ -349,7 +380,7 @@ if ready_to_analyze:
     try:
         # 1. Buscar dados usando funções cacheadas, com animação de carregamento
         with loading_overlay(
-            "Buscando indicadores fundamentalistas na B3...", tickers=tickers
+            "Buscando indicadores fundamentalistas na B3…", tickers=tickers
         ):
             df = get_fundamentus_data(tickers)
 
@@ -386,7 +417,7 @@ if ready_to_analyze:
         except Exception:
             logger.debug("fundamentus CSV export failed", exc_info=True)
 
-        section_header(ICO_SECTOR, "Setor", "h3")
+        section_header(ICO_SECTOR, "Setor", "h2")
         df_sector = df[["Empresa", "Setor", "Subsetor"]]
 
         if len(tickers) > 1:
@@ -411,7 +442,7 @@ if ready_to_analyze:
                 st.warning(f"Sem dados de setor para {ticker}")
 
         # Informações de mercado em caixas estilizadas
-        section_header(ICO_MARKET, "Informações de Mercado", "h3")
+        section_header(ICO_MARKET, "Informações de Mercado", "h2")
         df_price = df[
             [
                 "Cotacao",
@@ -463,7 +494,7 @@ if ready_to_analyze:
                 st.warning(f"Sem dados de mercado para {ticker}")
 
         # Indicadores Fundamentalistas
-        section_header(ICO_METRICS, "Indicadores Financeiros", "h3")
+        section_header(ICO_METRICS, "Indicadores Financeiros", "h2")
         df_ind = df[
             [
                 "Marg_Liquida",
@@ -535,7 +566,7 @@ if ready_to_analyze:
 
         # ── Saúde Financeira ─────────────────────────────────────────────────
         st.markdown("---")
-        section_header(ICO_SHIELD, "Saúde Financeira", "h3")
+        section_header(ICO_SHIELD, "Saúde Financeira", "h2")
         st.caption(
             "Endividamento e liquidez da empresa. "
             "Dívida/PL acima de 3x e Liquidez abaixo de 1x são sinais de alerta."
@@ -761,7 +792,7 @@ if ready_to_analyze:
             st.markdown("".join(sintese_items), unsafe_allow_html=True)
 
         # ── Próximo Passo ────────────────────────────────────────────────────
-        tickers_str = ", ".join(tickers[:3]) + ("..." if len(tickers) > 3 else "")
+        tickers_str = ", ".join(tickers[:3]) + ("…" if len(tickers) > 3 else "")
         st.markdown(
             f"""
 <div style="background:linear-gradient(135deg,rgba(0,255,135,0.06),rgba(0,210,255,0.03));border:1px solid rgba(0,255,135,0.25);border-radius:14px;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">

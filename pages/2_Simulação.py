@@ -45,10 +45,9 @@ ICO_METRICS = _svg(
 )
 
 
-def section_header(icon_svg, text, tag="h3"):
+def section_header(icon_svg, text, tag="h2"):
     st.markdown(
-        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
-        f"{icon_svg}<span>{text}</span></{tag}>",
+        f'<{tag} class="ui-section-heading">{icon_svg}<span>{text}</span></{tag}>',
         unsafe_allow_html=True,
     )
 
@@ -90,7 +89,7 @@ plt.rcParams["font.family"] = "sans-serif"
 st.markdown(
     """
 <div class="page-hero">
-    <div class="page-hero-icon">
+    <div class="page-hero-icon" aria-hidden="true">
         <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" fill="none">
           <!-- Background grid lines -->
           <line x1="4" y1="56" x2="56" y2="56" stroke="#1e293b" stroke-width="1"/>
@@ -114,8 +113,8 @@ st.markdown(
         </svg>
     </div>
     <div class="page-hero-content">
-        <h1 class="page-hero-title">Simulação Monte Carlo</h1>
-        <p class="page-hero-subtitle">Projete trajetórias de retorno com 1.000+ simulações estocásticas e avalie o espectro de cenários para o seu portfólio.</p>
+        <h1 class="page-hero-title">Simulação de portfólio</h1>
+        <p class="page-hero-subtitle">Projete faixas de retorno e risco a partir dos pesos definidos na carteira.</p>
     </div>
 </div>
 """,
@@ -178,9 +177,9 @@ loading_placeholder = st.empty()
 with loading_placeholder.container():
     st.markdown(
         """
-    <div class="loading-container">
+    <div class="loading-container" role="status" aria-live="polite">
         <div class="loading-spinner"></div>
-        <div class="loading-text">Rodando simulações Monte Carlo multivariadas...</div>
+        <div class="loading-text">Rodando simulações Monte Carlo multivariadas…</div>
         <div class="loading-bar-track"><div class="loading-bar-fill"></div></div>
     </div>
     """,
@@ -256,7 +255,7 @@ sim_stats_dict = {
     "Melhor Cenário": f"R$ {melhor_cenario:,.2f}",
 }
 
-section_header(ICO_CHART, "Estatísticas da Simulação Monte Carlo", "h3")
+section_header(ICO_CHART, "Estatísticas da Simulação Monte Carlo", "h2")
 
 col_s1, col_s2, col_s3 = st.columns(3)
 with col_s1:
@@ -313,7 +312,7 @@ with col_exp2:
     )
 
 # Gráfico com algumas trajetórias individuais para ilustrar a dispersão
-section_header(ICO_SIGNAL, "Trajetórias Individuais das Simulações", "h3")
+section_header(ICO_SIGNAL, "Trajetórias Individuais das Simulações", "h2")
 n_plot_max = min(50, n_simulations)
 n_plot = st.number_input(
     "Número de trajetórias exibidas",
@@ -446,7 +445,7 @@ q1 = valores_finais.quantile(0.25)
 q2 = valores_finais.quantile(0.50)
 q3 = valores_finais.quantile(0.75)
 
-section_header(ICO_FRONTIER, "Distribuição do Valor Final do Portfólio", "h3")
+section_header(ICO_FRONTIER, "Distribuição do Valor Final do Portfólio", "h2")
 fig_hist = px.histogram(
     x=valores_finais,
     nbins=30,
@@ -504,7 +503,7 @@ estatisticas_dict = {
     "Média": f"R$ {estatisticas['Média']:,.2f}",
     "Desvio Padrão": f"R$ {estatisticas['Desvio Padrão']:,.2f}",
 }
-section_header(ICO_METRICS, "Estatísticas da Distribuição Final", "h3")
+section_header(ICO_METRICS, "Estatísticas da Distribuição Final", "h2")
 render_cards_grid(estatisticas_dict)
 loading_placeholder.empty()
 

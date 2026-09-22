@@ -66,12 +66,12 @@ def render_ticker_cards(row, setor=""):
     # 1. Valuation Section
     st.markdown(
         """
-<div style="margin: 1.2rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<div class="metric-section-heading">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#61d4c6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="12" y1="1" x2="12" y2="23"></line>
         <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
     </svg>
-    <span style="font-weight: 700; color: #00d2ff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Valuation</span>
+    <span>Valuation</span>
 </div>
 """,
         unsafe_allow_html=True,
@@ -114,12 +114,12 @@ def render_ticker_cards(row, setor=""):
     # 2. Rentabilidade Section
     st.markdown(
         """
-<div style="margin: 1.5rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<div class="metric-section-heading">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8cb4f2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
         <polyline points="17 6 23 6 23 12"></polyline>
     </svg>
-    <span style="font-weight: 700; color: #00ff87; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Rentabilidade</span>
+    <span>Rentabilidade</span>
 </div>
 """,
         unsafe_allow_html=True,
@@ -175,11 +175,11 @@ def render_ticker_cards(row, setor=""):
     # 3. Crescimento & Yield Section
     st.markdown(
         """
-<div style="margin: 1.5rem 0 0.6rem 0; display: flex; align-items: center; gap: 6px;">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffd600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<div class="metric-section-heading">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e7b96b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
     </svg>
-    <span style="font-weight: 700; color: #ffd600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Crescimento & Yield</span>
+    <span>Crescimento &amp; Yield</span>
 </div>
 """,
         unsafe_allow_html=True,
@@ -360,7 +360,7 @@ def get_ticker_setor(df, ticker):
 
 def render_hist_section(tkr):
     """Renderiza seção de histórico fundamentalista (receita, margens, ROE) para um ticker."""
-    with loading_overlay(f"Buscando histórico de {tkr}...", tickers=[tkr]):
+    with loading_overlay(f"Buscando histórico de {tkr}…", tickers=[tkr]):
         df_h = build_hist_df(tkr)
     if df_h is None or df_h.empty:
         st.info(f"Dados históricos não disponíveis para {tkr} via yfinance.")

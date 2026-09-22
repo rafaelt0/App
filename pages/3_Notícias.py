@@ -50,11 +50,11 @@ ICO_CPU     = _svg('<rect x="4" y="4" width="16" height="16" rx="2" stroke="#00f
 ICO_LEXICON = _svg('<path d="M4 5.5A2 2 0 0 1 6 3.5h13V19H6a2 2 0 0 0-2 2z" stroke="#00d2ff" stroke-width="1.7" stroke-linejoin="round"/>'
                    '<path d="M4 19.5A2 2 0 0 1 6 17.5h13" stroke="#00d2ff" stroke-width="1.7" stroke-linejoin="round"/>', 14)
 
-def section_header(icon_svg, text, tag="h3"):
+def section_header(icon_svg, text, tag="h2"):
     st.markdown(
-        f'<{tag} style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">'
-        f'{icon_svg}<span>{text}</span></{tag}>',
-        unsafe_allow_html=True)
+        f'<{tag} class="ui-section-heading">{icon_svg}<span>{text}</span></{tag}>',
+        unsafe_allow_html=True,
+    )
 
 def diag_row(icon_svg, text, color):
     st.markdown(
@@ -78,7 +78,7 @@ def get_diag_row_html(icon_svg, text, color):
 # Hero Header
 st.markdown("""
 <div class="page-hero">
-    <div class="page-hero-icon">
+    <div class="page-hero-icon" aria-hidden="true">
         <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="1.5">
           <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z"/>
           <path d="M14 4v4h4"/>
@@ -88,8 +88,8 @@ st.markdown("""
         </svg>
     </div>
     <div class="page-hero-content">
-        <h1 class="page-hero-title">Notícias & Sentimento do Portfólio</h1>
-        <p class="page-hero-subtitle">Monitore notícias em tempo real e analise o sentimento de mercado agregando o impacto qualitativo nas ações de sua carteira.</p>
+        <h1 class="page-hero-title">Notícias do portfólio</h1>
+        <p class="page-hero-subtitle">Acompanhe eventos recentes e o tom das notícias sobre seus ativos.</p>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -450,7 +450,7 @@ def load_finbert_pipeline():
 
 # Load FinBERT
 if "finbert_nlp" not in st.session_state:
-    with loading_overlay("Carregando modelo de IA (FinBERT-PT-BR)..."):
+    with loading_overlay("Carregando modelo de IA (FinBERT-PT-BR)…"):
         st.session_state["finbert_nlp"] = load_finbert_pipeline()
 finbert_nlp = st.session_state["finbert_nlp"]
 
@@ -570,7 +570,7 @@ news_items = []
 random.seed(42)  # Semente estática para consistência entre renderizações da mesma sessão
 
 # Barra de progresso para download/fetch de notícias em tempo real
-with loading_overlay("Buscando notícias e processando sentimento NLP...", tickers=tickers):
+with loading_overlay("Buscando notícias e processando sentimento NLP…", tickers=tickers):
     for t in tickers:
         real_news = get_brazilian_news(t)
         
@@ -744,7 +744,7 @@ st.markdown("---")
 # ─── NEWS FEED LISTING ───────────────────────────────────────────────────────
 
 # Filtro lateral/superior de notícias
-section_header(ICO_NEWS, "Feed Qualitativo de Notícias da Carteira", "h3")
+section_header(ICO_NEWS, "Feed Qualitativo de Notícias da Carteira", "h2")
 
 col_filter, col_sort = st.columns([1, 1])
 with col_filter:
@@ -953,7 +953,7 @@ elif len(filtered_news) > ITEMS_PER_PAGE:
 st.markdown("---")
 
 # Painel de Decisão de Notícias / Insights de Alocação
-section_header(ICO_TARGET, "Insights Estratégicos & Análise de Risco Qualitativo", "h3")
+section_header(ICO_TARGET, "Insights Estratégicos & Análise de Risco Qualitativo", "h2")
 
 insights_html = []
 

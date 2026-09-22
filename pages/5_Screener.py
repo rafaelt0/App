@@ -1,13 +1,13 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import os
 import logging
 
 logger = logging.getLogger(__name__)
 
 from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
-from utils.market_data import get_full_market_data
+from utils.home_data import clear_fundamentus_cache
+from utils.market_data import get_full_market_data, get_listed_stocks
 
 st.set_page_config(page_title="Screener B3", page_icon="favicon.svg", layout="wide")
 
@@ -45,8 +45,8 @@ ICO_SORT = _svg(
 # ─── Cabeçalho ────────────────────────────────────────────────────────────────
 st.markdown(
     """
-<div class="page-hero" style="border-left-color:#38bdf8">
-    <div class="page-hero-icon">
+<div class="page-hero">
+    <div class="page-hero-icon" aria-hidden="true">
         <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" fill="none">
           <circle cx="26" cy="26" r="17" stroke="#38bdf8" stroke-width="3"/>
           <line x1="38" y1="38" x2="53" y2="53" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
@@ -54,9 +54,7 @@ st.markdown(
         </svg>
     </div>
     <div class="page-hero-content">
-        <h1 class="page-hero-title" style="background:linear-gradient(135deg,#f8fafc 40%,#38bdf8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
-            Screener B3
-        </h1>
+        <h1 class="page-hero-title">Screener de ações</h1>
         <p class="page-hero-subtitle">Filtre todas as ações listadas na B3 por indicadores fundamentalistas e encontre candidatos de investimento. Os dados são atualizados a cada hora via Fundamentus.</p>
     </div>
 </div>
@@ -101,8 +99,21 @@ def carregar_dados():
     return raw.rename(columns={k: v for k, v in RENAMES.items() if k in raw.columns})
 
 
+if st.sidebar.button(
+    "Atualizar dados Fundamentus",
+    help="Limpa o cache do screener e busca uma nova fotografia do mercado.",
+):
+    removed = clear_fundamentus_cache()
+    st.session_state["fund_refresh_removed"] = removed
+    st.rerun()
+
+_refresh_removed = st.session_state.pop("fund_refresh_removed", None)
+if _refresh_removed is not None:
+    st.sidebar.success(f"Cache Fundamentus atualizado ({_refresh_removed} entradas removidas).")
+
+
 try:
-    with loading_overlay("Carregando dados da B3..."):
+    with loading_overlay("Carregando dados da B3…"):
         df_raw = carregar_dados()
 except Exception as e:
     logger.exception("carregar_dados failed")
@@ -150,12 +161,12 @@ def _calcular_score(df: pd.DataFrame) -> pd.Series:
 df["score"] = _calcular_score(df)
 
 # ─── Setor (para exclusão de financeiras/utilities na Magic Formula) ──────────
-_csv_path = os.path.join(os.path.dirname(__file__), "..", "acoes-listadas-b3.csv")
 try:
-    _setores = pd.read_csv(_csv_path).set_index("Ticker")["Setor"]
+    _setores = get_listed_stocks().set_index("Ticker")["Setor"]
     df["setor"] = df.index.map(_setores)
 except Exception:
     logger.warning("sector CSV enrichment failed", exc_info=True)
+    st.warning("Classificação setorial indisponível; filtros por setor podem ficar limitados.")
     df["setor"] = None
 
 # ─── Colunas calculadas (frameworks) ──────────────────────────────────────────

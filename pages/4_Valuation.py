@@ -24,7 +24,7 @@ from utils.valuation import (
 )
 from utils.home_data import MULTIPLES_CFG, compute_sector_ranking, get_sector_peers
 from utils.home_render import color_pct, color_veredicto, render_hist_section
-from utils.market_data import clean_numeric_column
+from utils.market_data import clean_numeric_column, get_listed_stocks
 
 load_css()
 
@@ -239,8 +239,8 @@ def get_koller_data(ticker_b3: str):
 # ─── Hero ──────────────────────────────────────────────────────────────────────
 st.markdown(
     """
-<div class="page-hero" style="border-left-color:#a855f7">
-  <div class="page-hero-icon">
+<div class="page-hero">
+  <div class="page-hero-icon" aria-hidden="true">
     <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 64 64" fill="none">
       <rect x="4" y="4" width="56" height="56" rx="14" fill="#0e1726"/>
       <line x1="32" y1="10" x2="32" y2="54" stroke="#a855f7" stroke-width="3" stroke-linecap="round"/>
@@ -249,12 +249,9 @@ st.markdown(
     </svg>
   </div>
   <div class="page-hero-content">
-    <h1 class="page-hero-title" style="background:linear-gradient(135deg,#f8fafc 40%,#a855f7 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
-      Valuation — McKinsey / Koller
-    </h1>
+    <h1 class="page-hero-title">Valuation por DCF</h1>
     <p class="page-hero-subtitle">
-      Enterprise DCF completo em 8 etapas: NOPLAT → Invested Capital → ROIC histórico →
-      Projeção → Continuing Value → WACC/CAPM → Enterprise Value → Validação por múltiplos.
+      Estime o valor intrínseco por fluxo de caixa descontado e compare o resultado com o preço atual.
     </p>
   </div>
 </div>
@@ -265,7 +262,12 @@ st.markdown(
 # ─── Ticker input ──────────────────────────────────────────────────────────────
 col_t, col_hint = st.columns([2, 5])
 with col_t:
-    b3_stocks = sorted(pd.read_csv("acoes-listadas-b3.csv")["Ticker"].tolist())
+    b3_stocks = []
+    try:
+        b3_stocks = sorted(get_listed_stocks()["Ticker"].tolist())
+    except (OSError, ValueError) as exc:
+        st.error(f"Não foi possível carregar a lista de ações da B3: {exc}")
+        st.stop()
     defaults = st.session_state.get("selected_tickers", [])
     default_ticker = defaults[0] if defaults else None
     default_idx = (
@@ -276,7 +278,7 @@ with col_t:
             "Ticker B3",
             options=[""] + b3_stocks,
             index=default_idx,
-            format_func=lambda t: "Selecione um ticker..." if t == "" else t,
+            format_func=lambda t: "Selecione um ticker…" if t == "" else t,
             help="Dados via yfinance (4 anos) + Selic BCB.",
         )
         .strip()
@@ -291,7 +293,7 @@ if not ticker:
     st.stop()
 
 # ─── Load data ─────────────────────────────────────────────────────────────────
-with loading_overlay(f"Carregando dados financeiros de {ticker}...", tickers=[ticker]):
+with loading_overlay(f"Carregando dados financeiros de {ticker}…", tickers=[ticker]):
     selic = get_selic()
     kdata = get_koller_data(ticker)
 
@@ -329,7 +331,7 @@ if skey not in st.session_state:
     _equity_for_weight = _mkt_equity if _mkt_equity > 0 else latest["equity"]
     _ev0 = max(_equity_for_weight + t_debt - cash_v, 1)
     _ew = round(max(min(_equity_for_weight / _ev0, 0.95), 0.3), 2)
-    _roic_hist = next((y["roic"] for y in reversed(ys) if y.get("roic")), 12.0) or 12.0
+    _roic_hist = next((y["roic"] for y in reversed(ys) if y.get("roic") and y["roic"] > 0), 12.0) or 12.0
     _g1 = round(min(max(cagr or 5.0, 0.0), 20.0), 1)
     st.session_state[skey] = {
         "ke": _ke,
@@ -343,6 +345,10 @@ if skey not in st.session_state:
         "model": "Enterprise DCF",
     }
 ss = st.session_state[skey]
+# Historical ROIC can be negative for distressed companies, but the DCF
+# controls require positive values. Sanitize stale session values before widgets.
+ss["roic_proj"] = max(float(ss.get("roic_proj", 12.0)), 1.0)
+ss["roic_cv"] = max(float(ss.get("roic_cv", 12.0)), 5.0)
 
 # ─── WACC (live, derived from sliders) ─────────────────────────────────────────
 tax_rate = latest["tax_rate"]
@@ -1333,7 +1339,7 @@ with tabs[7]:
         "(fonte: Fundamentus). Verde = favorável · Vermelho = desfavorável · Cinza = neutro."
     )
 
-    _b3_data = pd.read_csv("acoes-listadas-b3.csv")
+    _b3_data = get_listed_stocks()
     _setor_ticker = (
         _b3_data[_b3_data["Ticker"] == ticker]["Setor"].values[0]
         if ticker in _b3_data["Ticker"].values
@@ -1348,7 +1354,7 @@ with tabs[7]:
             f"Setor: **{_setor_ticker}** · {len(_peers_tickers)} empresas comparáveis"
         )
 
-        with loading_overlay("Carregando múltiplos do setor..."):
+        with loading_overlay("Carregando múltiplos do setor…"):
             _peers_raw = get_sector_peers((_setor_ticker,))
 
         if _peers_raw.empty:
