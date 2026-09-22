@@ -236,6 +236,11 @@ if len(tickers) == 1:
     )
     st.stop()
 
+
+# Any portfolio rerun can change lookback, mode, or manual weights. Invalidate
+# cross-page results until this run completes successfully.
+if st.session_state.get("portfolio_loaded"):
+    st.session_state["portfolio_analysis_tickers"] = []
 tickers_yf = [t + ".SA" for t in tickers]
 
 # Inputs de peso manual devem aparecer ANTES do botão
