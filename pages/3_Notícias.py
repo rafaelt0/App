@@ -862,11 +862,13 @@ with col_sentiment:
         ["Todos", "Otimistas", "Neutras", "Pessimistas"],
         help="Mostra apenas notícias classificadas pelo PLN com o sentimento escolhido.",
     )
-with col_impact:
     impact_filter = st.selectbox(
         "Filtrar por impacto",
-        ["Todos", "Alto", "Médio-Alto", "Médio", "Baixo-Médio", "Baixo"],
-        help="Mostra apenas notícias com o nível de impacto escolhido.",
+        ["Todos", "Alto", "Médio", "Baixo"],
+        help=(
+            "Mostra apenas notícias nos três níveis de impacto "
+            "calculados pelo score de sentimento."
+        ),
     )
 
 
