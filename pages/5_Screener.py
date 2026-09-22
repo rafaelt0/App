@@ -677,6 +677,27 @@ else:
         f"Clique no cabeçalho da coluna para reordenar."
     )
 
+    st.markdown("#### Destaques da triagem")
+    st.caption("As primeiras posições seguem a ordenação selecionada.")
+    _top_picks = df_filtrado.head(3)
+    _pick_cols = st.columns(len(_top_picks))
+
+    def _pick_value(value, formatter):
+        return "—" if pd.isna(value) else formatter(value)
+
+    for _rank, (_ticker, _pick_row) in enumerate(_top_picks.iterrows(), start=1):
+        with _pick_cols[_rank - 1]:
+            st.markdown(f"**#{_rank} · {_ticker}**")
+            st.metric(
+                "Score",
+                _pick_value(_pick_row.get("score"), lambda value: f"{float(value):.0f} / 100"),
+            )
+            st.caption(
+                f"Cotação {_pick_value(_pick_row.get('cotacao'), lambda value: f'R$ {float(value):.2f}')}"
+                f" · DY {_pick_value(_pick_row.get('dy'), lambda value: f'{float(value) * 100:.2f}%')}"
+                f" · P/L {_pick_value(_pick_row.get('pl'), lambda value: f'{float(value):.2f}')}"
+            )
+
     # Seleciona e renomeia colunas relevantes para exibição
     col_map = {
         "score": "Score",
