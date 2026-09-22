@@ -794,7 +794,7 @@ with col_g2:
     fig.update_layout(
         barmode='stack',
         title="Volume de Notícias e Distribuição por Ativo",
-        xaxis=dict(title="Quantidade de Notícias", dtick=1),
+        xaxis=dict(title="", dtick=1),
         yaxis=dict(title="Ativos"),
         height=200 + len(tickers) * 35,
         margin=dict(l=20, r=20, t=40, b=20),
@@ -804,9 +804,20 @@ with col_g2:
     fig.update_layout(
         title=dict(text="Notícias por ativo", x=0, xanchor="left"),
         height=max(280, 190 + len(tickers) * 40),
-        margin=dict(l=48, r=12, t=46, b=90),
+        margin=dict(l=48, r=12, t=46, b=96),
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.16,
+            xanchor="left",
+            x=0,
+        ),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displayModeBar": False, "displaylogo": False, "responsive": True},
+    )
 
 st.markdown("---")
 
