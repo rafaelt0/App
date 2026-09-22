@@ -9,6 +9,7 @@ import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
 import email.utils
+from html import escape
 import logging
 
 logger = logging.getLogger(__name__)
@@ -966,8 +967,27 @@ for news in news_to_show:
     impact_color = "#4ade80" if news["impact"] == "Baixo" else \
                    "#ffd600" if "Médio" in news["impact"] else "#ff3d5a"
 
-    # Clickable title if link is present
-    title_html = f'<a class="news-title-link" href="{news["link"]}" target="_blank">{news["title"]}</a>' if news["link"] != "#" else news["title"]
+    # Escape external feed content before embedding it in custom HTML.
+    _news_ticker = escape(str(news["ticker"]))
+    _news_provider = escape(str(news["provider"]))
+    _news_pub_time = escape(str(news["pub_time"]))
+    _news_sentiment = escape(str(news["sentiment"]).upper())
+    _news_impact = escape(str(news["impact"]).upper())
+    _news_title = escape(str(news["title"]))
+    _news_summary = escape(str(news["summary"]))
+    _raw_link = str(news.get("link", "")).strip()
+    _parsed_link = urllib.parse.urlparse(_raw_link)
+    _safe_link = (
+        escape(_raw_link, quote=True)
+        if _parsed_link.scheme in {"http", "https"}
+        else None
+    )
+    title_html = (
+        f'<a class="news-title-link" href="{_safe_link}" target="_blank" '
+        f'rel="noopener noreferrer">{_news_title}</a>'
+        if _safe_link
+        else _news_title
+    )
 
     # News Card Container
     st.markdown(f"""
@@ -980,18 +1000,18 @@ for news in news_to_show:
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.6rem;">
                 <span style="background: rgba(0, 210, 255, 0.1); color: var(--secondary-color); border: 1px solid rgba(0, 210, 255, 0.25); border-radius: 4px; padding: 0.1rem 0.4rem; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;">
-                    {news["ticker"]}
+                    {_news_ticker}
                 </span>
                 <span style="color: var(--text-muted); font-size: 0.72rem; font-family: 'JetBrains Mono', monospace;">
-                    {news["provider"]} • {news["pub_time"]}
+                    {_news_provider} • {_news_pub_time}
                 </span>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 <span style="background: {badge_bg}; color: {badge_color}; border: 1px solid {badge_color}40; border-radius: 10rem; padding: 0.15rem 0.5rem; font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem; font-weight: 700;">
-                    {news["sentiment"].upper()}
+                    {_news_sentiment}
                 </span>
                 <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">
-                    IMPACTO: <span style="color: {impact_color}; font-weight: 800;">{news["impact"].upper()}</span>
+                    IMPACTO: <span style="color: {impact_color}; font-weight: 800;">{_news_impact}</span>
                 </span>
             </div>
         </div>
@@ -999,7 +1019,7 @@ for news in news_to_show:
             {title_html}
         </h4>
         <p style="margin: 0; color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 0.6rem;">
-            {news["summary"]}
+            {_news_summary}
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -1059,14 +1079,14 @@ for news in news_to_show:
             with col_exp1:
                 st.markdown("<p style='font-size:0.75rem; color:#94a3b8; margin-bottom:2px; font-weight:600;'> termos positivos encontrados </p>", unsafe_allow_html=True)
                 if news["pos_terms"]:
-                    pos_html = " ".join([f"<span style='background:rgba(74, 222, 128, 0.15); color:#4ade80; border:1px solid #4ade8040; border-radius:4px; padding:2px 6px; font-size:0.72rem; font-family:\"JetBrains Mono\", monospace;'>{w}</span>" for w in news["pos_terms"]])
+                    pos_html = " ".join([f"<span style='background:rgba(74, 222, 128, 0.15); color:#4ade80; border:1px solid #4ade8040; border-radius:4px; padding:2px 6px; font-size:0.72rem; font-family:\"JetBrains Mono\", monospace;'>{escape(str(w))}</span>" for w in news["pos_terms"]])
                     st.markdown(pos_html, unsafe_allow_html=True)
                 else:
                     st.markdown("<span style='font-size:0.72rem; color:#64748b; font-style:italic;'>Nenhum</span>", unsafe_allow_html=True)
                     
                 st.markdown("<p style='font-size:0.75rem; color:#94a3b8; margin-top:8px; margin-bottom:2px; font-weight:600;'> termos negativos encontrados </p>", unsafe_allow_html=True)
                 if news["neg_terms"]:
-                    neg_html = " ".join([f"<span style='background:rgba(248, 113, 113, 0.15); color:#f87171; border:1px solid #f8717140; border-radius:4px; padding:2px 6px; font-size:0.72rem; font-family:\"JetBrains Mono\", monospace;'>{w}</span>" for w in news["neg_terms"]])
+                    neg_html = " ".join([f"<span style='background:rgba(248, 113, 113, 0.15); color:#f87171; border:1px solid #f8717140; border-radius:4px; padding:2px 6px; font-size:0.72rem; font-family:\"JetBrains Mono\", monospace;'>{escape(str(w))}</span>" for w in news["neg_terms"]])
                     st.markdown(neg_html, unsafe_allow_html=True)
                 else:
                     st.markdown("<span style='font-size:0.72rem; color:#64748b; font-style:italic;'>Nenhum</span>", unsafe_allow_html=True)
