@@ -657,6 +657,15 @@ st.caption(
     + f" · {_coverage:.0f}% do universo"
 )
 
+if _filter_summary != ["configuração padrão"]:
+    st.button(
+        "Limpar filtros ativos",
+        key="screener_inline_reset",
+        on_click=_reset_filters,
+        use_container_width=True,
+        help="Restaura os limites padrão e remove os filtros calculados.",
+    )
+
 st.markdown("---")
 
 # ─── Tabela de resultados ─────────────────────────────────────────────────────
