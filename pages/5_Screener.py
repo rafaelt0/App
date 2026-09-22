@@ -706,6 +706,15 @@ else:
                 f" · DY {_pick_value(_pick_row.get('dy'), lambda value: f'{float(value) * 100:.2f}%')}"
                 f" · P/L {_pick_value(_pick_row.get('pl'), lambda value: f'{float(value):.2f}')}"
             )
+            if st.button(
+                "Abrir valuation",
+                key=f"screener_valuation_{_ticker}",
+                use_container_width=True,
+                help="Abre o DCF já com este ticker selecionado.",
+            ):
+                st.session_state["_valuation_handoff_ticker"] = str(_ticker)
+                st.session_state["valuation_ticker"] = str(_ticker)
+                st.switch_page("pages/4_Valuation.py")
 
     # Seleciona e renomeia colunas relevantes para exibição
     col_map = {

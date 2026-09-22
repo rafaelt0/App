@@ -268,6 +268,11 @@ with col_t:
     except (OSError, ValueError) as exc:
         st.error(f"Não foi possível carregar a lista de ações da B3: {exc}")
         st.stop()
+    _handoff_ticker = str(
+        st.session_state.pop("_valuation_handoff_ticker", "")
+    ).strip().upper()
+    if _handoff_ticker:
+        b3_stocks = sorted(set(b3_stocks) | {_handoff_ticker})
     defaults = st.session_state.get("selected_tickers", [])
     default_ticker = defaults[0] if defaults else None
     if default_ticker not in b3_stocks:
@@ -282,6 +287,9 @@ with col_t:
         )
         if default_ticker:
             st.session_state["_valuation_ticker_restored"] = True
+    if _handoff_ticker:
+        default_ticker = _handoff_ticker
+        st.session_state.pop("_valuation_ticker_restored", None)
     ticker_options = [""] + b3_stocks
     if "valuation_ticker" not in st.session_state:
         st.session_state["valuation_ticker"] = (
@@ -382,7 +390,7 @@ skey = f"kval_{ticker}"
 if skey not in st.session_state:
     _b = max(min(beta, 2.5), 0.3)
     _ke = round(min(selic * 100 + _b * ERP_MATURE, 22.0), 1)
-    _kd = round(kd_est, 1) if kd_est else 8.0
+    _kd = round(min(max(kd_est, 4.0), 20.0), 1) if kd_est else 8.0
     _mkt_equity = price * shares if price and shares else 0
     _equity_for_weight = _mkt_equity if _mkt_equity > 0 else latest["equity"]
     _ev0 = max(_equity_for_weight + t_debt - cash_v, 1)
@@ -970,11 +978,13 @@ with tabs[5]:
         if kd_est:
             st.markdown(
                 f'<div style="font-size:0.8rem;color:#94a3b8;padding:0.4rem 0;">'
-                f'Estimado: Juros / Dívida = <b style="color:#00d2ff">{kd_est:.1f}%</b> a.a.'
+                f'Estimado: Juros / Dívida = <b style="color:#00d2ff">{kd_est:.1f}%</b> a.a. · '
+                "premissa inicial limitada a 4–20%."
                 f"</div>",
                 unsafe_allow_html=True,
             )
 
+        ss["kd"] = min(max(float(ss.get("kd", 8.0)), 4.0), 20.0)
         kd = st.number_input(
             "kd — Custo da Dívida (%)",
             4.0,
