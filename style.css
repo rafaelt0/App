@@ -2758,3 +2758,35 @@ body,
   outline: none !important;
   box-shadow: var(--focus-ring) !important;
 }
+
+/* Clickable hand-off after a completed analysis. */
+.next-step-card {
+  margin-top: 0.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--next-step-accent) 35%, var(--panel-border));
+  border-left: 3px solid var(--next-step-accent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--next-step-accent) 7%, var(--panel-bg));
+}
+
+.next-step-eyebrow {
+  margin-bottom: 0.3rem;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.next-step-title {
+  color: var(--text-main);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.next-step-message {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}

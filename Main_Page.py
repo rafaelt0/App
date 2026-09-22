@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
-from utils.ui import load_css, loading_overlay, render_flow_sidebar, section_header
+from utils.ui import load_css, loading_overlay, next_step_card, render_flow_sidebar, section_header
 from utils.market_data import clean_numeric_column, get_listed_stocks, get_sorted_tickers_by_liquidity
 from utils.icons import (
     ICO_BULB,
@@ -808,18 +808,11 @@ if ready_to_analyze:
 
         # ── Próximo Passo ────────────────────────────────────────────────────
         tickers_str = ", ".join(tickers[:3]) + ("…" if len(tickers) > 3 else "")
-        st.markdown(
-            f"""
-<div style="background:linear-gradient(135deg,rgba(0,255,135,0.06),rgba(0,210,255,0.03));border:1px solid rgba(0,255,135,0.25);border-radius:14px;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">
-  <div>
-    <div style="font-size:0.72rem;color:#64748b;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.3rem;">Próximo Passo</div>
-    <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;">Abra <span style="color:#00ff87">Portfolio</span> na barra lateral</div>
-    <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.2rem;">Monte e otimize a carteira com {tickers_str}</div>
-  </div>
-  <div style="font-size:1.8rem;opacity:0.6;">→</div>
-</div>
-""",
-            unsafe_allow_html=True,
+        next_step_card(
+            message=f"Monte e otimize a carteira com {tickers_str}.",
+            accent="var(--brand-primary)",
+            cta_label="Abrir Portfolio",
+            cta_page="pages/1_Portfolio.py",
         )
 
     except OSError as e:

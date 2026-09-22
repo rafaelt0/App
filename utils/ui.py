@@ -76,6 +76,20 @@ def empty_state_card(icon_svg: str, title: str, message: str, cta_label: str, ct
     )
     st.page_link(cta_page, label=cta_label)
 
+def next_step_card(message: str, accent: str, cta_label: str, cta_page: str) -> None:
+    """Render a compact, clickable hand-off to the next analysis page."""
+    st.markdown(
+        f"""
+<div class="next-step-card" style="--next-step-accent:{escape(accent)}">
+  <div class="next-step-eyebrow">Próximo passo</div>
+  <div class="next-step-title">Continue sua análise</div>
+  <div class="next-step-message">{escape(message)}</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    st.page_link(cta_page, label=cta_label)
+
 
 def load_css(path: str = "style.css") -> None:
     """Load a CSS file and inject it into the page via `st.markdown`.

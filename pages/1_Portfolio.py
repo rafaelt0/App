@@ -22,6 +22,7 @@ from utils.ui import (
     empty_state_card,
     load_css,
     loading_overlay,
+    next_step_card,
     render_cards_grid,
     render_flow_sidebar,
     section_header,
@@ -1728,16 +1729,9 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         sharpe_txt = (
             f"Sharpe de {sharpe_val:.2f}" if sharpe_val > 0 else "portfólio configurado"
         )
-        st.markdown(
-            f"""
-<div style="background:linear-gradient(135deg,rgba(0,210,255,0.06),rgba(0,255,135,0.03));border:1px solid rgba(0,210,255,0.25);border-radius:14px;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">
-  <div>
-    <div style="font-size:0.72rem;color:#64748b;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.3rem;">Próximo Passo</div>
-    <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;">Abra <span style="color:#00d2ff">Simulação</span> na barra lateral</div>
-    <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.2rem;">Com {sharpe_txt} — projete trajetórias com Monte Carlo</div>
-  </div>
-  <div style="font-size:1.8rem;opacity:0.6;">→</div>
-</div>
-""",
-            unsafe_allow_html=True,
+        next_step_card(
+            message=f"Com {sharpe_txt} — projete trajetórias com Monte Carlo.",
+            accent="var(--brand-secondary)",
+            cta_label="Abrir Simulação",
+            cta_page="pages/2_Simulação.py",
         )

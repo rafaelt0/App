@@ -6,7 +6,7 @@ import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.charts import apply_plotly_theme
-from utils.ui import empty_state_card, load_css, render_flow_sidebar, svg_icon
+from utils.ui import empty_state_card, load_css, next_step_card, render_flow_sidebar, svg_icon
 
 
 # CSS customizado
@@ -625,18 +625,11 @@ st.markdown(
 cenario_desc = (
     f"cenário {cenario_label} com {prob_ganho:.0f}% de probabilidade de ganho"
 )
-st.markdown(
-    f"""
-<div style="background:linear-gradient(135deg,rgba(168,85,247,0.06),rgba(0,210,255,0.03));border:1px solid rgba(168,85,247,0.25);border-radius:14px;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">
-  <div>
-    <div style="font-size:0.72rem;color:#64748b;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.3rem;">Próximo Passo</div>
-    <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;">Abra <span style="color:#a855f7">Notícias</span> na barra lateral</div>
-    <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.2rem;">Monitore o sentimento qualitativo — {cenario_desc}</div>
-  </div>
-  <div style="font-size:1.8rem;opacity:0.6;">→</div>
-</div>
-""",
-    unsafe_allow_html=True,
+next_step_card(
+    message=f"Monitore o sentimento qualitativo — {cenario_desc}.",
+    accent="var(--brand-info)",
+    cta_label="Abrir Notícias",
+    cta_page="pages/3_Notícias.py",
 )
 
 st.session_state["sim_estatisticas"] = estatisticas
