@@ -325,6 +325,7 @@ with col_t:
 def _refresh_valuation_data(ticker_value: str) -> None:
     get_selic.clear()
     get_koller_data.clear()
+    get_sector_peers.clear()
     st.session_state.pop(f"kval_{ticker_value}", None)
 
 
