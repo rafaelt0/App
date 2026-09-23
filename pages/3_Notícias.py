@@ -404,6 +404,8 @@ ticker_to_name = {
     'KLBN11': 'Klabin'
 }
 
+NEWS_REQUEST_TIMEOUT_SECONDS = 8
+
 @st.cache_data(ttl=600, show_spinner=False)
 def get_brazilian_news(ticker_name):
     # Clean up and combine company name to improve search query
@@ -419,9 +421,10 @@ def get_brazilian_news(ticker_name):
     req = urllib.request.Request(url, headers=headers)
     
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(
+            req, timeout=NEWS_REQUEST_TIMEOUT_SECONDS
+        ) as response:
             xml_data = response.read()
-        
         root = ET.fromstring(xml_data)
         news_items = []
         for item in root.findall('.//item')[:3]:  # Max 3 real news per asset
