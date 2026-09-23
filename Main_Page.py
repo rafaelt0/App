@@ -533,7 +533,7 @@ if ready_to_analyze:
                 "Valor_de_mercado",
                 "Data_ult_cot",
             ]
-        ]
+        ].copy()
         df_price.columns = [
             "Cotação",
             "Mínimo (52 semanas)",
