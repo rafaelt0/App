@@ -206,7 +206,9 @@ def loading_overlay(text: str, tickers=None):
     placeholder = st.empty()
     chips_html = ""
     if tickers:
-        chips = "".join(f'<span class="loading-ticker-chip">{t}</span>' for t in tickers)
+        chips = "".join(
+            f'<span class="loading-ticker-chip">{escape(str(t))}</span>' for t in tickers
+        )
         chips_html = f'<div class="loading-tickers">{chips}</div>'
     with placeholder.container():
         # Built as a single unindented line — an indented multi-line f-string
@@ -216,7 +218,7 @@ def loading_overlay(text: str, tickers=None):
         html = (
             '<div class="loading-container" role="status" aria-live="polite">'
             '<div class="loading-spinner"></div>'
-            f'<div class="loading-text">{text}</div>'
+            f'<div class="loading-text">{escape(str(text))}</div>'
             f"{chips_html}"
             '<div class="loading-bar-track"><div class="loading-bar-fill"></div></div>'
             "</div>"
