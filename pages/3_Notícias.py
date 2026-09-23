@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 import plotly.graph_objects as go
 import random
+import math
 import re
 import unicodedata
 import urllib.request
@@ -556,14 +557,27 @@ def _restore_saved_portfolio_context() -> None:
     if not tickers:
         return
 
-    normalized_weights = {
-        str(ticker).replace(".SA", ""): float(weight)
-        for ticker, weight in (saved_weights or {}).items()
+    normalized_weights = {}
+    for raw_ticker, raw_weight in (saved_weights or {}).items():
+        ticker = str(raw_ticker).replace(".SA", "").strip().upper()
+        try:
+            parsed_weight = float(raw_weight)
+        except (TypeError, ValueError):
+            continue
+        if ticker and math.isfinite(parsed_weight) and parsed_weight >= 0:
+            normalized_weights[ticker] = parsed_weight
+
+    raw_weights = {
+        ticker: normalized_weights.get(ticker, 0.0) for ticker in tickers
     }
-    default_weight = 1.0 / len(tickers)
-    weights = {
-        ticker: normalized_weights.get(ticker, default_weight) for ticker in tickers
-    }
+    total_weight = sum(raw_weights.values())
+    if total_weight > 0:
+        weights = {
+            ticker: raw_weights[ticker] / total_weight for ticker in tickers
+        }
+    else:
+        default_weight = 1.0 / len(tickers)
+        weights = {ticker: default_weight for ticker in tickers}
     st.session_state["selected_tickers"] = tickers
     st.session_state["portfolio_loaded_tickers"] = tickers
     st.session_state["portfolio_analysis_tickers"] = tickers
