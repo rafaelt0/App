@@ -427,11 +427,19 @@ def get_brazilian_news(ticker_name):
             xml_data = response.read()
         root = ET.fromstring(xml_data)
         news_items = []
-        for item in root.findall('.//item')[:3]:  # Max 3 real news per asset
-            title = item.find('title').text if item.find('title') is not None else ''
-            link = item.find('link').text if item.find('link') is not None else ''
-            pub_date = item.find('pubDate').text if item.find('pubDate') is not None else ''
-            source = item.find('source').text if item.find('source') is not None else ''
+
+        def _item_text(item, tag):
+            node = item.find(tag)
+            return node.text.strip() if node is not None and node.text else ""
+
+        for item in root.findall(".//item")[:3]:  # Max 3 real news per asset
+            title = _item_text(item, "title")
+            if not title:
+                logger.debug("news RSS item missing title; skipping")
+                continue
+            link = _item_text(item, "link")
+            pub_date = _item_text(item, "pubDate")
+            source = _item_text(item, "source")
             
             # Format date nicely
             formatted_date = ""
