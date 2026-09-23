@@ -165,8 +165,20 @@ def _restore_saved_portfolio_context() -> None:
     if isinstance(prices.columns, pd.MultiIndex):
         prices.columns = ["_".join(col).strip() for col in prices.columns.values]
 
+    expected_columns = {f"{ticker}.SA" for ticker in tickers}
+    missing_tickers = sorted(expected_columns.difference(map(str, prices.columns)))
+    if missing_tickers:
+        logger.warning(
+            "simulation saved portfolio missing price history for %s", missing_tickers
+        )
+        st.session_state["_simulation_restore_error"] = True
+        return
+
     returns = prices.pct_change().dropna()
-    if returns.empty:
+    if len(returns) < 30:
+        logger.warning(
+            "simulation saved portfolio has only %d complete return rows", len(returns)
+        )
         st.session_state["_simulation_restore_error"] = True
         return
 
