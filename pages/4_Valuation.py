@@ -33,6 +33,7 @@ render_flow_sidebar(active_step=5, pending_opacities=[0.35])
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 ERP_MATURE = 5.0  # ERP de mercado maduro (EUA). Rf=Selic já embute o risco-país
+DEFAULT_SELIC_ANNUAL = 0.1375
 # (juros nominais brasileiros carregam prêmio de inflação/risco doméstico via a
 # reação do BCB), então somar um CRP à parte aqui contaria o risco Brasil duas
 # vezes no ke. Ver Damodaran: quando Rf é a taxa local (não o Treasury), usa-se
@@ -105,11 +106,18 @@ def get_selic():
         # Série 432 (BCB) = Meta Selic definida pelo Copom, já em % a.a. — não é taxa
         # diária, então não deve ser reanualizada com (1+r)^252.
         taxa = sgs.get(432, last=1)
-        return round(taxa.iloc[-1, 0] / 100, 4)
+        rate_percent = float(pd.to_numeric(taxa.iloc[-1, 0], errors="coerce"))
+        if not np.isfinite(rate_percent) or rate_percent < 0:
+            raise ValueError(f"BCB returned invalid Selic value: {rate_percent!r}")
+        return round(rate_percent / 100, 4)
     except Exception as exc:
-        logger.warning("get_selic BCB fetch failed; using default rate: %s", exc)
+        logger.warning(
+            "get_selic BCB fetch failed; using reference rate %.2f%%: %s",
+            DEFAULT_SELIC_ANNUAL * 100,
+            exc,
+        )
         logger.debug("get_selic BCB failure details", exc_info=True)
-        return 0.105
+        return DEFAULT_SELIC_ANNUAL
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
