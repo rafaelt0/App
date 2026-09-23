@@ -1920,10 +1920,13 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         # Gráfico Sharpe Móvel
         rolling_sharpe = (
-            portfolio_returns.rolling(window).mean() - taxa_selic
-        ) / portfolio_returns.rolling(window).std()
+            (
+                portfolio_returns.rolling(window).mean() - taxa_selic
+            )
+            / portfolio_returns.rolling(window).std()
+        ) * np.sqrt(252)
 
-        st.subheader(f"Índice de Sharpe Móvel ({window} dias)")
+        st.subheader(f"Índice de Sharpe Móvel Anualizado ({window} dias)")
         fig_3 = go.Figure()
         fig_3.add_trace(
             go.Scatter(
@@ -1936,9 +1939,9 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         )
         fig_3.add_hline(y=0, line_dash="dash", line_color="#94a3b8", line_width=1)
         fig_3.update_layout(
-            title=f"Índice de Sharpe Móvel ({window} dias)",
+            title=f"Índice de Sharpe Móvel Anualizado ({window} dias)",
             xaxis_title="Data",
-            yaxis_title="Sharpe",
+            yaxis_title="Sharpe anualizado",
         )
         apply_plotly_theme(fig_3)
         st.plotly_chart(fig_3, use_container_width=True)
