@@ -566,17 +566,27 @@ if peg_on:
     peg_valid = df["peg"].isna() | (df["peg"] <= peg_max)
     mask = mask & peg_valid
 
-# Magic Formula — exclui financeiras/utilities (contabilidade não comparável)
-if ordenar_por == "Magic Formula (Greenblatt)" and magic_exclude_fin and "setor" in df.columns:
-    EXCLUDED_SECTORS_MAGIC = {
-        "Intermediários Financeiros",
-        "Previdência e Seguros",
-        "Serviços Financeiros Diversos",
-        "Energia Elétrica",
-        "Água e Saneamento",
-        "Gás",
-    }
-    mask = mask & (~df["setor"].isin(EXCLUDED_SECTORS_MAGIC))
+if ordenar_por == "Magic Formula (Greenblatt)":
+    # Greenblatt requires both positive profitability and earnings yield.
+    # Do not rank incomplete rows or let a single available metric carry them.
+    if "roic" in df.columns:
+        mask = mask & df["roic"].notna() & (df["roic"] > 0)
+    else:
+        mask = mask & pd.Series(False, index=df.index)
+    mask = mask & df["earnings_yield"].notna() & (df["earnings_yield"] > 0)
+
+    # Exclude financials/utilities (accounting is not comparable)
+    # when the option is enabled.
+    if magic_exclude_fin and "setor" in df.columns:
+        EXCLUDED_SECTORS_MAGIC = {
+            "Intermediários Financeiros",
+            "Previdência e Seguros",
+            "Serviços Financeiros Diversos",
+            "Energia Elétrica",
+            "Água e Saneamento",
+            "Gás",
+        }
+        mask = mask & (~df["setor"].isin(EXCLUDED_SECTORS_MAGIC))
 
 df_filtrado = df[mask].copy()
 
