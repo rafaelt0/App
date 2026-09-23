@@ -117,6 +117,7 @@ if st.sidebar.button(
     help="Limpa o cache do screener e busca uma nova fotografia do mercado.",
 ):
     removed = clear_fundamentus_cache()
+    carregar_dados.clear()
     get_sorted_tickers_by_liquidity.clear()
     st.session_state["fund_refresh_removed"] = removed
     st.rerun()
