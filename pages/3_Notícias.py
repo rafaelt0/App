@@ -996,7 +996,9 @@ elif sort_mode == "Mais otimistas":
 elif sort_mode == "Mais pessimistas":
     filtered_news = sorted(filtered_news, key=lambda x: x["score"])
 
-_live_count = len(live_news_items)
+_live_count = sum(
+    1 for item in filtered_news if not item.get("is_synthetic", False)
+)
 _illustrative_count = sum(
     1 for item in filtered_news if item.get("is_synthetic", False)
 )
