@@ -25,8 +25,12 @@ _fundamentus_lock = threading.Lock()  # ponytail: fundamentus/requests_cache pat
 
 
 def _fetch_one(ticker):
-    with _fundamentus_lock:
-        return fundamentus.get_papel(ticker)
+    try:
+        with _fundamentus_lock:
+            return fundamentus.get_papel(ticker)
+    except Exception:
+        logger.warning("fundamentus fetch failed for ticker=%s", ticker, exc_info=True)
+        return None
 
 # Mapa de renomeação de colunas do fundamentus para identificadores internos
 FUNDAMENTUS_RENAME = {
