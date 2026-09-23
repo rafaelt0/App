@@ -1042,6 +1042,53 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             logger.exception("monthly returns table generation failed")
             st.warning(f"Não foi possível gerar a tabela de retornos mensais: {str(e)}")
 
+        if not benchmark_available:
+            st.info(
+                "Métricas relativas ao IBOVESPA, CAPM e stress test ficam "
+                "indisponíveis enquanto a série do benchmark não responder."
+            )
+            total_return = (portfolio_value.iloc[-1] / valor_inicial - 1) * 100
+            vol_anual = portfolio_returns.std() * np.sqrt(252) * 100
+            sharpe_val = sharpe(portfolio_returns, rf=taxa_selic)
+            sortino_val = sortino(portfolio_returns, rf=taxa_selic)
+            max_dd = max_drawdown(portfolio_returns) * 100
+
+            section_header(ICO_CHART, "Desempenho da Carteira", "h2")
+            _fallback_metrics = st.columns(5)
+            _fallback_metrics[0].metric(
+                "Retorno Total",
+                f"{total_return:.2f}%",
+                delta="Positivo" if total_return > 0 else "Negativo",
+                delta_color="normal" if total_return > 0 else "inverse",
+            )
+            _fallback_metrics[1].metric(
+                "Volatilidade Anual",
+                f"{vol_anual:.2f}%",
+                delta="Baixa"
+                if vol_anual < 15
+                else ("Alta" if vol_anual > 25 else "Moderada"),
+                delta_color="normal"
+                if vol_anual < 15
+                else ("inverse" if vol_anual > 25 else "off"),
+            )
+            _fallback_metrics[2].metric("Índice Sharpe", f"{sharpe_val:.2f}")
+            _fallback_metrics[3].metric("Índice Sortino", f"{sortino_val:.2f}")
+            _fallback_metrics[4].metric("Max Drawdown", f"{max_dd:.2f}%")
+            st.session_state["modo"] = modo
+            st.session_state["returns"] = returns
+            st.session_state["portfolio_analysis_tickers"] = list(tickers)
+            st.session_state["peso_manual_df"] = peso_manual_df
+            st.session_state["portfolio_returns"] = portfolio_returns
+            st.session_state["retorno_bench"] = None
+            st.session_state["lookback"] = lookback_opcao
+            st.session_state["total_return"] = total_return
+            st.caption(
+                "Atualize as cotações quando o IBOVESPA estiver disponível para "
+                "reativar beta, alfa, CAPM e as comparações relativas."
+            )
+            st.stop()
+
+
         # Cálculos de Métricas
         total_return = (portfolio_value.iloc[-1] / valor_inicial - 1) * 100
         vol_anual = portfolio_returns.std() * np.sqrt(252) * 100
