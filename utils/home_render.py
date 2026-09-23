@@ -3,6 +3,8 @@ blocks, kept separate from the page's data-fetching and top-level flow.
 """
 
 import pandas as pd
+from html import escape
+
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -30,8 +32,8 @@ def render_sector_cards(ticker_name, row):
         ("Subsetor", sub, "#fbbf24"),
     ]
     cards_html = "".join(
-        f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
-        f'<div class="mcard-value" style="color:{clr};font-size:0.95rem">{val}</div></div>'
+        f'<div class="mcard"><div class="mcard-label">{escape(str(lbl))}</div>'
+        f'<div class="mcard-value" style="color:{clr};font-size:0.95rem">{escape(str(val))}</div></div>'
         for lbl, val, clr in metrics
     )
     st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)

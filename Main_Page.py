@@ -4,6 +4,8 @@ import pandas as pd
 import warnings
 import datetime
 import logging
+from html import escape
+
 from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
@@ -784,6 +786,8 @@ if ready_to_analyze:
             nome = df.loc[t, "Empresa"] if t in df.index else t
             if isinstance(nome, pd.Series):
                 nome = nome.iloc[0]
+            safe_ticker = escape(str(t))
+            safe_nome = escape(str(nome))
 
             pontos_pos = []
             pontos_neg = []
@@ -846,7 +850,7 @@ if ready_to_analyze:
                     f'<span {tip} style="display:inline-block;background:{color}14;'
                     f'border:1px solid {color}40;color:{color};border-radius:999px;'
                     f'padding:1px 8px;font-size:0.7rem;font-weight:600;margin:0 4px 4px 0;'
-                    f'white-space:nowrap;">{text}</span>'
+                    f'white-space:nowrap;">{escape(str(text))}</span>'
                 )
 
             chips_html = "".join(_chip(p, "#00ff87") for p in pontos_pos)
@@ -859,9 +863,9 @@ if ready_to_analyze:
 <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:10px;padding:0.55rem 0.85rem;margin-bottom:0.4rem;">
   <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.3rem;">
     <div>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:0.88rem;">{t}</span>
-      <span style="font-size:0.7rem;color:#64748b;margin-left:0.4rem;">{nome}</span>
-      <span style="font-size:0.62rem;color:#475569;font-style:italic;margin-left:0.4rem;">{fonte_label}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:0.88rem;">{safe_ticker}</span>
+      <span style="font-size:0.7rem;color:#64748b;margin-left:0.4rem;">{safe_nome}</span>
+      <span style="font-size:0.62rem;color:#475569;font-style:italic;margin-left:0.4rem;">{escape(fonte_label)}</span>
     </div>
     <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto[1]}40;border-radius:6px;padding:0.1rem 0.6rem;font-size:0.66rem;font-weight:800;color:{veredicto[1]};letter-spacing:0.06em;">{veredicto[0]}</span>
   </div>
