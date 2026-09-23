@@ -26,6 +26,7 @@ from utils.icons import (
     ICO_STAR,
 )
 from utils.home_data import clear_fundamentus_cache, get_fundamentus_data
+from utils.market_data import get_sorted_tickers_by_liquidity
 from utils.home_render import (
     get_ticker_setor,
     render_debt_panel,
@@ -200,6 +201,7 @@ if st.sidebar.button(
     help="Limpa o cache dos indicadores e busca dados atualizados na próxima análise.",
 ):
     removed = clear_fundamentus_cache()
+    get_sorted_tickers_by_liquidity.clear()
     st.session_state["fund_refresh_removed"] = removed
     st.rerun()
 

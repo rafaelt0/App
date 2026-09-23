@@ -7,7 +7,12 @@ logger = logging.getLogger(__name__)
 
 from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
 from utils.home_data import clear_fundamentus_cache
-from utils.market_data import clean_numeric_column, get_full_market_data, get_listed_stocks
+from utils.market_data import (
+    clean_numeric_column,
+    get_full_market_data,
+    get_listed_stocks,
+    get_sorted_tickers_by_liquidity,
+)
 from utils.identity import get_browser_uid
 from utils import db as _db
 
@@ -112,6 +117,7 @@ if st.sidebar.button(
     help="Limpa o cache do screener e busca uma nova fotografia do mercado.",
 ):
     removed = clear_fundamentus_cache()
+    get_sorted_tickers_by_liquidity.clear()
     st.session_state["fund_refresh_removed"] = removed
     st.rerun()
 
