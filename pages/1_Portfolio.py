@@ -1111,18 +1111,22 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         if not benchmark_metrics_valid:
             st.warning(
                 "A variação do IBOVESPA é insuficiente para calcular métricas "
-                "relativas; beta, R² e information ratio foram zerados."
+                "relativas; beta, alfa, R² e information ratio ficaram indisponíveis."
             )
             beta = 0.0
         else:
             beta = cov_matrix[0, 1] / benchmark_variance
-        # Jensen alpha compares excess returns over the daily risk-free rate.
-        alfa = (portfolio_returns.mean() - taxa_selic) - beta * (
-            retorno_bench.mean() - taxa_selic
-        )
-        alfa_val = (
-            alfa.values[0] if hasattr(alfa, "values") and len(alfa.values) > 0 else alfa
-        )
+        # Jensen alpha is defined only when the benchmark has usable variance.
+        alfa_val = None
+        if benchmark_metrics_valid:
+            alfa = (portfolio_returns.mean() - taxa_selic) - beta * (
+                retorno_bench.mean() - taxa_selic
+            )
+            alfa_val = (
+                alfa.values[0]
+                if hasattr(alfa, "values") and len(alfa.values) > 0
+                else alfa
+            )
         if benchmark_metrics_valid:
             try:
                 r_quadrado = qs.stats.r_squared(portfolio_returns, retorno_bench)
@@ -1233,25 +1237,35 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 (ICO_CRIT, "Drawdown severo (>20%) — risco de ruína elevado", "#ff3d5a")
             )
 
-        alfa_anual = alfa_val * 252 * 100
-        if alfa_anual > 5:
-            score += 15
-            health_detalhes.append(
-                (ICO_OK, f"Alfa anual positivo: {alfa_anual:.1f}%", "#00ff87")
-            )
-        elif alfa_anual > 0:
-            score += 7
-            health_detalhes.append(
-                (ICO_WARN, f"Alfa marginal: {alfa_anual:.1f}%", "#ffd600")
-            )
-        else:
+        if alfa_val is None:
+            alfa_anual = None
             health_detalhes.append(
                 (
-                    ICO_CRIT,
-                    f"Alfa negativo ({alfa_anual:.1f}%) — portfólio perde pro índice",
-                    "#ff3d5a",
+                    ICO_WARN,
+                    "Alfa indisponível — variação insuficiente do IBOVESPA",
+                    "#ffd600",
                 )
             )
+        else:
+            alfa_anual = alfa_val * 252 * 100
+            if alfa_anual > 5:
+                score += 15
+                health_detalhes.append(
+                    (ICO_OK, f"Alfa anual positivo: {alfa_anual:.1f}%", "#00ff87")
+                )
+            elif alfa_anual > 0:
+                score += 7
+                health_detalhes.append(
+                    (ICO_WARN, f"Alfa marginal: {alfa_anual:.1f}%", "#ffd600")
+                )
+            else:
+                health_detalhes.append(
+                    (
+                        ICO_CRIT,
+                        f"Alfa negativo ({alfa_anual:.1f}%) — portfólio perde pro índice",
+                        "#ff3d5a",
+                    )
+                )
 
         pesos_arr_dec = np.array(
             pesos_manuais_arr
@@ -1749,7 +1763,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         max_dd_val = max_drawdown(portfolio_returns) * 100
         var_val = var(portfolio_returns) * 100
-        alfa_anual = alfa_val * 252 * 100
+        alfa_anual = alfa_val * 252 * 100 if alfa_val is not None else None
 
         detailed_stats = pd.DataFrame(
             {
@@ -1770,7 +1784,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                     f"{vol_anual:.2f}%",
                     f"{sharpe_anual:.2f}",
                     f"{beta:.4f}",
-                    f"{alfa_anual:.2f}%",
+                    f"{alfa_anual:.2f}%" if alfa_anual is not None else "N/D",
                     f"{max_dd_val:.2f}%",
                     f"{var_val:.2f}%",
                     f"{information_ratio:.2f}",
