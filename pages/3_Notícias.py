@@ -451,8 +451,9 @@ def get_brazilian_news(ticker_name):
                 'summary': ''
             })
         return news_items
-    except Exception:
-        logger.warning("news RSS fetch/parse failed", exc_info=True)
+    except Exception as exc:
+        logger.warning("news RSS fetch/parse failed: %s", exc)
+        logger.debug("news RSS failure details", exc_info=True)
         return []
 
 
