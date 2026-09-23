@@ -519,7 +519,7 @@ with col_exp2:
     st.markdown(
         """
     <div style="background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#fff3b0;">
-    <b>CVaR 5%:</b> Média das perdas nos piores 5% dos cenários — representa o risco em cauda extrema.
+    <b>CVaR 5%:</b> Média dos resultados finais nos 5% piores cenários — mede a gravidade média da cauda de risco.
     </div>
     """,
         unsafe_allow_html=True,
@@ -773,7 +773,7 @@ sintese_sim_items.append(
     f'<li style="color:{"#00ff87" if ret_esperado_pct > 0.05 else "#ffd600" if ret_esperado_pct > 0 else "#ff3d5a"};margin-bottom:3px;">Retorno anual esperado {ret_label}: {ret_esperado_pct * 100:.1f}% a.a. ao longo de {years} ano(s)</li>'
 )
 sintese_sim_items.append(
-    f'<li style="color:{"#00ff87" if risco_label == "controlado" else "#ffd600" if risco_label == "moderado" else "#ff3d5a"};margin-bottom:3px;">Risco de cauda {risco_label}: perda máxima esperada de {perda_var:.1f}% no VaR 5%</li>'
+    f'<li style="color:{"#00ff87" if risco_label == "controlado" else "#ffd600" if risco_label == "moderado" else "#ff3d5a"};margin-bottom:3px;">Risco de cauda {risco_label}: limiar de perda de {perda_var:.1f}% no VaR 5%</li>'
 )
 
 amplitude = (melhor_cenario - pior_cenario) / valor_inicial * 100
