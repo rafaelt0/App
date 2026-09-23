@@ -1116,7 +1116,10 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             beta = 0.0
         else:
             beta = cov_matrix[0, 1] / benchmark_variance
-        alfa = portfolio_returns.mean() - beta * retorno_bench.mean()
+        # Jensen alpha compares excess returns over the daily risk-free rate.
+        alfa = (portfolio_returns.mean() - taxa_selic) - beta * (
+            retorno_bench.mean() - taxa_selic
+        )
         alfa_val = (
             alfa.values[0] if hasattr(alfa, "values") and len(alfa.values) > 0 else alfa
         )
@@ -1330,7 +1333,10 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             if not np.isfinite(var_m) or var_m <= 0:
                 continue
             beta_i = cov_mat[0, 1] / var_m
-            alpha_i = (ri.mean() - beta_i * rm.mean()) * 252  # Jensen's alpha a.a.
+            alpha_i = (
+                (ri.mean() - taxa_selic)
+                - beta_i * (rm.mean() - taxa_selic)
+            ) * 252  # Jensen's alpha a.a.
             ri_var = np.var(ri.values)
             r2 = (cov_mat[0, 1] ** 2) / (ri_var * var_m) if ri_var * var_m > 0 else 0
             ri_anual = ri.mean() * 252
