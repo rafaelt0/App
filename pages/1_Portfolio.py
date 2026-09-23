@@ -162,7 +162,7 @@ with col_config2:
         data_inicio = today - datetime.timedelta(days=lookback_dias)
 
 try:
-    taxa_selic = get_selic_rate(data_inicio)
+    taxa_selic = get_selic_rate()
 except Exception as _selic_err:
     logger.warning("get_selic_rate failed; using reference rate: %s", _selic_err)
     logger.debug("get_selic_rate failure details", exc_info=True)
