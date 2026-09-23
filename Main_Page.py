@@ -490,7 +490,7 @@ if ready_to_analyze:
             ]
             export_cols_exist = [c for c in export_cols if c in df.columns]
             df_export = df[export_cols_exist].copy()
-            csv_data = df_export.to_csv().encode("utf-8")
+            csv_data = df_export.to_csv().encode("utf-8-sig")
             st.download_button(
                 label="Exportar dados fundamentalistas (CSV)",
                 data=csv_data,

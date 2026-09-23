@@ -786,7 +786,7 @@ else:
 
     # CSV mantém os valores numéricos crus (útil para análise externa) — a
     # formatação em texto abaixo é só para a tabela em tela.
-    csv_bytes = df_exib.to_csv(index=True).encode("utf-8")
+    csv_bytes = df_exib.to_csv(index=True).encode("utf-8-sig")
 
     # Formatação de exibição. Score e Magic Score ficam numéricos (para o
     # gradiente de cor); as demais colunas viram texto já formatado — o
