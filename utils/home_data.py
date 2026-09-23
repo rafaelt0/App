@@ -79,14 +79,20 @@ def get_fundamentus_data(tickers):
         try:
             with ThreadPoolExecutor(max_workers=min(len(tickers), 5)) as ex:
                 raw = list(ex.map(_fetch_one, tickers))
-            results = [r for r in raw if r is not None]
+            results = [r for r in raw if r is not None and not r.empty]
             if not results:
                 raise RuntimeError(
                     f"Nenhum dado retornado pelo Fundamentus para: {', '.join(tickers)}. "
                     "Verifique se os tickers estão corretos."
                 )
             result = pd.concat(results)
-            _db.cache_set(cache_key, result.to_json())
+            if len(results) == len(tickers):
+                _db.cache_set(cache_key, result.to_json())
+            else:
+                logger.warning(
+                    "fundamentus returned partial data for %s; skipping cache",
+                    tickers,
+                )
             return result
         except Exception as exc:
             last_exc = exc

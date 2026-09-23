@@ -468,6 +468,18 @@ if ready_to_analyze:
             "Buscando indicadores fundamentalistas na B3…", tickers=tickers
         ):
             df = get_fundamentus_data(tickers)
+        _fundamentus_index = {
+            str(index).replace(".SA", "").strip().upper() for index in df.index
+        }
+        _missing_fundamentus = [
+            ticker for ticker in tickers if ticker.upper() not in _fundamentus_index
+        ]
+        if _missing_fundamentus:
+            logger.warning(
+                "fundamentus returned partial data for %s; clearing Streamlit cache",
+                _missing_fundamentus,
+            )
+            get_fundamentus_data.clear()
 
         tickers_yf = [t + ".SA" for t in tickers]
 
