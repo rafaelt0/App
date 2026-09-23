@@ -380,8 +380,12 @@ with st.form("form_simulacao"):
         st.number_input(
             "Anos",
             min_value=1,
+            max_value=10,
             value=1,
-            help="Horizonte da simulação em anos.",
+            help=(
+                "Horizonte da simulação em anos. Limitado a 10 anos para "
+                "manter o consumo de memória previsível."
+            ),
             key="sim_years_input",
         )
     )
