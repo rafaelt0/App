@@ -100,7 +100,11 @@ def carregar_dados():
         if "brut" in s and "patrim" in s and col not in RENAMES:
             RENAMES[col] = "divbpatr"
 
-    return raw.rename(columns={k: v for k, v in RENAMES.items() if k in raw.columns})
+    renamed = raw.rename(columns={k: v for k, v in RENAMES.items() if k in raw.columns})
+    for required in ("pl", "pvp", "c5y", "dy", "cotacao"):
+        if required not in renamed.columns:
+            renamed[required] = pd.NA
+    return renamed
 
 
 if st.sidebar.button(
