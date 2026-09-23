@@ -6,40 +6,17 @@ this single cache instead of each page maintaining its own copy.
 """
 
 import logging
-import re
 
 import pandas as pd
 import streamlit as st
+from utils.formatting import normalize_numeric_text
 
 logger = logging.getLogger(__name__)
 
 
-def _normalize_numeric_text(value):
-    if pd.isna(value):
-        return None
-
-    text = re.sub(r"[^0-9,.\-]", "", str(value).strip())
-    if not text:
-        return None
-
-    if "," in text and "." in text:
-        if text.rfind(",") > text.rfind("."):
-            text = text.replace(".", "").replace(",", ".")
-        else:
-            text = text.replace(",", "")
-    elif text.count(",") > 1:
-        text = text.replace(",", "")
-    elif "," in text:
-        text = text.replace(",", ".")
-    elif text.count(".") > 1:
-        text = text.replace(".", "")
-
-    return text
-
-
 def clean_numeric_column(col):
     """Parse Brazilian decimals and thousands into numeric values."""
-    return pd.to_numeric(col.map(_normalize_numeric_text), errors="coerce")
+    return pd.to_numeric(col.map(normalize_numeric_text), errors="coerce")
 
 
 @st.cache_data(ttl=3600, show_spinner=False)

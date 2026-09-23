@@ -4,6 +4,32 @@ so these are safe to unit-test without a Streamlit runtime.
 
 import pandas as pd
 
+import re
+
+
+def normalize_numeric_text(value):
+    """Normalize Brazilian or international numeric text to a parseable string."""
+    if pd.isna(value):
+        return None
+
+    text = re.sub(r"[^0-9,.\-]", "", str(value).strip())
+    if not text:
+        return None
+
+    if "," in text and "." in text:
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    elif text.count(",") > 1:
+        text = text.replace(",", "")
+    elif "," in text:
+        text = text.replace(",", ".")
+    elif text.count(".") > 1:
+        text = text.replace(".", "")
+
+    return text
+
 
 def get_ev_ebitda_context(setor: str):
     """Returns (alt_metric, reason) when EV/EBITDA doesn't apply, or None if it applies normally."""
@@ -65,9 +91,7 @@ def extract_debt_metric(row, aliases):
     """Tenta extrair uma métrica testando vários nomes de coluna possíveis."""
     for name in aliases:
         if name in row.index:
-            v = pd.to_numeric(
-                str(row[name]).replace(",", ".").strip("%").strip(), errors="coerce"
-            )
+            v = pd.to_numeric(normalize_numeric_text(row[name]), errors="coerce")
             if not pd.isna(v):
                 return v
     return None
