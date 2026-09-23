@@ -1104,13 +1104,39 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         cov_matrix = np.cov(
             portfolio_returns.squeeze(), retorno_bench.squeeze()
         )  # matriz de covariância 2x2
-        beta = cov_matrix[0, 1] / cov_matrix[1, 1]
+        benchmark_variance = float(cov_matrix[1, 1])
+        benchmark_metrics_valid = (
+            np.isfinite(benchmark_variance) and benchmark_variance > 1e-12
+        )
+        if not benchmark_metrics_valid:
+            st.warning(
+                "A variação do IBOVESPA é insuficiente para calcular métricas "
+                "relativas; beta, R² e information ratio foram zerados."
+            )
+            beta = 0.0
+        else:
+            beta = cov_matrix[0, 1] / benchmark_variance
         alfa = portfolio_returns.mean() - beta * retorno_bench.mean()
         alfa_val = (
             alfa.values[0] if hasattr(alfa, "values") and len(alfa.values) > 0 else alfa
         )
-        r_quadrado = qs.stats.r_squared(portfolio_returns, retorno_bench)
-        information_ratio = qs.stats.information_ratio(portfolio_returns, retorno_bench)
+        if benchmark_metrics_valid:
+            try:
+                r_quadrado = qs.stats.r_squared(portfolio_returns, retorno_bench)
+                information_ratio = qs.stats.information_ratio(
+                    portfolio_returns, retorno_bench
+                )
+                if not np.isfinite(r_quadrado):
+                    r_quadrado = 0.0
+                if not np.isfinite(information_ratio):
+                    information_ratio = 0.0
+            except Exception:
+                logger.warning("relative benchmark metrics failed", exc_info=True)
+                r_quadrado = 0.0
+                information_ratio = 0.0
+        else:
+            r_quadrado = 0.0
+            information_ratio = 0.0
 
         # Desempenho Resumido em Cards (st.metric)
         section_header(ICO_CHART, "Desempenho Resumido da Carteira", "h2")
@@ -1301,7 +1327,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 continue
             cov_mat = np.cov(ri.values, rm.values)
             var_m = cov_mat[1, 1]
-            if var_m <= 0:
+            if not np.isfinite(var_m) or var_m <= 0:
                 continue
             beta_i = cov_mat[0, 1] / var_m
             alpha_i = (ri.mean() - beta_i * rm.mean()) * 252  # Jensen's alpha a.a.
@@ -1841,7 +1867,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         window = 60
         rolling_cov = portfolio_returns.rolling(window).cov(retorno_bench)
         rolling_var = retorno_bench.rolling(window).var()
-        rolling_beta = rolling_cov / rolling_var
+        rolling_beta = rolling_cov / rolling_var.where(rolling_var.abs() > 1e-12)
 
         # Gráfico Rolling Beta
         st.subheader(f"Beta Móvel ({window} dias) vs IBOVESPA")
