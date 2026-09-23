@@ -164,7 +164,8 @@ with col_config2:
 try:
     taxa_selic = get_selic_rate(data_inicio)
 except Exception as _selic_err:
-    logger.exception("get_selic_rate failed")
+    logger.warning("get_selic_rate failed; using reference rate: %s", _selic_err)
+    logger.debug("get_selic_rate failure details", exc_info=True)
     st.warning(
         f"Não foi possível buscar a taxa Selic no BCB ({_selic_err}). Usando valor de referência: 13,75% a.a."
     )
@@ -442,7 +443,8 @@ _price_status.markdown(
 try:
     data_yf = get_portfolio_prices(tickers_yf, data_inicio)
 except Exception as _price_err:
-    logger.exception("get_portfolio_prices failed")
+    logger.warning("get_portfolio_prices failed: %s", _price_err)
+    logger.debug("get_portfolio_prices failure details", exc_info=True)
     _price_status.empty()
     st.error(
         f"Erro ao buscar cotações no Yahoo Finance: {_price_err}. Verifique sua conexão e tente novamente."
