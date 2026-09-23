@@ -1467,7 +1467,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                     st.markdown(
                         f"""
 <div style="text-align:center;padding:0.6rem;border:1px solid #1e293b;border-radius:10px">
-  <div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:0.4rem">{row["Ativo"]}</div>
+  <div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:0.4rem">{escape(str(row["Ativo"]))}</div>
   <div style="font-size:1.1rem;font-weight:700;color:#a855f7">{r2_val:.0f}%</div>
   <div style="font-size:0.6rem;color:#64748b">sistemático</div>
   <div style="font-size:0.9rem;color:#334155">{100 - r2_val:.0f}%</div>
@@ -1558,7 +1558,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 st.markdown(
                     f'<div style="margin-bottom:0.3rem;font-size:0.78rem;font-weight:700;'
                     f'color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em">'
-                    f'{r["Crise"]} <span style="font-weight:400;color:#475569">({r["Período"]})</span></div>',
+                    f'{escape(str(r["Crise"]))} <span style="font-weight:400;color:#475569">({escape(str(r["Período"]))})</span></div>',
                     unsafe_allow_html=True,
                 )
                 st.markdown(
