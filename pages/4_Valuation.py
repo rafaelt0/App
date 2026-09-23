@@ -135,6 +135,19 @@ def get_koller_data(ticker_b3: str):
                         continue
             return None
 
+        def _info_float(keys, default):
+            for key in keys:
+                try:
+                    value = info.get(key)
+                    if value is None:
+                        continue
+                    value = float(value)
+                    if np.isfinite(value):
+                        return value
+                except (TypeError, ValueError):
+                    continue
+            return default
+
         if inc is None or inc.empty:
             return None
 
@@ -206,11 +219,15 @@ def get_koller_data(ticker_b3: str):
 
         ys = compute_roic_series(sorted(years, key=lambda x: x["year"]))
 
-        shares = (
-            info.get("sharesOutstanding") or info.get("impliedSharesOutstanding") or 1
+        shares = max(
+            _info_float(("sharesOutstanding", "impliedSharesOutstanding"), 1.0),
+            1.0,
         )
-        beta = float(info.get("beta") or 1.0)
-        price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0)
+        beta = _info_float(("beta",), 1.0)
+        price = max(
+            _info_float(("currentPrice", "regularMarketPrice"), 0.0),
+            0.0,
+        )
         lat = ys[-1]
         kd_est = (
             abs(lat["interest"]) / lat["debt"] * 100
