@@ -460,6 +460,15 @@ if data_yf.empty:
 
 if isinstance(data_yf.columns, pd.MultiIndex):
     data_yf.columns = ["_".join(col).strip() for col in data_yf.columns.values]
+missing_tickers = sorted(set(map(str, tickers_yf)).difference(map(str, data_yf.columns)))
+if missing_tickers:
+    missing_labels = ", ".join(ticker.replace(".SA", "") for ticker in missing_tickers)
+    logger.warning("portfolio price history missing for %s", missing_tickers)
+    st.error(
+        f"Não foi possível obter cotações para: {missing_labels}. "
+        "Remova esses ativos ou tente novamente mais tarde."
+    )
+    st.stop()
 
 returns = data_yf.pct_change().dropna()
 
