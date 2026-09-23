@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
 from utils.home_data import clear_fundamentus_cache
-from utils.market_data import get_full_market_data, get_listed_stocks
+from utils.market_data import clean_numeric_column, get_full_market_data, get_listed_stocks
 from utils.identity import get_browser_uid
 from utils import db as _db
 
@@ -134,7 +134,7 @@ if df_raw is None or df_raw.empty:
 # mrgliq, mrgebit, cotacao, psr, liqc, divbpatr, c5y, pa, pcg, pebit, pacl,
 # evebit, patrliq
 def _num(series):
-    return pd.to_numeric(series, errors="coerce")
+    return clean_numeric_column(series)
 
 
 df = df_raw.copy()
