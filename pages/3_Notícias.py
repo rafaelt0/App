@@ -691,6 +691,7 @@ else:
 
 # Gerador dinâmico de notícias baseado nos ativos selecionados com avaliação PLN em tempo real
 news_items = []
+fallback_tickers = []
 random.seed(42)  # Semente estática para consistência entre renderizações da mesma sessão
 
 # Barra de progresso para download/fetch de notícias em tempo real
@@ -713,6 +714,7 @@ with loading_overlay("Buscando notícias e processando sentimento NLP…", ticke
                     "pos_terms": sentiment_res.get("pos_terms", []),
                     "neg_terms": sentiment_res.get("neg_terms", []),
                     "raw_text_length": sentiment_res.get("raw_text_length", 0),
+                    "is_synthetic": False,
                     "provider": item["provider"],
                     "impact": _impacto_por_score(sentiment_res["score"]),
                     "pub_time": item["date"],
@@ -721,6 +723,7 @@ with loading_overlay("Buscando notícias e processando sentimento NLP…", ticke
                 })
         else:
             # Fallback to simulated news database templates if no news found or offline
+            fallback_tickers.append(t)
             prefix = t[:4]
             if prefix in news_database:
                 templates = news_database[prefix]
@@ -750,12 +753,25 @@ with loading_overlay("Buscando notícias e processando sentimento NLP…", ticke
                     "pos_terms": sentiment_res.get("pos_terms", []),
                     "neg_terms": sentiment_res.get("neg_terms", []),
                     "raw_text_length": sentiment_res.get("raw_text_length", 0),
-                    "provider": temp["provider"],
+                    "is_synthetic": True,
+                    "provider": "Exemplo ilustrativo",
                     "impact": temp["impact"],
-                    "pub_time": pub_time,
+                    "pub_time": "Sem atualização",
                     "link": "#",
                     "peso": pesos[t]
                 })
+
+if fallback_tickers:
+    _fallback_labels = ", ".join(fallback_tickers)
+    st.warning(
+        f"Notícias em tempo real indisponíveis para {_fallback_labels}. "
+        "Os itens marcados como **Exemplo ilustrativo** são apenas conteúdo "
+        "de demonstração e não representam eventos recentes."
+    )
+
+live_news_items = [
+    item for item in news_items if not item.get("is_synthetic", False)
+]
 
 # Cálculos de sentimentos consolidados baseados nas métricas dinâmicas do NLP
 total_score = 0.0
@@ -764,7 +780,7 @@ pos_count = 0
 neg_count = 0
 neu_count = 0
 
-for item in news_items:
+for item in live_news_items:
     total_score += item["score"] * item["peso"]
     total_weight += item["peso"]
     if item["sentiment"] == "Otimista":
@@ -775,16 +791,34 @@ for item in news_items:
         neu_count += 1
 
 # Normaliza score global de -1 a +1 para 0 a 100
-avg_score = (total_score / total_weight) if total_weight > 0 else 0.0
-normalized_score = int((avg_score + 1.0) / 2.0 * 100)
+if live_news_items:
+    avg_score = total_score / total_weight if total_weight > 0 else 0.0
+    normalized_score = int((avg_score + 1.0) / 2.0 * 100)
+    sentiment_label = (
+        "FORTEMENTE OTIMISTA"
+        if normalized_score >= 80
+        else "OTIMISTA"
+        if normalized_score >= 60
+        else "NEUTRO / EQUILIBRADO"
+        if normalized_score >= 40
+        else "PREOCUPANTE"
+        if normalized_score >= 20
+        else "CRÍTICO"
+    )
+    score_color = (
+        "#00ff87"
+        if normalized_score >= 60
+        else "#ffd600"
+        if normalized_score >= 40
+        else "#ff3d5a"
+    )
+else:
+    avg_score = 0.0
+    normalized_score = 50
+    sentiment_label = "SEM DADOS RECENTES"
+    score_color = "#64748b"
 
-sentiment_label = "FORTEMENTE OTIMISTA" if normalized_score >= 80 else \
-                  "OTIMISTA" if normalized_score >= 60 else \
-                  "NEUTRO / EQUILIBRADO" if normalized_score >= 40 else \
-                  "PREOCUPANTE" if normalized_score >= 20 else "CRÍTICO"
-
-score_color = "#00ff87" if normalized_score >= 60 else \
-              "#ffd600" if normalized_score >= 40 else "#ff3d5a"
+score_display = str(normalized_score) if live_news_items else "—"
 
 # Exibição do painel principal
 col_g1, col_g2 = st.columns([1, 2])
@@ -802,7 +836,7 @@ with col_g1:
                 margin-bottom: 1.5rem;">
         <div style="font-size: 0.75rem; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase;">Sentimento Consolidado ({nlp_engine_label})</div>
         <div style="font-size: 3.5rem; font-weight: 900; color: {score_color}; font-family: 'JetBrains Mono', monospace; margin: 0.5rem 0;">
-            {normalized_score}<span style="font-size: 1.5rem; font-weight: 500; color: #94a3b8;">/100</span>
+            {score_display}<span style="font-size: 1.5rem; font-weight: 500; color: #94a3b8;">/100</span>
         </div>
         <div style="font-size: 0.85rem; font-weight: 700; color: {score_color}; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.8rem;">
             {sentiment_label}
@@ -828,7 +862,7 @@ with col_g2:
     # Gráfico de Distribuição do Sentimento por Ativo
     asset_sentiments = []
     for t in tickers:
-        t_items = [x for x in news_items if x["ticker"] == t]
+        t_items = [x for x in live_news_items if x["ticker"] == t]
         pos = sum(1 for x in t_items if x["sentiment"] == "Otimista")
         neu = sum(1 for x in t_items if x["sentiment"] == "Neutro")
         neg = sum(1 for x in t_items if x["sentiment"] == "Pessimista")
@@ -962,11 +996,19 @@ elif sort_mode == "Mais otimistas":
 elif sort_mode == "Mais pessimistas":
     filtered_news = sorted(filtered_news, key=lambda x: x["score"])
 
+_live_count = len(live_news_items)
+_illustrative_count = sum(
+    1 for item in filtered_news if item.get("is_synthetic", False)
+)
 total_news = len(filtered_news)
 pos_f = sum(1 for x in filtered_news if x["sentiment"] == "Otimista")
 neg_f = sum(1 for x in filtered_news if x["sentiment"] == "Pessimista")
 neu_f = total_news - pos_f - neg_f
-st.caption(f"Exibindo {total_news} notícias — {pos_f} otimistas · {neu_f} neutras · {neg_f} pessimistas")
+st.caption(
+    f"Exibindo {total_news} itens — {_live_count} notícias atuais · "
+    f"{_illustrative_count} exemplos ilustrativos · "
+    f"{pos_f} otimistas · {neu_f} neutras · {neg_f} pessimistas"
+)
 
 if not filtered_news:
     st.info(
@@ -1155,24 +1197,92 @@ section_header(ICO_TARGET, "Insights Estratégicos & Análise de Risco Qualitati
 insights_html = []
 
 # Gerar diagnósticos baseados no score médio
-if normalized_score >= 60:
-    insights_html.append(get_diag_row_html(ICO_OK, "<b>Fator de Sentimento Positivo:</b> A carteira possui sentimentos favoráveis dominantes. Isto apoia a tese de manutenção ou leve ampliação em correções técnicas.", "#00ff87"))
+if not live_news_items:
+    insights_html.append(
+        get_diag_row_html(
+            ICO_WARN,
+            "<b>Dados recentes indisponíveis:</b> Atualize o feed antes de "
+            "usar o sentimento como sinal de decisão.",
+            "#64748b",
+        )
+    )
+elif normalized_score >= 60:
+    insights_html.append(
+        get_diag_row_html(
+            ICO_OK,
+            "<b>Fator de Sentimento Positivo:</b> A carteira possui sentimentos "
+            "favoráveis dominantes. Isto apoia a tese de manutenção ou leve "
+            "ampliação em correções técnicas.",
+            "#00ff87",
+        )
+    )
 elif normalized_score >= 40:
-    insights_html.append(get_diag_row_html(ICO_WARN, "<b>Sentimento de Consolidação:</b> Fluxo de notícias equilibrado entre fatores macro e dinâmicas internas. Mantenha os rebalanceamentos normais programados.", "#ffd600"))
+    insights_html.append(
+        get_diag_row_html(
+            ICO_WARN,
+            "<b>Sentimento de Consolidação:</b> Fluxo de notícias equilibrado "
+            "entre fatores macro e dinâmicas internas. Mantenha os "
+            "rebalanceamentos normais programados.",
+            "#ffd600",
+        )
+    )
 else:
-    insights_html.append(get_diag_row_html(ICO_CRIT, "<b>Sinal de Alerta Qualitativo:</b> Sentimento desfavorável predominante nos ativos selecionados. Monitore potenciais rompimentos de suporte técnico.", "#ff3d5a"))
+    insights_html.append(
+        get_diag_row_html(
+            ICO_CRIT,
+            "<b>Sinal de Alerta Qualitativo:</b> Sentimento desfavorável "
+            "predominante nos ativos selecionados. Monitore potenciais "
+            "rompimentos de suporte técnico.",
+            "#ff3d5a",
+        )
+    )
     
 # Análise de concentração qualitativa (pesos elevados em ações com sentimento negativo)
 risco_alto = False
-for item in news_items:
+for item in live_news_items:
     if item["sentiment"] == "Pessimista" and item["peso"] >= 0.25:
         risco_alto = True
         insights_html.append(get_diag_row_html(ICO_CRIT, f"<b>Risco de Concentração Negativa:</b> O ativo <b>{item['ticker']}</b> tem peso expressivo ({item['peso']*100:.1f}%) e está sob fluxo de notícias pessimistas (<i>{item['title']}</i>).", "#ff3d5a"))
         
-if not risco_alto:
-    insights_html.append(get_diag_row_html(ICO_OK, "<b>Risco Qualitativo Controlado:</b> Não foram detectadas posições altamente concentradas em ativos com fluxo de notícias pessimistas graves.", "#00ff87"))
+if live_news_items and not risco_alto:
+    insights_html.append(
+        get_diag_row_html(
+            ICO_OK,
+            "<b>Risco Qualitativo Controlado:</b> Não foram detectadas posições "
+            "altamente concentradas em ativos com fluxo de notícias pessimistas graves.",
+            "#00ff87",
+        )
+    )
+elif not live_news_items:
+    insights_html.append(
+        get_diag_row_html(
+            ICO_WARN,
+            "<b>Risco qualitativo não avaliado:</b> Não há notícias recentes "
+            "suficientes para validar essa leitura.",
+            "#64748b",
+        )
+    )
     
-insights_html.append(get_diag_row_html(ICO_IDEA, "<b>Sugestão de Alocação:</b> Use as notícias e o indicador qualitativo para programar rebalanceamentos operacionais. Em momentos de sentimento extremo, a volatilidade de curto prazo tende a se elevar.", "#ffd600"))
+if live_news_items:
+    insights_html.append(
+        get_diag_row_html(
+            ICO_IDEA,
+            "<b>Sugestão de Alocação:</b> Use as notícias e o indicador "
+            "qualitativo para programar rebalanceamentos operacionais. Em "
+            "momentos de sentimento extremo, a volatilidade de curto prazo "
+            "tende a se elevar.",
+            "#ffd600",
+        )
+    )
+else:
+    insights_html.append(
+        get_diag_row_html(
+            ICO_IDEA,
+            "<b>Próximo passo:</b> Atualize o feed quando a fonte de notícias "
+            "estiver disponível antes de interpretar o sentimento da carteira.",
+            "#ffd600",
+        )
+    )
 
 st.markdown(f"""
 <div class="financial-panel">
