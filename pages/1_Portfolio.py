@@ -5,6 +5,7 @@ import numpy as np
 import datetime
 import warnings
 import logging
+from html import escape
 
 logger = logging.getLogger(__name__)
 import plotly.express as px
@@ -693,8 +694,7 @@ if (
             p_ef = row_c["Peso Efetivo (%)"]
 
             cotas_rows_html += (
-                "<tr style=\"border-bottom: 1px solid #1e293b;\">"
-                f"<td style=\"padding: 0.45rem 0.5rem; text-align: left; color: #38bdf8; font-weight: 700; font-family: 'JetBrains Mono', monospace;\">{ticker_name}</td>"
+                f"<td style=\"padding: 0.45rem 0.5rem; text-align: left; color: #38bdf8; font-weight: 700; font-family: 'JetBrains Mono', monospace;\">{escape(str(ticker_name))}</td>"
                 f"<td style=\"padding: 0.45rem 0.5rem; color: #f8fafc; font-family: 'JetBrains Mono', monospace;\">R$ {pu:,.2f}</td>"
                 f"<td style=\"padding: 0.45rem 0.5rem; color: #4ade80; font-weight: 700; font-family: 'JetBrains Mono', monospace;\">{int(cotas):,}</td>"
                 f"<td style=\"padding: 0.45rem 0.5rem; color: #fbbf24; font-family: 'JetBrains Mono', monospace;\">R$ {val_ef:,.2f}</td>"
