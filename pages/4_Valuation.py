@@ -102,8 +102,9 @@ def get_selic():
         # diária, então não deve ser reanualizada com (1+r)^252.
         taxa = sgs.get(432, start=dt.date.today() - dt.timedelta(days=30))
         return round(taxa.iloc[-1, 0] / 100, 4)
-    except Exception:
-        logger.warning("get_selic BCB fetch failed, using default rate", exc_info=True)
+    except Exception as exc:
+        logger.warning("get_selic BCB fetch failed; using default rate: %s", exc)
+        logger.debug("get_selic BCB failure details", exc_info=True)
         return 0.105
 
 
