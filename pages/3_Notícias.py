@@ -466,6 +466,9 @@ def load_finbert_pipeline():
         model = BertForSequenceClassification.from_pretrained(model_name)
         nlp = pipeline("text-classification", model=model, tokenizer=tokenizer, top_k=None)
         return nlp
+    except ModuleNotFoundError as exc:
+        logger.info("FinBERT opcional indisponível; usando PLN léxico: %s", exc)
+        return None
     except Exception:
         logger.warning("FinBERT pipeline load failed", exc_info=True)
         return None
