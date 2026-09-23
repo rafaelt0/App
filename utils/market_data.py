@@ -31,7 +31,9 @@ def get_full_market_data():
 def get_sorted_tickers_by_liquidity(tickers_list):
     try:
         df = get_full_market_data()
-        df = df.sort_values(by="Liq.2meses", ascending=False)
+        df = df.copy()
+        df["_liquidity_sort"] = clean_numeric_column(df["Liq.2meses"])
+        df = df.sort_values("_liquidity_sort", ascending=False, na_position="last")
         sorted_all = df.index.tolist()
         sorted_filtered = [t for t in sorted_all if t in tickers_list]
         remaining = [t for t in tickers_list if t not in sorted_filtered]
