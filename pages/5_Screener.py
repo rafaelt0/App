@@ -119,9 +119,10 @@ if _refresh_removed is not None:
 try:
     with loading_overlay("Carregando dados da B3…"):
         df_raw = carregar_dados()
-except Exception as e:
-    logger.exception("carregar_dados failed")
-    st.error(f"Não foi possível carregar os dados da Fundamentus: {e}")
+except Exception as exc:
+    logger.warning("carregar_dados failed: %s", exc)
+    logger.debug("carregar_dados failure details", exc_info=True)
+    st.error(f"Não foi possível carregar os dados da Fundamentus: {exc}")
     st.stop()
 
 if df_raw is None or df_raw.empty:
