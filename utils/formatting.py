@@ -12,7 +12,9 @@ def normalize_numeric_text(value):
     if pd.isna(value):
         return None
 
-    text = re.sub(r"[^0-9,.\-]", "", str(value).strip())
+    raw_text = str(value).strip()
+    parenthetical_negative = raw_text.startswith("(") and raw_text.endswith(")")
+    text = re.sub(r"[^0-9,.\-]", "", raw_text)
     if not text:
         return None
 
@@ -27,6 +29,8 @@ def normalize_numeric_text(value):
         text = text.replace(",", ".")
     elif text.count(".") > 1:
         text = text.replace(".", "")
+    if parenthetical_negative and not text.startswith("-"):
+        text = f"-{text}"
 
     return text
 
