@@ -32,7 +32,7 @@ def align_benchmark_returns(portfolio_returns, benchmark_prices):
 
     benchmark_returns = benchmark_prices.pct_change().dropna()
     common_idx = portfolio_returns.index.intersection(benchmark_returns.index)
-    if common_idx.empty:
+    if len(common_idx) < 30:
         return portfolio_returns, None
 
     return portfolio_returns.loc[common_idx], benchmark_returns.loc[common_idx]
