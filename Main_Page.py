@@ -244,7 +244,7 @@ if _sector_changed and setores_selecionados and "Todos" not in setores_seleciona
 
 section_header(ICO_COMPASS, "Selecione ativos para analisar", "h2")
 n_disponíveis = len(tickers_filtrados)
-setor_label = (
+setor_label = escape(
     "todos os setores"
     if (not setores_selecionados or "Todos" in setores_selecionados)
     else ", ".join(setores_selecionados[:2])
