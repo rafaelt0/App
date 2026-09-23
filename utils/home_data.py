@@ -101,7 +101,7 @@ def get_yfinance_data(tickers_yf, start, interval):
     today = datetime.date.today()
     for attempt in range(3):
         try:
-            return yf.download(tickers_yf, start=start, end=today, interval=interval)[
+            return yf.download(tickers_yf, start=start, end=today, interval=interval, auto_adjust=True)[
                 "Close"
             ]
         except OSError:

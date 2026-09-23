@@ -18,9 +18,9 @@ def get_selic_rate():
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_portfolio_prices(tickers_yf, start_date):
     today = datetime.date.today()
-    return yf.download(tickers_yf, start=start_date, end=today, progress=False)["Close"]
+    return yf.download(tickers_yf, start=start_date, end=today, progress=False, auto_adjust=True)["Close"]
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_benchmark_prices(start_date):
-    return yf.download("^BVSP", start=start_date, progress=False)["Close"].squeeze()
+    return yf.download("^BVSP", start=start_date, progress=False, auto_adjust=True)["Close"].squeeze()
