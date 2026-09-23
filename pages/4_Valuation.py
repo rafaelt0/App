@@ -100,7 +100,7 @@ def get_selic():
 
         # Série 432 (BCB) = Meta Selic definida pelo Copom, já em % a.a. — não é taxa
         # diária, então não deve ser reanualizada com (1+r)^252.
-        taxa = sgs.get(432, start=dt.date.today() - dt.timedelta(days=30))
+        taxa = sgs.get(432, last=1)
         return round(taxa.iloc[-1, 0] / 100, 4)
     except Exception as exc:
         logger.warning("get_selic BCB fetch failed; using default rate: %s", exc)

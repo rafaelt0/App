@@ -9,7 +9,7 @@ from bcb import sgs
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_selic_rate(start_date):
-    taxa_selic = sgs.get(432, start=start_date)
+    taxa_selic = sgs.get(432, last=1)
     val = (taxa_selic.iloc[-1, 0]) / 100
     daily_val = (1 + val) ** (1 / 252) - 1
     return daily_val
