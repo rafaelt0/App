@@ -10,7 +10,9 @@ from bcb import sgs
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_selic_rate():
     taxa_selic = sgs.get(432, last=1)
-    val = (taxa_selic.iloc[-1, 0]) / 100
+    val = float(taxa_selic.iloc[-1, 0]) / 100
+    if not (val >= 0 and val < float("inf")):
+        raise ValueError(f"BCB returned invalid Selic value: {val!r}")
     daily_val = (1 + val) ** (1 / 252) - 1
     return daily_val
 
