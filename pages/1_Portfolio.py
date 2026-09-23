@@ -612,7 +612,7 @@ if (
             )
             df_pesos_export["Peso (%)"] = (df_pesos_export["Peso"] * 100).round(2)
             df_pesos_export = df_pesos_export.drop(columns=["Peso"])
-            pesos_csv = df_pesos_export.to_csv().encode("utf-8")
+            pesos_csv = df_pesos_export.to_csv().encode("utf-8-sig")
             st.download_button(
                 label="⬇ Exportar alocação (CSV)",
                 data=pesos_csv,

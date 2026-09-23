@@ -641,12 +641,12 @@ st.plotly_chart(fig_fan, use_container_width=True)
 sim_summary = pd.DataFrame(
     [{"Métrica": k, "Valor": v} for k, v in sim_stats_dict.items()]
 )
-sim_summary_csv = sim_summary.to_csv(index=False).encode("utf-8")
+sim_summary_csv = sim_summary.to_csv(index=False).encode("utf-8-sig")
 
 # Download dos percentis por data
 fan_export = fan_chart.copy()
 fan_export.index = fan_export.index.strftime("%Y-%m-%d")
-fan_export_csv = fan_export.to_csv().encode("utf-8")
+fan_export_csv = fan_export.to_csv().encode("utf-8-sig")
 
 col_dl1, col_dl2, _ = st.columns([1, 1, 1])
 with col_dl1:
