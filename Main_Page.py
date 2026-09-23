@@ -26,7 +26,6 @@ from utils.icons import (
     ICO_STAR,
 )
 from utils.home_data import clear_fundamentus_cache, get_fundamentus_data
-from utils.market_data import get_sorted_tickers_by_liquidity
 from utils.home_render import (
     get_ticker_setor,
     render_debt_panel,
@@ -479,7 +478,7 @@ if ready_to_analyze:
                 "fundamentus returned partial data for %s; clearing Streamlit cache",
                 _missing_fundamentus,
             )
-            get_fundamentus_data.clear()
+            clear_fundamentus_cache()
 
         tickers_yf = [t + ".SA" for t in tickers]
 
