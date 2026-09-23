@@ -159,7 +159,12 @@ with col_config2:
         st.info(f"Data Inicial calculada: {data_inicio.strftime('%d/%m/%Y')}")
     else:
         lookback_dias = st.number_input(
-            "Dias de Lookback", min_value=30, max_value=5000, value=500, step=10
+            "Dias de Lookback",
+            min_value=60,
+            max_value=5000,
+            value=500,
+            step=10,
+            help="Mínimo de 60 dias para garantir ao menos 30 retornos úteis.",
         )
         data_inicio = today - datetime.timedelta(days=lookback_dias)
 
@@ -493,7 +498,7 @@ if len(returns) < MIN_RETURN_ROWS:
         "Isso costuma acontecer quando um ou mais ativos têm histórico bem mais curto "
         "que os demais (IPO recente, deslistagem, falha na fonte de dados)."
         + (f" Possíveis responsáveis: {culprits}." if culprits else "")
-        + " Remova esses ativos ou reduza o período de lookback."
+        + " Remova ativos com histórico curto ou ajuste o período de lookback."
     )
     st.stop()
 
