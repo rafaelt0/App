@@ -256,6 +256,7 @@ def get_sector_peers(_setores):
             if src in raw.columns:
                 df2[dest] = raw[src]
         df2 = df2.drop_duplicates(keep="first")
+        df2 = df2[~df2.index.duplicated(keep="first")]
         return df2
     except Exception:
         logger.warning("get_sector_peers failed", exc_info=True)
