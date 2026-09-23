@@ -1,11 +1,48 @@
 """Cached data-fetching helpers for pages/1_Portfolio.py."""
 
 import datetime
+import logging
+import time
 
 import streamlit as st
 import yfinance as yf
 from bcb import sgs
 
+logger = logging.getLogger(__name__)
+_YF_DOWNLOAD_ATTEMPTS = 3
+_YF_DOWNLOAD_TIMEOUT_SECONDS = 15
+
+
+def _download_close(tickers_yf, start_date):
+    """Fetch adjusted closes with bounded retries for transient Yahoo failures."""
+    last_exc = None
+    for attempt in range(_YF_DOWNLOAD_ATTEMPTS):
+        try:
+            downloaded = yf.download(
+                tickers_yf,
+                start=start_date,
+                end=datetime.date.today(),
+                progress=False,
+                auto_adjust=True,
+                timeout=_YF_DOWNLOAD_TIMEOUT_SECONDS,
+            )
+            if "Close" not in downloaded:
+                raise ValueError("Yahoo Finance não retornou a coluna Close.")
+            close = downloaded["Close"]
+            if close.empty:
+                raise ValueError("Yahoo Finance retornou histórico vazio.")
+            return close
+        except Exception as exc:
+            last_exc = exc
+            if attempt < _YF_DOWNLOAD_ATTEMPTS - 1:
+                logger.warning(
+                    "Yahoo Finance download attempt %d/%d failed: %s",
+                    attempt + 1,
+                    _YF_DOWNLOAD_ATTEMPTS,
+                    exc,
+                )
+                time.sleep(1)
+    raise last_exc
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_selic_rate():
@@ -19,13 +56,12 @@ def get_selic_rate():
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_portfolio_prices(tickers_yf, start_date):
-    today = datetime.date.today()
-    return yf.download(tickers_yf, start=start_date, end=today, progress=False, auto_adjust=True)["Close"]
+    return _download_close(tickers_yf, start_date)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_benchmark_prices(start_date):
-    return yf.download("^BVSP", start=start_date, progress=False, auto_adjust=True)["Close"].squeeze()
+    return _download_close("^BVSP", start_date).squeeze()
 
 def align_benchmark_returns(portfolio_returns, benchmark_prices):
     """Align portfolio and benchmark returns when comparable data exists."""
