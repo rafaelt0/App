@@ -476,7 +476,7 @@ with col_s1:
         ret_str,
         delta="Positivo" if ret_esperado_pct > 0 else "Negativo",
         delta_color="normal" if ret_esperado_pct > 0 else "inverse",
-        help="Retorno anual composto implícito no valor esperado mediano.",
+        help="Retorno anual composto implícito no valor esperado médio.",
     )
 with col_s2:
     st.metric(
@@ -493,11 +493,14 @@ with col_s2:
 with col_s3:
     perda_var = (var_5 / valor_inicial - 1) * 100
     st.metric(
-        "VaR 5% (perda máx.)",
+        "VaR 5% (limiar de perda)",
         f"{perda_var:.1f}%",
         delta="Controlado" if perda_var > -30 else "Elevado",
         delta_color="normal" if perda_var > -30 else "inverse",
-        help="Em 95% dos cenários, a perda máxima é este percentual.",
+        help=(
+            "Limite do percentil de 5%: em 5% dos cenários, o portfólio "
+            "termina abaixo deste valor. Não representa a perda máxima."
+        ),
     )
 
 render_cards_grid(sim_stats_dict)
@@ -507,7 +510,7 @@ with col_exp1:
     st.markdown(
         """
     <div style="background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#b8eeff;">
-    <b>VaR 5%:</b> Valor mínimo do portfólio em 95% dos cenários simulados. Abaixo disso está a zona de risco extremo.
+    <b>VaR 5%:</b> Limiar que separa os 5% piores cenários. Os resultados abaixo dele representam a cauda de risco, não a perda máxima.
     </div>
     """,
         unsafe_allow_html=True,
