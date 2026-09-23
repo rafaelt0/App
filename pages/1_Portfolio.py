@@ -50,6 +50,7 @@ from utils.icons import (
     ICO_WARN,
 )
 from utils.portfolio_data import (
+    align_benchmark_returns,
     bound_efficient_return,
     get_benchmark_prices,
     get_portfolio_prices,
@@ -858,21 +859,32 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         # Cálculo do portfólio com os pesos escolhidos
         portfolio_returns = returns.dot(pesos_manuais_arr)
 
-        # Obter os dados de benchmark BOVESPA e calcular o retorno acumulado
-        bench = get_benchmark_prices(data_inicio)
-        retorno_bench = bench.pct_change().dropna()
+        # O benchmark é complementar: se o IBOVESPA falhar, preserve a análise
+        # do portfólio e sinalize que o gráfico está sem comparação.
+        retorno_bench = None
+        try:
+            bench = get_benchmark_prices(data_inicio)
+            portfolio_returns, retorno_bench = align_benchmark_returns(
+                portfolio_returns, bench
+            )
+        except Exception as _bench_err:
+            logger.warning("get_benchmark_prices failed: %s", _bench_err)
+            logger.debug("get_benchmark_prices failure details", exc_info=True)
 
-        # Alinhar datas do portfólio e do benchmark
-        comum_idx = portfolio_returns.index.intersection(retorno_bench.index)
-        portfolio_returns = portfolio_returns.loc[comum_idx]
-        retorno_bench = retorno_bench.loc[comum_idx]
+        benchmark_available = retorno_bench is not None and not retorno_bench.empty
+        if not benchmark_available:
+            st.warning(
+                "Dados do IBOVESPA indisponíveis no momento; "
+                "o gráfico exibirá apenas o valor do portfólio."
+            )
 
-        # Calcular os retornos acumulados correspondentes
+        # Calcular o retorno acumulado do portfólio e, quando disponível, do benchmark.
         cum_return = (1 + portfolio_returns).cumprod()
         portfolio_value = cum_return * valor_inicial
-
-        retorno_cum_bench = (1 + retorno_bench).cumprod()
-        bench_value = retorno_cum_bench * valor_inicial
+        bench_value = None
+        if benchmark_available:
+            retorno_cum_bench = (1 + retorno_bench).cumprod()
+            bench_value = retorno_cum_bench * valor_inicial
 
         # Mostrar gráfico do valor do portfólio x BOVESPA
         fig = go.Figure()
@@ -885,17 +897,22 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 line=dict(color="#00ff87", width=2.5),
             )
         )
-        fig.add_trace(
-            go.Scatter(
-                x=bench_value.index,
-                y=bench_value,
-                mode="lines",
-                name="IBOVESPA",
-                line=dict(color="#ffd600", width=1.5, dash="dash"),
+        if benchmark_available:
+            fig.add_trace(
+                go.Scatter(
+                    x=bench_value.index,
+                    y=bench_value,
+                    mode="lines",
+                    name="IBOVESPA",
+                    line=dict(color="#ffd600", width=1.5, dash="dash"),
+                )
             )
-        )
         fig.update_layout(
-            title="Evolução do Valor do Portfólio vs Benchmark",
+            title=(
+                "Evolução do Valor do Portfólio vs Benchmark"
+                if benchmark_available
+                else "Evolução do Valor do Portfólio"
+            ),
             xaxis_title="Data",
             yaxis_title="Valor (R$)",
         )
