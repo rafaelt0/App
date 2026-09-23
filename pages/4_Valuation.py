@@ -232,9 +232,10 @@ def get_koller_data(ticker_b3: str):
             "kd_est": kd_est,
             "rev_cagr": rev_cagr,
         }
-    except Exception as e:
-        logger.exception("get_koller_data failed")
-        return {"_error": str(e)}
+    except Exception as exc:
+        logger.warning("get_koller_data failed: %s", exc)
+        logger.debug("get_koller_data failure details", exc_info=True)
+        return {"_error": str(exc)}
 
 
 # ─── Hero ──────────────────────────────────────────────────────────────────────
