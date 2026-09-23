@@ -177,6 +177,7 @@ except Exception as _selic_err:
         f"Não foi possível buscar a taxa Selic no BCB ({_selic_err}). Usando valor de referência: 13,75% a.a."
     )
     taxa_selic = (1 + 0.1375) ** (1 / 252) - 1
+taxa_selic_anual = (1 + taxa_selic) ** 252 - 1
 
 
 # Seleção de ações
@@ -1054,8 +1055,8 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             )
             total_return = (portfolio_value.iloc[-1] / valor_inicial - 1) * 100
             vol_anual = portfolio_returns.std() * np.sqrt(252) * 100
-            sharpe_val = sharpe(portfolio_returns, rf=taxa_selic)
-            sortino_val = sortino(portfolio_returns, rf=taxa_selic)
+            sharpe_val = sharpe(portfolio_returns, rf=taxa_selic_anual)
+            sortino_val = sortino(portfolio_returns, rf=taxa_selic_anual)
             max_dd = max_drawdown(portfolio_returns) * 100
 
             section_header(ICO_CHART, "Desempenho da Carteira", "h2")
@@ -1097,8 +1098,8 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         # Cálculos de Métricas
         total_return = (portfolio_value.iloc[-1] / valor_inicial - 1) * 100
         vol_anual = portfolio_returns.std() * np.sqrt(252) * 100
-        sharpe_val = sharpe(portfolio_returns, rf=taxa_selic)
-        sortino_val = sortino(portfolio_returns, rf=taxa_selic)
+        sharpe_val = sharpe(portfolio_returns, rf=taxa_selic_anual)
+        sortino_val = sortino(portfolio_returns, rf=taxa_selic_anual)
         max_dd = max_drawdown(portfolio_returns) * 100
 
         cov_matrix = np.cov(
