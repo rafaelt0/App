@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import datetime as dt
 import warnings
 import logging
+from html import escape
 
 logger = logging.getLogger(__name__)
 
@@ -56,17 +57,20 @@ def _pct(v):
 
 
 def _card(label, value, vc="#f8fafc", badge_text="", badge_style="", tip=""):
-    t = f' title="{tip}"' if tip else ""
+    safe_label = escape(str(label))
+    safe_value = escape(str(value))
+    safe_badge = escape(str(badge_text))
+    t = f' title="{escape(str(tip), quote=True)}"' if tip else ""
     bdg = (
         f'<div style="font-size:0.65rem;font-weight:700;font-family:monospace;'
-        f'padding:1px 7px;border-radius:4px;margin-top:4px;{badge_style}">{badge_text}</div>'
+        f'padding:1px 7px;border-radius:4px;margin-top:4px;{badge_style}">{safe_badge}</div>'
         if badge_text
         else ""
     )
     return (
         f'<div class="mcard"{t}>'
-        f'<div class="mcard-label">{label}</div>'
-        f'<div class="mcard-value" style="color:{vc}">{value}</div>'
+        f'<div class="mcard-label">{safe_label}</div>'
+        f'<div class="mcard-value" style="color:{vc}">{safe_value}</div>'
         f"{bdg}</div>"
     )
 
