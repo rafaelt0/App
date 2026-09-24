@@ -85,7 +85,7 @@ source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # 4. Iniciar a aplicação
-streamlit run Main_Page.py
+streamlit run Início.py
 ```
 
 A aplicação abre em `http://localhost:8501`.

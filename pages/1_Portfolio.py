@@ -298,7 +298,7 @@ if len(tickers) == 0:
         "Monte seu portfólio",
         "Selecione pelo menos duas ações para comparar risco, retorno e diversificação.",
         "Voltar para análise de ativos",
-        "Main_Page.py",
+        "Início.py",
     )
     _render_portfolio_presets()
     st.stop()
@@ -309,7 +309,7 @@ if len(tickers) == 1:
         "Adicione mais um ativo",
         "A otimização precisa de pelo menos dois ativos para calcular uma carteira.",
         "Voltar para análise de ativos",
-        "Main_Page.py",
+        "Início.py",
     )
     _render_portfolio_presets()
     st.stop()
