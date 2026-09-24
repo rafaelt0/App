@@ -1,15 +1,11 @@
 import streamlit as st
 import pandas as pd
-import datetime
 import plotly.graph_objects as go
-import random
 import math
 import re
 import unicodedata
 import urllib.request
 import urllib.parse
-import xml.etree.ElementTree as ET
-import email.utils
 from html import escape
 import logging
 
@@ -17,6 +13,7 @@ logger = logging.getLogger(__name__)
 from utils.charts import apply_plotly_theme
 from utils import db as _db
 from utils.identity import get_browser_uid
+from utils.news import aggregate_ticker_sentiment, parse_rss_items
 
 from utils.ui import (
     empty_state_card,
@@ -178,15 +175,15 @@ def analise_sentimento_pln(title, summary):
     return {
         "sentiment": sentiment,
         "score": round(score, 2),
-        "pos_terms": list(set(matched_pos)),
-        "neg_terms": list(set(matched_neg)),
+        "pos_terms": matched_pos,
+        "neg_terms": matched_neg,
         "raw_text_length": len(words)
     }
 
-_IMPACT_LEVELS = ("Alto", "Médio-Alto", "Médio", "Baixo-Médio", "Baixo")
+_INTENSITY_LEVELS = ("Alto", "Médio-Alto", "Médio", "Baixo-Médio", "Baixo")
 
 
-def _impacto_por_score(score):
+def _intensidade_sentimento(score):
     try:
         intensity = abs(float(score))
     except (TypeError, ValueError):
@@ -200,170 +197,6 @@ def _impacto_por_score(score):
     if intensity >= 0.1:
         return "Baixo-Médio"
     return "Baixo"
-
-# Dados de notícias pré-definidas por papel principal (Fallback offline)
-news_database = {
-    "PETR": [
-        {
-            "title": "Petrobras anuncia descoberta de óleo leve em bloco da Bacia de Santos",
-            "summary": "A estatal comunicou a descoberta de indícios de hidrocarbonetos no poço pioneiro do bloco de exploração. Análise preliminar indica óleo de excelente qualidade comercial.",
-            "provider": "Bloomberg Línea",
-            "impact": "Alto"
-        },
-        {
-            "title": "Conselho da Petrobras aprova nova política de dividendos e plano de investimentos",
-            "summary": "O colegiado da petroleira definiu as diretrizes estratégicas de alocação de capital para o próximo ciclo de 5 anos. Decisão reduz volatilidade e agrada analistas de mercado.",
-            "provider": "Valor Econômico",
-            "impact": "Médio-Alto"
-        },
-        {
-            "title": "Petrobras enfrenta greve parcial de petroleiros nas refinarias do Sudeste",
-            "summary": "Sindicatos iniciaram paralisação preventiva alegando descumprimento de cláusulas do acordo coletivo. Companhia ativou plano de contingência para evitar desabastecimento.",
-            "provider": "Estadão Broadcast",
-            "impact": "Médio"
-        },
-        {
-            "title": "Flutuação do preço internacional do barril de Brent pressiona margens de refino da Petrobras",
-            "summary": "A oscilação do barril de petróleo no mercado de Londres aumenta as pressões sobre a defasagem interna de preços de combustíveis da estatal brasileira.",
-            "provider": "InfoMoney",
-            "impact": "Baixo"
-        }
-    ],
-    "VALE": [
-        {
-            "title": "Vale registra forte alta nas exportações de minério de ferro de alta pureza para a Ásia",
-            "summary": "O volume embarcado de pelotas de alto teor de ferro subiu 12% em comparação ao trimestre anterior. Demanda de siderúrgicas chinesas apoia o resultado operacional.",
-            "provider": "Valor Econômico",
-            "impact": "Alto"
-        },
-        {
-            "title": "Vale assina acordo estratégico de descarbonização com consórcio europeu",
-            "summary": "A mineradora fechou parceria para o desenvolvimento de soluções industriais focadas na redução de emissões do escopo 3. Iniciativa melhora o rating ESG global da empresa.",
-            "provider": "Bloomberg Línea",
-            "impact": "Médio"
-        },
-        {
-            "title": "Tribunal de Justiça suspende provisoriamente licença de operação de mina da Vale no Pará",
-            "summary": "A decisão cautelar atende a pedido de associação comunitária local. Vale informou que recorrerá e que a mina representa menos de 3% da produção anual consolidada.",
-            "provider": "Estadão Broadcast",
-            "impact": "Médio-Alto"
-        },
-        {
-            "title": "Preço da tonelada do minério de ferro em Dalian opera em estabilidade após dados de estoques",
-            "summary": "Os estoques portuários na China apresentaram leve variação, levando analistas a preverem manutenção dos preços do minério de ferro no curto prazo.",
-            "provider": "InfoMoney",
-            "impact": "Baixo"
-        }
-    ],
-    "ITUB": [
-        {
-            "title": "Itaú Unibanco reporta lucro recorde no trimestre impulsionado por carteira de crédito corporativo",
-            "summary": "O maior banco privado do país superou as projeções de consenso do mercado. O Retorno sobre o Patrimônio Líquido (ROE) atingiu patamar de liderança no setor.",
-            "provider": "Valor Econômico",
-            "impact": "Alto"
-        },
-        {
-            "title": "Itaú expande plataforma de investimentos digitais e atrai R$ 15 bilhões em captação líquida",
-            "summary": "O aplicativo de investimentos do banco registrou forte fluxo de novos clientes, reduzindo o custo de aquisição (CAC) e consolidando a liderança de varejo digital.",
-            "provider": "InfoMoney",
-            "impact": "Médio"
-        },
-        {
-            "title": "Inadimplência de curto prazo do Itaú apresenta leve alta em carteiras de crédito pessoal",
-            "summary": "O indicador de atrasos entre 15 e 90 dias subiu 0.15 pontos percentuais. A diretoria do banco declarou estar confortável e com provisões adequadas.",
-            "provider": "Estadão Broadcast",
-            "impact": "Baixo-Médio"
-        }
-    ],
-    "BBDC": [
-        {
-            "title": "Bradesco acelera plano de reestruturação de agências e eficiência operacional",
-            "summary": "O banco anunciou o fechamento de postos físicos redundantes e foco em atendimento digitalizado, prevendo economia de R$ 1,2 bilhão em despesas administrativas anuais.",
-            "provider": "Valor Econômico",
-            "impact": "Médio-Alto"
-        },
-        {
-            "title": "Bradesco reduz provisões para devedores duvidosos (PDD) sinalizando melhora do ciclo de crédito",
-            "summary": "A diretoria informou estabilização da inadimplência nos cartões de crédito, permitindo menor alocação preventiva de capital no balanço.",
-            "provider": "Bloomberg Línea",
-            "impact": "Alto"
-        },
-        {
-            "title": "Bradesco enfrenta concorrência acirrada de fintechs no segmento de microcrédito e pequenos comércios",
-            "summary": "A margem financeira líquida no varejo de baixa renda continua sob pressão devido à oferta agressiva de players puramente digitais.",
-            "provider": "InfoMoney",
-            "impact": "Médio"
-        }
-    ],
-    "BBAS": [
-        {
-            "title": "Banco do Brasil registra forte expansão na carteira de crédito do agronegócio nacional",
-            "summary": "A instituição pública desembolsou volume recorde de recursos na safra atual, mantendo taxas de inadimplência muito abaixo da média de mercado.",
-            "provider": "Estadão Broadcast",
-            "impact": "Alto"
-        },
-        {
-            "title": "Banco do Brasil anuncia pagamento de R$ 2,5 bilhões em Juros sobre Capital Próprio (JCP)",
-            "summary": "O conselho de administração aprovou o provento aos acionistas com base nos lucros acumulados. O dividend yield implícito agrada o mercado financeiro.",
-            "provider": "Valor Econômico",
-            "impact": "Médio-Alto"
-        },
-        {
-            "title": "Discussões sobre governança em empresas de controle estatal elevam prêmio de risco das ações BBAS3",
-            "summary": "Analistas de bancos estrangeiros rebaixaram levemente o preço-alvo das ações citando volatilidade política e governança corporativa no radar.",
-            "provider": "Bloomberg Línea",
-            "impact": "Médio-Alto"
-        }
-    ],
-    "WEGE": [
-        {
-            "title": "WEG assina contrato bilionário de fornecimento de geradores eólicos para complexo no Nordeste",
-            "summary": "A fabricante catarinense fechou parceria para equipar um dos maiores parques eólicos em construção do país, reforçando sua liderança na transição energética.",
-            "provider": "Valor Econômico",
-            "impact": "Alto"
-        },
-        {
-            "title": "WEG expande capacidade produtiva de motores elétricos de alta eficiência na Europa",
-            "summary": "Com a ampliação de instalações fabris na Alemanha, a WEG reduces prazos de entrega regionais e atende à crescente demanda de substituição industrial de motores antigos.",
-            "provider": "Bloomberg Línea",
-            "impact": "Médio-Alto"
-        },
-        {
-            "title": "Oscilação cambial e fortalecimento do Real afetam margens de receitas de exportação da WEG",
-            "summary": "Como grande parte da receita é dolarizada, a valorização do Real no período atua como redutor contábil no faturamento reportado em moeda local.",
-            "provider": "Estadão Broadcast",
-            "impact": "Médio"
-        }
-    ]
-}
-
-generic_news_templates = [
-    {
-        "title": "Companhia {ticker} anuncia investimentos focados em eficiência energética e ESG",
-        "summary": "A diretoria da {ticker} aprovou o plano plurianual de modernização de processos, estimando reduzir custos de energia em 15% nos próximos 24 meses.",
-        "provider": "Valor Econômico",
-        "impact": "Médio"
-    },
-    {
-        "title": "{ticker} reporta resultados operacionais estáveis e em linha com estimativas de mercado",
-        "summary": "A empresa apresentou receita líquida estável. O conselho de administração sinalizou manutenção das taxas históricas de payout aos acionistas.",
-        "provider": "Bloomberg Línea",
-        "impact": "Baixo"
-    },
-    {
-        "title": "Analistas elevam recomendação de {ticker} citando resiliência e solidez financeira no atual cenário",
-        "summary": "O time de análise de banco de investimentos elevou a recomendação das ações para compra, apontando forte geração de caixa da empresa.",
-        "provider": "InfoMoney",
-        "impact": "Médio-Alto"
-    },
-    {
-        "title": "{ticker} enfrenta pressões inflacionárias de custos logísticos e alta de tarifas de transporte",
-        "summary": "O aumento no frete rodoviário e nas tarifas portuárias pressionou as margens de lucro bruto da companhia, que avalia repasse parcial de preços.",
-        "provider": "Estadão Broadcast",
-        "impact": "Médio"
-    }
-]
-
 
 # ─── REAL-TIME NEWS RSS FETCHING ──────────────────────────────────────────────
 ticker_to_name = {
@@ -400,65 +233,18 @@ NEWS_REQUEST_TIMEOUT_SECONDS = 8
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_brazilian_news(ticker_name):
-    # Clean up and combine company name to improve search query
     name = ticker_to_name.get(ticker_name, "")
-    if name:
-        query = f"{ticker_name} OR \"{name}\""
-    else:
-        query = ticker_name
-    encoded_query = urllib.parse.quote(query)
-    
-    url = f"https://news.google.com/rss/search?q={encoded_query}&hl=pt-BR&gl=BR&ceid=BR:pt-419"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-    req = urllib.request.Request(url, headers=headers)
-    
+    query = f"{ticker_name} OR \"{name}\"" if name else ticker_name
+    url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
     try:
-        with urllib.request.urlopen(
-            req, timeout=NEWS_REQUEST_TIMEOUT_SECONDS
-        ) as response:
+        with urllib.request.urlopen(req, timeout=NEWS_REQUEST_TIMEOUT_SECONDS) as response:
             xml_data = response.read()
-        root = ET.fromstring(xml_data)
-        news_items = []
-
-        def _item_text(item, tag):
-            node = item.find(tag)
-            return node.text.strip() if node is not None and node.text else ""
-
-        for item in root.findall(".//item")[:3]:  # Max 3 real news per asset
-            title = _item_text(item, "title")
-            if not title:
-                logger.debug("news RSS item missing title; skipping")
-                continue
-            link = _item_text(item, "link")
-            pub_date = _item_text(item, "pubDate")
-            source = _item_text(item, "source")
-            
-            # Format date nicely
-            formatted_date = ""
-            if pub_date:
-                try:
-                    dt = email.utils.parsedate_to_datetime(pub_date)
-                    formatted_date = dt.strftime('%d/%m/%Y %H:%M')
-                except Exception:
-                    logger.debug("news pubDate parse failed for %r", pub_date, exc_info=True)
-                    formatted_date = pub_date
-            
-            # Clean source name from title
-            if source and title.endswith(f" - {source}"):
-                title = title[:-len(f" - {source}")]
-                
-            news_items.append({
-                'title': title,
-                'link': link,
-                'date': formatted_date,
-                'provider': source,
-                'summary': ''
-            })
-        return news_items
+        return {"ok": True, "items": parse_rss_items(xml_data)}
     except Exception as exc:
         logger.warning("news RSS fetch/parse failed: %s", exc)
         logger.debug("news RSS failure details", exc_info=True)
-        return []
+        return {"ok": False, "items": []}
 
 
 # ─── DEEP LEARNING MODEL LOAD (FinBERT-PT-BR) ───────────────────────────────
@@ -498,6 +284,7 @@ def analise_sentimento_finbert(title, summary, nlp):
             "score": res_pln["score"],
             "scores": scores,
             "is_finbert": False,
+            "engine": "PLN Léxico (fallback)",
             "pos_terms": res_pln["pos_terms"],
             "neg_terms": res_pln["neg_terms"],
             "raw_text_length": res_pln["raw_text_length"]
@@ -511,24 +298,15 @@ def analise_sentimento_finbert(title, summary, nlp):
         pos_score = score_dict.get('POSITIVE', 0.0)
         neg_score = score_dict.get('NEGATIVE', 0.0)
         
-        # Decide sentiment label based on the highest probability
-        max_label = max(score_dict, key=score_dict.get)
-        
-        if max_label == 'POSITIVE':
-            sentiment = "Otimista"
-            score = pos_score
-        elif max_label == 'NEGATIVE':
-            sentiment = "Pessimista"
-            score = -neg_score
-        else:
-            sentiment = "Neutro"
-            score = 0.0
+        score = pos_score - neg_score
+        sentiment = "Otimista" if score >= 0.20 else "Pessimista" if score <= -0.20 else "Neutro"
             
         return {
             "sentiment": sentiment,
             "score": round(score, 2),
             "scores": res,
             "is_finbert": True,
+            "engine": "FinBERT-PT-BR",
             "raw_text_length": len(text.split())
         }
     except Exception:
@@ -545,10 +323,16 @@ def analise_sentimento_finbert(title, summary, nlp):
             "score": res_pln["score"],
             "scores": scores,
             "is_finbert": False,
+            "engine": "PLN Léxico (fallback)",
             "pos_terms": res_pln["pos_terms"],
             "neg_terms": res_pln["neg_terms"],
             "raw_text_length": res_pln["raw_text_length"]
         }
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _cached_sentiment(title, summary, model_key, _nlp):
+    return analise_sentimento_finbert(title, summary, _nlp)
+
 
 def _restore_saved_portfolio_context() -> None:
     """Restore the last analyzed portfolio after a full-page handoff."""
@@ -681,110 +465,45 @@ else:
         unsafe_allow_html=True,
     )
 
-# Gerador dinâmico de notícias baseado nos ativos selecionados com avaliação PLN em tempo real
+# Build the feed exclusively from recent, parseable RSS entries.
 news_items = []
-fallback_tickers = []
-random.seed(42)  # Semente estática para consistência entre renderizações da mesma sessão
-
-# Barra de progresso para download/fetch de notícias em tempo real
+feed_status = {}
 with loading_overlay("Buscando notícias e processando sentimento NLP…", tickers=tickers):
     for t in tickers:
-        real_news = get_brazilian_news(t)
-        
-        if real_news:
-            for item in real_news:
-                sentiment_res = analise_sentimento_finbert(item["title"], item.get("summary", ""), finbert_nlp)
-                
-                news_items.append({
-                    "ticker": t,
-                    "title": item["title"],
-                    "summary": item["summary"] if item["summary"] else "Clique no link do título para ler os detalhes da notícia na fonte oficial.",
-                    "sentiment": sentiment_res["sentiment"],
-                    "score": sentiment_res["score"],
-                    "scores": sentiment_res.get("scores", []),
-                    "is_finbert": sentiment_res.get("is_finbert", False),
-                    "pos_terms": sentiment_res.get("pos_terms", []),
-                    "neg_terms": sentiment_res.get("neg_terms", []),
-                    "raw_text_length": sentiment_res.get("raw_text_length", 0),
-                    "is_synthetic": False,
-                    "provider": item["provider"],
-                    "impact": _impacto_por_score(sentiment_res["score"]),
-                    "pub_time": item["date"],
-                    "link": item["link"],
-                    "peso": pesos[t]
-                })
-        else:
-            # Fallback to simulated news database templates if no news found or offline
-            fallback_tickers.append(t)
-            prefix = t[:4]
-            if prefix in news_database:
-                templates = news_database[prefix]
-            else:
-                templates = []
-                for g_temp in generic_news_templates:
-                    templates.append({
-                        "title": g_temp["title"].format(ticker=t),
-                        "summary": g_temp["summary"].format(ticker=t),
-                        "provider": g_temp["provider"],
-                        "impact": g_temp["impact"]
-                    })
-            
-            hours_ago = random.randint(1, 23)
-            for idx, temp in enumerate(templates[:3]):
-                pub_time = f"Há {hours_ago + idx*4} horas" if hours_ago + idx*4 < 24 else f"Ontem às {random.randint(9, 20):02d}:{random.randint(0, 59):02d}"
-                sentiment_res = analise_sentimento_finbert(temp["title"], temp["summary"], finbert_nlp)
-                
-                news_items.append({
-                    "ticker": t,
-                    "title": temp["title"],
-                    "summary": temp["summary"],
-                    "sentiment": sentiment_res["sentiment"],
-                    "score": sentiment_res["score"],
-                    "scores": sentiment_res.get("scores", []),
-                    "is_finbert": sentiment_res.get("is_finbert", False),
-                    "pos_terms": sentiment_res.get("pos_terms", []),
-                    "neg_terms": sentiment_res.get("neg_terms", []),
-                    "raw_text_length": sentiment_res.get("raw_text_length", 0),
-                    "is_synthetic": True,
-                    "provider": "Exemplo ilustrativo",
-                    "impact": temp["impact"],
-                    "pub_time": "Sem atualização",
-                    "link": "#",
-                    "peso": pesos[t]
-                })
+        result = get_brazilian_news(t)
+        feed_status[t] = result["ok"]
+        for item in result["items"]:
+            sentiment_res = _cached_sentiment(
+                item["title"], item.get("summary", ""),
+                "lucas-leme/FinBERT-PT-BR:v1" if finbert_nlp is not None else "lexicon:v1",
+                finbert_nlp,
+            )
+            news_items.append({
+                "ticker": t, "title": item["title"],
+                "summary": item["summary"] or "Clique no link do título para ler os detalhes da notícia na fonte oficial.",
+                "sentiment": sentiment_res["sentiment"], "score": sentiment_res["score"],
+                "scores": sentiment_res.get("scores", []), "is_finbert": sentiment_res.get("is_finbert", False),
+                "engine": sentiment_res["engine"], "pos_terms": sentiment_res.get("pos_terms", []),
+                "neg_terms": sentiment_res.get("neg_terms", []), "raw_text_length": sentiment_res.get("raw_text_length", 0),
+                "provider": item["provider"], "intensity": _intensidade_sentimento(sentiment_res["score"]),
+                "pub_time": item["date"], "published": item["published"], "link": item["link"], "peso": pesos[t],
+            })
+for ticker, succeeded in feed_status.items():
+    if not succeeded:
+        st.warning(f"Feed de notícias indisponível para {ticker}; nenhum item foi usado na análise.")
+    elif not any(item["ticker"] == ticker for item in news_items):
+        st.info(f"Nenhuma notícia recente (últimos 7 dias) encontrada para {ticker}.")
 
-if fallback_tickers:
-    _fallback_labels = ", ".join(fallback_tickers)
-    st.warning(
-        f"Notícias em tempo real indisponíveis para {_fallback_labels}. "
-        "Os itens marcados como **Exemplo ilustrativo** são apenas conteúdo "
-        "de demonstração e não representam eventos recentes."
-    )
-
-live_news_items = [
-    item for item in news_items if not item.get("is_synthetic", False)
-]
+live_news_items = news_items
 
 # Cálculos de sentimentos consolidados baseados nas métricas dinâmicas do NLP
-total_score = 0.0
-total_weight = 0.0
-pos_count = 0
-neg_count = 0
-neu_count = 0
-
-for item in live_news_items:
-    total_score += item["score"] * item["peso"]
-    total_weight += item["peso"]
-    if item["sentiment"] == "Otimista":
-        pos_count += 1
-    elif item["sentiment"] == "Pessimista":
-        neg_count += 1
-    else:
-        neu_count += 1
+pos_count = sum(item["sentiment"] == "Otimista" for item in live_news_items)
+neg_count = sum(item["sentiment"] == "Pessimista" for item in live_news_items)
+neu_count = sum(item["sentiment"] == "Neutro" for item in live_news_items)
+avg_score, news_coverage = aggregate_ticker_sentiment(live_news_items, pesos)
 
 # Normaliza score global de -1 a +1 para 0 a 100
-if live_news_items:
-    avg_score = total_score / total_weight if total_weight > 0 else 0.0
+if news_coverage > 0:
     normalized_score = int((avg_score + 1.0) / 2.0 * 100)
     sentiment_label = (
         "FORTEMENTE OTIMISTA"
@@ -810,7 +529,7 @@ else:
     sentiment_label = "SEM DADOS RECENTES"
     score_color = "#64748b"
 
-score_display = str(normalized_score) if live_news_items else "—"
+score_display = str(normalized_score) if news_coverage > 0 else "—"
 
 # Exibição do painel principal
 col_g1, col_g2 = st.columns([1, 2])
@@ -826,7 +545,7 @@ with col_g1:
                 text-align: center; 
                 box-shadow: 0 0 20px {score_color}1a;
                 margin-bottom: 1.5rem;">
-        <div style="font-size: 0.75rem; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase;">Sentimento Consolidado ({nlp_engine_label})</div>
+        <div style="font-size: 0.75rem; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase;">Sentimento das notícias disponíveis ({nlp_engine_label})</div>
         <div style="font-size: 3.5rem; font-weight: 900; color: {score_color}; font-family: 'JetBrains Mono', monospace; margin: 0.5rem 0;">
             {score_display}<span style="font-size: 1.5rem; font-weight: 500; color: #94a3b8;">/100</span>
         </div>
@@ -910,14 +629,14 @@ st.markdown("---")
 # ─── NEWS FEED LISTING ───────────────────────────────────────────────────────
 
 # Filtro lateral/superior de notícias
-section_header(ICO_NEWS, "Feed Qualitativo de Notícias da Carteira", "h2")
+section_header(ICO_NEWS, "Feed de Notícias da Carteira", "h2")
 st.caption(
-    "O sentimento consolidado e o gráfico consideram todas as notícias; "
-    "os filtros abaixo afetam apenas o feed."
+    "O sentimento resume notícias recentes disponíveis, agregadas primeiro por ativo; "
+    "não é previsão de retorno. Os filtros abaixo afetam apenas o feed."
 )
 
 
-col_filter, col_sort, col_sentiment, col_impact = st.columns([1, 1, 1, 1])
+col_filter, col_sort, col_sentiment, col_intensity = st.columns([1, 1, 1, 1])
 with col_filter:
     selected_ticker = st.selectbox(
         "Filtrar por ativo",
@@ -928,7 +647,7 @@ with col_filter:
 with col_sort:
     sort_mode = st.selectbox(
         "Ordenar por",
-        ["Mais recentes", "Mais impactantes", "Mais otimistas", "Mais pessimistas"]
+        ["Mais recentes", "Maior intensidade", "Mais otimistas", "Mais pessimistas"]
     )
 with col_sentiment:
     sentiment_filter = st.selectbox(
@@ -936,13 +655,10 @@ with col_sentiment:
         ["Todos", "Otimistas", "Neutras", "Pessimistas"],
         help="Mostra apenas notícias classificadas pelo PLN com o sentimento escolhido.",
     )
-    impact_filter = st.selectbox(
-        "Filtrar por impacto",
-        ["Todos", *_IMPACT_LEVELS],
-        help=(
-            "Mostra apenas notícias nos cinco níveis de impacto "
-            "calculados pelo score de sentimento."
-        ),
+    intensity_filter = st.selectbox(
+        "Filtrar por intensidade do sentimento",
+        ["Todos", *_INTENSITY_LEVELS],
+        help="Faixas de intensidade baseadas apenas no score de sentimento; não representam materialidade financeira.",
     )
 
 
@@ -954,66 +670,43 @@ if sentiment_filter != "Todos":
         "Pessimistas": "Pessimista",
     }[sentiment_filter]
     filtered_news = [x for x in filtered_news if x["sentiment"] == _sentiment_value]
-if impact_filter != "Todos":
+if intensity_filter != "Todos":
     filtered_news = [
-        x for x in filtered_news if x["impact"] == impact_filter
+        x for x in filtered_news if x["intensity"] == intensity_filter
     ]
 
-# Ordenar notícias
-def parse_pub_time(pub_time):
-    # Try to parse string formats to sort news nicely
-    if "Há" in pub_time:
-        try:
-            return int(pub_time.split()[1])
-        except Exception:
-            logger.debug("parse_pub_time relative-format parse failed for %r", pub_time, exc_info=True)
-            return 24
-    elif "/" in pub_time:
-        try:
-            dt = datetime.datetime.strptime(pub_time, '%d/%m/%Y %H:%M')
-            # return negative timestamp for descending sort
-            return -int(dt.timestamp())
-        except Exception:
-            logger.debug("parse_pub_time absolute-format parse failed for %r", pub_time, exc_info=True)
-            return 0
-    return 24
-
+# RSS dates are parsed timezone-aware UTC datetimes; newest first.
 if sort_mode == "Mais recentes":
-    filtered_news = sorted(filtered_news, key=lambda x: parse_pub_time(x["pub_time"]))
-elif sort_mode == "Mais impactantes":
-    impact_rank = {impact: rank for rank, impact in enumerate(_IMPACT_LEVELS)}
-    filtered_news = sorted(filtered_news, key=lambda x: impact_rank.get(x["impact"], 5))
+    filtered_news = sorted(filtered_news, key=lambda x: x["published"], reverse=True)
+elif sort_mode == "Maior intensidade":
+    intensity_rank = {level: rank for rank, level in enumerate(_INTENSITY_LEVELS)}
+    filtered_news = sorted(filtered_news, key=lambda x: intensity_rank.get(x["intensity"], 5))
 elif sort_mode == "Mais otimistas":
     filtered_news = sorted(filtered_news, key=lambda x: -x["score"])
 elif sort_mode == "Mais pessimistas":
     filtered_news = sorted(filtered_news, key=lambda x: x["score"])
 
-_live_count = sum(
-    1 for item in filtered_news if not item.get("is_synthetic", False)
-)
-_illustrative_count = sum(
-    1 for item in filtered_news if item.get("is_synthetic", False)
-)
 total_news = len(filtered_news)
 pos_f = sum(1 for x in filtered_news if x["sentiment"] == "Otimista")
 neg_f = sum(1 for x in filtered_news if x["sentiment"] == "Pessimista")
 neu_f = total_news - pos_f - neg_f
 st.caption(
-    f"Exibindo {total_news} itens — {_live_count} notícias atuais · "
-    f"{_illustrative_count} exemplos ilustrativos · "
-    f"{pos_f} otimistas · {neu_f} neutras · {neg_f} pessimistas"
+    f"Exibindo {total_news} notícias recentes · {pos_f} otimistas · "
+    f"{neu_f} neutras · {neg_f} pessimistas"
 )
+st.metric("Cobertura de notícias da carteira", f"{news_coverage:.1%}",
+          help="Soma do peso dos ativos com pelo menos uma notícia recente; ativos sem notícias não são tratados como neutros.")
 
 if not filtered_news:
     st.info(
         "Nenhuma notícia corresponde aos filtros atuais. "
-        "Tente selecionar outro ativo, sentimento ou impacto."
+        "Tente outro filtro ou aguarde notícias recentes para os ativos selecionados."
     )
 
 
 # Paginação
 ITEMS_PER_PAGE = 15
-page_key = f"{selected_ticker}_{sort_mode}_{sentiment_filter}_{impact_filter}"
+page_key = f"{selected_ticker}_{sort_mode}_{sentiment_filter}_{intensity_filter}"
 if st.session_state.get("_noticias_filter_key") != page_key:
     st.session_state["noticias_page"] = 1
     st.session_state["_noticias_filter_key"] = page_key
@@ -1029,15 +722,16 @@ for news in news_to_show:
     badge_color = "#4ade80" if news["sentiment"] == "Otimista" else \
                   "#f87171" if news["sentiment"] == "Pessimista" else "#60a5fa"
                   
-    impact_color = "#4ade80" if news["impact"] == "Baixo" else \
-                   "#ffd600" if "Médio" in news["impact"] else "#ff3d5a"
+    intensity_color = "#4ade80" if news["intensity"] == "Baixo" else \
+                      "#ffd600" if "Médio" in news["intensity"] else "#ff3d5a"
 
     # Escape external feed content before embedding it in custom HTML.
     _news_ticker = escape(str(news["ticker"]))
     _news_provider = escape(str(news["provider"]))
     _news_pub_time = escape(str(news["pub_time"]))
     _news_sentiment = escape(str(news["sentiment"]).upper())
-    _news_impact = escape(str(news["impact"]).upper())
+    _news_intensity = escape(str(news["intensity"]).upper())
+    _news_engine = escape(str(news["engine"]))
     _news_title = escape(str(news["title"]))
     _news_summary = escape(str(news["summary"]))
     _raw_link = str(news.get("link", "")).strip()
@@ -1068,7 +762,7 @@ for news in news_to_show:
                     {_news_ticker}
                 </span>
                 <span style="color: var(--text-muted); font-size: 0.72rem; font-family: 'JetBrains Mono', monospace;">
-                    {_news_provider} • {_news_pub_time}
+                    {_news_provider} • {_news_pub_time} • {_news_engine}
                 </span>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -1076,7 +770,7 @@ for news in news_to_show:
                     {_news_sentiment}
                 </span>
                 <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">
-                    IMPACTO: <span style="color: {impact_color}; font-weight: 800;">{_news_impact}</span>
+                    INTENSIDADE DO SENTIMENTO: <span style="color: {intensity_color}; font-weight: 800;">{_news_intensity}</span>
                 </span>
             </div>
         </div>
@@ -1190,93 +884,21 @@ section_header(ICO_TARGET, "Insights Estratégicos & Análise de Risco Qualitati
 
 insights_html = []
 
-# Gerar diagnósticos baseados no score médio
 if not live_news_items:
-    insights_html.append(
-        get_diag_row_html(
-            ICO_WARN,
-            "<b>Dados recentes indisponíveis:</b> Atualize o feed antes de "
-            "usar o sentimento como sinal de decisão.",
-            "#64748b",
-        )
-    )
-elif normalized_score >= 60:
-    insights_html.append(
-        get_diag_row_html(
-            ICO_OK,
-            "<b>Fator de Sentimento Positivo:</b> A carteira possui sentimentos "
-            "favoráveis dominantes. Isto apoia a tese de manutenção ou leve "
-            "ampliação em correções técnicas.",
-            "#00ff87",
-        )
-    )
-elif normalized_score >= 40:
-    insights_html.append(
-        get_diag_row_html(
-            ICO_WARN,
-            "<b>Sentimento de Consolidação:</b> Fluxo de notícias equilibrado "
-            "entre fatores macro e dinâmicas internas. Mantenha os "
-            "rebalanceamentos normais programados.",
-            "#ffd600",
-        )
-    )
+    insights_html.append(get_diag_row_html(ICO_WARN,
+        "<b>Dados recentes indisponíveis:</b> Nenhuma observação de sentimento pode ser feita.", "#64748b"))
 else:
-    insights_html.append(
-        get_diag_row_html(
-            ICO_CRIT,
-            "<b>Sinal de Alerta Qualitativo:</b> Sentimento desfavorável "
-            "predominante nos ativos selecionados. Monitore potenciais "
-            "rompimentos de suporte técnico.",
-            "#ff3d5a",
-        )
-    )
-    
-# Análise de concentração qualitativa (pesos elevados em ações com sentimento negativo)
-risco_alto = False
-for item in live_news_items:
-    if item["sentiment"] == "Pessimista" and item["peso"] >= 0.25:
-        risco_alto = True
-        insights_html.append(get_diag_row_html(ICO_CRIT, f"<b>Risco de Concentração Negativa:</b> O ativo <b>{item['ticker']}</b> tem peso expressivo ({item['peso']*100:.1f}%) e está sob fluxo de notícias pessimistas (<i>{item['title']}</i>).", "#ff3d5a"))
-        
-if live_news_items and not risco_alto:
-    insights_html.append(
-        get_diag_row_html(
-            ICO_OK,
-            "<b>Risco Qualitativo Controlado:</b> Não foram detectadas posições "
-            "altamente concentradas em ativos com fluxo de notícias pessimistas graves.",
-            "#00ff87",
-        )
-    )
-elif not live_news_items:
-    insights_html.append(
-        get_diag_row_html(
-            ICO_WARN,
-            "<b>Risco qualitativo não avaliado:</b> Não há notícias recentes "
-            "suficientes para validar essa leitura.",
-            "#64748b",
-        )
-    )
-    
-if live_news_items:
-    insights_html.append(
-        get_diag_row_html(
-            ICO_IDEA,
-            "<b>Sugestão de Alocação:</b> Use as notícias e o indicador "
-            "qualitativo para programar rebalanceamentos operacionais. Em "
-            "momentos de sentimento extremo, a volatilidade de curto prazo "
-            "tende a se elevar.",
-            "#ffd600",
-        )
-    )
-else:
-    insights_html.append(
-        get_diag_row_html(
-            ICO_IDEA,
-            "<b>Próximo passo:</b> Atualize o feed quando a fonte de notícias "
-            "estiver disponível antes de interpretar o sentimento da carteira.",
-            "#ffd600",
-        )
-    )
+    coverage_pct = news_coverage * 100
+    insights_html.append(get_diag_row_html(ICO_IDEA,
+        f"<b>Cobertura:</b> há notícias recentes para {coverage_pct:.1f}% do peso da carteira; a parcela sem cobertura foi excluída do sentimento.", "#00d2ff"))
+    means = {}
+    for item in live_news_items:
+        means.setdefault(item["ticker"], []).append(item["score"])
+    for ticker, scores in means.items():
+        mean_score = sum(scores) / len(scores)
+        label = "favorável" if mean_score >= 0.2 else "desfavorável" if mean_score <= -0.2 else "misto/neutro"
+        insights_html.append(get_diag_row_html(ICO_WARN,
+            f"<b>{escape(str(ticker))}:</b> tom médio {label} ({mean_score:+.2f}); observação textual, sem implicação de retorno.", "#ffd600"))
 
 st.markdown(f"""
 <div class="financial-panel">
