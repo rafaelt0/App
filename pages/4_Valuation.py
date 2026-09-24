@@ -132,13 +132,17 @@ def get_koller_data(ticker_b3: str):
         bs = t.balance_sheet
         info = t.info or {}
 
-        def _v(df, keys, col_i=0):
-            if df is None or df.empty or col_i >= len(df.columns):
+        def _v(df, keys, statement_date):
+            if df is None or df.empty:
+                return None
+            date_to_col = {pd.Timestamp(col): col for col in df.columns}
+            col = date_to_col.get(pd.Timestamp(statement_date))
+            if col is None:
                 return None
             for k in keys:
                 if k in df.index:
                     try:
-                        v = pd.to_numeric(df.loc[k].iloc[col_i], errors="coerce")
+                        v = pd.to_numeric(df.loc[k, col], errors="coerce")
                         if not pd.isna(v):
                             return float(v)
                     except Exception:
@@ -162,47 +166,44 @@ def get_koller_data(ticker_b3: str):
         if inc is None or inc.empty:
             return None
 
-        n = min(len(inc.columns), 4)
+        statement_dates = sorted((pd.Timestamp(date) for date in inc.columns), reverse=True)[:4]
         years = []
-        for i in range(n):
-            date = inc.columns[i]
+        for date in statement_dates:
             ylbl = str(date.year) if hasattr(date, "year") else str(date)[:4]
-            rev = _v(inc, ["Total Revenue", "Revenue"], i)
-            ebit = _v(inc, ["EBIT", "Operating Income"], i)
-            pretx = _v(inc, ["Pretax Income"], i)
-            taxex = _v(inc, ["Tax Provision", "Income Tax Expense"], i)
-            intr = _v(inc, ["Interest Expense", "Interest Expense Non Operating"], i)
-            da = _v(cf, ["Depreciation And Amortization", "Depreciation"], i)
-            capex = _v(cf, ["Capital Expenditure"], i)
-            dwc = _v(cf, ["Change In Working Capital"], i)
-            ppe = _v(bs, ["Net PPE", "Net Property Plant And Equipment"], i)
-            gw = _v(bs, ["Goodwill And Other Intangible Assets", "Goodwill"], i) or 0.0
-            ca = _v(bs, ["Current Assets", "Total Current Assets"], i)
-            cl = _v(bs, ["Current Liabilities", "Total Current Liabilities"], i)
+            rev = _v(inc, ["Total Revenue", "Revenue"], date)
+            ebit = _v(inc, ["EBIT", "Operating Income"], date)
+            pretx = _v(inc, ["Pretax Income"], date)
+            taxex = _v(inc, ["Tax Provision", "Income Tax Expense"], date)
+            intr = _v(inc, ["Interest Expense", "Interest Expense Non Operating"], date)
+            da = _v(cf, ["Depreciation And Amortization", "Depreciation"], date)
+            capex = _v(cf, ["Capital Expenditure"], date)
+            dwc = _v(cf, ["Change In Working Capital"], date)
+            ppe = _v(bs, ["Net PPE", "Net Property Plant And Equipment"], date)
+            gw = _v(bs, ["Goodwill And Other Intangible Assets", "Goodwill"], date)
+            ca = _v(bs, ["Current Assets", "Total Current Assets"], date)
+            cl = _v(bs, ["Current Liabilities", "Total Current Liabilities"], date)
             cash = _v(
                 bs,
                 [
                     "Cash And Cash Equivalents",
                     "Cash Cash Equivalents And Short Term Investments",
                 ],
-                i,
+                date,
             )
-            dbt_s = (
-                _v(bs, ["Current Debt", "Current Portion Of Long Term Debt"], i) or 0.0
-            )
-            dbt_l = (
-                _v(
-                    bs,
-                    ["Long Term Debt", "Long Term Debt And Capital Lease Obligation"],
-                    i,
-                )
-                or 0.0
+            dbt_s = _v(bs, ["Current Debt", "Current Portion Of Long Term Debt"], date)
+            dbt_l = _v(
+                bs,
+                ["Long Term Debt", "Long Term Debt And Capital Lease Obligation"],
+                date,
             )
             equity = _v(
-                bs, ["Stockholders Equity", "Total Equity Gross Minority Interest"], i
+                bs, ["Stockholders Equity", "Total Equity Gross Minority Interest"], date
             )
 
-            if ebit is None or rev is None:
+            if any(value is None for value in (
+                rev, ebit, pretx, taxex, da, capex, dwc, ppe, gw, ca, cl,
+                cash, dbt_s, dbt_l, equity,
+            )):
                 continue
 
             metrics = compute_year_metrics(
@@ -223,22 +224,20 @@ def get_koller_data(ticker_b3: str):
                 equity=equity,
                 interest_expense=intr,
             )
+            if metrics is None:
+                continue
             years.append({"year": ylbl, "revenue": rev, "ebit": ebit, **metrics})
 
         if not years:
-            return None
+            return {"_error": "Sem demonstrações completas com datas fiscais alinhadas entre DRE, DFC e balanço."}
 
         ys = compute_roic_series(sorted(years, key=lambda x: x["year"]))
 
-        shares = max(
-            _info_float(("sharesOutstanding", "impliedSharesOutstanding"), 1.0),
-            1.0,
-        )
-        beta = _info_float(("beta",), 1.0)
-        price = max(
-            _info_float(("currentPrice", "regularMarketPrice"), 0.0),
-            0.0,
-        )
+        shares = _info_float(("sharesOutstanding", "impliedSharesOutstanding"), None)
+        beta = _info_float(("beta",), None)
+        price = _info_float(("currentPrice", "regularMarketPrice"), None)
+        if not shares or shares <= 0 or beta is None:
+            return {"_error": "yfinance não forneceu ações em circulação ou beta; valuation indisponível."}
         lat = ys[-1]
         kd_est = (
             abs(lat["interest"]) / lat["debt"] * 100
@@ -419,9 +418,8 @@ if skey not in st.session_state:
     _ke = round(min(selic * 100 + _b * ERP_MATURE, 22.0), 1)
     _kd = round(min(max(kd_est, 4.0), 20.0), 1) if kd_est else 8.0
     _mkt_equity = price * shares if price and shares else 0
-    _equity_for_weight = _mkt_equity if _mkt_equity > 0 else latest["equity"]
-    _ev0 = max(_equity_for_weight + t_debt - cash_v, 1)
-    _ew = round(max(min(_equity_for_weight / _ev0, 0.95), 0.3), 2)
+    _capital = _mkt_equity + t_debt
+    _ew = _mkt_equity / _capital if price and price > 0 and _capital > 0 else 0.5
     _roic_hist = next((y["roic"] for y in reversed(ys) if y.get("roic") and y["roic"] > 0), 12.0) or 12.0
     _g1 = round(min(max(cagr or 5.0, 0.0), 20.0), 1)
     st.session_state[skey] = {
@@ -811,42 +809,47 @@ with tabs[3]:
             noplat0, g1, g2, ss["gt"], wacc_dec, roic_cv, roic_proj
         )
 
-        df_proj = pd.DataFrame(
-            [
-                {
-                    "Ano": f"T+{r['t']}",
-                    "g (%)": f"{r['g_pct']:.1f}%",
-                    "NOPLAT": _fmt(r["noplat"]),
-                    "Reinv. (%)": f"{r['reinv_pct']:.1f}%",
-                    "FCF": _fmt(r["fcf"]),
-                    "PV (FCF)": _fmt(r["pv"]),
-                }
-                for r in proj_rows
-            ]
-        )
-        df_proj = df_proj.set_index("Ano")
-        st.dataframe(df_proj, use_container_width=True)
-
-        # Waterfall chart
-        fig_wf = go.Figure(
-            go.Bar(
-                x=[f"T+{r['t']}" for r in proj_rows],
-                y=[r["fcf"] / 1e6 for r in proj_rows],
-                marker_color=[
-                    "#00ff87" if r["fcf"] >= 0 else "#ff3d5a" for r in proj_rows
-                ],
+        if not proj_rows:
+            st.error(
+                "Projeção indisponível: crescimento excede o ROIC ou WACC ≤ crescimento terminal."
             )
-        )
-        fig_wf.update_layout(
-            title="FCF Projetado (R$ mi)", height=240, yaxis_title="FCF (R$ mi)"
-        )
-        apply_plotly_theme(fig_wf)
-        st.plotly_chart(fig_wf, use_container_width=True)
+        else:
+            df_proj = pd.DataFrame(
+                [
+                    {
+                        "Ano": f"T+{r['t']}",
+                        "g (%)": f"{r['g_pct']:.1f}%",
+                        "NOPLAT": _fmt(r["noplat"]),
+                        "Reinv. (%)": f"{r['reinv_pct']:.1f}%",
+                        "FCF": _fmt(r["fcf"]),
+                        "PV (FCF)": _fmt(r["pv"]),
+                    }
+                    for r in proj_rows
+                ]
+            )
+            df_proj = df_proj.set_index("Ano")
+            st.dataframe(df_proj, use_container_width=True)
 
-        st.caption(
-            f"NOPLAT base: {_fmt(noplat0)} | "
-            f"Reinvestimento = g / ROIC_proj ({roic_proj:.1f}%) por período"
-        )
+            # Waterfall chart
+            fig_wf = go.Figure(
+                go.Bar(
+                    x=[f"T+{r['t']}" for r in proj_rows],
+                    y=[r["fcf"] / 1e6 for r in proj_rows],
+                    marker_color=[
+                        "#00ff87" if r["fcf"] >= 0 else "#ff3d5a" for r in proj_rows
+                    ],
+                )
+            )
+            fig_wf.update_layout(
+                title="FCF Projetado (R$ mi)", height=240, yaxis_title="FCF (R$ mi)"
+            )
+            apply_plotly_theme(fig_wf)
+            st.plotly_chart(fig_wf, use_container_width=True)
+
+            st.caption(
+                f"NOPLAT base: {_fmt(noplat0)} | "
+                f"Reinvestimento = g / ROIC_proj ({roic_proj:.1f}%) por período"
+            )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 5 — Valor Terminal
@@ -885,7 +888,8 @@ CV_T = NOPLAT_{T+1} × (1 − g / ROIC_cv) / (WACC − g)
         )
         ss["roic_cv"] = roic_cv
 
-    if latest["noplat"] > 0:
+    if (latest["noplat"] > 0 and ss["g1"] <= ss["roic_proj"]
+            and ss["g2"] <= ss["roic_proj"] and ss["gt"] <= ss["roic_cv"]):
         noplat0 = latest["noplat"]
         noplat_11 = (
             noplat0
@@ -939,8 +943,8 @@ CV_T = NOPLAT_{T+1} × (1 − g / ROIC_cv) / (WACC − g)
                 )
 
             # Fórmula detalhada
-            reinv_tv = min(gt / 100 / (roic_cv / 100), 0.99) if roic_cv > 0 else 0
-            fcf_mult_tv = max(1 - reinv_tv, 0.01)
+            reinv_tv = gt / roic_cv if roic_cv > 0 else 0
+            fcf_mult_tv = 1 - reinv_tv
             st.markdown(
                 f'<div style="font-size:0.78rem;color:#64748b;padding:0.5rem 0;line-height:1.8">'
                 f'<b style="color:#94a3b8">Fórmula:</b><br>'
@@ -962,7 +966,9 @@ CV_T = NOPLAT_{T+1} × (1 − g / ROIC_cv) / (WACC − g)
                 "WACC ≤ g terminal — modelo indefinido. Aumente o WACC ou reduza g."
             )
     else:
-        st.error("NOPLAT negativo — não é possível calcular o Continuing Value.")
+        st.error(
+            "NOPLAT negativo ou crescimento superior ao ROIC — Continuing Value indisponível."
+        )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 6 — WACC
@@ -1024,11 +1030,13 @@ with tabs[5]:
         ss["kd"] = kd
 
     st.markdown("**6c. Estrutura de Capital (pesos de mercado)**")
+    if price is None:
+        st.warning("Cotação indisponível; peso inicial E/V de 50% é apenas uma premissa editável, não peso de mercado.")
     e_weight = (
         st.number_input(
             "Participação do Equity — E/(E+D) (%)",
-            20.0,
-            95.0,
+            0.0,
+            100.0,
             value=float(ss["e_weight"] * 100),
             step=1.0,
             key=f"{skey}_ew",
@@ -1090,16 +1098,17 @@ with tabs[6]:
 
     if noplat0 <= 0:
         st.error("NOPLAT base negativo — não é possível calcular o Enterprise Value.")
-    elif wacc_dec <= ss["gt"] / 100:
+    elif (wacc_dec <= ss["gt"] / 100 or ss["g1"] > ss["roic_proj"]
+          or ss["g2"] > ss["roic_proj"] or ss["gt"] > ss["roic_cv"]):
         st.error(
-            "WACC ≤ g terminal — modelo indefinido. Ajuste os parâmetros na aba WACC."
+            "DCF indisponível: WACC ≤ g terminal ou crescimento superior ao ROIC. Ajuste as premissas."
         )
     else:
         pv_exp, pv_cv, ev, proj_rows, cv, noplat_11 = calc_dcf(
             noplat0, ss["g1"], ss["g2"], ss["gt"], wacc_dec, ss["roic_cv"], ss["roic_proj"]
         )
 
-        net_debt = t_debt - cash_v
+        net_debt = t_debt - latest["excess_cash"]
         equity_val = ev - net_debt
         price_iv = equity_val / shares if shares > 0 else None
         upside = (
@@ -1112,12 +1121,12 @@ with tabs[6]:
         )
 
         # Summary cards
-        vc_up = "#00ff87" if (upside and upside > 0) else "#ff3d5a"
+        vc_up = "#00ff87" if (upside is not None and upside > 0) else "#ff3d5a"
         verdict = (
             "SUBAVALIADO"
-            if upside and upside > 15
+            if upside is not None and upside > 15
             else "SOBREAVALIADO"
-            if upside and upside < -15
+            if upside is not None and upside < -15
             else "PRÓXIMO DO JUSTO"
         )
         vcolor = (
@@ -1149,7 +1158,7 @@ with tabs[6]:
                 "(−) Dívida Líquida",
                 _fmt(-net_debt),
                 "#f87171",
-                tip="Dívida total − Caixa. Ponte firma → ação.",
+                tip="Dívida total − caixa excedente (caixa operacional permanece na operação). Ponte firma → ação.",
             )
             + _card(
                 "Equity Value",
@@ -1158,23 +1167,23 @@ with tabs[6]:
                 tip="Equity Value = Enterprise Value − Dívida Líquida",
             )
         )
-        if price_iv:
+        if price_iv is not None:
             res_cards += (
                 _card("IV por Ação", f"R$ {price_iv:,.2f}", "#00ff87")
-                + _card("Preço Atual", f"R$ {price:,.2f}", "#94a3b8")
+                + _card("Preço Atual", f"R$ {price:,.2f}" if price is not None else "—", "#94a3b8")
                 + _card(
                     "Potencial",
-                    f"{upside:+.1f}%",
+                    f"{upside:+.1f}%" if upside is not None else "—",
                     vc_up,
-                    badge_text=verdict,
+                    badge_text=verdict if upside is not None else "COTAÇÃO INDISPONÍVEL",
                     badge_style=f"color:{vcolor};background:{vcolor}18;border:1px solid {vcolor}44",
                 )
                 + _card(
                     "Margem de Seg.",
-                    f"{ms:.1f}%" if ms else "—",
+                    f"{ms:.1f}%" if ms is not None else "—",
                     "#00ff87"
-                    if ms and ms > 20
-                    else ("#ff3d5a" if ms and ms < 0 else "#ffd600"),
+                    if ms is not None and ms > 20
+                    else ("#ff3d5a" if ms is not None and ms < 0 else "#ffd600"),
                 )
             )
         st.markdown(
@@ -1182,7 +1191,7 @@ with tabs[6]:
         )
 
         # Price vs IV bar
-        if price_iv and price > 0:
+        if price_iv is not None and price and price > 0:
             total_r = max(price_iv, price) * 1.15
             pp = min(price / total_r * 100, 100)
             ip = min(price_iv / total_r * 100, 100)
@@ -1249,7 +1258,7 @@ with tabs[6]:
             for w in wacc_range:
                 row_z, row_t = [], []
                 for g in gt_range:
-                    if w <= g / 100:
+                    if w <= g / 100 or g > ss["roic_cv"]:
                         row_z.append(None)
                         row_t.append("N/A")
                         continue
@@ -1340,11 +1349,14 @@ with tabs[7]:
     ebit0 = latest["ebit"]
     rev0 = latest["revenue"]
 
-    if noplat0 > 0 and ebit0 and rev0:
+    if noplat0 > 0 and ebit0 and rev0 and wacc_dec > ss["gt"] / 100:
         # Implied multiples from our DCF
         _, _, ev_dcf, _, _, _ = calc_dcf(
             noplat0, ss["g1"], ss["g2"], ss["gt"], wacc_dec, ss["roic_cv"], ss["roic_proj"]
         )
+        if ev_dcf is None:
+            st.warning("Múltiplos DCF indisponíveis: premissas de crescimento/ROIC inconsistentes.")
+            ev_dcf = None
 
         ebitda_approx = ebit0 + latest["da"]  # EBITDA ≈ EBIT + D&A
         ebita_approx = ebit0  # EBITA ≈ EBIT (sem amortização explícita)
@@ -1352,42 +1364,29 @@ with tabs[7]:
         mult_rows = [
             (
                 "EV/EBITDA",
-                ev_dcf / ebitda_approx if ebitda_approx > 0 else None,
+                ev_dcf / ebitda_approx if ev_dcf is not None and ebitda_approx > 0 else None,
                 "Mais comum; neutro para D&A",
                 "Koller: preferido para comparação entre empresas do mesmo setor",
             ),
             (
                 "EV/EBITA",
-                ev_dcf / ebita_approx if ebita_approx > 0 else None,
+                ev_dcf / ebita_approx if ev_dcf is not None and ebita_approx > 0 else None,
                 "Melhor para comparação entre indústrias",
                 "Remove o efeito de políticas de depreciação diferentes",
             ),
             (
                 "EV/NOPLAT",
-                ev_dcf / noplat0 if noplat0 > 0 else None,
+                ev_dcf / noplat0 if ev_dcf is not None and noplat0 > 0 else None,
                 "Consistente com DCF; ajusta impostos",
-                "Múltiplo mais alinhado ao Enterprise DCF — equivalente ao P/E sem alavancagem",
+                "Múltiplo mais alinhado ao Enterprise DCF; não é múltiplo de lucro líquido",
             ),
             (
                 "EV/Receita",
-                ev_dcf / rev0 if rev0 > 0 else None,
+                ev_dcf / rev0 if ev_dcf is not None and rev0 > 0 else None,
                 "Para early-stage ou margens muito baixas",
                 "Útil quando EBITDA é negativo ou muito volátil",
             ),
         ]
-
-        if price and price > 0 and shares > 0:
-            mkt_cap = price * shares
-            lpa = noplat0 / shares
-            mult_rows.insert(
-                2,
-                (
-                    "P/E (implícito)",
-                    mkt_cap / (noplat0) if noplat0 > 0 else None,
-                    "Inclui efeito de alavancagem financeira",
-                    "Calculado sobre NOPLAT (proxy do lucro operacional líquido)",
-                ),
-            )
 
         st.markdown("**Múltiplos implícitos pelo DCF vs mercado atual:**")
         for name, val, desc, note in mult_rows:
@@ -1421,7 +1420,7 @@ with tabs[7]:
             )
     else:
         st.warning(
-            "NOPLAT, EBIT ou Receita indisponíveis para calcular os múltiplos implícitos."
+            "DCF e múltiplos indisponíveis: WACC ≤ crescimento terminal ou NOPLAT/EBIT/Receita ausentes."
         )
 
     # ── Comparação de Múltiplos do Setor ─────────────────────────────────────────

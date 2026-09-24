@@ -22,16 +22,12 @@ def test_calc_cv_none_when_wacc_at_or_below_g():
     assert calc_cv(1000.0, 6.0, 15.0, 0.05) is None
 
 
-def test_calc_cv_reinvestment_capped_at_99_percent():
-    # g >> roic_cv would imply reinvesting >100% of NOPLAT — capped at 99%.
-    cv = calc_cv(1000.0, 6.0, 1.0, 0.10)
-    expected = 1000.0 * 0.01 / (0.10 - 0.06)
-    assert cv == pytest.approx(expected)
+def test_calc_cv_unavailable_when_growth_exceeds_roic():
+    assert calc_cv(1000.0, 6.0, 1.0, 0.10) is None
 
 
-def test_calc_cv_zero_roic_cv_means_no_reinvestment():
-    cv = calc_cv(1000.0, 4.0, 0.0, 0.10)
-    assert cv == pytest.approx(1000.0 / (0.10 - 0.04))
+def test_calc_cv_unavailable_when_roic_is_zero():
+    assert calc_cv(1000.0, 4.0, 0.0, 0.10) is None
 
 
 # ─── calc_dcf ───────────────────────────────────────────────────────────────
@@ -60,16 +56,30 @@ def test_calc_dcf_noplat_11_compounds_both_growth_phases_plus_terminal():
     assert noplat_11 == pytest.approx(expected)
 
 
-def test_calc_dcf_reinvestment_rate_capped_at_95_percent_in_explicit_period():
-    # Very high growth vs low ROIC would demand >100% reinvestment; capped at 95%,
-    # so FCF is never less than 5% of NOPLAT for a given projected year.
+def test_calc_dcf_unavailable_when_wacc_is_at_or_below_terminal_growth():
+    result = calc_dcf(1000, 5, 4, 6, 0.06, roic_cv_pct=15)
+    assert result == (None, None, None, [], None, None)
+
+
+def test_calc_dcf_fcf_uses_uncapped_reinvestment_rate():
     _, _, _, rows, _, _ = calc_dcf(
-        noplat0=1000, g1_pct=20, g2_pct=20, gt_pct=3.0, wacc_dec=0.14, roic_cv_pct=14,
-        roic_proj_pct=1.0,
+        1000, 10, 5, 3, 0.15, roic_cv_pct=15, roic_proj_pct=20
     )
-    for r in rows:
-        assert r["reinv_pct"] <= 95.0
-        assert r["fcf"] == pytest.approx(r["noplat"] * 0.05)
+    assert rows[0]["reinv_pct"] == pytest.approx(50.0)
+    assert rows[0]["fcf"] == pytest.approx(rows[0]["noplat"] * 0.5)
+
+
+def test_calc_dcf_unavailable_when_growth_exceeds_roic():
+    result = calc_dcf(
+        noplat0=1000, g1_pct=20, g2_pct=20, gt_pct=3.0, wacc_dec=0.14,
+        roic_cv_pct=14, roic_proj_pct=1.0,
+    )
+    assert result == (None, None, None, [], None, None)
+
+
+def test_calc_dcf_unavailable_when_terminal_growth_exceeds_roic():
+    result = calc_dcf(1000, 5, 4, 6, 0.10, roic_cv_pct=5)
+    assert result == (None, None, None, [], None, None)
 
 
 def test_calc_dcf_roic_proj_defaults_to_roic_cv_when_not_given():
@@ -79,8 +89,8 @@ def test_calc_dcf_roic_proj_defaults_to_roic_cv_when_not_given():
 
 
 def test_calc_dcf_higher_roic_cv_increases_terminal_value():
-    low_roic = calc_dcf(1000, 10, 5, 3.5, 0.15, roic_cv_pct=6)
-    high_roic = calc_dcf(1000, 10, 5, 3.5, 0.15, roic_cv_pct=20)
+    low_roic = calc_dcf(1000, 5, 4, 3.5, 0.15, roic_cv_pct=6)
+    high_roic = calc_dcf(1000, 5, 4, 3.5, 0.15, roic_cv_pct=20)
     assert high_roic[1] > low_roic[1]  # pv_cv
 
 
@@ -108,9 +118,8 @@ def _base_year_kwargs(**overrides):
     return kwargs
 
 
-def test_compute_year_metrics_default_tax_rate_when_missing():
-    m = compute_year_metrics(**_base_year_kwargs(pretax_income=None, tax_expense=None))
-    assert m["tax_rate"] == 0.34
+def test_compute_year_metrics_unavailable_when_tax_inputs_missing():
+    assert compute_year_metrics(**_base_year_kwargs(pretax_income=None, tax_expense=None)) is None
 
 
 def test_compute_year_metrics_tax_rate_clamped_to_10_40_range():
@@ -131,6 +140,10 @@ def test_compute_year_metrics_noplat_uses_effective_tax_rate():
     assert m["noplat"] == pytest.approx(200_000.0 * (1 - 0.30))
 
 
+def test_compute_year_metrics_unavailable_when_required_cash_flow_missing():
+    assert compute_year_metrics(**_base_year_kwargs(capex=None)) is None
+
+
 def test_compute_year_metrics_fcf_adds_delta_wc_not_subtracts():
     # delta_wc already carries the DFC-indireto cash-flow sign; a negative value
     # (working capital consuming cash) must reduce FCF when added, matching the
@@ -149,20 +162,27 @@ def test_compute_year_metrics_wco_excludes_only_excess_cash():
     # cash_op floor = 1.5% of revenue = 15,000. Cash of 200,000 leaves 185,000
     # "excess" cash excluded from WCO.
     m = compute_year_metrics(**_base_year_kwargs())
-    expected_wco = 300_000.0 - 150_000.0 - (200_000.0 - 15_000.0)
+    expected_wco = 300_000.0 - (150_000.0 - 20_000.0) - (200_000.0 - 15_000.0)
     assert m["wco"] == pytest.approx(expected_wco)
 
 
 def test_compute_year_metrics_wco_keeps_cash_below_operating_floor():
     # When cash is under the operating floor, none of it is excluded (max(...,0)).
     m = compute_year_metrics(**_base_year_kwargs(cash=5_000.0))
-    expected_wco = 300_000.0 - 150_000.0 - 0
+    expected_wco = 300_000.0 - (150_000.0 - 20_000.0) - 0
     assert m["wco"] == pytest.approx(expected_wco)
 
 
 def test_compute_year_metrics_ic_sums_wco_ppe_goodwill():
     m = compute_year_metrics(**_base_year_kwargs())
     assert m["ic"] == pytest.approx(m["wco"] + 500_000.0 + 100_000.0)
+
+
+def test_compute_year_metrics_short_debt_is_removed_from_operating_liabilities():
+    metrics = compute_year_metrics(**_base_year_kwargs())
+    without_short_debt = compute_year_metrics(**_base_year_kwargs(debt_short=0.0))
+    assert metrics["wco"] == pytest.approx(without_short_debt["wco"] + 20_000.0)
+    assert metrics["excess_cash"] == pytest.approx(185_000.0)
 
 
 def test_compute_year_metrics_debt_sums_short_and_long():
