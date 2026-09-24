@@ -25,9 +25,14 @@ from utils.icons import (
     ICO_SHIELD,
     ICO_STAR,
 )
-from utils.home_data import clear_fundamentus_cache, get_fundamentus_data
+from utils.home_data import (
+    clear_fundamentus_cache,
+    get_fundamentus_data,
+    get_sector_peers,
+)
 from utils.home_render import (
     get_ticker_setor,
+    render_analyst_synthesis,
     render_debt_panel,
     render_price_cards,
     render_sector_cards,
@@ -39,6 +44,7 @@ import plotly.graph_objects as go
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 # Configurar temas de plotagem escuros
 plt.style.use("dark_background")
@@ -462,11 +468,23 @@ if tickers and not ready_to_analyze:
 
 if ready_to_analyze:
     try:
+        sector_values = tuple(
+            sorted(
+                {
+                    str(sector).strip()
+                    for sector in data.loc[
+                        data["Ticker"].isin(tickers), "Setor"
+                    ].dropna()
+                    if str(sector).strip()
+                }
+            )
+        )
         # 1. Buscar dados usando funções cacheadas, com animação de carregamento
         with loading_overlay(
             "Buscando indicadores fundamentalistas na B3…", tickers=tickers
         ):
             df = get_fundamentus_data(tickers)
+            peers_raw = get_sector_peers(sector_values)
         _fundamentus_index = {
             str(index).replace(".SA", "").strip().upper() for index in df.index
         }
@@ -776,118 +794,7 @@ if ready_to_analyze:
 
         # ── Síntese do Analista ──────────────────────────────────────────────
         st.markdown("---")
-        st.markdown(
-            """
-<h3 style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" stroke="#a855f7" stroke-width="1.8"/>
-    <path d="M12 8v4l3 3" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/>
-  </svg>
-  <span style="background:linear-gradient(135deg,#f8fafc,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Síntese do Analista</span>
-</h3>
-""",
-            unsafe_allow_html=True,
-        )
-
-        sintese_items = []
-        for t in tickers:
-            if t not in df_ind.index:
-                continue
-            r = df_ind.loc[t]
-            if isinstance(r, pd.DataFrame):
-                r = r.iloc[-1]
-            nome = df.loc[t, "Empresa"] if t in df.index else t
-            if isinstance(nome, pd.Series):
-                nome = nome.iloc[0]
-            safe_ticker = escape(str(t))
-            safe_nome = escape(str(nome))
-
-            pontos_pos = []
-            pontos_neg = []
-            alertas = []
-            fonte_label = ""
-
-            # Fallback: thresholds absolutos com contexto
-            fonte_label = "thresholds"
-            roe = float(r.get("ROE", 0) or 0)
-            roic = float(r.get("ROIC", 0) or 0)
-            pl = float(r.get("P/L", 0) or 0)
-            dy = float(r.get("Dividend Yield", 0) or 0)
-            ml = float(r.get("Margem Líquida", 0) or 0)
-            cr = float(r.get("Crescimento Receita 5 anos", 0) or 0)
-
-            if roe > 15:
-                pontos_pos.append((f"ROE {roe:.1f}%", 'title="acima dos 15% de referência"'))
-            elif roe < 5:
-                pontos_neg.append((f"ROE {roe:.1f}%", 'title="abaixo dos 5% mínimos"'))
-
-            if roic > 12:
-                pontos_pos.append((f"ROIC {roic:.1f}%", 'title="acima dos 12% de referência"'))
-            elif roic < 5:
-                pontos_neg.append((f"ROIC {roic:.1f}%", ""))
-
-            if 0 < pl < 15:
-                pontos_pos.append((f"P/L {pl:.1f}x", 'title="abaixo de 15x"'))
-            elif pl > 30:
-                pontos_neg.append((f"P/L {pl:.1f}x", 'title="acima de 30x"'))
-            elif pl < 0:
-                alertas.append((f"P/L {pl:.1f}x — prejuízo", ""))
-
-            if dy > 5:
-                pontos_pos.append((f"DY {dy:.1f}%", ""))
-
-            if cr > 10:
-                pontos_pos.append((f"Cresc.Rec {cr:.1f}%", ""))
-            elif cr < 0:
-                pontos_neg.append((f"Cresc.Rec {cr:.1f}%", ""))
-
-            if ml > 15:
-                pontos_pos.append((f"Mrg.Líq {ml:.1f}%", ""))
-            elif 0 <= ml < 5:
-                alertas.append((f"Mrg.Líq {ml:.1f}%", 'title="margem comprimida"'))
-            elif ml < 0:
-                pontos_neg.append((f"Mrg.Líq {ml:.1f}%", ""))
-
-            n_pos = len(pontos_pos)
-            n_neg = len(pontos_neg)
-            if n_pos >= 3 or (n_pos > n_neg and n_pos >= 2):
-                veredicto = ("ATRATIVO", "#00ff87")
-            elif n_neg >= 3 or (n_neg > n_pos and n_neg >= 2):
-                veredicto = ("FRACO", "#ff3d5a")
-            else:
-                veredicto = ("NEUTRO", "#ffd600")
-
-            def _chip(item, color):
-                text, tip = item
-                return (
-                    f'<span {tip} style="display:inline-block;background:{color}14;'
-                    f'border:1px solid {color}40;color:{color};border-radius:999px;'
-                    f'padding:1px 8px;font-size:0.7rem;font-weight:600;margin:0 4px 4px 0;'
-                    f'white-space:nowrap;">{escape(str(text))}</span>'
-                )
-
-            chips_html = "".join(_chip(p, "#00ff87") for p in pontos_pos)
-            chips_html += "".join(_chip(p, "#ff3d5a") for p in pontos_neg)
-            chips_html += "".join(_chip(p, "#ffd600") for p in alertas)
-            if not chips_html:
-                chips_html = '<span style="color:#64748b;font-size:0.72rem;">Dados de peers insuficientes.</span>'
-
-            sintese_items.append(f"""
-<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:10px;padding:0.55rem 0.85rem;margin-bottom:0.4rem;">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.3rem;">
-    <div>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:0.88rem;">{safe_ticker}</span>
-      <span style="font-size:0.7rem;color:#64748b;margin-left:0.4rem;">{safe_nome}</span>
-      <span style="font-size:0.62rem;color:#475569;font-style:italic;margin-left:0.4rem;">{escape(fonte_label)}</span>
-    </div>
-    <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto[1]}40;border-radius:6px;padding:0.1rem 0.6rem;font-size:0.66rem;font-weight:800;color:{veredicto[1]};letter-spacing:0.06em;">{veredicto[0]}</span>
-  </div>
-  <div>{chips_html}</div>
-</div>
-""")
-
-        if sintese_items:
-            st.markdown("".join(sintese_items), unsafe_allow_html=True)
+        render_analyst_synthesis(df_ind, df, tickers, peers_raw, data)
 
         # ── Próximo Passo ────────────────────────────────────────────────────
         tickers_str = ", ".join(tickers[:3]) + ("…" if len(tickers) > 3 else "")

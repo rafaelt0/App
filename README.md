@@ -18,6 +18,7 @@ A aplicação é organizada como um **fluxo de análise em 6 etapas**:
 * Panorama de todo o mercado com dados atualizados do Fundamentus (a cada hora).
 * Cartões de preço, indicadores por setor e ranking setorial de ativos.
 * Painel de endividamento e watchlist personalizada (favoritos por navegador).
+* Síntese do Analista compara valuation, rentabilidade e dividend yield com pares do mesmo setor, atribui um voto por categoria e informa quando a cobertura é insuficiente.
 
 ### 2. Portfolio — Análise & Otimização
 * Importação de preços históricos ajustados via `yfinance`.

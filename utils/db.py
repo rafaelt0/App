@@ -157,7 +157,23 @@ def wl_has(uid: str, ticker: str) -> bool:
         return False
 
 
-# ── Portfolio (última carteira montada) ────────────────────────────────────────
+def cache_clear_prefix(prefix: str) -> int:
+    """Delete cached entries whose keys start with prefix and return the count."""
+    if not prefix:
+        raise ValueError("cache prefix must not be empty")
+    try:
+        escaped_prefix = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        with _conn() as c:
+            cursor = c.execute(
+                "DELETE FROM cache WHERE key LIKE ? ESCAPE '\\'",
+                (f"{escaped_prefix}%",),
+            )
+            return cursor.rowcount
+    except Exception:
+        logger.warning("cache_clear_prefix failed for prefix=%s", prefix, exc_info=True)
+        return 0
+
+
 
 def portfolio_get(uid: str) -> tuple[list[str], dict]:
     """Return (tickers, weights) from this visitor's last saved portfolio."""

@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+import math
 import time
 
 import streamlit as st
@@ -43,6 +44,22 @@ def _download_close(tickers_yf, start_date):
                 )
                 time.sleep(1)
     raise last_exc
+
+
+def bound_efficient_return(
+    target_return: float,
+    minimum_return: float,
+    maximum_return: float,
+    epsilon: float = 1e-6,
+):
+    """Keep an efficient-return target feasible, or return None if degenerate."""
+    if not all(math.isfinite(value) for value in (target_return, minimum_return, maximum_return)):
+        return None
+    if maximum_return - minimum_return <= 2 * epsilon:
+        return None
+    return max(min(float(target_return), maximum_return - epsilon), minimum_return + epsilon)
+
+
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_selic_rate():

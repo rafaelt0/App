@@ -16,9 +16,122 @@ from utils.formatting import (
     format_large_number,
     get_ev_ebitda_context,
 )
-from utils.home_data import build_hist_df
+from utils.home_data import build_analyst_synthesis, build_hist_df
 from utils.icons import ICO_ALERT, ICO_BOLT, ICO_CHECK_SM
-from utils.ui import loading_overlay
+from utils.ui import analyst_synthesis_header, loading_overlay
+
+
+
+def _analyst_chip(item, color):
+    text, tooltip = item
+    return (
+        f'<span title="{escape(str(tooltip), quote=True)}" '
+        f'style="display:inline-block;background:{color}14;'
+        f'border:1px solid {color}40;color:{color};border-radius:999px;'
+        f'padding:1px 8px;font-size:0.7rem;font-weight:600;margin:0 4px 4px 0;'
+        f'white-space:nowrap;">{escape(str(text))}</span>'
+    )
+
+
+def render_analyst_synthesis(
+    df_ind,
+    company_data,
+    tickers,
+    peers_raw,
+    b3_data,
+):
+    """Render peer-relative signals and coverage for the selected tickers."""
+    analyst_synthesis_header()
+    synthesis_items = []
+    sector_lookup = {}
+    if isinstance(b3_data, pd.DataFrame) and {"Ticker", "Setor"}.issubset(
+        b3_data.columns
+    ):
+        sector_lookup = (
+            b3_data.drop_duplicates("Ticker")
+            .set_index("Ticker")["Setor"]
+            .to_dict()
+        )
+
+    for ticker in tickers:
+        if ticker not in df_ind.index:
+            continue
+
+        if ticker in company_data.index and "Empresa" in company_data.columns:
+            company_name = company_data.loc[ticker, "Empresa"]
+            if isinstance(company_name, pd.Series):
+                company_name = company_name.iloc[0]
+        else:
+            company_name = ticker
+
+        sector = sector_lookup.get(str(ticker).strip().upper(), "")
+        if not isinstance(sector, str) or not sector.strip():
+            sector = ""
+        else:
+            sector = sector.strip()
+
+        safe_ticker = escape(str(ticker))
+        safe_company_name = escape(str(company_name))
+        safe_sector = escape(sector or "Setor indisponível")
+        synthesis = build_analyst_synthesis(peers_raw, ticker, sector, b3_data)
+        verdict_color = synthesis["cor_veredicto"]
+
+        chips_html = "".join(
+            _analyst_chip(item, "#00ff87")
+            for item in synthesis["pontos_positivos"]
+        )
+        chips_html += "".join(
+            _analyst_chip(item, "#ff3d5a")
+            for item in synthesis["pontos_negativos"]
+        )
+        chips_html += "".join(
+            _analyst_chip(item, "#ffd600") for item in synthesis["alertas"]
+        )
+        if not chips_html:
+            chips_html = (
+                '<span style="color:#64748b;font-size:0.72rem;">'
+                "Dados de peers insuficientes.</span>"
+            )
+
+        category_html = "".join(
+            '<span style="display:inline-block;color:#cbd5e1;font-size:0.68rem;'
+            f'margin:0 10px 3px 0;">{escape(str(category))}: '
+            f'{escape(str(summary["veredicto"]))} · '
+            f'P{float(summary["percentil"]):.1f} · '
+            f'{int(summary["indicadores_validos"])} indicador(es)</span>'
+            for category, summary in synthesis["categorias"].items()
+        )
+        if not category_html:
+            category_html = (
+                '<span style="color:#64748b;font-size:0.68rem;">'
+                "Sem categorias com cobertura suficiente.</span>"
+            )
+
+        coverage_text = (
+            f"Cobertura: {synthesis['indicadores_validos']} indicador(es) "
+            f"válido(s) em {synthesis['categorias_validas']} categoria(s)"
+        )
+        synthesis_items.append(
+            f"""
+<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:10px;padding:0.55rem 0.85rem;margin-bottom:0.4rem;">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.3rem;">
+    <div>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:0.88rem;">{safe_ticker}</span>
+      <span style="font-size:0.7rem;color:#64748b;margin-left:0.4rem;">{safe_company_name}</span>
+      <span style="font-size:0.62rem;color:#475569;font-style:italic;margin-left:0.4rem;">{safe_sector}</span>
+    </div>
+    <span style="background:rgba(0,0,0,0.3);border:1px solid {verdict_color}40;border-radius:6px;padding:0.1rem 0.6rem;font-size:0.66rem;font-weight:800;color:{verdict_color};letter-spacing:0.06em;">{escape(str(synthesis["veredicto"]))}</span>
+  </div>
+  <div style="margin-bottom:0.2rem;">{category_html}</div>
+  <div style="color:#64748b;font-size:0.62rem;margin-bottom:0.2rem;">{escape(coverage_text)}; mínimo de 3 observações por indicador.</div>
+  <div>{chips_html}</div>
+</div>
+"""
+        )
+
+    if synthesis_items:
+        st.markdown("".join(synthesis_items), unsafe_allow_html=True)
+
 
 
 def render_sector_cards(ticker_name, row):

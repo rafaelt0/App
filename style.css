@@ -1309,6 +1309,22 @@ footer::after { display: none !important; }
   letter-spacing: -0.015em !important;
 }
 
+.analyst-synthesis-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0.5rem !important;
+}
+
+.analyst-synthesis-heading svg {
+  flex-shrink: 0;
+}
+
+.analyst-synthesis-title {
+  color: var(--text-main) !important;
+}
+
+
 .ui-section-heading::after {
   content: '';
   align-self: flex-end;
@@ -2297,7 +2313,7 @@ h6 {
   box-shadow: none !important;
 }
 
-[style*="-webkit-background-clip"] {
+[style*="-webkit-text-fill-color"] {
   background: none !important;
   -webkit-background-clip: initial !important;
   background-clip: initial !important;

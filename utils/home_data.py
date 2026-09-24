@@ -62,6 +62,128 @@ MULTIPLES_CFG = [
 COLS_NEEDED = [c[0] for c in MULTIPLES_CFG]
 
 
+def build_analyst_synthesis(
+    peers_raw: pd.DataFrame,
+    ticker: str,
+    setor: str,
+    b3_data: pd.DataFrame,
+) -> dict:
+    """Summarize a ticker's sector-relative fundamentals by category."""
+    empty_result = {
+        "pontos_positivos": [],
+        "pontos_negativos": [],
+        "alertas": [],
+        "categorias": {},
+        "indicadores_validos": 0,
+        "categorias_validas": 0,
+        "veredicto": "DADOS INSUFICIENTES",
+        "cor_veredicto": "#94a3b8",
+        "fonte": "comparação setorial",
+    }
+    if (
+        not isinstance(peers_raw, pd.DataFrame)
+        or peers_raw.empty
+        or not isinstance(b3_data, pd.DataFrame)
+        or not {"Ticker", "Setor"}.issubset(b3_data.columns)
+        or not isinstance(setor, str)
+        or not setor.strip()
+    ):
+        return empty_result
+
+    ranking = compute_sector_ranking(peers_raw, ticker, setor.strip(), b3_data)
+    if ranking.empty:
+        return empty_result
+
+    ranking = ranking.copy()
+    for column in ("Valor", "Percentil", "Peers (n)"):
+        ranking[column] = pd.to_numeric(ranking[column], errors="coerce")
+    eligible = ranking[
+        (ranking["Peers (n)"] >= 3)
+        & ranking["Valor"].notna()
+        & ranking["Percentil"].notna()
+    ].copy()
+
+    positive_points = []
+    negative_points = []
+    neutral_points = []
+    categories = {}
+    for category in dict.fromkeys(config[3] for config in MULTIPLES_CFG):
+        category_rows = eligible[eligible["Categoria"] == category]
+        if category_rows.empty:
+            continue
+
+        percentile = round(float(category_rows["Percentil"].median()), 1)
+        if percentile >= 70:
+            verdict = "Favorável"
+        elif percentile >= 40:
+            verdict = "Neutro"
+        else:
+            verdict = "Desfavorável"
+        categories[category] = {
+            "percentil": percentile,
+            "veredicto": verdict,
+            "indicadores_validos": len(category_rows),
+        }
+
+        for name, value, peers_count, metric_percentile in category_rows[
+            ["Múltiplo", "Valor", "Peers (n)", "Percentil"]
+        ].itertuples(index=False, name=None):
+            name = str(name)
+            value = float(value)
+            peers_count = int(peers_count)
+            metric_percentile = float(metric_percentile)
+            is_percentage = name.endswith(" (%)")
+            display_name = name[:-4] if is_percentage else name
+            display_value = value * 100 if is_percentage else value
+            formatted_value = (
+                f"{display_value:g}%" if is_percentage else f"{display_value:g}"
+            )
+            label = (
+                f"{display_name} {formatted_value} · "
+                f"P{metric_percentile:.1f} · n={peers_count}"
+            )
+            tooltip = (
+                f"{display_name}: valor {formatted_value}; "
+                f"percentil {metric_percentile:.1f}; {peers_count} observações "
+                "do setor, incluindo o ticker analisado."
+            )
+            signal = (label, tooltip)
+            if metric_percentile >= 70:
+                positive_points.append(signal)
+            elif metric_percentile >= 40:
+                neutral_points.append(signal)
+            else:
+                negative_points.append(signal)
+
+    categories_valid = len(categories)
+    positive_categories = sum(
+        category["veredicto"] == "Favorável" for category in categories.values()
+    )
+    negative_categories = sum(
+        category["veredicto"] == "Desfavorável" for category in categories.values()
+    )
+    if categories_valid < 2:
+        verdict, color = "DADOS INSUFICIENTES", "#94a3b8"
+    elif positive_categories >= 2 and positive_categories > negative_categories:
+        verdict, color = "ATRATIVO", "#00ff87"
+    elif negative_categories >= 2 and negative_categories > positive_categories:
+        verdict, color = "FRACO", "#ff3d5a"
+    else:
+        verdict, color = "NEUTRO", "#ffd600"
+
+    return {
+        "pontos_positivos": positive_points,
+        "pontos_negativos": negative_points,
+        "alertas": neutral_points,
+        "categorias": categories,
+        "indicadores_validos": len(eligible),
+        "categorias_validas": categories_valid,
+        "veredicto": verdict,
+        "cor_veredicto": color,
+        "fonte": "comparação setorial",
+    }
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_fundamentus_data(tickers):
     """Busca dados fundamentalistas com SQLite cache (4h) + retry automático."""
@@ -103,6 +225,14 @@ def get_fundamentus_data(tickers):
     raise last_exc
 
 
+def clear_fundamentus_cache() -> int:
+    """Clear both Streamlit and persistent Fundamentus caches."""
+    get_fundamentus_data.clear()
+    get_full_market_data.clear()
+    get_sector_peers.clear()
+    return _db.cache_clear_prefix("fund_")
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_yfinance_data(tickers_yf, start, interval):
     """Busca cotações do Yahoo Finance com retry automático."""
@@ -111,9 +241,13 @@ def get_yfinance_data(tickers_yf, start, interval):
     today = datetime.date.today()
     for attempt in range(3):
         try:
-            return yf.download(tickers_yf, start=start, end=today, interval=interval, auto_adjust=True)[
-                "Close"
-            ]
+            return yf.download(
+                tickers_yf,
+                start=start,
+                end=today,
+                interval=interval,
+                auto_adjust=True,
+            )["Close"]
         except OSError:
             if attempt < 2:
                 time.sleep(1)

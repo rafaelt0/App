@@ -13,6 +13,7 @@ from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
 from utils.portfolio_data import get_portfolio_prices
 from utils.ui import (
+    analyst_synthesis_header,
     empty_state_card,
     load_css,
     loading_overlay,
@@ -22,6 +23,7 @@ from utils.ui import (
 )
 
 logger = logging.getLogger(__name__)
+
 
 
 # CSS customizado
@@ -749,18 +751,8 @@ st.session_state["sim_pior_cenario"] = pior_cenario
 st.session_state["sim_melhor_cenario"] = melhor_cenario
 # ── Síntese do Analista (Simulação) ─────────────────────────────────────
 st.markdown("---")
-st.markdown(
-    """
-<h3 style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" stroke="#a855f7" stroke-width="1.8"/>
-    <path d="M12 8v4l3 3" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/>
-  </svg>
-  <span style="background:linear-gradient(135deg,#f8fafc,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Síntese do Analista</span>
-</h3>
-""",
-    unsafe_allow_html=True,
-)
+analyst_synthesis_header()
+
 
 # Gera análise textual dos resultados da simulação
 cenario_label = (
