@@ -16,7 +16,11 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
-from utils.ui import load_css, loading_overlay, render_flow_sidebar
+from utils.ui import (
+    load_css,
+    loading_overlay,
+    render_page_header,
+)
 from utils.valuation import (
     calc_cv,
     calc_dcf,
@@ -29,7 +33,6 @@ from utils.market_data import clean_numeric_column, get_listed_stocks
 
 load_css()
 
-render_flow_sidebar(active_step=5, pending_opacities=[0.35])
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 ERP_MATURE = 5.0  # ERP de mercado maduro (EUA). Rf=Selic já embute o risco-país
@@ -267,27 +270,11 @@ def get_koller_data(ticker_b3: str):
         return {"_error": str(exc)}
 
 
-# ─── Hero ──────────────────────────────────────────────────────────────────────
-st.markdown(
-    """
-<div class="page-hero">
-  <div class="page-hero-icon" aria-hidden="true">
-    <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 64 64" fill="none">
-      <rect x="4" y="4" width="56" height="56" rx="14" fill="#0e1726"/>
-      <line x1="32" y1="10" x2="32" y2="54" stroke="#a855f7" stroke-width="3" stroke-linecap="round"/>
-      <path d="M44 18H26a8 8 0 0 0 0 16h12a8 8 0 0 1 0 16H18"
-            stroke="#a855f7" stroke-width="3" stroke-linecap="round" fill="none"/>
-    </svg>
-  </div>
-  <div class="page-hero-content">
-    <h1 class="page-hero-title">Valuation por DCF</h1>
-    <p class="page-hero-subtitle">
-      Estime o valor intrínseco por fluxo de caixa descontado e compare o resultado com o preço atual.
-    </p>
-  </div>
-</div>
-""",
-    unsafe_allow_html=True,
+# ── Page header ───────────────────────────────────────────────────────────────
+render_page_header(
+    "Valuation por DCF",
+    "Estime o valor intrínseco por fluxo de caixa descontado e compare o resultado com o preço atual.",
+    "valuation",
 )
 
 # ─── Ticker input ──────────────────────────────────────────────────────────────

@@ -25,7 +25,7 @@ from utils.ui import (
     loading_overlay,
     next_step_card,
     render_cards_grid,
-    render_flow_sidebar,
+    render_page_header,
     section_header,
 )
 from utils.market_data import get_listed_stocks, get_sorted_tickers_by_liquidity
@@ -66,41 +66,16 @@ from utils.portfolio_charts import (
 # CSS customizado
 load_css()
 
-render_flow_sidebar(active_step=2, pending_opacities=[0.4, 0.3, 0.2, 0.12])
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-# ── Hero Header ─────────────────────────────────────────────────────────────
-st.markdown(
-    """
-<div class="page-hero">
-    <div class="page-hero-icon" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" fill="none">
-          <!-- Donut allocation chart — 4 arcs representing diversified assets -->
-          <path d="M30 6 A24 24 0 0 1 54 30" stroke="#00ff87" stroke-width="5.5" stroke-linecap="round"/>
-          <path d="M54 30 A24 24 0 0 1 30 54" stroke="#00d2ff" stroke-width="5.5" stroke-linecap="round"/>
-          <path d="M30 54 A24 24 0 0 1 6 30" stroke="#ffd600" stroke-width="5.5" stroke-linecap="round"/>
-          <path d="M6 30 A24 24 0 0 1 30 6" stroke="#a855f7" stroke-width="5.5" stroke-linecap="round"/>
-          <!-- inner ring -->
-          <circle cx="30" cy="30" r="11" fill="#080c14" stroke="#1e293b" stroke-width="1"/>
-          <!-- center pulse -->
-          <circle cx="30" cy="30" r="4" fill="#00ff87" opacity="0.9"/>
-          <!-- tick marks at each junction -->
-          <circle cx="30" cy="6" r="2" fill="#0e1524" stroke="#00ff87" stroke-width="1.5"/>
-          <circle cx="54" cy="30" r="2" fill="#0e1524" stroke="#00d2ff" stroke-width="1.5"/>
-          <circle cx="30" cy="54" r="2" fill="#0e1524" stroke="#ffd600" stroke-width="1.5"/>
-          <circle cx="6"  cy="30" r="2" fill="#0e1524" stroke="#a855f7" stroke-width="1.5"/>
-        </svg>
-    </div>
-    <div class="page-hero-content">
-        <h1 class="page-hero-title">Otimização de portfólio</h1>
-        <p class="page-hero-subtitle">Monte uma carteira, compare risco e retorno e revise os pesos antes de investir.</p>
-    </div>
-</div>
-""",
-    unsafe_allow_html=True,
+# ── Page header ───────────────────────────────────────────────────────────────
+render_page_header(
+    "Otimização de portfólio",
+    "Monte uma carteira, compare risco e retorno e revise os pesos antes de investir.",
+    "portfolio",
 )
 
 def _refresh_portfolio_data() -> None:

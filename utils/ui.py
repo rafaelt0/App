@@ -30,6 +30,47 @@ def section_header(icon_svg: str, text: str, tag: str = "h2") -> None:
         unsafe_allow_html=True,
     )
 
+
+_PAGE_HEADER_CONFIG = {
+    "home": ("favicon.svg", "Main_Page"),
+    "portfolio": ("icons/portfolio.svg", "Portfolio"),
+    "simulation": ("icons/simulation.svg", "Simulação"),
+    "news": ("icons/news.svg", "Notícias"),
+    "valuation": ("icons/valuation.svg", "Valuation"),
+    "screener": ("icons/screener.svg", "Screener"),
+}
+
+
+def render_page_header(title: str, subtitle: str, icon: str) -> None:
+    """Render a shared page heading and mark its sidebar navigation link."""
+    icon_file, page_path = _PAGE_HEADER_CONFIG[icon]
+    icon_path = Path(__file__).resolve().parent.parent / icon_file
+    icon_svg = icon_path.read_text(encoding="utf-8")
+    st.markdown(
+        f"""
+<style>
+[data-testid="stSidebarNavLink"][href$="/{page_path}"] {{
+  border-left-color: var(--brand-primary) !important;
+  background: rgba(97, 212, 198, 0.12) !important;
+}}
+[data-testid="stSidebarNavLink"][href$="/{page_path}"] span {{
+  color: var(--brand-primary) !important;
+  font-weight: 650 !important;
+}}
+</style>
+<header class="page-hero" data-page="{escape(icon)}" aria-labelledby="page-title">
+  <span class="page-hero-icon" aria-hidden="true">{icon_svg}</span>
+  <div class="page-hero-content">
+    <h1 class="page-hero-title" id="page-title">{escape(title)}</h1>
+    <p class="page-hero-subtitle">{escape(subtitle)}</p>
+  </div>
+</header>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+
 def analyst_synthesis_header() -> None:
     """Render the shared analyst-synthesis heading without fragile inline CSS."""
     st.markdown(
@@ -144,74 +185,6 @@ def load_css(path: str = "style.css") -> None:
             st.markdown(f"<style>{css_file.read()}</style>", unsafe_allow_html=True)
     except FileNotFoundError:
         pass
-
-
-_FLOW_STEPS = [
-    "Análise Fundamentalista",
-    "Portfolio",
-    "Simulação",
-    "Notícias",
-    "Valuation",
-    "Screener",
-]
-
-_ICO_FLOW = svg_icon(
-    '<circle cx="5" cy="6" r="2.2" stroke="#829196" stroke-width="1.6"/>'
-    '<circle cx="19" cy="18" r="2.2" stroke="#829196" stroke-width="1.6"/>'
-    '<path d="M7 7.2c0 4 3 4.6 5 5.8s5 1.8 5 5" stroke="#829196" stroke-width="1.6" '
-    'fill="none" stroke-linecap="round"/>',
-    12,
-)
-
-
-def _flow_done_step_html(label: str) -> str:
-    return (
-        '<div class="flow-step flow-step-done">'
-        '<span class="flow-step-marker">✓</span>'
-        f"<span>{label}</span>"
-        "</div>"
-    )
-
-
-def _flow_active_step_html(label: str, num: int) -> str:
-    return (
-        '<div class="flow-step flow-step-current">'
-        f'<span class="flow-step-marker">{num}</span>'
-        f"<span>{label}</span>"
-        "</div>"
-    )
-
-
-def _flow_pending_step_html(label: str, num: int, opacity: float) -> str:
-    del opacity
-    return (
-        '<div class="flow-step flow-step-pending">'
-        f'<span class="flow-step-marker">{num}</span>'
-        f"<span>{label}</span>"
-        "</div>"
-    )
-
-
-def render_flow_sidebar(active_step: int, pending_opacities=None) -> None:
-    """Render the compact analysis flow in the sidebar."""
-    opacities = list(pending_opacities or [])
-    parts = []
-    for i, label in enumerate(_FLOW_STEPS, start=1):
-        if i < active_step:
-            parts.append(_flow_done_step_html(label))
-        elif i == active_step:
-            parts.append(_flow_active_step_html(label, i))
-        else:
-            parts.append(_flow_pending_step_html(label, i, opacities.pop(0) if opacities else 1))
-    html = (
-        '<div class="flow-sidebar">'
-        f'<div class="flow-sidebar-label">{_ICO_FLOW}<span>Fluxo de análise</span></div>'
-        f'<div class="flow-steps">{"".join(parts)}</div>'
-        "</div>"
-    )
-    st.sidebar.markdown(html, unsafe_allow_html=True)
-
-
 
 
 @contextmanager

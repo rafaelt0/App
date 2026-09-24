@@ -18,12 +18,17 @@ from utils.charts import apply_plotly_theme
 from utils import db as _db
 from utils.identity import get_browser_uid
 
-from utils.ui import empty_state_card, load_css, loading_overlay, render_flow_sidebar, svg_icon
+from utils.ui import (
+    empty_state_card,
+    load_css,
+    loading_overlay,
+    render_page_header,
+    svg_icon,
+)
 
 # CSS customizado
 load_css()
 
-render_flow_sidebar(active_step=4, pending_opacities=[0.35, 0.2])
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
 _svg = svg_icon
@@ -79,25 +84,12 @@ def get_diag_row_html(icon_svg, text, color):
         f'</div>'
     )
 
-# Customização do Plotly para o tema Obsidian Neo-Financial
-# Hero Header
-st.markdown("""
-<div class="page-hero">
-    <div class="page-hero-icon" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="1.5">
-          <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z"/>
-          <path d="M14 4v4h4"/>
-          <line x1="7" y1="9" x2="11" y2="9" stroke-linecap="round"/>
-          <line x1="7" y1="13" x2="17" y2="13" stroke-linecap="round"/>
-          <line x1="7" y1="17" x2="17" y2="17" stroke-linecap="round"/>
-        </svg>
-    </div>
-    <div class="page-hero-content">
-        <h1 class="page-hero-title">Notícias do portfólio</h1>
-        <p class="page-hero-subtitle">Acompanhe eventos recentes e o tom das notícias sobre seus ativos.</p>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# ── Page header ───────────────────────────────────────────────────────────────
+render_page_header(
+    "Notícias do portfólio",
+    "Acompanhe eventos recentes e o tom das notícias sobre seus ativos.",
+    "news",
+)
 
 
 # ─── ALGORITMO PLN DE SENTIMENTO (Lexicon-Based Fallback) ────────────────────────

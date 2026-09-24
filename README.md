@@ -5,6 +5,7 @@
 O **B3 Explorer** é uma aplicação web interativa desenvolvida com **Streamlit** para análise quantitativa de ações listadas na B3 (Bolsa de Valores do Brasil). A plataforma reúne, em um único fluxo de trabalho, análise fundamentalista, otimização de portfólio, simulação Monte Carlo, monitoramento de notícias com análise de sentimento, valuation por Enterprise DCF e um screener de mercado.
 
 O projeto integra dados históricos do Yahoo Finance (`yfinance`), indicadores fundamentalistas do Fundamentus e a taxa Selic do Banco Central (`python-bcb`), oferecendo uma ferramenta completa de apoio à decisão de investimento.
+As seis páginas compartilham cabeçalho, navegação e componentes de análise, com adaptação para telas menores.
 
 🔗 **Acesse a aplicação:** https://b3explorer.streamlit.app/
 
