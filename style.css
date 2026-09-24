@@ -113,9 +113,7 @@
 }
 
 [data-testid="stSidebarNavSeparator"] {
-  background: var(--border-color) !important;
-  opacity: 0.7;
-  margin: 0.5rem 0 !important;
+  display: none !important;
 }
 
 /* Small-caps section label used throughout the sidebar (setor filter, etc.) */
