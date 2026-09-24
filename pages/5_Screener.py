@@ -5,7 +5,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from utils.ui import load_css, loading_overlay, render_flow_sidebar, svg_icon
+from utils.ui import (
+    load_css,
+    loading_overlay,
+    render_page_header,
+    svg_icon,
+)
 from utils.home_data import clear_fundamentus_cache
 from utils.market_data import (
     clean_numeric_column,
@@ -21,7 +26,6 @@ st.set_page_config(page_title="Screener B3", page_icon="favicon.svg", layout="wi
 # ─── CSS opcional (dark theme via style.css do projeto) ───────────────────────
 load_css()
 
-render_flow_sidebar(active_step=6)
 
 _screener_uid = get_browser_uid()
 
@@ -51,24 +55,12 @@ ICO_SORT = _svg(
     13,
 )
 
-# ─── Cabeçalho ────────────────────────────────────────────────────────────────
-st.markdown(
-    """
-<div class="page-hero">
-    <div class="page-hero-icon" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" fill="none">
-          <circle cx="26" cy="26" r="17" stroke="#38bdf8" stroke-width="3"/>
-          <line x1="38" y1="38" x2="53" y2="53" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
-          <path d="M18 26h16M26 18v16" stroke="#00ff87" stroke-width="2.5" stroke-linecap="round"/>
-        </svg>
-    </div>
-    <div class="page-hero-content">
-        <h1 class="page-hero-title">Screener de ações</h1>
-        <p class="page-hero-subtitle">Filtre todas as ações listadas na B3 por indicadores fundamentalistas e encontre candidatos de investimento. Os dados são atualizados a cada hora via Fundamentus.</p>
-    </div>
-</div>
-""",
-    unsafe_allow_html=True,
+# ── Page header ───────────────────────────────────────────────────────────────
+render_page_header(
+    "Screener de ações",
+    "Filtre as ações listadas na B3 por indicadores fundamentalistas e encontre candidatos de investimento. "
+    "Os dados são atualizados a cada hora via Fundamentus.",
+    "screener",
 )
 
 

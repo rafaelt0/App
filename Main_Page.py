@@ -13,7 +13,13 @@ logger = logging.getLogger(__name__)
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
-from utils.ui import load_css, loading_overlay, next_step_card, render_flow_sidebar, section_header
+from utils.ui import (
+    load_css,
+    loading_overlay,
+    next_step_card,
+    render_page_header,
+    section_header,
+)
 from utils.market_data import clean_numeric_column, get_listed_stocks, get_sorted_tickers_by_liquidity
 from utils.icons import (
     ICO_BULB,
@@ -66,44 +72,16 @@ st.set_page_config(
 )
 st.logo("logo.svg", icon_image="favicon.svg")
 
-render_flow_sidebar(active_step=1, pending_opacities=[0.45, 0.35, 0.25, 0.18, 0.12])
 
 # CSS customizado
 load_css()
 
 
-# ── Hero Header ─────────────────────────────────────────────────────────────
-st.markdown(
-    """
-<div class="page-hero main-hero">
-    <div class="page-hero-icon" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" fill="none">
-          <!-- X-axis baseline -->
-          <line x1="4" y1="54" x2="56" y2="54" stroke="#1e293b" stroke-width="1.5"/>
-          <!-- Candle 1 — bullish green -->
-          <line x1="14" y1="10" x2="14" y2="50" stroke="#334155" stroke-width="1.5"/>
-          <rect x="10" y="22" width="8" height="18" rx="2" fill="#00ff87"/>
-          <!-- Candle 2 — bearish red -->
-          <line x1="30" y1="8" x2="30" y2="46" stroke="#334155" stroke-width="1.5"/>
-          <rect x="26" y="16" width="8" height="20" rx="2" fill="#ff3d5a"/>
-          <!-- Candle 3 — bullish green, stronger -->
-          <line x1="46" y1="6" x2="46" y2="44" stroke="#334155" stroke-width="1.5"/>
-          <rect x="42" y="12" width="8" height="22" rx="2" fill="#00ff87"/>
-          <!-- Trend line (cyan) -->
-          <path d="M6 50 L22 36 L38 42 L54 18"
-                stroke="#00d2ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <!-- Arrow head -->
-          <path d="M48 14 L54 18 L50 24"
-                stroke="#00d2ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        </svg>
-    </div>
-    <div class="page-hero-content">
-        <h1 class="page-hero-title">B3 Explorer</h1>
-        <p class="page-hero-subtitle">Consulte fundamentos, compare empresas e avance para portfolio, simulação e valuation.</p>
-    </div>
-</div>
-""",
-    unsafe_allow_html=True,
+# ── Page header ───────────────────────────────────────────────────────────────
+render_page_header(
+    "B3 Explorer",
+    "Compare fundamentos, preço e risco das empresas listadas na B3.",
+    "home",
 )
 
 
@@ -338,10 +316,10 @@ if not tickers:
 <div class="onboarding-card">
   <div class="onboarding-card-header">
     <div>
-      <div class="onboarding-eyebrow">Primeiro acesso</div>
-      <div class="onboarding-title">Monte sua primeira análise</div>
+      <div class="onboarding-eyebrow">Comece por aqui</div>
+      <div class="onboarding-title">Escolha um ativo para começar</div>
       <p class="onboarding-description">
-        Selecione um ticker no campo acima ou use um dos atalhos para abrir os indicadores fundamentais.
+        Pesquise pelo ticker, filtre por setor ou use um dos ativos líquidos abaixo.
       </p>
     </div>
     <div class="onboarding-signal" aria-hidden="true">

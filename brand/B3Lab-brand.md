@@ -38,6 +38,10 @@ financial semantics.
 Color communicates hierarchy and state, never decoration alone. Surfaces remain
 flat: no gradients, glow, or color-only status indicators.
 
+Page headers reuse these accents for wayfinding: mint for Home, blue for Portfolio,
+lavender for Simulation, amber for News, coral for Valuation, and blue-violet for
+Screener. Color stays on the title, icon badge, and divider; surfaces remain neutral.
+
 ## Typography
 
 | Role | Font | Weight | Size |
@@ -66,6 +70,7 @@ text. Decorative inline SVGs use `aria-hidden="true"` and
 | Helper | Purpose |
 |--------|---------|
 | `svg_icon` | Safe inline decorative icon wrapper |
+| `render_page_header` | Consistent page title, description, and existing B3Lab icon |
 | `section_header` | Consistent semantic section heading |
 | `empty_state_card` | Actionable empty and error state |
 | `loading_overlay` | Explicit, live loading feedback |

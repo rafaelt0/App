@@ -18,7 +18,7 @@ from utils.ui import (
     load_css,
     loading_overlay,
     next_step_card,
-    render_flow_sidebar,
+    render_page_header,
     svg_icon,
 )
 
@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 # CSS customizado
 load_css()
 
-render_flow_sidebar(active_step=3, pending_opacities=[0.35, 0.22, 0.12])
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
@@ -101,43 +100,12 @@ plt.rcParams["ytick.color"] = "#aebaca"
 plt.rcParams["grid.color"] = "#34465b"
 plt.rcParams["font.family"] = "sans-serif"
 
-# Customização do Plotly para o tema Obsidian Neo-Financial
-# ── Hero Header ─────────────────────────────────────────────────────────────
-st.markdown(
-    """
-<div class="page-hero">
-    <div class="page-hero-icon" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" fill="none">
-          <!-- Background grid lines -->
-          <line x1="4" y1="56" x2="56" y2="56" stroke="#1e293b" stroke-width="1"/>
-          <line x1="4" y1="42" x2="56" y2="42" stroke="#1e293b" stroke-width="0.5" stroke-dasharray="3 3"/>
-          <line x1="4" y1="28" x2="56" y2="28" stroke="#1e293b" stroke-width="0.5" stroke-dasharray="3 3"/>
-          <!-- Stochastic path — upper scenario (cyan, faint) -->
-          <path d="M8 48 C14 38 18 32 24 38 S34 46 44 22 50 10 56 14"
-                stroke="#00d2ff" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.45"/>
-          <!-- Stochastic path — lower scenario (green, faint) -->
-          <path d="M8 50 C16 44 20 40 26 44 S38 50 46 30 52 20 56 24"
-                stroke="#00ff87" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.45"/>
-          <!-- Median trajectory (gold, prominent) -->
-          <path d="M8 49 C14 40 20 36 26 41 S38 48 46 26 52 14 56 18"
-                stroke="#ffd600" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-          <!-- Origin node -->
-          <circle cx="8" cy="49" r="3.5" fill="#ffd600" opacity="0.9"/>
-          <!-- End nodes -->
-          <circle cx="56" cy="14" r="2.5" fill="#00d2ff" opacity="0.7"/>
-          <circle cx="56" cy="24" r="2.5" fill="#00ff87" opacity="0.7"/>
-          <circle cx="56" cy="18" r="3.5" fill="#ffd600" opacity="0.9"/>
-        </svg>
-    </div>
-    <div class="page-hero-content">
-        <h1 class="page-hero-title">Simulação de portfólio</h1>
-        <p class="page-hero-subtitle">Projete faixas de retorno e risco a partir dos pesos definidos na carteira.</p>
-    </div>
-</div>
-""",
-    unsafe_allow_html=True,
+# ── Page header ───────────────────────────────────────────────────────────────
+render_page_header(
+    "Simulação de portfólio",
+    "Projete faixas de retorno e risco a partir dos pesos definidos na carteira.",
+    "simulation",
 )
-
 
 def _restore_saved_portfolio_context() -> None:
     """Restore a saved portfolio when this page opens in a fresh session."""

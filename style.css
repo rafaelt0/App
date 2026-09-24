@@ -774,7 +774,7 @@ td, th, .stMetric, [data-testid="stMetricValue"] {
 
   /* Hero compacto */
   .page-hero {
-    flex-direction: column;
+    flex-direction: row !important;
     align-items: flex-start;
     gap: 0.65rem;
     padding: 1.1rem 1rem;
@@ -2125,69 +2125,6 @@ h6 {
   box-shadow: none !important;
 }
 
-/* Keep the analysis flow legible after its inline styles are removed. */
-.flow-sidebar {
-  padding: 1rem 0 0.75rem;
-  border-bottom: 1px solid #202c33;
-  margin-bottom: 0.8rem;
-}
-
-.flow-sidebar-label {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-bottom: 0.7rem;
-  color: #829196;
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.flow-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 0.36rem;
-}
-
-.flow-step {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 1.6rem;
-  color: #65727a;
-  font-size: 0.78rem;
-  font-weight: 500;
-}
-
-.flow-step-marker {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.2rem;
-  height: 1.2rem;
-  border: 1px solid #34434a;
-  border-radius: 50%;
-  color: #65727a;
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-}
-
-.flow-step-done .flow-step-marker {
-  border-color: #70967e;
-  color: #9ad7b1;
-}
-
-.flow-step-current {
-  color: #dce8df;
-  font-weight: 650;
-}
-
-.flow-step-current .flow-step-marker {
-  background: #9ad7b1;
-  border-color: #9ad7b1;
-  color: #0b1410;
-}
 
 @media (max-width: 768px) {
   .page-hero {
@@ -2397,7 +2334,8 @@ th {
   --border-subtle: #28384b;
   --border-strong: #405873;
   --control-bg: #182433;
-  --focus-ring: 0 0 0 3px rgba(97, 212, 198, 0.25);
+  --content-max-width: 1360px;
+  --focus-ring: 0 0 0 3px rgba(97, 212, 198, 0.3);
 }
 
 html,
@@ -2432,24 +2370,75 @@ body,
 
 .sidebar-section-label {
   border-bottom-color: var(--border-subtle) !important;
-  color: var(--brand-secondary) !important;
+  color: var(--text-muted) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+.page-hero[data-page="home"] { --page-accent: var(--brand-primary); }
+.page-hero[data-page="portfolio"] { --page-accent: var(--brand-secondary); }
+.page-hero[data-page="simulation"] { --page-accent: var(--brand-info); }
+.page-hero[data-page="news"] { --page-accent: var(--brand-accent); }
+.page-hero[data-page="valuation"] { --page-accent: var(--brand-danger); }
+.page-hero[data-page="screener"] {
+  --page-accent: color-mix(in srgb, var(--brand-secondary) 70%, var(--brand-info));
 }
 
-.page-hero {
-  background: var(--panel-bg) !important;
-  border-color: var(--panel-border) !important;
-  border-left-color: var(--brand-primary) !important;
+
+.page-hero,
+.main-hero {
+  display: flex !important;
+  align-items: center !important;
+  gap: 1rem !important;
+  min-height: 0 !important;
+  margin: 0 0 1.25rem !important;
+  padding: 0 0 1.1rem !important;
+  border: 0 !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--page-accent, var(--brand-primary)) 42%, var(--border-subtle)) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .page-hero:hover,
 .main-hero:hover {
-  border-left-color: var(--brand-secondary) !important;
+  box-shadow: none !important;
 }
 
 .page-hero-icon,
 .main-hero .page-hero-icon {
-  filter: saturate(0.72) brightness(0.94) opacity(0.84) !important;
+  display: flex !important;
+  flex: 0 0 42px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 42px !important;
+  height: 42px !important;
+  padding: 0 !important;
+  border-color: color-mix(in srgb, var(--page-accent, var(--brand-primary)) 48%, var(--border-subtle)) !important;
+  border-radius: 8px !important;
+  background: color-mix(in srgb, var(--page-accent, var(--brand-primary)) 14%, var(--panel-bg)) !important;
+  color: var(--page-accent, var(--brand-primary)) !important;
+  filter: none !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
 }
+
+.page-hero-icon svg {
+  width: 25px !important;
+  height: 25px !important;
+  max-width: none !important;
+  max-height: none !important;
+  filter: none !important;
+}
+
+.page-hero-content {
+  min-width: 0;
+}
+.page-hero-title {
+  -webkit-text-fill-color: var(--page-accent, var(--text-main)) !important;
+  color: var(--page-accent, var(--text-main)) !important;
+}
+
 
 .page-hero-subtitle {
   color: var(--text-muted) !important;
@@ -2522,15 +2511,16 @@ body,
 }
 
 .ui-section-heading {
-  border-bottom-color: var(--panel-border) !important;
+  border-bottom-color: var(--border-subtle) !important;
 }
 
 .ui-section-heading::after {
-  background: var(--brand-secondary) !important;
+  display: none !important;
 }
 
 .ui-section-heading svg {
-  filter: saturate(0.75) opacity(0.9) !important;
+  filter: none !important;
+  opacity: 0.95 !important;
 }
 
 .selection-summary {
@@ -2621,12 +2611,13 @@ body,
 }
 
 .onboarding-tip-label {
-  color: var(--text-main) !important;
+  color: var(--tip-color) !important;
 }
 
 .onboarding-tip-badge {
   border-color: var(--tip-color) !important;
   color: var(--tip-color) !important;
+  background: color-mix(in srgb, var(--tip-color) 14%, var(--panel-bg)) !important;
 }
 
 .quick-start-sector {
@@ -2655,42 +2646,11 @@ body,
 }
 
 [data-testid="stTabs"] [aria-selected="true"] {
-  background: rgba(140, 180, 242, 0.12) !important;
-  color: var(--brand-secondary) !important;
-  border-bottom-color: var(--brand-secondary) !important;
-}
-
-.flow-sidebar {
-  border-bottom-color: var(--border-subtle) !important;
-}
-
-.flow-sidebar-label {
-  color: var(--brand-secondary) !important;
-}
-
-.flow-step-pending {
-  color: var(--text-faint) !important;
-}
-
-.flow-step-marker {
-  border-color: var(--border-strong) !important;
-  color: var(--text-faint) !important;
-}
-
-.flow-step-done .flow-step-marker {
-  border-color: var(--brand-primary) !important;
+  background: rgba(97, 212, 198, 0.1) !important;
   color: var(--brand-primary) !important;
+  border-bottom-color: var(--brand-primary) !important;
 }
 
-.flow-step-current {
-  color: var(--text-main) !important;
-}
-
-.flow-step-current .flow-step-marker {
-  background: var(--brand-primary) !important;
-  border-color: var(--brand-primary) !important;
-  color: #0b111a !important;
-}
 
 .metric-section-heading {
   color: var(--text-main) !important;
@@ -2836,4 +2796,93 @@ body,
 .next-step-link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+
+.onboarding-card {
+  margin: 1.2rem 0 0.25rem !important;
+  padding: 1rem 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-top: 1px solid var(--panel-border) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.onboarding-card::before {
+  display: none !important;
+}
+
+.onboarding-eyebrow,
+.onboarding-subheading {
+  color: var(--brand-secondary) !important;
+  font-size: 0.76rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.onboarding-title {
+  font-size: clamp(1.2rem, 2vw, 1.45rem) !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.onboarding-description {
+  max-width: 62ch !important;
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
+}
+
+.onboarding-tip-grid {
+  gap: 1.1rem !important;
+}
+
+.onboarding-tip,
+.onboarding-tip:hover {
+  min-height: 0 !important;
+  padding: 0 0.9rem !important;
+  background: color-mix(in srgb, var(--tip-color) 7%, var(--panel-bg)) !important;
+  border: 0 !important;
+  border-left: 1px solid color-mix(in srgb, var(--tip-color) 40%, var(--panel-border)) !important;
+  border-radius: 0 !important;
+  transform: none !important;
+}
+
+.onboarding-tip:first-child {
+  padding-left: 0 !important;
+  border-left: 0 !important;
+}
+
+.onboarding-tip-label {
+  font-size: 0.76rem !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.onboarding-tip-copy {
+  font-size: 0.83rem !important;
+  line-height: 1.55 !important;
+}
+
+.quick-start-sector {
+  margin-left: 0.25rem !important;
+  font-size: 0.72rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  text-align: left !important;
+  text-transform: none !important;
+}
+
+@media (max-width: 768px) {
+  .onboarding-tip,
+  .onboarding-tip:hover {
+    padding: 0.75rem 0 0 !important;
+    border-top: 1px solid color-mix(in srgb, var(--tip-color) 40%, var(--panel-border)) !important;
+    border-left: 0 !important;
+  }
+
+  .onboarding-tip:first-child {
+    padding-top: 0 !important;
+    border-top: 0 !important;
+  }
 }
