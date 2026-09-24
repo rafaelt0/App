@@ -32,7 +32,7 @@ def section_header(icon_svg: str, text: str, tag: str = "h2") -> None:
 
 
 _PAGE_HEADER_CONFIG = {
-    "home": ("favicon.svg", "Início"),
+    "home": ("favicon.svg", "Main_Page"),
     "portfolio": ("icons/portfolio.svg", "Portfolio"),
     "simulation": ("icons/simulation.svg", "Simulação"),
     "news": ("icons/news.svg", "Notícias"),
