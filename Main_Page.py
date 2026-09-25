@@ -142,16 +142,16 @@ if _watchlist:
                         st.session_state["selected_tickers"] = _cur + [_wt]
                     st.rerun()
             elif st.button(
-                f"{_wt} · Valuation",
+                f"{_wt} · Preço-alvo",
                 key=f"wl_val_{_wt}",
                 use_container_width=True,
-                help="Ticker fora da lista local; abrir valuation para continuar.",
+                help="Ticker fora da lista local; abrir o preço-alvo de mercado.",
             ):
                 st.session_state["_valuation_handoff_ticker"] = _wt
                 st.session_state["valuation_ticker"] = _wt
                 st.query_params["uid"] = _uid
                 st.query_params["valuation_ticker"] = _wt
-                st.switch_page("pages/4_Valuation.py")
+                st.switch_page("pages/4_Visão_de_mercado.py")
         with _c2:
             if st.button("✕", key=f"wl_rm_{_wt}", help="Remover dos favoritos"):
                 _db.wl_remove(_uid, _wt)
@@ -337,7 +337,7 @@ if not tickers:
     </div>
     <div class="onboarding-tip onboarding-tip-purple">
       <div class="onboarding-tip-label"><span class="onboarding-tip-badge">3</span>Aprofunde</div>
-      <div class="onboarding-tip-copy">Use Portfolio e Valuation quando quiser sair da análise inicial.</div>
+      <div class="onboarding-tip-copy">Use Portfolio e Preço-alvo para aprofundar a análise.</div>
     </div>
   </div>
 </div>

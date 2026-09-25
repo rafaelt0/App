@@ -727,16 +727,16 @@ else:
                 f" · P/L {_pick_value(_pick_row.get('pl'), lambda value: f'{float(value):.2f}')}"
             )
             if st.button(
-                "Abrir valuation",
+                "Ver preço-alvo",
                 key=f"screener_valuation_{_ticker}",
                 use_container_width=True,
-                help="Abre o DCF já com este ticker selecionado.",
+                help="Abre a análise de preço-alvo já com este ticker selecionado.",
             ):
                 st.session_state["_valuation_handoff_ticker"] = str(_ticker)
                 st.session_state["valuation_ticker"] = str(_ticker)
                 st.query_params["uid"] = get_browser_uid()
                 st.query_params["valuation_ticker"] = str(_ticker)
-                st.switch_page("pages/4_Valuation.py")
+                st.switch_page("pages/4_Visão_de_mercado.py")
             _ticker_label = str(_ticker)
             _is_favorited = _db.wl_has(_screener_uid, _ticker_label)
             if st.button(

@@ -6,6 +6,7 @@ this single cache instead of each page maintaining its own copy.
 """
 
 import logging
+import math
 from pathlib import Path
 
 
@@ -44,6 +45,17 @@ def get_listed_stocks() -> pd.DataFrame:
 def clean_numeric_column(col):
     """Parse Brazilian decimals and thousands into numeric values."""
     return pd.to_numeric(col.map(normalize_numeric_text), errors="coerce")
+
+
+def compute_target_upside(current_price, target_price):
+    """Return target-price upside in percent, or None for invalid prices."""
+    try:
+        current, target = float(current_price), float(target_price)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(current) or not math.isfinite(target) or current <= 0 or target <= 0:
+        return None
+    return (target / current - 1) * 100
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
