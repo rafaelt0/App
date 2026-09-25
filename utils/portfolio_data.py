@@ -17,8 +17,8 @@ _YF_DOWNLOAD_ATTEMPTS = 3
 _YF_DOWNLOAD_TIMEOUT_SECONDS = 15
 
 
-def _download_close(tickers_yf, start_date):
-    """Fetch adjusted closes with bounded retries for transient Yahoo failures."""
+def _download_close(tickers_yf, start_date, auto_adjust=True):
+    """Fetch close prices with bounded retries for transient Yahoo failures."""
     last_exc = None
     for attempt in range(_YF_DOWNLOAD_ATTEMPTS):
         try:
@@ -27,7 +27,7 @@ def _download_close(tickers_yf, start_date):
                 start=start_date,
                 end=datetime.date.today(),
                 progress=False,
-                auto_adjust=True,
+                auto_adjust=auto_adjust,
                 timeout=_YF_DOWNLOAD_TIMEOUT_SECONDS,
             )
             if "Close" not in downloaded:
@@ -47,6 +47,15 @@ def _download_close(tickers_yf, start_date):
                 )
                 time.sleep(1)
     raise last_exc
+
+
+def finite_or_none(value):
+    """Return finite scalar metrics as floats; undefined ratios become None."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
 
 
 def bound_efficient_return(
@@ -79,9 +88,22 @@ def get_portfolio_prices(tickers_yf, start_date):
     return _download_close(tickers_yf, start_date)
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def get_portfolio_trade_prices(tickers_yf):
+    """Fetch recent unadjusted closes for share-count estimates, not returns."""
+    if not tickers_yf:
+        return pd.DataFrame()
+    start_date = datetime.date.today() - datetime.timedelta(days=14)
+    prices = _download_close(tickers_yf, start_date, auto_adjust=False)
+    if isinstance(prices, pd.Series):
+        prices = prices.to_frame(name=tuple(tickers_yf)[0])
+    return prices
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_benchmark_prices(start_date):
     return _download_close("^BVSP", start_date).squeeze()
+
 
 def estimate_markowitz_inputs(returns):
     """Estimate both optimizer inputs from the same gap-free return rows."""
@@ -104,6 +126,12 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
     """Calculate fixed-weight portfolio returns for crises with enough shared data."""
     if portfolio_prices is None or portfolio_prices.empty:
         return []
+    active_columns = [
+        column for column in portfolio_prices.columns if weights.get(column, 0) > 0
+    ]
+    if not active_columns:
+        return []
+    portfolio_prices = portfolio_prices.loc[:, active_columns]
 
     benchmark_returns = (
         benchmark_prices.pct_change(fill_method=None).dropna()

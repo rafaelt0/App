@@ -3,7 +3,35 @@ from utils.portfolio_data import (
     align_weights_to_columns,
     bound_efficient_return,
     estimate_markowitz_inputs,
+    finite_or_none,
 )
+
+
+def test_undefined_metric_ratios_render_as_unavailable():
+    assert finite_or_none(float("nan")) is None
+    assert finite_or_none(float("inf")) is None
+    assert finite_or_none(0.0) == 0.0
+    assert finite_or_none(1.25) == 1.25
+
+
+def test_trade_price_fetch_uses_unadjusted_close(monkeypatch):
+    import pandas as pd
+    from utils import portfolio_data
+
+    observed = {}
+    raw_close = pd.DataFrame({"AAA.SA": [10.0]})
+
+    def download(tickers, start_date, auto_adjust=True):
+        observed.update(tickers=tickers, start_date=start_date, auto_adjust=auto_adjust)
+        return raw_close
+
+    monkeypatch.setattr(portfolio_data, "_download_close", download)
+    portfolio_data.get_portfolio_trade_prices.clear()
+    result = portfolio_data.get_portfolio_trade_prices(("AAA.SA",))
+
+    pd.testing.assert_frame_equal(result, raw_close)
+    assert observed["tickers"] == ("AAA.SA",)
+    assert observed["auto_adjust"] is False
 
 
 def test_weights_align_to_return_columns_by_ticker_not_position():
@@ -128,6 +156,30 @@ def test_flags_tickers_without_full_crisis_listing_history():
         "EMPTY.SA": "sem cotações históricas",
     }
     assert find_crisis_history_gaps(prices, crises, dates[2]) == {}
+
+
+def test_historical_stress_ignores_missing_zero_weight_assets():
+    import pandas as pd
+
+    from utils.portfolio_data import calculate_historical_stress
+
+    dates = pd.bdate_range("2020-01-01", periods=8)
+    prices = pd.DataFrame(
+        {
+            "AAA.SA": [100, 100, 100, 100, 110, 110, 110, 110],
+            "ZERO.SA": [None] * 8,
+        },
+        index=dates,
+    )
+    results = calculate_historical_stress(
+        prices, None, {"AAA.SA": 1.0, "ZERO.SA": 0.0},
+        {"Crise": ("2020-01-01", "2020-01-31")},
+    )
+
+    assert len(results) == 1
+    import pytest
+
+    assert results[0]["Portfólio"] == pytest.approx(0.1)
 
 
 def test_missing_stress_price_does_not_bridge_gap():
