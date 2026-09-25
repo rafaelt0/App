@@ -129,12 +129,13 @@ _screener_defaults = {
     "sort_by": "Liquidez 2m",
 }
 if (
-    st.session_state.get("_screener_filter_version") != 1
+    st.session_state.get("_screener_filter_version") != 2
     or st.session_state.get("preset_select") not in PRESET_FILTERS
 ):
     for key, value in _screener_defaults.items():
         st.session_state[key] = value
-    st.session_state["_screener_filter_version"] = 1
+    st.session_state.pop("screener_visible_columns", None)
+    st.session_state["_screener_filter_version"] = 2
 else:
     for key, value in _screener_defaults.items():
         st.session_state.setdefault(key, value)
@@ -353,14 +354,15 @@ default_columns = [
     "Cotação (R$)", "P/L", "P/VP", "Div. Yield (%)", "ROE (%)",
     "ROIC (%)", "EV/EBITDA", "Liq. 2m (R$)",
 ]
+available_columns = list(display.columns)
 visible_columns = st.multiselect(
     "Colunas exibidas",
-    columns,
-    default=[column for column in default_columns if column in columns],
+    available_columns,
+    default=[column for column in default_columns if column in available_columns],
     key="screener_visible_columns",
 )
 # Include optional columns only when selected, without changing ticker membership.
-display_columns = [column for column in columns if column in visible_columns]
+display_columns = [column for column in available_columns if column in visible_columns]
 
 number_formats = {
     "Cotação (R$)": "R$ %.2f",

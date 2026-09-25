@@ -71,8 +71,10 @@ def test_screener_migrates_stale_session_filters_to_explorar_b3():
         index=["AAA3"],
     )
     app = AppTest.from_file("pages/5_Screener.py")
+    app.session_state["_screener_filter_version"] = 1
     app.session_state["preset_select"] = "Greenblatt — Magic Formula"
     app.session_state["liq2m_min"] = 100_000_000
+    app.session_state["screener_visible_columns"] = ["cotacao", "pl"]
     with patch("utils.market_data.get_full_market_data", return_value=raw):
         app.run()
 
@@ -102,6 +104,7 @@ def test_screener_preset_change_and_manual_edit_update_ui_state():
         app = AppTest.from_file("pages/5_Screener.py").run()
         assert not app.exception
         assert any("3 de 3 ativos" in item.value for item in app.caption)
+        assert "P/L" in app.dataframe[0].value.columns
 
         app.selectbox(key="preset_select").select("Renda atual").run()
         assert app.selectbox(key="preset_select").value == "Renda atual"
