@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 from utils.charts import apply_plotly_theme
 from utils import db as _db
 from utils.identity import get_browser_uid
-from utils.news import aggregate_ticker_sentiment, parse_rss_items
+from utils.news import aggregate_ticker_sentiment, build_news_query, parse_rss_items
 
 from utils.ui import (
     empty_state_card,
@@ -199,42 +199,11 @@ def _intensidade_sentimento(score):
     return "Baixo"
 
 # ─── REAL-TIME NEWS RSS FETCHING ──────────────────────────────────────────────
-ticker_to_name = {
-    'PETR3': 'Petrobras', 'PETR4': 'Petrobras',
-    'VALE3': 'Vale',
-    'ITUB3': 'Itaú', 'ITUB4': 'Itaú',
-    'BBDC3': 'Bradesco', 'BBDC4': 'Bradesco',
-    'BBAS3': 'Banco do Brasil',
-    'WEGE3': 'Weg',
-    'MGLU3': 'Magazine Luiza',
-    'ABEV3': 'Ambev',
-    'ELET3': 'Eletrobras', 'ELET6': 'Eletrobras',
-    'RENT3': 'Localiza',
-    'LREN3': 'Lojas Renner',
-    'PRIO3': 'PetroRio',
-    'HAPV3': 'Hapvida',
-    'SANB11': 'Santander',
-    'VVAR3': 'Via Varejo', 'BHIA3': 'Casas Bahia',
-    'GGBR4': 'Gerdau',
-    'ITSA4': 'Itaúsa',
-    'SUZB3': 'Suzano',
-    'JBSS3': 'JBS',
-    'UGPA3': 'Ultrapar',
-    'RADL3': 'RaiaDrogasil',
-    'EQTL3': 'Equatorial',
-    'CSAN3': 'Cosan',
-    'CPFE3': 'CPFL Energia',
-    'SBSP3': 'Sabesp',
-    'TAEE11': 'Taesa',
-    'KLBN11': 'Klabin'
-}
-
 NEWS_REQUEST_TIMEOUT_SECONDS = 8
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_brazilian_news(ticker_name):
-    name = ticker_to_name.get(ticker_name, "")
-    query = f"{ticker_name} OR \"{name}\"" if name else ticker_name
+    query = build_news_query(ticker_name)
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419"
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
     try:
