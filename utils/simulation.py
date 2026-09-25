@@ -17,6 +17,28 @@ def _normalized_weights(weights):
     return weights / weights.sum()
 
 
+def annualized_log_return_stats(asset_returns, weights, trading_days=252):
+    """Return annualized log mean and IID standard error for a daily-rebalanced portfolio."""
+    asset_returns = np.asarray(asset_returns, dtype=float)
+    weights = _normalized_weights(weights)
+    if (
+        asset_returns.ndim != 2 or asset_returns.shape[0] < 2
+        or asset_returns.shape[1] != len(weights)
+        or not np.isfinite(asset_returns).all()
+        or not np.isfinite(trading_days) or trading_days <= 0
+    ):
+        raise ValueError("Daily returns and annualization factor must be finite and aligned.")
+
+    portfolio_returns = asset_returns @ weights
+    if (portfolio_returns <= -1).any():
+        raise ValueError("Portfolio daily returns must be greater than -100%.")
+    daily_log_returns = np.log1p(portfolio_returns)
+    return (
+        float(trading_days * daily_log_returns.mean()),
+        float(trading_days * daily_log_returns.std(ddof=1) / np.sqrt(len(daily_log_returns))),
+    )
+
+
 def simulate_portfolio(
     mu, covariance, weights, days, simulations, initial_value, start_date, chunk_size=64
 ):

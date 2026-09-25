@@ -12,7 +12,11 @@ from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
 from utils.portfolio_data import get_portfolio_prices
-from utils.simulation import bootstrap_terminal_values, simulate_portfolio
+from utils.simulation import (
+    annualized_log_return_stats,
+    bootstrap_terminal_values,
+    simulate_portfolio,
+)
 from utils.ui import (
     analyst_synthesis_header,
     empty_state_card,
@@ -331,8 +335,30 @@ for _index, (_label, _values, _description) in enumerate(_SIMULATION_PRESETS):
             args=(_values,),
         )
 
+# The displayed analyzed allocation is canonical for every portfolio mode.
+weight_index = pd.Index([str(ticker).removesuffix(".SA") for ticker in peso_manual_df.index])
+weights = pd.Series(peso_manual_df["Peso"].to_numpy(), index=weight_index, dtype=float)
+weights.index = weights.index + ".SA"
+if (
+    not np.isfinite(weights.to_numpy()).all()
+    or (weights < 0).any()
+    or weights.sum() <= 0
+):
+    st.error("Os pesos analisados devem ser finitos, não negativos e somar um valor positivo.")
+    st.stop()
+weights = weights / weights.sum()
+weights = weights[weights > 0]
 
 with st.form("form_simulacao"):
+    calibration_window = st.selectbox(
+        "Janela de calibração",
+        ("Histórico do Portfolio", "2 Anos", "3 Anos", "5 Anos"),
+        key="sim_calibration_window",
+        help=(
+            "Define o histórico usado para estimar retornos e risco; não altera os pesos. "
+            "Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos."
+        ),
+    )
     n_simulations = st.number_input(
         "Número de Simulações",
         min_value=10,
@@ -355,8 +381,8 @@ with st.form("form_simulacao"):
             max_value=10,
             value=1,
             help=(
-                "Horizonte da simulação em anos. Limitado a 10 anos para "
-                "manter o consumo de memória previsível."
+                "Horizonte projetado em anos, independente da janela histórica de calibração. "
+                "Limitado a 10 anos para manter o consumo de memória previsível."
             ),
             key="sim_years_input",
         )
@@ -366,10 +392,36 @@ with st.form("form_simulacao"):
         "Rodar Simulação", type="primary", use_container_width=True
     )
 
+calibration_returns = returns
+if calibration_window != "Histórico do Portfolio":
+    calibration_years = {"2 Anos": 2, "3 Anos": 3, "5 Anos": 5}[calibration_window]
+    calibration_start = datetime.date.today() - datetime.timedelta(days=365 * calibration_years)
+    try:
+        with loading_overlay(
+            f"Carregando histórico de calibração de {calibration_years} anos…",
+            tickers=_current_tickers,
+        ):
+            calibration_prices = get_portfolio_prices(
+                tuple(weights.index),
+                calibration_start,
+            )
+    except Exception as exc:
+        logger.warning("simulation calibration history fetch failed: %s", exc)
+        st.error(f"Não foi possível carregar o histórico de calibração: {exc}")
+        st.stop()
+    if calibration_prices is None or calibration_prices.empty:
+        st.error("A fonte não retornou preços para a janela de calibração escolhida.")
+        st.stop()
+    if isinstance(calibration_prices.columns, pd.MultiIndex):
+        calibration_prices.columns = [
+            "_".join(map(str, column)).strip() for column in calibration_prices.columns
+        ]
+    calibration_returns = calibration_prices.pct_change(fill_method=None)
+
 _simulation_fingerprint = hashlib.sha256(
     repr((
-        int(n_simulations), int(valor), years, modo,
-        peso_manual_df.to_json(), returns.to_json(),
+        int(n_simulations), int(valor), years, modo, calibration_window,
+        peso_manual_df.to_json(), calibration_returns.to_json(),
     )).encode()
 ).hexdigest()
 if submitted:
@@ -398,24 +450,17 @@ st.markdown("---")
 n_dias = years * 252  # 252 dias úteis no ano
 valor_inicial = valor
 
-# The displayed analyzed allocation is canonical for every portfolio mode.
-weight_index = pd.Index([str(ticker).removesuffix(".SA") for ticker in peso_manual_df.index])
-weights = pd.Series(peso_manual_df["Peso"].to_numpy(), index=weight_index, dtype=float)
-weights.index = weights.index + ".SA"
-if (
-    not np.isfinite(weights.to_numpy()).all()
-    or (weights < 0).any()
-    or weights.sum() <= 0
-):
-    st.error("Os pesos analisados devem ser finitos, não negativos e somar um valor positivo.")
-    st.stop()
-weights = weights / weights.sum()
-weights = weights[weights > 0]
-missing_weight_tickers = weights.index.difference(returns.columns)
+missing_weight_tickers = weights.index.difference(calibration_returns.columns)
 if len(missing_weight_tickers):
     st.error("Não há retornos disponíveis para todos os ativos com peso positivo.")
     st.stop()
-aligned_returns = returns.loc[:, weights.index]
+aligned_returns = calibration_returns.loc[:, weights.index].dropna()
+if len(aligned_returns) < 30:
+    st.error(
+        f"Histórico insuficiente para calibrar a simulação: apenas {len(aligned_returns)} "
+        "retornos completos nos ativos com peso positivo."
+    )
+    st.stop()
 if aligned_returns.empty or aligned_returns.isna().any().any() or not np.isfinite(aligned_returns.to_numpy()).all() or (aligned_returns <= -1).any().any():
     st.error("Retornos históricos inválidos: verifique preços ausentes ou retornos de -100% ou menos.")
     st.stop()
@@ -431,12 +476,47 @@ periodo = (
     f"{aligned_returns.index.min():%d/%m/%Y} a {aligned_returns.index.max():%d/%m/%Y}"
     if isinstance(aligned_returns.index, pd.DatetimeIndex) else "datas não disponíveis"
 )
-log_portfolio = np.log1p(aligned_returns.to_numpy() @ weights.to_numpy())
-se_anual = 252 * log_portfolio.std(ddof=1) / np.sqrt(len(log_portfolio))
+media_log_anual, se_anual = annualized_log_return_stats(
+    aligned_returns.to_numpy(), weights.to_numpy()
+)
 st.caption(
     f"Calibração: {len(aligned_returns)} retornos diários completos ({periodo}). "
-    f"Incerteza aproximada da média log anual: ±{se_anual * 100:.1f} p.p. (1 erro-padrão, assumindo dias independentes)."
+    f"Média log anual estimada: {media_log_anual * 100:.1f}% ±{se_anual * 100:.1f} p.p. "
+    "(1 erro-padrão IID; não mede a incerteza dos retornos futuros)."
 )
+if isinstance(aligned_returns.index, pd.DatetimeIndex) and (
+    calibration_window == "5 Anos"
+    or (aligned_returns.index.max() - aligned_returns.index.min()).days >= 365 * 4
+):
+    comparison_rows = []
+    window_end = aligned_returns.index.max()
+    for window_years in (2, 3, 5):
+        window_start = window_end - pd.DateOffset(years=window_years)
+        window_returns = aligned_returns.loc[aligned_returns.index >= window_start]
+        if len(window_returns) < 2:
+            continue
+        window_mean, window_se = annualized_log_return_stats(
+            window_returns.to_numpy(), weights.to_numpy()
+        )
+        comparison_rows.append(
+            {
+                "Janela": f"{window_years} anos",
+                "Retornos completos": len(window_returns),
+                "Período": (
+                    f"{window_returns.index.min():%d/%m/%Y} a "
+                    f"{window_returns.index.max():%d/%m/%Y}"
+                ),
+                "Média log anual": f"{window_mean * 100:.1f}%",
+                "Erro-padrão IID": f"±{window_se * 100:.1f} p.p.",
+            }
+        )
+    if comparison_rows:
+        st.markdown("**Sensibilidade à janela histórica (pesos fixos)**")
+        st.dataframe(pd.DataFrame(comparison_rows), hide_index=True, use_container_width=True)
+        st.caption(
+            "Janelas aninhadas usam a mesma alocação. O erro-padrão pressupõe dias independentes; "
+            "mudanças entre janelas podem indicar efeito de regimes de mercado."
+        )
 if len(aligned_returns) < 252 or n_dias > len(aligned_returns):
     st.warning(
         "A amostra histórica é curta para este horizonte. Médias e riscos estimados podem mudar muito "
