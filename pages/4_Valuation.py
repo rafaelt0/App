@@ -22,7 +22,6 @@ from utils.ui import (
     render_page_header,
 )
 from utils.valuation import (
-    calc_cv,
     calc_dcf,
     compute_roic_series,
     compute_year_metrics,
@@ -343,6 +342,10 @@ def _refresh_valuation_data(ticker_value: str) -> None:
     get_koller_data.clear()
     get_sector_peers.clear()
     st.session_state.pop(f"kval_{ticker_value}", None)
+    # Streamlit retains keyed widget values independently of the assumptions dict.
+    for key in tuple(st.session_state):
+        if key.startswith(f"kval_{ticker_value}_"):
+            st.session_state.pop(key, None)
 
 
 if ticker:
@@ -439,30 +442,48 @@ ss = st.session_state[skey]
 ss["roic_proj"] = max(float(ss.get("roic_proj", 12.0)), 1.0)
 ss["roic_cv"] = max(float(ss.get("roic_cv", 12.0)), 5.0)
 
-# ─── WACC (live, derived from sliders) ─────────────────────────────────────────
+# ─── DCF assumptions (all edits feed the same calculation) ───────────────────
 tax_rate = latest["tax_rate"]
-wacc_dec = ss["ke"] / 100 * ss["e_weight"] + ss["kd"] / 100 * (1 - ss["e_weight"]) * (
-    1 - tax_rate
-)
+st.markdown("### Premissas do valuation")
+assumption_cols = st.columns(3)
+with assumption_cols[0]:
+    g1 = st.number_input("Crescimento Anos 1–5 (%)", 0.0, 30.0, value=float(ss["g1"]), step=0.5, key=f"{skey}_g1", help=f"CAGR histórico da receita: {_pct(cagr)}. Seja conservador.")
+    ss["g1"] = g1
+    g2 = st.number_input("Crescimento Anos 6–10 (%)", 0.0, 20.0, value=float(ss["g2"]), step=0.5, key=f"{skey}_g2", help="Fase de desaceleração — costuma ser metade do crescimento da fase 1.")
+    ss["g2"] = g2
+    roic_proj = st.number_input("ROIC — Período de Projeção (%)", 1.0, 40.0, value=float(ss["roic_proj"]), step=0.5, key=f"{skey}_roic_proj", help="ROIC marginal usado para calcular o reinvestimento (g/ROIC) nos anos 1–10.")
+    ss["roic_proj"] = roic_proj
+with assumption_cols[1]:
+    gt = st.number_input("Crescimento Terminal — g (%)", 1.0, 6.0, value=float(ss["gt"]), step=0.25, key=f"{skey}_gt", help="Taxa de crescimento na perpetuidade. PIB nominal BR ≈ 3–4%.")
+    ss["gt"] = gt
+    roic_cv = st.number_input("ROIC na Perpetuidade — ROIC_cv (%)", 5.0, 35.0, value=float(ss["roic_cv"]), step=0.5, key=f"{skey}_roic_cv", help="Use WACC se não há moat sustentável; ROIC histórico se há vantagem competitiva.")
+    ss["roic_cv"] = roic_cv
+with assumption_cols[2]:
+    ke = st.number_input("ke — Custo do Equity (%)", 6.0, 25.0, value=float(ss["ke"]), step=0.25, key=f"{skey}_ke", help="CAPM: Rf + β × ERP. Rf=Selic já embute o risco-país; ERP sem CRP adicional.")
+    ss["ke"] = ke
+    ss["kd"] = min(max(float(ss.get("kd", 8.0)), 4.0), 20.0)
+    kd = st.number_input("kd — Custo da Dívida (%)", 4.0, 20.0, value=float(ss["kd"]), step=0.25, key=f"{skey}_kd", help="Yield to maturity estimado de Juros/Dívida.")
+    ss["kd"] = kd
+    e_weight = st.number_input("Participação do Equity — E/(E+D) (%)", 0.0, 100.0, value=float(ss["e_weight"] * 100), step=1.0, key=f"{skey}_ew", help="Use valor de mercado, não contábil.") / 100
+    ss["e_weight"] = e_weight
+    if price is None:
+        st.caption("Cotação indisponível; peso inicial E/V é uma premissa editável.")
 
-# ─── 8 Tabs ─────────────────────────────────────────────────────────────────────
+d_weight = 1 - e_weight
+wacc_dec = ke / 100 * e_weight + kd / 100 * d_weight * (1 - tax_rate)
+wacc_pct = wacc_dec * 100
+noplat0 = latest["noplat"]
+base_dcf = calc_dcf(noplat0, g1, g2, gt, wacc_dec, roic_cv, roic_proj)
+
+# ─── Detail tabs: result first; methodology remains available below ───────────
 tabs = st.tabs(
-    [
-        "1 · Modelo",
-        "2 · Histórico",
-        "3 · Drivers",
-        "4 · Projeção",
-        "5 · Valor Terminal",
-        "6 · WACC",
-        "7 · Resultados",
-        "8 · Múltiplos",
-    ]
+    ["1 · Resultados", "2 · Modelo", "3 · Histórico", "4 · Drivers", "5 · Projeção", "6 · Valor Terminal", "7 · WACC", "8 · Múltiplos"]
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — Modelo
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[0]:
+with tabs[1]:
     st.markdown("#### Escolha o modelo de valuation adequado")
 
     model_data = [
@@ -527,7 +548,7 @@ with tabs[0]:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — Histórico
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[1]:
+with tabs[2]:
     st.markdown("#### Análise Histórica — NOPLAT, Invested Capital, ROIC, FCF")
 
     if len(ys) < 2:
@@ -652,7 +673,7 @@ with tabs[1]:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — Drivers de Valor
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[2]:
+with tabs[3]:
     st.markdown("#### Drivers de Valor — Calibração com Evidências Empíricas")
 
     roic_vals_clean = [y["roic"] for y in ys if y.get("roic") is not None]
@@ -755,46 +776,8 @@ with tabs[2]:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — Projeção
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[3]:
+with tabs[4]:
     st.markdown("#### Projeção de Performance — 10 Anos")
-
-    col_sl1, col_sl2, col_sl3 = st.columns(3)
-    with col_sl1:
-        g1 = st.number_input(
-            "Crescimento Anos 1–5 (%)",
-            0.0,
-            30.0,
-            value=float(ss["g1"]),
-            step=0.5,
-            key=f"{skey}_g1",
-            help=f"CAGR histórico da receita: {_pct(cagr)}. Seja conservador.",
-        )
-        ss["g1"] = g1
-
-    with col_sl2:
-        g2 = st.number_input(
-            "Crescimento Anos 6–10 (%)",
-            0.0,
-            20.0,
-            value=float(ss["g2"]),
-            step=0.5,
-            key=f"{skey}_g2",
-            help="Fase de desaceleração — costuma ser metade do crescimento da fase 1.",
-        )
-        ss["g2"] = g2
-
-    with col_sl3:
-        roic_proj = st.number_input(
-            "ROIC — Período de Projeção (%)",
-            1.0,
-            40.0,
-            value=float(ss["roic_proj"]),
-            step=0.5,
-            key=f"{skey}_roic_proj",
-            help="ROIC marginal usado para calcular o reinvestimento (g/ROIC) nos anos 1–10. "
-            "Pode diferir do ROIC na perpetuidade, definido na aba Valor Terminal.",
-        )
-        ss["roic_proj"] = roic_proj
 
     noplat0 = latest["noplat"]
     roic_cv = ss["roic_cv"]
@@ -805,9 +788,7 @@ with tabs[3]:
             "Verifique se o EBIT é positivo nos dados históricos."
         )
     else:
-        _, _, _, proj_rows, _, _ = calc_dcf(
-            noplat0, g1, g2, ss["gt"], wacc_dec, roic_cv, roic_proj
-        )
+        _, _, _, proj_rows, _, _ = base_dcf
 
         if not proj_rows:
             st.error(
@@ -854,7 +835,7 @@ with tabs[3]:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 5 — Valor Terminal
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[4]:
+with tabs[5]:
     st.markdown("#### Valor Terminal — Continuing Value (Gordon Growth adaptado)")
 
     st.markdown("""
@@ -863,46 +844,11 @@ CV_T = NOPLAT_{T+1} × (1 − g / ROIC_cv) / (WACC − g)
 ```
 """)
 
-    col_cv1, col_cv2 = st.columns(2)
-    with col_cv1:
-        gt = st.number_input(
-            "Crescimento Terminal — g (%)",
-            1.0,
-            6.0,
-            value=float(ss["gt"]),
-            step=0.25,
-            key=f"{skey}_gt",
-            help="Taxa de crescimento na perpetuidade. PIB nominal BR ≈ 3–4%.",
-        )
-        ss["gt"] = gt
-
-    with col_cv2:
-        roic_cv = st.number_input(
-            "ROIC na Perpetuidade — ROIC_cv (%)",
-            5.0,
-            35.0,
-            value=float(ss["roic_cv"]),
-            step=0.5,
-            key=f"{skey}_roic_cv",
-            help="Use WACC se não há moat sustentável; ROIC histórico se há vantagem competitiva.",
-        )
-        ss["roic_cv"] = roic_cv
-
     if (latest["noplat"] > 0 and ss["g1"] <= ss["roic_proj"]
             and ss["g2"] <= ss["roic_proj"] and ss["gt"] <= ss["roic_cv"]):
-        noplat0 = latest["noplat"]
-        noplat_11 = (
-            noplat0
-            * (1 + ss["g1"] / 100) ** 5
-            * (1 + ss["g2"] / 100) ** 5
-            * (1 + gt / 100)
-        )
-        cv = calc_cv(noplat_11, gt, roic_cv, wacc_dec)
+        _, pv_cv, ev_total, _, cv, noplat_11 = base_dcf
 
         if cv is not None:
-            pv_exp, pv_cv, ev_total, _, _, _ = calc_dcf(
-                noplat0, ss["g1"], ss["g2"], gt, wacc_dec, roic_cv, ss["roic_proj"]
-            )
             cv_pct = pv_cv / ev_total * 100 if ev_total > 0 else 0
 
             cv_cards = (
@@ -973,84 +919,17 @@ CV_T = NOPLAT_{T+1} × (1 − g / ROIC_cv) / (WACC − g)
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 6 — WACC
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[5]:
+with tabs[6]:
     st.markdown("#### Custo de Capital — WACC / CAPM")
 
-    col_ke, col_kd = st.columns(2)
-
-    with col_ke:
-        st.markdown("**6a. Custo do Equity — CAPM**")
-        rf_pct = selic * 100
-        _beta_c = max(min(beta, 2.5), 0.3)
-
-        st.markdown(
-            f'<div style="font-size:0.8rem;color:#94a3b8;padding:0.4rem 0;">'
-            f'Rf (Selic): <b style="color:#00d2ff">{rf_pct:.2f}%</b> · '
-            f'β (yfinance): <b style="color:#f8fafc">{beta:.2f}</b> · '
-            f'ERP (mercado maduro, s/ CRP): <b style="color:#ffd600">{ERP_MATURE:.1f}%</b><br>'
-            f"ke = Rf + β × ERP = {rf_pct:.1f}% + {_beta_c:.2f} × {ERP_MATURE:.0f}% ≈ "
-            f'<b style="color:#00ff87">{rf_pct + _beta_c * ERP_MATURE:.1f}%</b>'
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
-        ke = st.number_input(
-            "ke — Custo do Equity (%)",
-            6.0,
-            25.0,
-            value=float(ss["ke"]),
-            step=0.25,
-            key=f"{skey}_ke",
-            help="CAPM: Rf + β × ERP. Rf=Selic já embute o risco-país; ERP é o "
-            "prêmio de mercado maduro (~5%), sem CRP adicional (evita dupla contagem).",
-        )
-        ss["ke"] = ke
-
-    with col_kd:
-        st.markdown("**6b. Custo da Dívida**")
-        if kd_est:
-            st.markdown(
-                f'<div style="font-size:0.8rem;color:#94a3b8;padding:0.4rem 0;">'
-                f'Estimado: Juros / Dívida = <b style="color:#00d2ff">{kd_est:.1f}%</b> a.a. · '
-                "premissa inicial limitada a 4–20%."
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-        ss["kd"] = min(max(float(ss.get("kd", 8.0)), 4.0), 20.0)
-        kd = st.number_input(
-            "kd — Custo da Dívida (%)",
-            4.0,
-            20.0,
-            value=float(ss["kd"]),
-            step=0.25,
-            key=f"{skey}_kd",
-            help="Yield to maturity da dívida de longo prazo. Estimado de Juros/Dívida.",
-        )
-        ss["kd"] = kd
-
-    st.markdown("**6c. Estrutura de Capital (pesos de mercado)**")
-    if price is None:
-        st.warning("Cotação indisponível; peso inicial E/V de 50% é apenas uma premissa editável, não peso de mercado.")
-    e_weight = (
-        st.number_input(
-            "Participação do Equity — E/(E+D) (%)",
-            0.0,
-            100.0,
-            value=float(ss["e_weight"] * 100),
-            step=1.0,
-            key=f"{skey}_ew",
-            help="Use valor de mercado, não contábil. "
-            f"Estimado: {ss['e_weight'] * 100:.0f}%",
-        )
-        / 100
+    rf_pct = selic * 100
+    _beta_c = max(min(beta, 2.5), 0.3)
+    st.markdown(
+        f"CAPM de referência: Rf (Selic) {rf_pct:.2f}% + β {beta:.2f} × ERP {ERP_MATURE:.1f}% = "
+        f"{rf_pct + _beta_c * ERP_MATURE:.1f}%. As premissas editáveis estão na seção acima."
     )
-    ss["e_weight"] = e_weight
-    d_weight = 1 - e_weight
-
-    wacc_dec = ke / 100 * e_weight + kd / 100 * d_weight * (1 - tax_rate)
-    wacc_pct = wacc_dec * 100
-
+    if kd_est:
+        st.caption(f"Custo da dívida estimado de Juros/Dívida: {kd_est:.1f}% a.a.")
     st.markdown("**WACC resultante:**")
     wacc_cards = (
         _card("ke (Equity)", _pct(ke), "#00d2ff")
@@ -1091,7 +970,7 @@ with tabs[5]:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 7 — Resultados
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[6]:
+with tabs[0]:
     st.markdown("#### Enterprise Value → Equity Value → Preço por Ação")
 
     noplat0 = latest["noplat"]
@@ -1104,9 +983,7 @@ with tabs[6]:
             "DCF indisponível: WACC ≤ g terminal ou crescimento superior ao ROIC. Ajuste as premissas."
         )
     else:
-        pv_exp, pv_cv, ev, proj_rows, cv, noplat_11 = calc_dcf(
-            noplat0, ss["g1"], ss["g2"], ss["gt"], wacc_dec, ss["roic_cv"], ss["roic_proj"]
-        )
+        pv_exp, pv_cv, ev, proj_rows, cv, noplat_11 = base_dcf
 
         net_debt = t_debt - latest["excess_cash"]
         equity_val = ev - net_debt
@@ -1351,9 +1228,7 @@ with tabs[7]:
 
     if noplat0 > 0 and ebit0 and rev0 and wacc_dec > ss["gt"] / 100:
         # Implied multiples from our DCF
-        _, _, ev_dcf, _, _, _ = calc_dcf(
-            noplat0, ss["g1"], ss["g2"], ss["gt"], wacc_dec, ss["roic_cv"], ss["roic_proj"]
-        )
+        ev_dcf = base_dcf[2]
         if ev_dcf is None:
             st.warning("Múltiplos DCF indisponíveis: premissas de crescimento/ROIC inconsistentes.")
             ev_dcf = None
@@ -1446,12 +1321,20 @@ with tabs[7]:
             f"Setor: **{_setor_ticker}** · {len(_peers_tickers)} empresas comparáveis"
         )
 
-        with loading_overlay("Carregando múltiplos do setor…"):
-            _peers_raw = get_sector_peers((_setor_ticker,))
-
-        if _peers_raw.empty:
-            st.warning("Não foi possível carregar dados de peers do Fundamentus.")
+        fetch_sector_peers = st.checkbox(
+            "Buscar múltiplos dos peers deste setor (Fundamentus)",
+            key=f"valuation_fetch_peers_{ticker}",
+            help="A consulta externa só começa após sua autorização.",
+        )
+        if not fetch_sector_peers:
+            st.info("Ative a opção acima para consultar dados de peers do setor.")
         else:
+            with loading_overlay("Carregando múltiplos do setor…"):
+                _peers_raw = get_sector_peers((_setor_ticker,))
+
+        if fetch_sector_peers and _peers_raw.empty:
+            st.warning("Não foi possível carregar dados de peers do Fundamentus.")
+        elif fetch_sector_peers:
             _rank_df = compute_sector_ranking(
                 _peers_raw, ticker, _setor_ticker, _b3_data
             )
