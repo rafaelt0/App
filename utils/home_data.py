@@ -1,6 +1,4 @@
-"""Cached data-fetching + sector-comparison helpers shared by Main_Page.py
-and pages/4_Valuation.py (fundamentus + yfinance).
-"""
+"""Cached data-fetching + sector-comparison helpers shared by Main_Page.py."""
 
 import logging
 import time

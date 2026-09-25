@@ -404,11 +404,11 @@ if selected_rows:
     action_col, favorite_col = st.columns(2)
     with action_col:
         if st.button("Ver preço-alvo", key="screener_selected_valuation"):
-            st.session_state["_valuation_handoff_ticker"] = ticker
-            st.session_state["valuation_ticker"] = ticker
+            st.session_state["_market_target_handoff_ticker"] = ticker
+            st.session_state["market_target_ticker"] = ticker
             st.query_params["uid"] = get_browser_uid()
-            st.query_params["valuation_ticker"] = ticker
-            st.switch_page("pages/4_Visão_de_mercado.py")
+            st.query_params["market_target_ticker"] = ticker
+            st.switch_page("Main_Page.py")
     with favorite_col:
         is_favorited = _db.wl_has(_screener_uid, ticker)
         if st.button(

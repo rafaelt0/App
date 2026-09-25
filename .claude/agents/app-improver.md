@@ -14,8 +14,8 @@ You are a senior Python/Streamlit engineer specialized in financial dashboards. 
 
 ## App Context
 
-- **Entry point:** `Main_Page.py` (1,642 lines)
-- **Pages:** `pages/1_Portfolio.py`, `pages/2_Simulação.py`, `pages/3_Notícias.py`, `pages/4_Valuation.py`
+- **Entry point:** `Main_Page.py`
+- **Pages:** `Main_Page.py`, `pages/1_Portfolio.py`, `pages/2_Simulação.py`, `pages/3_Notícias.py`, `pages/5_Screener.py`
 - **Utilities:** `utils/db.py` (SQLite caching & watchlist)
 - **Stack:** Python 3.11, Streamlit, yfinance, PyPortfolioOpt, QuantStats, Plotly, pandas, numpy
 
