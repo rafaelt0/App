@@ -30,11 +30,11 @@ def test_market_page_keeps_user_ticker_change_when_query_has_old_ticker():
         app = AppTest.from_file("pages/4_Visão_de_mercado.py")
         app.run()
 
-        assert app.selectbox(key="valuation_ticker").value == ""
+        assert app.text_input(key="valuation_ticker").value == ""
         app.button(key="valuation_quick_PETR4").click().run()
         assert app.session_state["valuation_ticker"] == "PETR4"
 
-        app.selectbox(key="valuation_ticker").set_value("VALE3").run()
+        app.text_input(key="valuation_ticker").set_value("VALE3").run()
 
-        assert app.selectbox(key="valuation_ticker").value == "VALE3"
+        assert app.text_input(key="valuation_ticker").value == "VALE3"
         assert app.session_state["valuation_ticker"] == "VALE3"

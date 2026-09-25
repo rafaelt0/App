@@ -117,22 +117,21 @@ with col_t:
         default_ticker = handoff_ticker
         st.session_state["valuation_ticker"] = handoff_ticker
 
-    ticker_options = [""] + b3_stocks
     if "valuation_ticker" not in st.session_state:
         initial_ticker = requested_ticker or default_ticker
         st.session_state["valuation_ticker"] = (
             initial_ticker if initial_ticker in b3_stocks else ""
         )
-    elif st.session_state["valuation_ticker"] not in ticker_options:
-        st.session_state["valuation_ticker"] = ""
 
-    ticker = st.selectbox(
+    ticker = st.text_input(
         "Ticker B3",
-        options=ticker_options,
-        format_func=lambda value: "Selecione um ticker…" if value == "" else value,
-        help="Preços-alvo e recomendações via Yahoo Finance.",
+        placeholder="Digite um ticker, ex.: PETR4",
+        help="Digite o código de uma ação listada na B3.",
         key="valuation_ticker",
-    ).strip().upper()
+    ).strip().upper().removesuffix(".SA")
+    if ticker and ticker not in b3_stocks:
+        st.warning("Ticker não encontrado na lista de ações da B3.")
+        st.stop()
 
     if ticker:
         st.query_params["valuation_ticker"] = ticker
@@ -241,14 +240,20 @@ if target_low is not None and target_high is not None:
                     hovertemplate=f"{label}: %{{x:,.2f}}<extra></extra>",
                 )
             )
+    apply_plotly_theme(fig)
     fig.update_layout(
-        height=190,
-        margin={"t": 15, "b": 45, "l": 15, "r": 15},
-        legend={"orientation": "h", "y": 1.15},
+        height=230,
+        margin={"t": 40, "b": 60, "l": 15, "r": 15},
+        legend={
+            "orientation": "h",
+            "x": 0.5,
+            "xanchor": "center",
+            "y": 1.08,
+            "yanchor": "bottom",
+        },
         xaxis={"title": f"Preço por ação ({currency_symbol})"},
         yaxis={"visible": False, "fixedrange": True},
     )
-    apply_plotly_theme(fig)
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.caption("A faixa visual exige que a fonte informe os alvos mínimo e máximo.")
