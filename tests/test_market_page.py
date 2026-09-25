@@ -28,8 +28,11 @@ def test_market_page_keeps_user_ticker_change_when_query_has_old_ticker():
         patch("utils.db.wl_has", return_value=False),
     ):
         app = AppTest.from_file("pages/4_Visão_de_mercado.py")
-        app.session_state["valuation_ticker"] = "PETR4"
         app.run()
+
+        assert app.selectbox(key="valuation_ticker").value == ""
+        app.button(key="valuation_quick_PETR4").click().run()
+        assert app.session_state["valuation_ticker"] == "PETR4"
 
         app.selectbox(key="valuation_ticker").set_value("VALE3").run()
 

@@ -150,22 +150,21 @@ if ticker:
         )
 
 if not ticker:
-    with col_hint:
-        st.info("Selecione um ticker B3 para ver o preço-alvo de mercado.")
-        quick_tickers = [
-            item for item in ("PETR4", "WEGE3", "VALE3", "RENT3") if item in b3_stocks
-        ]
-        quick_cols = st.columns(2)
-        for index, quick_ticker in enumerate(quick_tickers):
-            with quick_cols[index % 2]:
-                st.button(
-                    quick_ticker,
-                    key=f"valuation_quick_{quick_ticker}",
-                    use_container_width=True,
-                    on_click=lambda value=quick_ticker: st.session_state.update(
-                        {"valuation_ticker": value}
-                    ),
-                )
+    st.info("Selecione um ticker B3 para ver o preço-alvo de mercado.")
+    quick_tickers = [
+        item for item in ("PETR4", "WEGE3", "VALE3", "RENT3") if item in b3_stocks
+    ]
+    quick_cols = st.columns(4)
+    for index, quick_ticker in enumerate(quick_tickers):
+        with quick_cols[index]:
+            st.button(
+                quick_ticker,
+                key=f"valuation_quick_{quick_ticker}",
+                use_container_width=True,
+                on_click=lambda value=quick_ticker: st.session_state.update(
+                    {"valuation_ticker": value}
+                ),
+            )
     st.stop()
 
 with loading_overlay(f"Buscando preços-alvo de {ticker}…", tickers=[ticker]):
