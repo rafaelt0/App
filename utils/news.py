@@ -46,6 +46,45 @@ def build_news_query(ticker):
     return " OR ".join(terms)
 
 
+NEWS_IMPORTANCE_LABELS = {1: "Baixa", 2: "Média", 3: "Alta"}
+
+_MATERIAL_NEWS_TERMS = (
+    "lucro", "prejuizo", "resultado financeiro", "balanco", "dividend",
+    "guidance", "projec", "aquisic", "fusao", "venda de ativo",
+    "emissao de acoes", "recompra", "recuperacao judicial", "falencia",
+    "default", "divida bilionaria", "multa", "processa", "investiga",
+    "cvm", "cade", "banco central", "greve", "paralisac", "acidente",
+    "vazamento", "rompimento", "interrupcao", "demissao em massa",
+    "contrato bilionario", "capex",
+)
+_CUSTOMER_TERMS = ("cliente", "consumidor", "usuario")
+_COMPLAINT_TERMS = (
+    "reclama", "critica", "detona", "insatisf", "fala mal", "queixa",
+    "reclame aqui", "mau atendimento",
+)
+_LOW_IMPORTANCE_TERMS = (
+    "patrocin", "campanha", "marketing", "promocao de marca",
+    "evento esportivo", "campeonato", "torneio", "clube de futebol",
+    "copa do mundo", "olimpiada",
+)
+
+
+def rank_news_importance(title, summary=""):
+    """Return 1 (low), 2 (medium), or 3 (high) from the headline and any RSS snippet."""
+    text = unicodedata.normalize("NFKD", f"{title or ''} {summary or ''}").casefold()
+    text = "".join(char for char in text if not unicodedata.combining(char))
+
+    # ponytail: keyword heuristic; replace with a labeled classifier if rankings prove unreliable.
+    if any(term in text for term in _MATERIAL_NEWS_TERMS):
+        return 3
+    if any(term in text for term in _LOW_IMPORTANCE_TERMS) or (
+        any(term in text for term in _CUSTOMER_TERMS)
+        and any(term in text for term in _COMPLAINT_TERMS)
+    ):
+        return 1
+    return 2
+
+
 def parse_rss_items(xml_data, now=None, limit=3):
     """Parse recent RSS entries; return newest unique articles with aware dates."""
     if limit <= 0:
