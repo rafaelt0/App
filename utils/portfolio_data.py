@@ -148,6 +148,34 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
     return results
 
 
+def find_crisis_history_gaps(portfolio_prices, crises, history_start):
+    """Flag tickers whose available price history does not span a crisis."""
+    if portfolio_prices is None or portfolio_prices.empty:
+        return {}
+
+    history_start = pd.Timestamp(history_start)
+    history_end = portfolio_prices.index.max()
+    gaps = {}
+    for name, (start, end) in crises.items():
+        start, end = pd.Timestamp(start), pd.Timestamp(end)
+        if history_start > start or history_end < end:
+            continue
+
+        missing = {}
+        for ticker in portfolio_prices.columns:
+            prices = portfolio_prices[ticker]
+            first, last = prices.first_valid_index(), prices.last_valid_index()
+            if first is None:
+                missing[ticker] = "sem cotações históricas"
+            elif first > start:
+                missing[ticker] = f"histórico começa em {first:%d/%m/%Y}"
+            elif last < end:
+                missing[ticker] = f"histórico termina em {last:%d/%m/%Y}"
+        if missing:
+            gaps[name] = missing
+    return gaps
+
+
 def align_benchmark_returns(portfolio_returns, benchmark_prices):
     """Align portfolio and benchmark returns when comparable data exists."""
     if benchmark_prices is None or benchmark_prices.empty:

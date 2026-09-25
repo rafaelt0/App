@@ -54,6 +54,7 @@ from utils.portfolio_data import (
     align_benchmark_returns,
     align_weights_to_columns,
     calculate_historical_stress,
+    find_crisis_history_gaps,
     bound_efficient_return,
     get_benchmark_prices,
     get_portfolio_prices,
@@ -1514,6 +1515,7 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
 
         stress_prices = data_yf
         stress_benchmark = bench
+        stress_history_start = data_inicio
         if st.checkbox(
             f"Carregar histórico longo para crises (desde {stress_start.year})", value=False
         ):
@@ -1524,6 +1526,7 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
                         "_".join(map(str, col)).strip() for col in stress_prices.columns
                     ]
                 stress_prices = stress_prices.reindex(columns=data_yf.columns)
+                stress_history_start = stress_start
             except Exception as _stress_err:
                 logger.warning("Historical stress prices unavailable: %s", _stress_err)
                 st.warning(
@@ -1539,6 +1542,14 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
                 st.warning(
                     "IBOV histórico indisponível; comparação limitada ao lookback selecionado."
                 )
+
+        for crisis, missing_prices in find_crisis_history_gaps(
+            stress_prices, CRISES_HISTORICAS, stress_history_start
+        ).items():
+            missing = "; ".join(
+                f"{ticker}: {reason}" for ticker, reason in missing_prices.items()
+            )
+            st.warning(f"{crisis} — histórico incompleto: {missing}")
 
         stress_results = calculate_historical_stress(
             stress_prices, stress_benchmark, pesos_por_ticker, CRISES_HISTORICAS

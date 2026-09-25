@@ -105,6 +105,31 @@ def test_markowitz_inputs_ignore_missing_quote_gap():
     assert covariance.loc["AAA.SA", "AAA.SA"] == 0
 
 
+def test_flags_tickers_without_full_crisis_listing_history():
+    import pandas as pd
+
+    from utils.portfolio_data import find_crisis_history_gaps
+
+    dates = pd.bdate_range("2020-01-01", periods=8)
+    prices = pd.DataFrame(
+        {
+            "AAA.SA": range(100, 108),
+            "NEW.SA": [None] * 4 + [100, 101, 102, 103],
+            "EMPTY.SA": [None] * 8,
+        },
+        index=dates,
+    )
+    crises = {"COVID": (str(dates[0].date()), str(dates[-1].date()))}
+
+    gaps = find_crisis_history_gaps(prices, crises, "2019-01-01")
+
+    assert gaps["COVID"] == {
+        "NEW.SA": f"histórico começa em {dates[4]:%d/%m/%Y}",
+        "EMPTY.SA": "sem cotações históricas",
+    }
+    assert find_crisis_history_gaps(prices, crises, dates[2]) == {}
+
+
 def test_missing_stress_price_does_not_bridge_gap():
     import pandas as pd
 
