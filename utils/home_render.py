@@ -425,12 +425,16 @@ def render_debt_panel(ticker_name, row):
 def render_star_button(tkr, uid):
     """Renderiza botão de favoritar/desfavoritar da watchlist."""
     starred = _db.wl_has(uid, tkr)
-    label = "Favoritado" if starred else "Favoritar"
+    label = f"Favoritado · {tkr}" if starred else f"Favoritar · {tkr}"
     if st.button(
         label,
         key=f"star_{tkr}",
         type="primary" if starred else "secondary",
-        help="Remover dos favoritos" if starred else "Salvar nos favoritos",
+        help=(
+            f"Remover {tkr} dos favoritos"
+            if starred
+            else f"Salvar {tkr} nos favoritos"
+        ),
     ):
         if starred:
             _db.wl_remove(uid, tkr)

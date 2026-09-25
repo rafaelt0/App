@@ -834,39 +834,71 @@ if ready_to_analyze:
             if col in df_ind.columns:
                 df_ind[col] = df_ind[col] / 100.0
 
-        # Colunas percentuais
-        pct_cols = [
-            "Margem Líquida",
-            "Margem EBIT",
-            "ROE",
-            "ROIC",
-            "Dividend Yield",
-            "Crescimento Receita 5 anos",
-        ]
-        for col in pct_cols:
-            df_ind[col] = df_ind[col]
-
-        df_ind = df_ind.fillna(0)
-
         # Remove duplicate indices if any
         df_ind = df_ind[~df_ind.index.duplicated(keep="last")]
 
-        # Exibe todos os ativos selecionados juntos para facilitar a comparação.
         if len(tickers) > 1:
-            favorite_columns = st.columns(min(4, len(tickers)))
-            for index, ticker in enumerate(tickers):
-                with favorite_columns[index % len(favorite_columns)]:
-                    render_star_button(ticker, _uid)
+            comparison = (
+                df_ind.reindex(tickers)
+                .drop(columns="Empresa")
+                .rename_axis("Ticker")
+                .reset_index()
+                .rename(
+                    columns={
+                        "Margem Líquida": "Margem Líquida (%)",
+                        "Margem EBIT": "Margem EBIT (%)",
+                        "ROE": "ROE (%)",
+                        "ROIC": "ROIC (%)",
+                        "Dividend Yield": "Dividend Yield (%)",
+                        "Crescimento Receita 5 anos": "Receita 5a (%)",
+                    }
+                )
+            )
+            percent_columns = [
+                "Margem Líquida (%)",
+                "Margem EBIT (%)",
+                "ROE (%)",
+                "ROIC (%)",
+                "Dividend Yield (%)",
+                "Receita 5a (%)",
+            ]
+            st.caption("Percentuais em % · múltiplos em × · sem dados ficam em branco.")
             st.dataframe(
-                df_ind.reindex(tickers).rename_axis("Ticker").reset_index(),
+                comparison,
                 hide_index=True,
                 use_container_width=True,
+                height=min(35 * (len(tickers) + 1) + 8, 760),
+                column_config={
+                    "Ticker": st.column_config.TextColumn(width="small"),
+                    **{
+                        name: st.column_config.NumberColumn(
+                            format="%.1f%%", width="small"
+                        )
+                        for name in percent_columns
+                    },
+                    **{
+                        name: st.column_config.NumberColumn(
+                            format="%.2f×", width="small"
+                        )
+                        for name in ("P/L", "EV/EBITDA", "P/VP")
+                    },
+                },
             )
+            st.markdown("**Favoritos rápidos**")
+            for start in range(0, len(tickers), 4):
+                favorite_columns = st.columns(min(4, len(tickers) - start))
+                for column, ticker in zip(
+                    favorite_columns, tickers[start : start + 4]
+                ):
+                    with column:
+                        render_star_button(ticker, _uid)
         else:
             ticker = tickers[0]
             render_star_button(ticker, _uid)
             if ticker in df_ind.index:
-                render_ticker_cards(df_ind.loc[ticker], setor=get_ticker_setor(df, ticker))
+                render_ticker_cards(
+                    df_ind.loc[ticker].fillna(0), setor=get_ticker_setor(df, ticker)
+                )
 
         # ── Saúde Financeira ─────────────────────────────────────────────────
         st.markdown("---")
