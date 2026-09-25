@@ -222,6 +222,7 @@ setores.insert(0, "Todos")
 SECTOR_AUTOPICK_LIMIT = 8
 MAX_ANALYSIS_TICKERS = 20
 _ticker_setor = dict(zip(data["Ticker"], data["Setor"]))
+_ticker_empresa = dict(zip(data["Ticker"], data["Empresa"])) if "Empresa" in data else {}
 
 _uid = get_browser_uid()
 
@@ -380,22 +381,26 @@ def _clear_main_selection():
 if "_pending_tickers" in st.session_state:
     st.session_state["selected_tickers"] = st.session_state.pop("_pending_tickers")
 
-# Remove any stale tickers that are no longer in the filtered list
+# Retain saved/selected tickers even when the current sector excludes them.
 st.session_state["selected_tickers"] = [
-    t for t in st.session_state["selected_tickers"] if t in tickers_filtrados
+    t for t in st.session_state["selected_tickers"] if t in stocks
 ][:MAX_ANALYSIS_TICKERS]
+
+def _stock_label(ticker):
+    return "  ·  ".join(filter(None, (ticker, _ticker_empresa.get(ticker), _ticker_setor.get(ticker))))
+
+
+_options = list(dict.fromkeys([*st.session_state["selected_tickers"], *tickers_filtrados]))
 
 tickers = st.multiselect(
     "Escolha ações para analisar",
-    options=tickers_filtrados,
-    format_func=lambda t: (
-        f"{t}  ·  {_ticker_setor[t]}" if _ticker_setor.get(t) else t
-    ),
-    placeholder="Digite o ticker ou selecione na lista…",
+    options=_options,
+    format_func=_stock_label,
+    placeholder="Digite o ticker ou nome da empresa…",
     max_selections=MAX_ANALYSIS_TICKERS,
     help=(
         f"Selecione até {MAX_ANALYSIS_TICKERS} ações. "
-        "Use o filtro de setor para reduzir a lista."
+        "Busque pelo ticker ou nome da empresa; clique em Analisar após escolher os ativos."
     ),
     key="selected_tickers",
 )
@@ -512,7 +517,7 @@ if not tickers:
 
     st.markdown(
         '<div class="onboarding-hint">'
-        f"{ICO_BULB} <b>Atalho</b><span>Digite qualquer ticker da B3 no campo de busca ou filtre por setor na barra lateral.</span>"
+        f"{ICO_BULB} <b>Atalho</b><span>Pesquise pelo ticker ou nome da empresa, ou filtre por setor na barra lateral.</span>"
         "</div>",
         unsafe_allow_html=True,
     )

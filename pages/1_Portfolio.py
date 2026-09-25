@@ -170,6 +170,7 @@ except (OSError, ValueError) as exc:
     st.stop()
 
 stocks = list(data["Ticker"].values)
+_ticker_empresa = dict(zip(data["Ticker"], data["Empresa"])) if "Empresa" in data else {}
 
 _uid = get_browser_uid()
 _saved_tickers, _saved_weights = _db.portfolio_get(_uid)
@@ -223,10 +224,14 @@ with col_tickers:
     tickers = st.multiselect(
         "Selecione as ações do portfólio",
         options=stocks,
-        placeholder="Digite tickers (ex.: PETR4, VALE3)",
+        format_func=lambda t: f"{t}  ·  {_ticker_empresa[t]}" if _ticker_empresa.get(t) else t,
+        placeholder="Digite o ticker ou nome da empresa…",
         key="selected_tickers",
         max_selections=MAX_TICKERS,
-        help=f"Limite de {MAX_TICKERS} ativos para manter o download de cotações e a otimização estáveis.",
+        help=(
+            f"Digite o ticker ou nome da empresa para filtrar. Limite de {MAX_TICKERS} ativos "
+            "para manter o download de cotações e a otimização estáveis."
+        ),
     )
 
 if st.session_state.pop("_portfolio_handoff_notice", None):
