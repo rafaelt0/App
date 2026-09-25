@@ -28,6 +28,24 @@ def test_trajectory_display_count_is_not_a_simulation_input(monkeypatch):
     assert calls == 1
 
 
+def test_annualized_log_return_stats_uses_more_daily_observations_to_reduce_iid_se():
+    import numpy as np
+    from utils.simulation import annualized_log_return_stats
+
+    returns = np.array([[0.01], [-0.02], [0.03], [0.0]])
+    annual_mean, standard_error = annualized_log_return_stats(returns, [1.0])
+    daily_log = np.log1p(returns[:, 0])
+    assert np.isclose(annual_mean, 252 * daily_log.mean())
+    assert np.isclose(standard_error, 252 * daily_log.std(ddof=1) / np.sqrt(4))
+
+    repeated_returns = np.tile(returns, (4, 1))
+    _, longer_standard_error = annualized_log_return_stats(repeated_returns, [1.0])
+    repeated_log = np.log1p(repeated_returns[:, 0])
+    expected = 252 * repeated_log.std(ddof=1) / np.sqrt(len(repeated_log))
+    assert np.isclose(longer_standard_error, expected)
+    assert longer_standard_error < standard_error
+
+
 def test_simulation_daily_rebalances_and_does_not_change_global_rng(monkeypatch):
     import numpy as np
     import streamlit as st
@@ -96,7 +114,7 @@ def test_page_uses_displayed_allocation_without_manual_weight_state():
         assert "pesos_manuais" not in app.session_state
 
 
-def test_page_rejects_incomplete_return_history():
+def test_page_drops_incomplete_days_before_calibration():
     import numpy as np
     from unittest.mock import patch
     from streamlit.testing.v1 import AppTest
@@ -116,6 +134,7 @@ def test_page_rejects_incomplete_return_history():
         "peso_manual_df": pd.DataFrame(
             {"Peso": [0.5, 0.5]}, index=["AAA3.SA", "BBB4.SA"]
         ),
+        "sim_n_simulations_input": 10,
     }.items():
         app.session_state[key] = value
 
@@ -125,7 +144,83 @@ def test_page_rejects_incomplete_return_history():
         submit.click().run()
 
     assert not app.exception
-    assert any("Retornos históricos inválidos" in error.value for error in app.error)
+    assert not any("Retornos históricos inválidos" in error.value for error in app.error)
+    assert any("39 retornos diários completos" in caption.value for caption in app.caption)
+
+
+def test_longer_simulation_calibration_uses_more_rows_and_fixed_horizon():
+    import numpy as np
+    from unittest.mock import patch
+    from streamlit.testing.v1 import AppTest
+
+    days = np.arange(1300)
+    prices = pd.DataFrame(
+        {
+            "AAA3.SA": 100 * np.exp(0.0004 * days + 0.01 * np.sin(days / 20)),
+            "BBB4.SA": np.nan,
+        },
+        index=pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=len(days)),
+    )
+    returns = pd.DataFrame(
+        np.zeros((40, 2)),
+        index=pd.date_range(end=pd.Timestamp.today().normalize(), periods=40, freq="B"),
+        columns=["AAA3.SA", "BBB4.SA"],
+    )
+    simulation_calls = []
+    bootstrap_rows = []
+
+    def simulate(mu, covariance, weights, days, simulations, initial_value, start_date):
+        simulation_calls.append((days, tuple(weights)))
+        index = pd.date_range(start=start_date, periods=days + 1, freq="B")
+        return pd.DataFrame(np.full((days + 1, simulations), initial_value), index=index)
+
+    def bootstrap(asset_returns, weights, days, simulations, initial_value):
+        bootstrap_rows.append(len(asset_returns))
+        return np.full(simulations, initial_value)
+
+    app = AppTest.from_file("pages/2_Simulação.py")
+    for key, value in {
+        "selected_tickers": ["AAA3", "BBB4"],
+        "portfolio_loaded_tickers": ["AAA3", "BBB4"],
+        "portfolio_analysis_tickers": ["AAA3", "BBB4"],
+        "portfolio_loaded": True,
+        "modo": "Alocação Manual",
+        "returns": returns,
+        "peso_manual_df": pd.DataFrame(
+            {"Peso": [1.0, 0.0]}, index=["AAA3.SA", "BBB4.SA"]
+        ),
+        "sim_n_simulations_input": 10,
+        "sim_years_input": 1,
+    }.items():
+        app.session_state[key] = value
+
+    with (
+        patch("streamlit.page_link", lambda *args, **kwargs: None),
+        patch("utils.portfolio_data.get_portfolio_prices", return_value=prices) as fetch_prices,
+        patch("utils.simulation.simulate_portfolio", side_effect=simulate),
+        patch("utils.simulation.bootstrap_terminal_values", side_effect=bootstrap),
+    ):
+        app.run()
+        assert not fetch_prices.called
+        app.selectbox(key="sim_calibration_window").set_value("5 Anos")
+        next(button for button in app.button if button.label == "Rodar Simulação").click().run()
+
+    assert not app.exception
+    assert fetch_prices.call_count == 1
+    assert fetch_prices.call_args.args[0] == ("AAA3.SA",)
+    assert simulation_calls == [(252, (1.0,))]
+    assert bootstrap_rows == [len(prices.index) - 1]
+    assert any(
+        f"{len(prices.index) - 1} retornos diários completos" in caption.value
+        for caption in app.caption
+    )
+    comparison = next(
+        element.value for element in app.dataframe
+        if "Retornos completos" in element.value.columns
+    )
+    assert comparison["Janela"].tolist() == ["2 anos", "3 anos", "5 anos"]
+    counts = comparison["Retornos completos"].tolist()
+    assert counts[0] < counts[1] < counts[2]
 
 
 def test_page_keeps_simulation_metrics_when_display_count_changes():
