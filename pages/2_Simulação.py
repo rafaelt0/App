@@ -499,7 +499,17 @@ with col_s3:
         ),
     )
 
-render_cards_grid(sim_stats_dict)
+render_cards_grid(
+    {
+        label: value
+        for label, value in sim_stats_dict.items()
+        if label not in {
+            "Probabilidade de Ganho",
+            "Retorno Anual Esperado",
+            "Retorno final P5",
+        }
+    }
+)
 
 col_exp1, col_exp2 = st.columns(2)
 with col_exp1:
