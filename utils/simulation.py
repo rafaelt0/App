@@ -7,6 +7,16 @@ import pandas as pd
 import streamlit as st
 
 
+def _normalized_weights(weights):
+    weights = np.asarray(weights, dtype=float)
+    if (
+        weights.ndim != 1 or not len(weights) or not np.isfinite(weights).all()
+        or (weights < 0).any() or weights.sum() <= 0
+    ):
+        raise ValueError("Portfolio weights must be finite, nonnegative, and have positive total.")
+    return weights / weights.sum()
+
+
 def simulate_portfolio(
     mu, covariance, weights, days, simulations, initial_value, start_date, chunk_size=64
 ):
@@ -19,13 +29,7 @@ def simulate_portfolio(
 
     mu = np.asarray(mu, dtype=float)
     covariance = np.asarray(covariance, dtype=float)
-    weights = np.asarray(weights, dtype=float)
-    if (
-        weights.ndim != 1 or not len(weights) or not np.isfinite(weights).all()
-        or (weights < 0).any() or weights.sum() <= 0
-    ):
-        raise ValueError("Portfolio weights must be finite, nonnegative, and have positive total.")
-    weights = weights / weights.sum()
+    weights = _normalized_weights(weights)
     if chunk_size < 1:
         raise ValueError("chunk_size must be positive.")
     rng = np.random.default_rng(42)
@@ -44,3 +48,34 @@ def simulate_portfolio(
     )
     st.session_state["_simulation_result"] = (fingerprint, result)
     return result
+
+
+def bootstrap_terminal_values(returns, weights, days, simulations, initial_value, chunk_size=64):
+    """Resample whole historical days to preserve cross-asset co-movements."""
+    returns = np.asarray(returns, dtype=float)
+    weights = _normalized_weights(weights)
+    if (
+        returns.ndim != 2 or returns.shape[0] < 2 or returns.shape[1] != len(weights)
+        or not np.isfinite(returns).all() or (returns <= -1).any()
+    ):
+        raise ValueError("Historical returns must be complete daily rows above -100%.")
+    if days < 1 or simulations < 1 or chunk_size < 1 or not np.isfinite(initial_value) or initial_value <= 0:
+        raise ValueError("Days, simulations, chunk size and initial value must be positive.")
+
+    inputs = (returns.shape, tuple(weights), days, simulations, initial_value, chunk_size)
+    fingerprint = hashlib.sha256(repr(inputs).encode() + returns.tobytes()).hexdigest()
+    cached = st.session_state.get("_bootstrap_terminal_result")
+    if cached and cached[0] == fingerprint:
+        return cached[1]
+
+    rng = np.random.default_rng(43)
+    final_values = np.empty(simulations, dtype=float)
+    for first in range(0, simulations, chunk_size):
+        count = min(chunk_size, simulations - first)
+        # ponytail: iid daily blocks omit volatility clustering; use multi-day blocks if validated.
+        indices = rng.integers(len(returns), size=(days, count))
+        daily_returns = returns[indices] @ weights
+        final_values[first:first + count] = initial_value * np.prod(1 + daily_returns, axis=0)
+
+    st.session_state["_bootstrap_terminal_result"] = (fingerprint, final_values)
+    return final_values

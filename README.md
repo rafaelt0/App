@@ -30,9 +30,10 @@ A aplicação é organizada como um **fluxo de análise em 5 etapas**:
 * Taxa livre de risco baseada na Selic real.
 
 ### 3. Simulação Monte Carlo
-* Projeção de trajetórias de retorno com 1.000+ simulações estocásticas.
-* Gráfico interativo estilo *fan chart* com faixas de confiança.
-* Estatísticas resumo: valor esperado, VaR e cenários extremos.
+* Projeção de 10 a 3.000 trajetórias (padrão: 2.000) com retornos logarítmicos normais e rebalanceamento diário.
+* Comparação dos percentis finais com reamostragem conjunta dos retornos históricos; nenhum modelo prevê crises não observadas.
+* Gráfico interativo estilo *fan chart* com faixas de percentis, não intervalos de confiança.
+* Estatísticas resumo: valor final médio, percentil 5, média da cauda inferior e extremos simulados.
 
 ### 4. Notícias & Sentimento
 * Monitoramento de notícias em tempo real das ações da carteira (RSS).
