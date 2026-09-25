@@ -49,6 +49,9 @@ def _normalize_listed_stocks(frame: pd.DataFrame) -> pd.DataFrame:
     frame = frame.copy()
     frame["Ticker"] = frame["Ticker"].astype(str).str.strip().str.upper()
     frame = frame[frame["Ticker"].ne("") & frame["Ticker"].ne("NAN")]
+    for column in ("Empresa", "RazaoSocial"):
+        if column in frame:
+            frame[column] = frame[column].fillna("").astype(str).str.strip()
     if frame.empty:
         raise ValueError("B3 universe contains no valid tickers")
     return frame.drop_duplicates(subset=["Ticker"]).reset_index(drop=True)
@@ -59,8 +62,6 @@ def get_listed_stocks() -> pd.DataFrame:
     """Load the shared local B3 universe once per hour."""
     frame = pd.read_csv(Path(__file__).resolve().parent.parent / "acoes-listadas-b3.csv")
     return _normalize_listed_stocks(frame)
-
-
 
 
 def clean_numeric_column(col):

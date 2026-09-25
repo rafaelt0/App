@@ -16,7 +16,11 @@ def test_portfolio_loads_quotes_only_on_click_and_names_missing_ticker():
         calls.append(args)
         return prices.copy()
 
+    stocks = pd.DataFrame({"Ticker": ["PETR4", "VALE3"], "Setor": ["Energia", "Mineração"],
+                           "Empresa": ["Petrobras", "Vale"],
+                           "RazaoSocial": ["Petróleo Brasileiro", "Vale S.A."]})
     with (
+        patch("utils.market_data.get_listed_stocks", return_value=stocks),
         patch("utils.portfolio_data.get_portfolio_prices", get_prices),
         patch("utils.portfolio_data.get_selic_rate", lambda: 0.0005),
         patch("utils.db.portfolio_get", lambda uid: ([], {})),
@@ -26,6 +30,18 @@ def test_portfolio_loads_quotes_only_on_click_and_names_missing_ticker():
         app.session_state["selected_tickers"] = ["PETR4", "VALE3"]
         app.run()
         assert not app.exception
+        assert not calls
+        selector = app.multiselect(key="selected_tickers")
+        assert selector.options == ["PETR4  ·  Petrobras", "VALE3  ·  Vale"]
+        assert selector.value == ["PETR4", "VALE3"]
+        assert not any(widget.key == "portfolio_stock_search" for widget in app.text_input)
+        assert not any(button.label == "Buscar" for button in app.button)
+
+        selector.set_value(["PETR4"]).run()
+        assert app.session_state["selected_tickers"] == ["PETR4"]
+        assert not calls
+        app.multiselect(key="selected_tickers").set_value(["PETR4", "VALE3"]).run()
+        assert app.session_state["selected_tickers"] == ["PETR4", "VALE3"]
         assert not calls
 
         next(button for button in app.button if button.label == "Carregar portfólio").click().run()
