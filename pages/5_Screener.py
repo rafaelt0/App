@@ -106,12 +106,16 @@ _PRESET_DESCRIPTIONS = {
     "Explorar B3": "Liquidez média em 2 meses de pelo menos R$ 1 milhão.",
     "Lucro a preço moderado": "P/L > 0 e ≤ 15, ROE ≥ 12% e liquidez ≥ R$ 1 milhão.",
     "Renda atual": "Dividend yield ≥ 5%, ROE ≥ 10% e liquidez ≥ R$ 1 milhão. DY passado não garante dividendos futuros.",
+    "Qualidade rentável": "ROE ≥ 18%, 0 < P/L ≤ 20 e liquidez ≥ R$ 2 milhões.",
+    "Alta liquidez": "Liquidez média em 2 meses ≥ R$ 10 milhões; sem outros critérios.",
+    "Crescimento com lucro": "Receita em 5 anos ≥ 10%, ROE ≥ 12% e liquidez ≥ R$ 1 milhão.",
     "Personalizado": "Escolha explicitamente quais critérios aplicar.",
 }
 _FILTER_WIDGETS = {
     "filter_pl_enabled": ("pl_min", "pl_max"),
     "filter_roe_enabled": ("roe_min",),
     "filter_dy_enabled": ("dy_min",),
+    "filter_c5y_enabled": ("c5y_min",),
     "filter_liq2m_enabled": ("liq2m_min",),
 }
 _screener_defaults = {
@@ -125,17 +129,18 @@ _screener_defaults = {
     "pl_min_exclusive": False,
     "roe_min": 12.0,
     "dy_min": 5.0,
+    "c5y_min": 10.0,
     "liq2m_min": 1_000_000,
     "sort_by": "Liquidez 2m",
 }
 if (
-    st.session_state.get("_screener_filter_version") != 2
+    st.session_state.get("_screener_filter_version") != 3
     or st.session_state.get("preset_select") not in PRESET_FILTERS
 ):
     for key, value in _screener_defaults.items():
         st.session_state[key] = value
     st.session_state.pop("screener_visible_columns", None)
-    st.session_state["_screener_filter_version"] = 2
+    st.session_state["_screener_filter_version"] = 3
 else:
     for key, value in _screener_defaults.items():
         st.session_state.setdefault(key, value)
@@ -154,7 +159,14 @@ def _apply_preset():
         return
     for enabled_key in _FILTER_WIDGETS:
         st.session_state[enabled_key] = False
-    for key, value in {"pl_min": 0.0, "pl_max": 15.0, "roe_min": 12.0, "dy_min": 5.0, "liq2m_min": 1_000_000}.items():
+    for key, value in {
+        "pl_min": 0.0,
+        "pl_max": 15.0,
+        "roe_min": 12.0,
+        "dy_min": 5.0,
+        "c5y_min": 10.0,
+        "liq2m_min": 1_000_000,
+    }.items():
         st.session_state[key] = value
     st.session_state["pl_min_exclusive"] = criteria.get("pl_min_exclusive", False)
     for criterion, value in criteria.items():
@@ -172,6 +184,9 @@ def _apply_preset():
         elif criterion == "dy_min":
             st.session_state["filter_dy_enabled"] = True
             st.session_state["dy_min"] = value * 100
+        elif criterion == "c5y_min":
+            st.session_state["filter_c5y_enabled"] = True
+            st.session_state["c5y_min"] = value * 100
         elif criterion == "liq2m_min":
             st.session_state["filter_liq2m_enabled"] = True
             st.session_state["liq2m_min"] = value
@@ -225,6 +240,18 @@ with st.sidebar.expander("Personalize critérios", expanded=True):
         on_change=_mark_custom,
     )
 
+    st.markdown("**Crescimento**")
+    st.checkbox(
+        "Aplicar crescimento da receita (5 anos)",
+        key="filter_c5y_enabled",
+        on_change=_mark_custom,
+    )
+    st.number_input(
+        "Crescimento mínimo (%)", min_value=0.0, max_value=100.0, step=1.0,
+        key="c5y_min", disabled=not st.session_state["filter_c5y_enabled"],
+        on_change=_mark_custom,
+    )
+
     st.markdown("**Dividendos**")
     st.checkbox("Aplicar dividend yield mínimo", key="filter_dy_enabled", on_change=_mark_custom)
     st.number_input(
@@ -235,9 +262,12 @@ with st.sidebar.expander("Personalize critérios", expanded=True):
 
     st.markdown("**Liquidez**")
     st.checkbox("Aplicar liquidez mínima", key="filter_liq2m_enabled", on_change=_mark_custom)
-    st.number_input(
-        "Liquidez média 2 meses mínima (R$)", min_value=0, max_value=100_000_000,
-        step=100_000, key="liq2m_min", disabled=not st.session_state["filter_liq2m_enabled"],
+    st.select_slider(
+        "Liquidez média 2 meses mínima (R$)", options=range(0, 100_000_001, 100_000),
+        format_func=lambda value: f"{value / 1_000_000:g}".replace(".", ",") + (
+            " milhão" if value == 1_000_000 else " milhões"
+        ),
+        key="liq2m_min", disabled=not st.session_state["filter_liq2m_enabled"],
         on_change=_mark_custom,
     )
 
@@ -261,6 +291,8 @@ if st.session_state["filter_roe_enabled"]:
     criteria["roe_min"] = st.session_state["roe_min"] / 100
 if st.session_state["filter_dy_enabled"]:
     criteria["dy_min"] = st.session_state["dy_min"] / 100
+if st.session_state["filter_c5y_enabled"]:
+    criteria["c5y_min"] = st.session_state["c5y_min"] / 100
 if st.session_state["filter_liq2m_enabled"]:
     criteria["liq2m_min"] = st.session_state["liq2m_min"]
 
@@ -294,6 +326,8 @@ if "roe_min" in criteria:
     active_filters.append(f"ROE ≥ {criteria['roe_min'] * 100:g}%")
 if "dy_min" in criteria:
     active_filters.append(f"DY ≥ {criteria['dy_min'] * 100:g}%")
+if "c5y_min" in criteria:
+    active_filters.append(f"Cresc. Rec. 5a ≥ {criteria['c5y_min'] * 100:g}%")
 
 st.markdown("### Resultados")
 st.caption(
