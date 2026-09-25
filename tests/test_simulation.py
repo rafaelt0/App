@@ -173,6 +173,19 @@ def test_page_keeps_simulation_metrics_when_display_count_changes():
         assert not app.exception
         assert observed_weights == [(0.0000001, 0.9999999)]
         metrics_before = [(metric.label, metric.value) for metric in app.metric]
+        stats_cards = next(
+            block.value for block in app.markdown
+            if "Valor Esperado Final" in block.value
+        )
+        assert stats_cards.count('class="mcard-label"') == 6
+        assert all(
+            label not in stats_cards
+            for label in (
+                "Probabilidade de Ganho",
+                "Retorno Anual Esperado",
+                "Retorno final P5",
+            )
+        )
 
         trajectories = next(
             widget
