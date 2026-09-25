@@ -196,3 +196,68 @@ def test_page_keeps_simulation_metrics_when_display_count_changes():
 
     assert not app.exception
     assert [(metric.label, metric.value) for metric in app.metric] == metrics_before
+
+
+def test_bootstrap_resamples_joint_days_and_invalidates_changed_history(monkeypatch):
+    import numpy as np
+    import streamlit as st
+    from utils.simulation import bootstrap_terminal_values
+
+    monkeypatch.setattr(st, "session_state", {})
+    # Independently drawing assets would create +/-20% days; joint rows cancel exactly.
+    returns = np.array([[0.2, -0.2], [-0.2, 0.2]])
+    args = ((0.5, 0.5), 5, 100, 100.0)
+    first = bootstrap_terminal_values(returns, *args, chunk_size=7)
+    np.testing.assert_allclose(first, 100.0)
+    assert bootstrap_terminal_values(returns, *args, chunk_size=7) is first
+
+    # A changed middle observation must invalidate the cache, even with the same shape.
+    changed = np.array([[0.2, -0.2], [-0.2, 0.0]])
+    second = bootstrap_terminal_values(changed, *args, chunk_size=7)
+    assert second is not first
+    assert (second < 100).any()
+    crash_days = np.array([[-0.3], [0.0]])
+    crash_paths = bootstrap_terminal_values(crash_days, (1.0,), 1, 100, 100.0)
+    assert set(np.round(crash_paths, 2)) == {70.0, 100.0}
+    with np.testing.assert_raises(ValueError):
+        bootstrap_terminal_values(np.array([[-1.0, 0.0], [0.0, 0.0]]), *args)
+
+
+def test_page_discloses_sample_and_compares_model_tails():
+    import numpy as np
+    from unittest.mock import patch
+    from streamlit.testing.v1 import AppTest
+
+    returns = pd.DataFrame(
+        np.zeros((40, 2)),
+        index=pd.date_range("2024-01-01", periods=40, freq="B"),
+        columns=["AAA3.SA", "BBB4.SA"],
+    )
+    returns.iloc[20] = [-0.3, 0.1]
+    app = AppTest.from_file("pages/2_Simulação.py")
+    for key, value in {
+        "selected_tickers": ["AAA3", "BBB4"],
+        "portfolio_loaded_tickers": ["AAA3", "BBB4"],
+        "portfolio_analysis_tickers": ["AAA3", "BBB4"],
+        "portfolio_loaded": True,
+        "modo": "Alocação Manual",
+        "returns": returns,
+        "peso_manual_df": pd.DataFrame({"Peso": [0.5, 0.5]}, index=["AAA3", "BBB4"]),
+        "sim_n_simulations_input": 100,
+        "sim_years_input": 3,
+    }.items():
+        app.session_state[key] = value
+
+    with patch("streamlit.page_link", lambda *args, **kwargs: None):
+        app.run()
+        next(button for button in app.button if button.label == "Rodar Simulação").click().run()
+
+    assert not app.exception
+    assert len(app.warning) == 2
+    assert any("01/01/2024" in caption.value and "erro-padrão" in caption.value for caption in app.caption)
+    assert any("Comparação de modelos" in block.value for block in app.markdown)
+    assert any("Amplitude entre P5 e P95" in block.value for block in app.markdown)
+    assert any("crises ausentes" in caption.value for caption in app.caption)
+    assert {metric.label for metric in app.metric} == {
+        "CAGR do valor final médio", "Probabilidade de Ganho", "Retorno final P5"
+    }
