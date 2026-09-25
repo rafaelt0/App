@@ -8,6 +8,7 @@ from utils.news import (
     build_news_query,
     merge_shared_articles,
     parse_rss_items,
+    rank_news_importance,
     recent_rss_sample,
     sentiment_intensity,
     ticker_tone_rows,
@@ -21,6 +22,14 @@ def test_news_queries_use_quoted_tickers_and_specific_issuer_names():
     assert build_news_query("VALE3") == '"VALE3" OR "Vale S.A."'
     assert build_news_query("RENT3") == '"RENT3" OR "Localiza Rent a Car"'
     assert build_news_query("UNKNOWN") == '"UNKNOWN"'
+
+
+def test_news_importance_ranks_material_events_above_promotions_and_complaints():
+    assert rank_news_importance("Banco patrocina evento esportivo") == 1
+    assert rank_news_importance("Consumidor fala mal do atendimento do banco") == 1
+    assert rank_news_importance("Consumidor faz reclamação e crítica ao banco") == 1
+    assert rank_news_importance("Companhia reporta lucro e dividendos recordes") == 3
+    assert rank_news_importance("Empresa apresenta um novo aplicativo") == 2
 
 
 def test_rss_filters_recent_parseable_items_deduplicates_and_sorts():

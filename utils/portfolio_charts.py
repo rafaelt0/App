@@ -104,7 +104,7 @@ def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=
     )
 
 
-def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
+def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, allocation_label):
     (
         results,
         efficient_vols,
@@ -170,9 +170,9 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
                 symbol="star",
                 line=dict(color="#f8fafc", width=2),
             ),
-            name="Max Sharpe (Markowitz)",
+            name=allocation_label,
             text=[
-                f"Max Sharpe<br>Retorno: {opt_return:.2%}<br>Vol: {opt_stddev:.2%}<br>Sharpe: {opt_sharpe:.2f}"
+                f"{allocation_label}<br>Retorno: {opt_return:.2%}<br>Vol: {opt_stddev:.2%}<br>Sharpe: {opt_sharpe:.2f}"
             ],
             hoverinfo="text",
         )
@@ -197,8 +197,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
         )
     )
 
-    # LAC — Linha de Alocação de Capital (EAE1242 — Tobin, 1958)
-    # Parte do Rf (volatilidade=0) e passa pela carteira tangente (Max Sharpe)
+    # Linha de alocação entre Rf e a carteira selecionada (só tangente se Max Sharpe).
     if opt_stddev > 0:
         lac_slope = (opt_return - rf) / opt_stddev
         lac_x_end = opt_stddev * 1.8
@@ -208,8 +207,8 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
                 y=[rf, rf + lac_slope * lac_x_end],
                 mode="lines",
                 line=dict(color="#ffd600", width=2, dash="dash"),
-                name="LAC (Alocação de Capital)",
-                hovertemplate="LAC<br>Vol: %{x:.2%}<br>Retorno: %{y:.2%}<extra></extra>",
+                name="Linha de alocação (carteira selecionada)",
+                hovertemplate="Alocação<br>Vol: %{x:.2%}<br>Retorno: %{y:.2%}<extra></extra>",
             )
         )
         fig.add_trace(
@@ -227,7 +226,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf):
         )
 
     fig.update_layout(
-        title="Fronteira Eficiente de Markowitz · LAC · Carteira Tangente",
+        title="Fronteira Eficiente de Markowitz · Carteira Selecionada",
         xaxis_title="Volatilidade Anualizada (Desvio Padrão)",
         yaxis_title="Retorno Esperado Anualizado",
     )

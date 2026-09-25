@@ -12,7 +12,7 @@ from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
 from utils.portfolio_data import get_portfolio_prices
-from utils.simulation import simulate_portfolio
+from utils.simulation import bootstrap_terminal_values, simulate_portfolio
 from utils.ui import (
     analyst_synthesis_header,
     empty_state_card,
@@ -147,7 +147,7 @@ def _restore_saved_portfolio_context() -> None:
         st.session_state["_simulation_restore_error"] = True
         return
 
-    returns = prices.pct_change().dropna()
+    returns = prices.pct_change(fill_method=None).dropna()
     if len(returns) < 30:
         logger.warning(
             "simulation saved portfolio has only %d complete return rows", len(returns)
@@ -211,7 +211,7 @@ _simulation_restore_notice = st.session_state.pop(
 
 
 # Verifica se o portfólio atual foi carregado e analisado nesta sessão.
-required_keys = ["modo", "returns", "pesos_manuais", "peso_manual_df"]
+required_keys = ["modo", "returns", "peso_manual_df"]
 _current_tickers = list(st.session_state.get("selected_tickers", []))
 _loaded_tickers = list(st.session_state.get("portfolio_loaded_tickers", []))
 _analyzed_tickers = list(st.session_state.get("portfolio_analysis_tickers", []))
@@ -268,7 +268,6 @@ if not _portfolio_ready:
 # Recupera as variáveis da aba 1
 modo = st.session_state["modo"]
 returns = st.session_state["returns"]
-pesos_manuais = st.session_state["pesos_manuais"]
 peso_manual_df = st.session_state["peso_manual_df"]
 
 section_header(ICO_METRICS, "Alocação usada na simulação", "h2")
@@ -287,29 +286,29 @@ _SIMULATION_PRESETS = (
     (
         "Rápida",
         {
-            "sim_n_simulations_input": 100,
+            "sim_n_simulations_input": 500,
             "sim_valor_input": 10_000,
             "sim_years_input": 1,
         },
-        "100 trajetórias · 1 ano",
+        "500 trajetórias · 1 ano (cauda menos estável)",
     ),
     (
         "Padrão",
         {
-            "sim_n_simulations_input": 200,
+            "sim_n_simulations_input": 2000,
             "sim_valor_input": 10_000,
             "sim_years_input": 1,
         },
-        "200 trajetórias · 1 ano",
+        "2.000 trajetórias · 1 ano",
     ),
     (
         "Longo prazo",
         {
-            "sim_n_simulations_input": 300,
+            "sim_n_simulations_input": 2000,
             "sim_valor_input": 10_000,
             "sim_years_input": 5,
         },
-        "300 trajetórias · 5 anos",
+        "2.000 trajetórias · 5 anos",
     ),
 )
 
@@ -337,9 +336,9 @@ with st.form("form_simulacao"):
     n_simulations = st.number_input(
         "Número de Simulações",
         min_value=10,
-        max_value=500,
-        value=200,
-        help="Quantidade de trajetórias simuladas para o portfólio.",
+        max_value=3000,
+        value=2000,
+        help="Quantidade de trajetórias simuladas para cada modelo; abaixo de 1.000, a cauda é pouco estável.",
         key="sim_n_simulations_input",
     )
     valor = st.number_input(
@@ -399,26 +398,63 @@ st.markdown("---")
 n_dias = years * 252  # 252 dias úteis no ano
 valor_inicial = valor
 
-# Garante que temos um dicionário de pesos, independente do modo escolhido
-if modo == "Alocação Manual":
-    pesos_dict = pesos_manuais
-else:
-    pesos_dict = dict(zip(peso_manual_df.index + ".SA", peso_manual_df["Peso"].values))
+# The displayed analyzed allocation is canonical for every portfolio mode.
+weight_index = pd.Index([str(ticker).removesuffix(".SA") for ticker in peso_manual_df.index])
+weights = pd.Series(peso_manual_df["Peso"].to_numpy(), index=weight_index, dtype=float)
+weights.index = weights.index + ".SA"
+if (
+    not np.isfinite(weights.to_numpy()).all()
+    or (weights < 0).any()
+    or weights.sum() <= 0
+):
+    st.error("Os pesos analisados devem ser finitos, não negativos e somar um valor positivo.")
+    st.stop()
+weights = weights / weights.sum()
+weights = weights[weights > 0]
+missing_weight_tickers = weights.index.difference(returns.columns)
+if len(missing_weight_tickers):
+    st.error("Não há retornos disponíveis para todos os ativos com peso positivo.")
+    st.stop()
+aligned_returns = returns.loc[:, weights.index]
+if aligned_returns.empty or aligned_returns.isna().any().any() or not np.isfinite(aligned_returns.to_numpy()).all() or (aligned_returns <= -1).any().any():
+    st.error("Retornos históricos inválidos: verifique preços ausentes ou retornos de -100% ou menos.")
+    st.stop()
 
-# Remove ativos com peso zero (se houver)
-pesos_dict = {k: v for k, v in pesos_dict.items() if v > 1e-6}
-
-aligned_returns = returns.loc[:, pesos_dict.keys()].dropna()
-
-pesos = np.array(list(pesos_dict.values()))
-
-log_returns = np.log(1 + aligned_returns)
+log_returns = np.log1p(aligned_returns)
 mu = log_returns.mean().values
 cov = log_returns.cov().values
+if not np.isfinite(mu).all() or not np.isfinite(cov).all():
+    st.error("Não foi possível estimar retornos e covariância finitos com este histórico.")
+    st.stop()
+
+periodo = (
+    f"{aligned_returns.index.min():%d/%m/%Y} a {aligned_returns.index.max():%d/%m/%Y}"
+    if isinstance(aligned_returns.index, pd.DatetimeIndex) else "datas não disponíveis"
+)
+log_portfolio = np.log1p(aligned_returns.to_numpy() @ weights.to_numpy())
+se_anual = 252 * log_portfolio.std(ddof=1) / np.sqrt(len(log_portfolio))
+st.caption(
+    f"Calibração: {len(aligned_returns)} retornos diários completos ({periodo}). "
+    f"Incerteza aproximada da média log anual: ±{se_anual * 100:.1f} p.p. (1 erro-padrão, assumindo dias independentes)."
+)
+if len(aligned_returns) < 252 or n_dias > len(aligned_returns):
+    st.warning(
+        "A amostra histórica é curta para este horizonte. Médias e riscos estimados podem mudar muito "
+        "com outra janela; estas trajetórias não são previsões."
+    )
+if n_simulations < 1000:
+    tail_count = max(1, int(np.ceil(n_simulations * 0.05)))
+    st.warning(
+        f"Com {n_simulations} trajetórias, apenas cerca de {tail_count} compõem os 5% "
+        "inferiores; prefira 1.000 ou mais para comparar a cauda."
+    )
 
 sim_df = simulate_portfolio(
-    tuple(mu), tuple(map(tuple, cov)), tuple(pesos), n_dias, int(n_simulations),
+    tuple(mu), tuple(map(tuple, cov)), tuple(weights.to_numpy()), n_dias, int(n_simulations),
     float(valor_inicial), datetime.date.today().isoformat(),
+)
+bootstrap_finals = bootstrap_terminal_values(
+    aligned_returns.to_numpy(), weights.to_numpy(), n_dias, int(n_simulations), float(valor_inicial)
 )
 
 # Estatísticas finais da simulação
@@ -429,25 +465,24 @@ cvar_5 = valores_finais[valores_finais <= var_5].mean()
 pior_cenario = valores_finais.min()
 melhor_cenario = valores_finais.max()
 prob_ganho = (valores_finais > valor_inicial).mean() * 100
+spread_p5_p95 = (np.percentile(valores_finais, 95) - var_5) / valor_inicial * 100
 
-# Retorno anualizado esperado
+# CAGR implied by the mean terminal value, not the mean of scenario CAGRs.
 ret_esperado_pct = (valor_esperado / valor_inicial) ** (1 / years) - 1
 ret_otimista_pct = (np.percentile(valores_finais, 75) / valor_inicial) ** (
-    1 / years
-) - 1
-ret_pessimista_pct = (np.percentile(valores_finais, 25) / valor_inicial) ** (
     1 / years
 ) - 1
 
 sim_stats_dict = {
     "Valor Esperado Final": f"R$ {valor_esperado:,.2f}",
     "Probabilidade de Ganho": f"{prob_ganho:.1f}%",
-    "Retorno Anual Esperado": f"{ret_esperado_pct * 100:.1f}% a.a.",
-    "Retorno Anual Q75": f"{ret_otimista_pct * 100:.1f}% a.a.",
-    "VaR 5%": f"R$ {var_5:,.2f}",
-    "CVaR 5%": f"R$ {cvar_5:,.2f}",
-    "Pior Cenário": f"R$ {pior_cenario:,.2f}",
-    "Melhor Cenário": f"R$ {melhor_cenario:,.2f}",
+    "CAGR do valor final médio": f"{ret_esperado_pct * 100:.1f}% a.a.",
+    "CAGR do valor final P75": f"{ret_otimista_pct * 100:.1f}% a.a.",
+    "Valor final P5": f"R$ {var_5:,.2f}",
+    "Retorno final P5": f"{(var_5 / valor_inicial - 1) * 100:.1f}%",
+    "Média dos 5% menores valores": f"R$ {cvar_5:,.2f}",
+    "Menor valor simulado": f"R$ {pior_cenario:,.2f}",
+    "Maior valor simulado": f"R$ {melhor_cenario:,.2f}",
 }
 
 section_header(ICO_CHART, "Estatísticas da Simulação Monte Carlo", "h2")
@@ -456,45 +491,49 @@ col_s1, col_s2, col_s3 = st.columns(3)
 with col_s1:
     ret_str = f"{ret_esperado_pct * 100:.1f}% a.a."
     st.metric(
-        "Retorno Anual Esperado",
+        "CAGR do valor final médio",
         ret_str,
-        delta="Positivo" if ret_esperado_pct > 0 else "Negativo",
-        delta_color="normal" if ret_esperado_pct > 0 else "inverse",
-        help="Retorno anual composto implícito no valor esperado médio.",
+        help="Crescimento anual implícito no valor final médio; não é a média dos CAGRs das trajetórias.",
     )
 with col_s2:
     st.metric(
         "Probabilidade de Ganho",
         f"{prob_ganho:.1f}%",
-        delta="Alta"
-        if prob_ganho > 70
-        else ("Moderada" if prob_ganho > 50 else "Baixa"),
-        delta_color="normal"
-        if prob_ganho > 60
-        else ("off" if prob_ganho > 40 else "inverse"),
-        help="Percentual de simulações que terminaram acima do capital inicial.",
+        help=(
+            "Percentual de simulações acima do capital inicial sob o modelo normal. "
+            f"Erro Monte Carlo de até ±{98 / np.sqrt(n_simulations):.1f} p.p. (95% aproximado, "
+            "pior caso); não inclui incerteza dos parâmetros."
+        ),
     )
 with col_s3:
     perda_var = (var_5 / valor_inicial - 1) * 100
     st.metric(
-        "VaR 5% (limiar de perda)",
+        "Retorno final P5",
         f"{perda_var:.1f}%",
-        delta="Controlado" if perda_var > -30 else "Elevado",
-        delta_color="normal" if perda_var > -30 else "inverse",
         help=(
-            "Limite do percentil de 5%: em 5% dos cenários, o portfólio "
-            "termina abaixo deste valor. Não representa a perda máxima."
+            "Retorno no percentil 5 dos valores finais simulados; não é uma "
+            "estimativa de VaR nem representa perda máxima."
         ),
     )
 
-render_cards_grid(sim_stats_dict)
+render_cards_grid(
+    {
+        label: value
+        for label, value in sim_stats_dict.items()
+        if label not in {
+            "Probabilidade de Ganho",
+            "CAGR do valor final médio",
+            "Retorno final P5",
+        }
+    }
+)
 
 col_exp1, col_exp2 = st.columns(2)
 with col_exp1:
     st.markdown(
         """
     <div style="background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#b8eeff;">
-    <b>VaR 5%:</b> Limiar que separa os 5% piores cenários. Os resultados abaixo dele representam a cauda de risco, não a perda máxima.
+    <b>Valor final P5:</b> percentil 5 dos valores finais simulados; não é uma medida VaR de perda.
     </div>
     """,
         unsafe_allow_html=True,
@@ -503,11 +542,33 @@ with col_exp2:
     st.markdown(
         """
     <div style="background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#fff3b0;">
-    <b>CVaR 5%:</b> Média dos resultados finais nos 5% piores cenários — mede a gravidade média da cauda de risco.
+    <b>Média dos 5% menores valores:</b> média dos resultados finais na cauda inferior simulada.
     </div>
     """,
         unsafe_allow_html=True,
     )
+
+section_header(ICO_SIGNAL, "Comparação de modelos", "h2")
+comparison = pd.DataFrame(
+    {
+        "Normal multivariado": {
+            "Valor final P5": f"R$ {var_5:,.2f}",
+            "Valor final P95": f"R$ {np.percentile(valores_finais, 95):,.2f}",
+            "Ganho sobre o capital inicial": f"{prob_ganho:.1f}%",
+        },
+        "Reamostragem histórica": {
+            "Valor final P5": f"R$ {np.percentile(bootstrap_finals, 5):,.2f}",
+            "Valor final P95": f"R$ {np.percentile(bootstrap_finals, 95):,.2f}",
+            "Ganho sobre o capital inicial": f"{(bootstrap_finals > valor_inicial).mean() * 100:.1f}%",
+        },
+    }
+)
+st.table(comparison)
+st.caption(
+    "A reamostragem sorteia dias históricos inteiros (preserva choques simultâneos entre ativos), "
+    "mas não cria crises ausentes da amostra nem preserva sequências de volatilidade. "
+    "A diferença entre modelos indica sensibilidade às hipóteses, não incerteza coberta pelas faixas."
+)
 
 # Gráfico com algumas trajetórias individuais para ilustrar a dispersão
 section_header(ICO_SIGNAL, "Trajetórias Individuais das Simulações", "h2")
@@ -516,7 +577,7 @@ n_plot = st.number_input(
     "Número de trajetórias exibidas",
     min_value=5,
     max_value=n_plot_max,
-    value=min(20, n_plot_max),
+    value=min(10, n_plot_max),
     step=5,
 )
 
@@ -534,11 +595,12 @@ for i in range(n_plot):
         )
     )
 fig_individual.update_layout(
-    title="Exemplos de Trajetórias Simuladas do Valor do Portfólio",
+    title="Exemplos de Trajetórias Simuladas do Valor do Portfólio (modelo normal)",
     xaxis_title="Data",
     yaxis_title="Valor do Portfólio (R$)",
 )
 apply_plotly_theme(fig_individual)
+fig_individual.update_layout(showlegend=False, margin=dict(b=55))
 st.plotly_chart(fig_individual, use_container_width=True)
 
 # Fan chart com percentis
@@ -592,7 +654,7 @@ fig_fan.add_trace(
     )
 )
 fig_fan.update_layout(
-    title="Simulação Monte Carlo por Ativos - Fan Chart com Faixas de Confiança",
+    title="Simulação Monte Carlo por Ativos - Fan Chart com Faixas de Percentis (modelo normal)",
     xaxis_title="Data",
     yaxis_title="Valor do Portfólio (R$)",
 )
@@ -612,6 +674,10 @@ st.plotly_chart(fig_fan, use_container_width=True)
 
 sim_summary = pd.DataFrame(
     [{"Métrica": k, "Valor": v} for k, v in sim_stats_dict.items()]
+    + [
+        {"Métrica": f"{model} — {metric}", "Valor": value}
+        for model in comparison.columns for metric, value in comparison[model].items()
+    ]
 )
 sim_summary_csv = sim_summary.to_csv(index=False).encode("utf-8-sig")
 
@@ -647,7 +713,7 @@ section_header(ICO_FRONTIER, "Distribuição do Valor Final do Portfólio", "h2"
 fig_hist = px.histogram(
     x=valores_finais,
     nbins=30,
-    title="Distribuição dos Valores Finais da Simulação Monte Carlo",
+    title="Distribuição dos Valores Finais da Simulação Monte Carlo (modelo normal)",
     labels={"x": "Valor Final do Portfólio (R$)", "y": "Frequência"},
     color_discrete_sequence=["#00d2ff"],
 )
@@ -662,13 +728,15 @@ fig_hist.add_vline(
     line_color="#ff1744",
     annotation_text="Q1 (25%)",
     annotation_position="top left",
+    annotation_yshift=0,
 )
 fig_hist.add_vline(
     x=q2,
     line_width=2.5,
     line_color="#00ff87",
     annotation_text="Mediana (50%)",
-    annotation_position="top left",
+    annotation_position="top",
+    annotation_yshift=18,
 )
 fig_hist.add_vline(
     x=q3,
@@ -676,7 +744,8 @@ fig_hist.add_vline(
     line_dash="dash",
     line_color="#ffd600",
     annotation_text="Q3 (75%)",
-    annotation_position="top left",
+    annotation_position="top right",
+    annotation_yshift=36,
 )
 
 apply_plotly_theme(fig_hist)
@@ -720,64 +789,24 @@ st.markdown("---")
 analyst_synthesis_header()
 
 
-# Gera análise textual dos resultados da simulação
-cenario_label = (
-    "otimista" if prob_ganho > 70 else ("equilibrado" if prob_ganho > 50 else "adverso")
-)
-risco_label = (
-    "controlado" if perda_var > -30 else ("elevado" if perda_var < -50 else "moderado")
-)
-ret_label = "positivo" if ret_esperado_pct > 0 else "negativo"
-
-sintese_sim_items = []
-if prob_ganho > 70:
-    sintese_sim_items.append(
-        f'<li style="color:#00ff87;margin-bottom:3px;">Alta probabilidade de ganho ({prob_ganho:.1f}%) — cenário {cenario_label}</li>'
-    )
-elif prob_ganho > 50:
-    sintese_sim_items.append(
-        f'<li style="color:#ffd600;margin-bottom:3px;">Probabilidade de ganho moderada ({prob_ganho:.1f}%) — cenário {cenario_label}</li>'
-    )
-else:
-    sintese_sim_items.append(
-        f'<li style="color:#ff3d5a;margin-bottom:3px;">Baixa probabilidade de ganho ({prob_ganho:.1f}%) — revise a alocação</li>'
-    )
-
-sintese_sim_items.append(
-    f'<li style="color:{"#00ff87" if ret_esperado_pct > 0.05 else "#ffd600" if ret_esperado_pct > 0 else "#ff3d5a"};margin-bottom:3px;">Retorno anual esperado {ret_label}: {ret_esperado_pct * 100:.1f}% a.a. ao longo de {years} ano(s)</li>'
-)
-sintese_sim_items.append(
-    f'<li style="color:{"#00ff87" if risco_label == "controlado" else "#ffd600" if risco_label == "moderado" else "#ff3d5a"};margin-bottom:3px;">Risco de cauda {risco_label}: limiar de perda de {perda_var:.1f}% no VaR 5%</li>'
-)
-
-amplitude = (melhor_cenario - pior_cenario) / valor_inicial * 100
-if amplitude > 200:
-    sintese_sim_items.append(
-        f'<li style="color:#ffd600;margin-bottom:3px;">Alta dispersão de cenários ({amplitude:.0f}% de amplitude) — portfólio com volatilidade significativa</li>'
-    )
-else:
-    sintese_sim_items.append(
-        f'<li style="color:#00ff87;margin-bottom:3px;">Dispersão de cenários controlada ({amplitude:.0f}% de amplitude)</li>'
-    )
-
-veredicto_sim = (
-    ("FAVORÁVEL", "#00ff87")
-    if prob_ganho > 65 and ret_esperado_pct > 0.05
-    else ("NEUTRO", "#ffd600")
-    if prob_ganho > 45
-    else ("DESFAVORÁVEL", "#ff3d5a")
-)
+# Gera uma leitura descritiva dos cenários, sem recomendação de investimento.
+sintese_sim_items = [
+    f'<li>{prob_ganho:.1f}% dos cenários do modelo normal terminaram acima do capital inicial.</li>',
+    f'<li>CAGR implícito no valor final médio: {ret_esperado_pct * 100:.1f}% a.a. ao longo de {years} ano(s).</li>',
+    f'<li>Retorno final P5: {perda_var:.1f}%.</li>',
+    f'<li>Amplitude entre P5 e P95: {spread_p5_p95:.0f}% do capital inicial.</li>',
+]
 
 st.markdown(
     f"""
 <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:14px;padding:1.2rem 1.4rem;margin-bottom:1rem;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;flex-wrap:wrap;gap:0.5rem;">
     <span style="font-weight:700;color:#f8fafc;font-size:0.95rem;">Projeção {years} ano(s) — {n_simulations} simulações</span>
-    <span style="background:rgba(0,0,0,0.3);border:1px solid {veredicto_sim[1]}40;border-radius:6px;padding:0.2rem 0.75rem;font-size:0.72rem;font-weight:800;color:{veredicto_sim[1]};letter-spacing:0.08em;">{veredicto_sim[0]}</span>
   </div>
   <ul style="margin:0;padding-left:1.1rem;font-size:0.82rem;line-height:1.9;list-style:disc;">
     {"".join(sintese_sim_items)}
   </ul>
+  <p style="font-size:0.75rem;color:#94a3b8;margin:0.75rem 0 0;">Modelo normal de retornos logarítmicos multivariados ({len(aligned_returns)} observações, {periodo}); pesos rebalanceados diariamente. Não inclui taxas nem impostos. Resultados são cenários, não previsões.</p>
 </div>
 """,
     unsafe_allow_html=True,
@@ -785,10 +814,10 @@ st.markdown(
 
 # ── Próximo Passo ────────────────────────────────────────────────────────
 cenario_desc = (
-    f"cenário {cenario_label} com {prob_ganho:.0f}% de probabilidade de ganho"
+    f"{prob_ganho:.0f}% dos cenários do modelo normal terminaram acima do capital inicial"
 )
 next_step_card(
-    message=f"Monitore o sentimento qualitativo — {cenario_desc}.",
+    message=f"Complemente a leitura da projeção com as notícias das empresas — {cenario_desc}.",
     accent="var(--brand-info)",
     cta_label="Abrir Notícias",
     cta_page="pages/3_Notícias.py",

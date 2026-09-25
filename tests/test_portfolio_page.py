@@ -1,0 +1,67 @@
+from unittest.mock import patch
+
+import pandas as pd
+from streamlit.testing.v1 import AppTest
+
+
+def test_portfolio_loads_quotes_only_on_click_and_names_missing_ticker():
+    dates = pd.bdate_range("2025-01-01", periods=40)
+    prices = pd.DataFrame(
+        {"PETR4.SA": [float("nan")] * 40, "VALE3.SA": [100.0] * 40},
+        index=dates,
+    )
+    calls = []
+
+    def get_prices(*args):
+        calls.append(args)
+        return prices.copy()
+
+    with (
+        patch("utils.portfolio_data.get_portfolio_prices", get_prices),
+        patch("utils.portfolio_data.get_selic_rate", lambda: 0.0005),
+        patch("utils.db.portfolio_get", lambda uid: ([], {})),
+        patch("utils.identity.get_browser_uid", lambda: "test-visitor"),
+    ):
+        app = AppTest.from_file("pages/1_Portfolio.py", default_timeout=30)
+        app.session_state["selected_tickers"] = ["PETR4", "VALE3"]
+        app.run()
+        assert not app.exception
+        assert not calls
+
+        next(button for button in app.button if button.label == "Carregar portfólio").click().run()
+        assert not app.exception
+        assert len(calls) == 1
+        assert any("PETR4 (sem cotações)" in error.value for error in app.error)
+
+
+def test_ibov_outage_still_passes_portfolio_to_simulation():
+    import numpy as np
+
+    dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=70)
+    days = np.arange(len(dates))
+    prices = pd.DataFrame(
+        {
+            "PETR4.SA": 100 + days + 2 * np.sin(days),
+            "VALE3.SA": 90 + 0.8 * days + np.cos(days),
+        },
+        index=dates,
+    )
+    with (
+        patch("utils.portfolio_data.get_portfolio_prices", lambda *args: prices.copy()),
+        patch("utils.portfolio_data.get_benchmark_prices", side_effect=OSError("offline")),
+        patch("utils.portfolio_data.get_selic_rate", lambda: 0.0005),
+        patch("utils.db.portfolio_get", lambda uid: ([], {})),
+        patch("utils.db.portfolio_save", lambda *args: None),
+        patch("utils.identity.get_browser_uid", lambda: "test-visitor"),
+        patch("streamlit.page_link", lambda *args, **kwargs: None),
+    ):
+        app = AppTest.from_file("pages/1_Portfolio.py", default_timeout=30)
+        app.session_state["selected_tickers"] = ["PETR4", "VALE3"]
+        app.run()
+        app.radio[0].set_value("Alocação Manual").run()
+        next(button for button in app.button if button.label == "Carregar portfólio").click().run()
+
+        assert not app.exception
+        assert app.session_state["portfolio_analysis_tickers"] == ["PETR4", "VALE3"]
+        assert app.session_state["pesos_manuais"] == {"PETR4.SA": 0.5, "VALE3.SA": 0.5}
+        assert app.session_state["retorno_bench"] is None
