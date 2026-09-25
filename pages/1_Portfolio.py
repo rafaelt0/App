@@ -736,37 +736,6 @@ if (
                 )
                 st.plotly_chart(fig_frontier, use_container_width=True)
 
-            # ── Teorema da Separação de Tobin (1958) ─────────────────────────
-            st.markdown(
-                """
-<div style="background:linear-gradient(135deg,rgba(245,158,11,0.07),rgba(168,85,247,0.04));
-border:1px solid rgba(245,158,11,0.25);border-radius:14px;padding:1rem 1.2rem;margin:0.5rem 0 1rem 0">
-<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#f59e0b;text-transform:uppercase;margin-bottom:0.5rem">
-📐 Teorema da Separação de Tobin (1958)
-</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-  <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:0.7rem">
-    <div style="font-size:0.68rem;font-weight:700;color:#00ff87;margin-bottom:0.3rem">① Decisão Objetiva — igual para todos</div>
-    <div style="font-size:0.72rem;color:#94a3b8;line-height:1.5">
-    Qual é a carteira ótima de ativos de risco?<br>
-    Resposta: sempre a <b style="color:#ff1744">Carteira Tangente</b> (Max Sharpe).<br>
-    Independente da sua aversão ao risco.
-    </div>
-  </div>
-  <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:0.7rem">
-    <div style="font-size:0.68rem;font-weight:700;color:#a855f7;margin-bottom:0.3rem">② Decisão Subjetiva — depende do perfil</div>
-    <div style="font-size:0.72rem;color:#94a3b8;line-height:1.5">
-    Quanto alocar entre Rf e a Carteira Tangente?<br>
-    Conservador: mais Rf. Agressivo: mais tangente.<br>
-    Todos os pontos ótimos estão na <b style="color:#ffd600">LAC</b>.
-    </div>
-  </div>
-</div>
-</div>
-""",
-                unsafe_allow_html=True,
-            )
-
             # Calcula parâmetros da carteira tangente
             _opt_w = np.array(list(cleaned_weights.values()))
             _et = float(np.sum(_opt_w * mu))  # E[R] tangente
