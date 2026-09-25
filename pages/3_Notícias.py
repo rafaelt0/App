@@ -13,7 +13,13 @@ logger = logging.getLogger(__name__)
 from utils.charts import apply_plotly_theme
 from utils import db as _db
 from utils.identity import get_browser_uid
-from utils.news import aggregate_ticker_sentiment, build_news_query, parse_rss_items
+from utils.news import (
+    NEWS_IMPORTANCE_LABELS,
+    aggregate_ticker_sentiment,
+    build_news_query,
+    parse_rss_items,
+    rank_news_importance,
+)
 
 from utils.ui import (
     empty_state_card,
@@ -450,6 +456,7 @@ with loading_overlay("Buscando notícias e processando sentimento NLP…", ticke
             )
             news_items.append({
                 "ticker": t, "title": item["title"],
+                "importance_rank": rank_news_importance(item["title"], item.get("summary", "")),
                 "summary": item["summary"] or "Clique no link do título para ler os detalhes da notícia na fonte oficial.",
                 "sentiment": sentiment_res["sentiment"], "score": sentiment_res["score"],
                 "scores": sentiment_res.get("scores", []), "is_finbert": sentiment_res.get("is_finbert", False),
@@ -601,8 +608,8 @@ st.markdown("---")
 # Filtro lateral/superior de notícias
 section_header(ICO_NEWS, "Feed de Notícias da Carteira", "h2")
 st.caption(
-    "O sentimento resume notícias recentes disponíveis, agregadas primeiro por ativo; "
-    "não é previsão de retorno. Os filtros abaixo afetam apenas o feed."
+    "O sentimento resume notícias por ativo e não prevê retorno. A importância é uma "
+    "triagem por palavras-chave do título, não uma análise de materialidade; os filtros afetam só o feed."
 )
 
 
@@ -617,7 +624,7 @@ with col_filter:
 with col_sort:
     sort_mode = st.selectbox(
         "Ordenar por",
-        ["Mais recentes", "Maior intensidade", "Mais otimistas", "Mais pessimistas"]
+        ["Mais importantes", "Mais recentes", "Maior intensidade", "Mais otimistas", "Mais pessimistas"]
     )
 with col_sentiment:
     sentiment_filter = st.selectbox(
@@ -645,8 +652,14 @@ if intensity_filter != "Todos":
         x for x in filtered_news if x["intensity"] == intensity_filter
     ]
 
-# RSS dates are parsed timezone-aware UTC datetimes; newest first.
-if sort_mode == "Mais recentes":
+# Important items lead; recent date breaks ties within each importance tier.
+if sort_mode == "Mais importantes":
+    filtered_news = sorted(
+        filtered_news,
+        key=lambda x: (x["importance_rank"], x["published"]),
+        reverse=True,
+    )
+elif sort_mode == "Mais recentes":
     filtered_news = sorted(filtered_news, key=lambda x: x["published"], reverse=True)
 elif sort_mode == "Maior intensidade":
     intensity_rank = {level: rank for rank, level in enumerate(_INTENSITY_LEVELS)}
@@ -694,12 +707,15 @@ for news in news_to_show:
                   
     intensity_color = "#4ade80" if news["intensity"] == "Baixo" else \
                       "#ffd600" if "Médio" in news["intensity"] else "#ff3d5a"
+    importance_rank = news["importance_rank"]
+    importance_color = {3: "#00d2ff", 2: "#ffd600", 1: "#94a3b8"}[importance_rank]
 
     # Escape external feed content before embedding it in custom HTML.
     _news_ticker = escape(str(news["ticker"]))
     _news_provider = escape(str(news["provider"]))
     _news_pub_time = escape(str(news["pub_time"]))
     _news_sentiment = escape(str(news["sentiment"]).upper())
+    _news_importance = escape(NEWS_IMPORTANCE_LABELS[importance_rank].upper())
     _news_intensity = escape(str(news["intensity"]).upper())
     _news_engine = escape(str(news["engine"]))
     _news_title = escape(str(news["title"]))
@@ -736,6 +752,9 @@ for news in news_to_show:
                 </span>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span style="background: rgba(148, 163, 184, 0.1); color: {importance_color}; border: 1px solid {importance_color}40; border-radius: 10rem; padding: 0.15rem 0.5rem; font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem; font-weight: 700;">
+                    IMPORTÂNCIA {_news_importance}
+                </span>
                 <span style="background: {badge_bg}; color: {badge_color}; border: 1px solid {badge_color}40; border-radius: 10rem; padding: 0.15rem 0.5rem; font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem; font-weight: 700;">
                     {_news_sentiment}
                 </span>
