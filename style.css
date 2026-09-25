@@ -2832,23 +2832,17 @@ body,
 }
 
 .onboarding-tip-grid {
-  gap: 1.1rem !important;
+  gap: 0.8rem !important;
 }
 
 .onboarding-tip,
 .onboarding-tip:hover {
   min-height: 0 !important;
-  padding: 0 0.9rem !important;
+  padding: 1rem !important;
   background: color-mix(in srgb, var(--tip-color) 7%, var(--panel-bg)) !important;
-  border: 0 !important;
-  border-left: 1px solid color-mix(in srgb, var(--tip-color) 40%, var(--panel-border)) !important;
-  border-radius: 0 !important;
+  border: 1px solid color-mix(in srgb, var(--tip-color) 30%, var(--panel-border)) !important;
+  border-radius: 14px !important;
   transform: none !important;
-}
-
-.onboarding-tip:first-child {
-  padding-left: 0 !important;
-  border-left: 0 !important;
 }
 
 .onboarding-tip-label {
@@ -2874,13 +2868,7 @@ body,
 @media (max-width: 768px) {
   .onboarding-tip,
   .onboarding-tip:hover {
-    padding: 0.75rem 0 0 !important;
-    border-top: 1px solid color-mix(in srgb, var(--tip-color) 40%, var(--panel-border)) !important;
-    border-left: 0 !important;
-  }
-
-  .onboarding-tip:first-child {
-    padding-top: 0 !important;
-    border-top: 0 !important;
+    padding: 0.85rem !important;
+    border-radius: 12px !important;
   }
 }

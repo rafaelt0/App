@@ -329,15 +329,15 @@ if not tickers:
   <div class="onboarding-tip-grid">
     <div class="onboarding-tip onboarding-tip-green">
       <div class="onboarding-tip-label"><span class="onboarding-tip-badge">1</span>Escolha</div>
-      <div class="onboarding-tip-copy">Filtre por setor ou digite o código da ação no campo de busca.</div>
+      <div class="onboarding-tip-copy">Filtre por setor ou pesquise diretamente pelo ticker.</div>
     </div>
     <div class="onboarding-tip onboarding-tip-blue">
       <div class="onboarding-tip-label"><span class="onboarding-tip-badge">2</span>Compare</div>
-      <div class="onboarding-tip-copy">Leia valuation, rentabilidade, crescimento e endividamento lado a lado.</div>
+      <div class="onboarding-tip-copy">Compare fundamentos, rentabilidade, crescimento e endividamento lado a lado.</div>
     </div>
     <div class="onboarding-tip onboarding-tip-purple">
       <div class="onboarding-tip-label"><span class="onboarding-tip-badge">3</span>Aprofunde</div>
-      <div class="onboarding-tip-copy">Use Portfolio e Preço-alvo para aprofundar a análise.</div>
+      <div class="onboarding-tip-copy">Use o Portfolio para analisar sua carteira e o Screener B3 para encontrar ações.</div>
     </div>
   </div>
 </div>
