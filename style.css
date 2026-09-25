@@ -2706,7 +2706,7 @@ body,
 }
 /* Empty-state navigation should read as the next action, not a raw link. */
 [data-testid="stPageLink"] {
-  margin: 0.35rem 0 1.4rem !important;
+  margin: 1rem 0 1.4rem !important;
 }
 
 [data-testid="stPageLink"] a {
