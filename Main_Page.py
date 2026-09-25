@@ -870,17 +870,26 @@ if ready_to_analyze:
                 else:
                     text_labels.append(f"{v:.2f}")
 
+            chart_palette = (
+                "#61d4c6",
+                "#8cb4f2",
+                "#e7b96b",
+                "#e58a93",
+                "#b7a2e6",
+            )
             fig_comp = go.Figure(
                 go.Bar(
                     x=df_chart.index.tolist(),
                     y=df_chart[selected_comp_mult].values,
                     marker=dict(
-                        color=df_chart[selected_comp_mult].values,
-                        colorscale="Viridis",
-                        showscale=False,
+                        color=[
+                            chart_palette[i % len(chart_palette)]
+                            for i in range(len(df_chart))
+                        ],
                     ),
                     text=text_labels,
                     textposition="outside",
+                    cliponaxis=False,
                     textfont=dict(size=10, color="#f8fafc"),
                 )
             )
