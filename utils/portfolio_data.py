@@ -80,6 +80,15 @@ def get_portfolio_prices(tickers_yf, start_date):
 def get_benchmark_prices(start_date):
     return _download_close("^BVSP", start_date).squeeze()
 
+def align_weights_to_columns(weights, columns):
+    """Return weights in column order, failing when a required ticker is absent."""
+    missing = [column for column in columns if column not in weights]
+    if missing:
+        tickers = ", ".join(map(str, missing))
+        raise ValueError(f"Missing portfolio weights for: {tickers}")
+    return [weights[column] for column in columns]
+
+
 def align_benchmark_returns(portfolio_returns, benchmark_prices):
     """Align portfolio and benchmark returns when comparable data exists."""
     if benchmark_prices is None or benchmark_prices.empty:

@@ -408,7 +408,6 @@ if selected_rows:
         if st.button("Ver preço-alvo", key="screener_selected_valuation"):
             st.session_state["_market_target_handoff_ticker"] = ticker
             st.session_state["market_target_ticker"] = ticker
-            st.query_params["uid"] = get_browser_uid()
             st.query_params["market_target_ticker"] = ticker
             st.switch_page("Main_Page.py")
     with favorite_col:

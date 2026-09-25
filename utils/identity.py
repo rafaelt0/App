@@ -1,23 +1,16 @@
-"""Identidade anônima por navegador, usada para isolar dados persistidos
-(portfólio, watchlist) por visitante em vez de compartilhá-los globalmente.
-
-Sem login: o id vive na query string da URL. Enquanto a aba/favorito do
-navegador mantiver esse parâmetro, o mesmo visitante mantém seus dados;
-abrir a URL "limpa" (sem o parâmetro) começa uma identidade nova.
-"""
+"""Session-scoped anonymous identity for portfolio and watchlist data."""
 import uuid
 
 import streamlit as st
 
 
 def get_browser_uid() -> str:
-    if "_browser_uid" in st.session_state:
-        return st.session_state["_browser_uid"]
+    """Return a random identity for this Streamlit session, never from the URL."""
+    if "uid" in st.query_params:
+        del st.query_params["uid"]
 
-    uid = st.query_params.get("uid")
-    if not uid:
-        uid = uuid.uuid4().hex
-        st.query_params["uid"] = uid
-
-    st.session_state["_browser_uid"] = uid
-    return uid
+    # Do not reuse _browser_uid: older versions populated it from the URL token.
+    st.session_state.pop("_browser_uid", None)
+    if "_session_uid" not in st.session_state:
+        st.session_state["_session_uid"] = uuid.uuid4().hex
+    return st.session_state["_session_uid"]

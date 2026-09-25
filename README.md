@@ -18,7 +18,7 @@ A aplicação é organizada como um **fluxo de análise em 5 etapas**:
 ### 1. Análise Fundamentalista *(página inicial)*
 * Panorama de todo o mercado com dados atualizados do Fundamentus (a cada hora).
 * Cartões de preço, indicadores por setor e ranking setorial de ativos.
-* Painel de endividamento e watchlist personalizada (favoritos por navegador).
+* Painel de endividamento e watchlist personalizada (favoritos por sessão).
 * Síntese do Analista compara valuation, rentabilidade e dividend yield com pares do mesmo setor, atribui um voto por categoria e informa quando a cobertura é insuficiente.
 * Painel de preços-alvo do Yahoo Finance: cotação, faixa de consenso, potencial implícito e recomendação agregada.
 
@@ -62,7 +62,7 @@ A aplicação é organizada como um **fluxo de análise em 5 etapas**:
 * [Matplotlib](https://matplotlib.org/) e [Seaborn](https://seaborn.pydata.org/) — Gráficos estáticos.
 * [Pandas](https://pandas.pydata.org/) e [NumPy](https://numpy.org/) — Manipulação e análise de dados.
 * [scikit-learn](https://scikit-learn.org/) e [SciPy](https://scipy.org/) — Suporte numérico e estatístico.
-* **SQLite** — Cache persistente, watchlist e portfólio por navegador.
+* **SQLite** — Cache de dados compartilhado; portfólio e watchlist usam identidade aleatória apenas na sessão atual.
 
 ---
 
@@ -84,7 +84,7 @@ pip install -r requirements.txt
 streamlit run Main_Page.py
 ```
 
-A aplicação abre em `http://localhost:8501`.
+A aplicação abre em `http://localhost:8501`. Portfólio e watchlist são associados à sessão atual; podem não sobreviver ao recarregamento ou ao encerramento da sessão.
 
 ### Testes
 

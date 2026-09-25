@@ -77,3 +77,35 @@ def test_full_market_fetch_records_successful_fetch_time(monkeypatch):
 
     assert fetched.attrs["fetched_at"].endswith("+00:00")
     market_data.get_full_market_data.clear()
+
+
+def test_http_cache_clear_evicts_fundamentus_non_expiring_result(monkeypatch):
+    import sys
+    import types
+    from types import SimpleNamespace
+
+    from utils.market_data import _clear_fundamentus_http_cache
+
+    deleted = []
+    response = SimpleNamespace(url="http://www.fundamentus.com.br/resultado.php")
+    cache = SimpleNamespace(
+        responses={"stale-response": response},
+        delete=deleted.append,
+    )
+
+    class Session:
+        def __enter__(self):
+            return SimpleNamespace(cache=cache)
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setitem(
+        sys.modules,
+        "requests_cache",
+        types.SimpleNamespace(CachedSession=lambda name: Session()),
+    )
+
+    _clear_fundamentus_http_cache()
+
+    assert deleted == ["stale-response"]
