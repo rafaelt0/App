@@ -54,10 +54,12 @@ from utils.portfolio_data import (
     align_benchmark_returns,
     align_weights_to_columns,
     calculate_historical_stress,
+    finite_or_none,
     find_crisis_history_gaps,
     bound_efficient_return,
     get_benchmark_prices,
     get_portfolio_prices,
+    get_portfolio_trade_prices,
     get_selic_rate,
     estimate_markowitz_inputs,
 )
@@ -84,6 +86,7 @@ render_page_header(
 
 def _refresh_portfolio_data() -> None:
     get_portfolio_prices.clear()
+    get_portfolio_trade_prices.clear()
     get_benchmark_prices.clear()
     get_selic_rate.clear()
     st.session_state["portfolio_loaded"] = False
@@ -388,6 +391,16 @@ if "Markowitz" in modo:
     )
     st.markdown("---")
 
+if "Manual" in modo:
+    _required_tickers_yf = [
+        ticker for ticker in tickers_yf if pesos_manuais_inputs.get(ticker, 0) > 0
+    ]
+    if not _required_tickers_yf:
+        st.error("A alocação manual precisa ter ao menos um peso positivo.")
+        st.stop()
+else:
+    _required_tickers_yf = tickers_yf
+
 # Keep the analysis visible across widget reruns, but fetch only after loading.
 if st.button("Carregar portfólio", type="primary", use_container_width=True):
     st.session_state["portfolio_loaded"] = True
@@ -405,7 +418,7 @@ _price_status.markdown(
     unsafe_allow_html=True,
 )
 try:
-    data_yf = get_portfolio_prices(tickers_yf, data_inicio)
+    data_yf = get_portfolio_prices(_required_tickers_yf, data_inicio)
 except Exception as _price_err:
     logger.warning("get_portfolio_prices failed: %s", _price_err)
     logger.debug("get_portfolio_prices failure details", exc_info=True)
@@ -424,7 +437,9 @@ if data_yf.empty:
 
 if isinstance(data_yf.columns, pd.MultiIndex):
     data_yf.columns = ["_".join(col).strip() for col in data_yf.columns.values]
-missing_tickers = sorted(set(map(str, tickers_yf)).difference(map(str, data_yf.columns)))
+missing_tickers = sorted(
+    set(map(str, _required_tickers_yf)).difference(map(str, data_yf.columns))
+)
 if missing_tickers:
     missing_labels = ", ".join(ticker.replace(".SA", "") for ticker in missing_tickers)
     logger.warning("portfolio price history missing for %s", missing_tickers)
@@ -434,15 +449,13 @@ if missing_tickers:
     )
     st.stop()
 
-returns = data_yf.pct_change(fill_method=None).dropna()
+analysis_prices = data_yf.loc[:, _required_tickers_yf]
+returns = analysis_prices.pct_change(fill_method=None).dropna()
 
 MIN_RETURN_ROWS = 30
 if len(returns) < MIN_RETURN_ROWS:
-    # Rows with a gap in ANY ticker's price history get dropped by dropna()
-    # above, so one short-history ticker (recent IPO, delisting, missing
-    # data) can collapse `returns` to near-empty even when most tickers
-    # have plenty of data. Surface which ones before optimizers choke on it.
-    first_valid = data_yf.apply(lambda col: col.first_valid_index())
+    # In complete-case returns, one short-history asset can collapse the sample.
+    first_valid = analysis_prices.apply(lambda col: col.first_valid_index())
     short_history = first_valid.dropna().sort_values(ascending=False).head(5)
     culprits = ", ".join(
         [f"{col.replace('.SA', '')} (sem cotações)" for col in first_valid[first_valid.isna()].index]
@@ -452,8 +465,8 @@ if len(returns) < MIN_RETURN_ROWS:
         ]
     )
     st.error(
-        f"Histórico de cotações em comum insuficiente entre os ativos selecionados "
-        f"(apenas {len(returns)} dia(s) com dados completos para todos os ativos). "
+        f"Histórico de cotações em comum insuficiente entre os ativos usados "
+        f"(apenas {len(returns)} dia(s) com dados completos). "
         "Isso costuma acontecer quando um ou mais ativos têm histórico bem mais curto "
         "que os demais (IPO recente, deslistagem, falha na fonte de dados)."
         + (f" Possíveis responsáveis: {culprits}." if culprits else "")
@@ -467,7 +480,20 @@ if (
     st.session_state.get("portfolio_loaded")
     and st.session_state.get("portfolio_loaded_tickers", []) == list(tickers)
 ):
-    st.caption(f"Análise ativa para {len(tickers)} ativos: {', '.join(tickers)}")
+    _sample_period = (
+        f"{returns.index.min():%d/%m/%Y} a {returns.index.max():%d/%m/%Y}"
+        if isinstance(returns.index, pd.DatetimeIndex)
+        else "datas indisponíveis"
+    )
+    _zero_weight_note = (
+        " Ativos com peso zero foram excluídos da amostra."
+        if "Manual" in modo and len(_required_tickers_yf) < len(tickers)
+        else ""
+    )
+    st.caption(
+        f"{len(tickers)} ativos selecionados · {len(returns)} retornos diários completos "
+        f"({_sample_period}).{_zero_weight_note}"
+    )
     # Overlay de carregamento global
     with loading_overlay("Carregando dados, aguarde…", tickers=tickers):
         if "Manual" in modo:
@@ -583,127 +609,112 @@ if (
         # ── Sugestão de Compra de Cotas (Alocação Discreta) ───────────────────
         st.subheader("Sugestão de Compra de Cotas")
         st.caption(
-            f"Preços históricos até {data_yf.index.max():%d/%m/%Y}; "
-            "confira a cotação atual antes de comprar."
+            "Estimativas usam o último fechamento bruto disponível por ativo (pode haver atraso); "
+            "confirme o preço de execução. Retornos seguem usando preços ajustados."
         )
         st.markdown(
             f"Estimativa de cotas a comprar considerando o valor total de **R$ {valor_inicial:,.2f}**."
         )
 
+        trade_tickers = tuple(
+            ticker for ticker, weight in pesos_por_ticker.items() if weight > 0
+        )
+        trade_prices = pd.DataFrame()
+        quote_fetch_error = False
+        try:
+            trade_prices = get_portfolio_trade_prices(trade_tickers)
+        except Exception:
+            quote_fetch_error = True
+            logger.warning("unadjusted trade quotes unavailable", exc_info=True)
+        if trade_prices is None:
+            trade_prices = pd.DataFrame()
+        if isinstance(trade_prices.columns, pd.MultiIndex):
+            trade_prices.columns = [
+                "_".join(map(str, column)).strip() for column in trade_prices.columns
+            ]
+
+        trade_quotes = {}
+        for ticker in trade_tickers:
+            if ticker in trade_prices.columns:
+                available = trade_prices[ticker].dropna()
+                if not available.empty:
+                    latest_price = finite_or_none(available.iloc[-1])
+                    if latest_price is not None and latest_price > 0:
+                        trade_quotes[ticker] = (latest_price, available.index[-1])
+
+        missing_quotes = [
+            ticker.removesuffix(".SA")
+            for ticker in trade_tickers
+            if ticker not in trade_quotes
+        ]
         cotas_list = []
         total_efetivo = 0.0
-
         for ticker, row in peso_manual_df.iterrows():
-            col_name = ticker + ".SA"
-            latest_price = 0.0
-
-            # Busca o preço mais recente válido
-            if col_name in data_yf.columns:
-                valid_prices = data_yf[col_name].dropna()
-                latest_price = valid_prices.iloc[-1] if not valid_prices.empty else 0.0
-            elif ticker in data_yf.columns:
-                valid_prices = data_yf[ticker].dropna()
-                latest_price = valid_prices.iloc[-1] if not valid_prices.empty else 0.0
-            else:
-                for col in data_yf.columns:
-                    if ticker in col:
-                        valid_prices = data_yf[col].dropna()
-                        latest_price = (
-                            valid_prices.iloc[-1] if not valid_prices.empty else 0.0
-                        )
-                        break
-
-            weight = row["Peso"]
+            weight = float(row["Peso"])
             valor_teorico = weight * valor_inicial
-
-            if latest_price > 0:
+            quote = trade_quotes.get(f"{ticker}.SA") if weight > 0 else None
+            if weight <= 0:
+                latest_price, quote_date, cotas, valor_efetivo = None, None, 0, 0.0
+            elif quote is None:
+                latest_price, quote_date, cotas, valor_efetivo = None, None, None, None
+            else:
+                latest_price, quote_date = quote
                 cotas = int(np.floor(valor_teorico / latest_price))
                 valor_efetivo = cotas * latest_price
-            else:
-                cotas = 0
-                valor_efetivo = 0.0
-
-            total_efetivo += valor_efetivo
+                total_efetivo += valor_efetivo
 
             cotas_list.append(
                 {
                     "Ativo": ticker,
-                    "Preço Unitário": latest_price,
-                    "Peso Sugerido (%)": weight * 100,
-                    "Valor Sugerido": valor_teorico,
-                    "Cotas a Comprar": cotas,
-                    "Valor Efetivo": valor_efetivo,
+                    "Preço Unitário": (
+                        f"R$ {latest_price:,.2f}" if latest_price is not None
+                        else "—" if weight <= 0 else "N/D"
+                    ),
+                    "Data da Cotação": (
+                        pd.Timestamp(quote_date).strftime("%d/%m/%Y")
+                        if quote_date is not None else "—" if weight <= 0 else "N/D"
+                    ),
+                    "Cotas a Comprar": f"{cotas:,}" if cotas is not None else "N/D",
+                    "Valor Efetivo": (
+                        f"R$ {valor_efetivo:,.2f}" if valor_efetivo is not None else "N/D"
+                    ),
+                    "Valor Sugerido": f"R$ {valor_teorico:,.2f}",
+                    "Peso Sugerido (%)": f"{weight * 100:.2f}%",
+                    "_Valor Efetivo": valor_efetivo,
+                    "_Peso": weight,
                 }
             )
 
-        df_cotas = pd.DataFrame(cotas_list)
-        if total_efetivo > 0:
-            df_cotas["Peso Efetivo (%)"] = (
-                df_cotas["Valor Efetivo"] / total_efetivo
-            ) * 100
-        else:
-            df_cotas["Peso Efetivo (%)"] = 0.0
-
-        cotas_rows_html = ""
-        for idx, row_c in df_cotas.iterrows():
-            ticker_name = row_c["Ativo"]
-            pu = row_c["Preço Unitário"]
-            p_sug = row_c["Peso Sugerido (%)"]
-            val_sug = row_c["Valor Sugerido"]
-            cotas = row_c["Cotas a Comprar"]
-            val_ef = row_c["Valor Efetivo"]
-            p_ef = row_c["Peso Efetivo (%)"]
-
-            cotas_rows_html += (
-                f"<td style=\"padding: 0.45rem 0.5rem; text-align: left; color: #38bdf8; font-weight: 700; font-family: 'JetBrains Mono', monospace;\">{escape(str(ticker_name))}</td>"
-                f"<td style=\"padding: 0.45rem 0.5rem; color: #f8fafc; font-family: 'JetBrains Mono', monospace;\">R$ {pu:,.2f}</td>"
-                f"<td style=\"padding: 0.45rem 0.5rem; color: #4ade80; font-weight: 700; font-family: 'JetBrains Mono', monospace;\">{int(cotas):,}</td>"
-                f"<td style=\"padding: 0.45rem 0.5rem; color: #fbbf24; font-family: 'JetBrains Mono', monospace;\">R$ {val_ef:,.2f}</td>"
-                f"<td style=\"padding: 0.45rem 0.5rem; color: #a78bfa; font-family: 'JetBrains Mono', monospace;\">R$ {val_sug:,.2f}</td>"
-                f"<td style=\"padding: 0.45rem 0.5rem; color: #e2e8f0; font-family: 'JetBrains Mono', monospace;\">{p_sug:.2f}%</td>"
-                f"<td style=\"padding: 0.45rem 0.5rem; color: #e2e8f0; font-family: 'JetBrains Mono', monospace;\">{p_ef:.2f}%</td>"
-                "</tr>"
+        quote_unavailable = quote_fetch_error or bool(missing_quotes)
+        if quote_unavailable:
+            missing_labels = ", ".join(
+                missing_quotes or [ticker.removesuffix(".SA") for ticker in trade_tickers]
             )
+            st.warning(
+                f"Fechamento bruto indisponível para {missing_labels}; "
+                "cotas e totais aparecem como N/D."
+            )
+        for quote_row in cotas_list:
+            effective_value = quote_row.pop("_Valor Efetivo")
+            weight = quote_row.pop("_Peso")
+            if quote_unavailable and weight > 0:
+                quote_row["Peso Efetivo (%)"] = "N/D"
+            elif total_efetivo > 0:
+                quote_row["Peso Efetivo (%)"] = (
+                    f"{effective_value / total_efetivo * 100:.2f}%"
+                )
+            else:
+                quote_row["Peso Efetivo (%)"] = "0.00%"
+        st.dataframe(pd.DataFrame(cotas_list), use_container_width=True, hide_index=True)
 
-        st.markdown(
-            f"""
-            <div style="background: linear-gradient(135deg, #0e1726, #070c14);
-                        border: 1px solid #1e293b;
-                        border-radius: 12px;
-                        padding: 0.8rem 1rem;
-                        overflow-x: auto;
-                        margin-bottom: 1rem;
-                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                <table style="width: 100%; border-collapse: collapse; text-align: right; font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #1e293b; color: #94a3b8; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;">
-                            <th style="padding: 0.4rem 0.5rem; text-align: left;">Ativo</th>
-                            <th style="padding: 0.4rem 0.5rem;">Preço Unit.</th>
-                            <th style="padding: 0.4rem 0.5rem;">Cotas</th>
-                            <th style="padding: 0.4rem 0.5rem;">Valor Efetivo</th>
-                            <th style="padding: 0.4rem 0.5rem;">Valor Sugerido</th>
-                            <th style="padding: 0.4rem 0.5rem;">Peso Sug.</th>
-                            <th style="padding: 0.4rem 0.5rem;">Peso Efet.</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {cotas_rows_html}
-                    </tbody>
-                </table>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Resumo financeiro do rebalanceamento/compra
-        sobra_caixa = valor_inicial - total_efetivo
-
-        col_c1, col_c2, col_c3 = st.columns(3)
-        col_c1.metric("Total Alocado Efetivo", f"R$ {total_efetivo:,.2f}")
-        col_c2.metric("Saldo Restante (Caixa)", f"R$ {sobra_caixa:,.2f}")
-        col_c3.metric(
-            "Eficiência da Alocação", f"{(total_efetivo / valor_inicial) * 100:.2f}%"
-        )
+        if not quote_unavailable:
+            sobra_caixa = valor_inicial - total_efetivo
+            col_c1, col_c2, col_c3 = st.columns(3)
+            col_c1.metric("Total Alocado Efetivo", f"R$ {total_efetivo:,.2f}")
+            col_c2.metric("Saldo Restante (Caixa)", f"R$ {sobra_caixa:,.2f}")
+            col_c3.metric(
+                "Eficiência da Alocação", f"{(total_efetivo / valor_inicial) * 100:.2f}%"
+            )
 
         st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True)
 
@@ -720,7 +731,9 @@ if (
             _opt_w = np.array(list(cleaned_weights.values()))
             _et = float(np.sum(_opt_w * mu))
             _st = float(np.sqrt(np.dot(_opt_w.T, np.dot(S, _opt_w))))
-            _sharpe_t = (_et - selic_anual) / _st if _st > 0 else 0
+            _sharpe_t = (
+                finite_or_none((_et - selic_anual) / _st) if _st > 0 else None
+            )
 
             st.markdown("**Linha de alocação — quanto você aloca em ativos de risco?**")
             st.caption(
@@ -744,7 +757,7 @@ if (
 
             _ep = selic_anual + _w * (_et - selic_anual)  # E[Rp] na LAC
             _sp = abs(_w) * _st  # σp na LAC (Rf tem σ=0)
-            _shp = (_ep - selic_anual) / _sp if _sp > 0 else 0
+            _shp = finite_or_none((_ep - selic_anual) / _sp) if _sp > 0 else None
 
             _perfil = (
                 "🏦 Conservador — grande parte em Rf (Selic)"
@@ -766,8 +779,12 @@ if (
             tc3.metric("Volatilidade a.a.", f"{_sp * 100:.2f}%")
             tc4.metric(
                 "Sharpe do Portfólio",
-                f"{_shp:.3f}",
-                delta=f"= Sharpe da carteira selecionada ({_sharpe_t:.3f})",
+                f"{_shp:.3f}" if _shp is not None else "N/D",
+                delta=(
+                    f"= carteira selecionada ({_sharpe_t:.3f})"
+                    if _sharpe_t is not None
+                    else None
+                ),
                 delta_color="off",
                 help="O Sharpe é constante para combinações positivas da Selic e da carteira selecionada.",
             )
@@ -778,7 +795,6 @@ if (
 border-radius:0 8px 8px 0;padding:0.6rem 1rem;font-size:0.78rem;color:#cbd5e1;margin-top:0.3rem">
 <b style="color:#f59e0b">Perfil:</b> {_perfil}<br>
 <span style="color:#64748b;font-size:0.68rem">
-Sharpe da carteira selecionada = {_sharpe_t:.3f} (alocação positiva).
 Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selecionado = {_st * 100:.2f}%
 </span>
 </div>
@@ -806,6 +822,17 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
             logger.debug("get_benchmark_prices failure details", exc_info=True)
 
         benchmark_available = retorno_bench is not None and not retorno_bench.empty
+        if benchmark_available:
+            _benchmark_period = (
+                f"{portfolio_returns.index.min():%d/%m/%Y} a "
+                f"{portfolio_returns.index.max():%d/%m/%Y}"
+                if isinstance(portfolio_returns.index, pd.DatetimeIndex)
+                else "datas indisponíveis"
+            )
+            st.caption(
+                f"Comparações com o IBOVESPA usam {len(portfolio_returns)} pregões comuns "
+                f"({_benchmark_period})."
+            )
         if not benchmark_available:
             st.warning(
                 "Dados do IBOVESPA indisponíveis no momento; "
@@ -853,8 +880,13 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
         apply_plotly_theme(fig)
         st.plotly_chart(fig, use_container_width=True)
         st.caption(
-            "Simulação hipotética no período da amostra: pesos fixos rebalanceados diariamente, "
-            "não retorno realizado nem buy-and-hold das cotas sugeridas. Taxas e impostos excluídos."
+            "Retornos históricos hipotéticos, pesos fixos rebalanceados diariamente; taxas e impostos excluídos. "
+            + (
+                "Markowitz/HRP são avaliados na mesma amostra usada para otimizar os pesos (in-sample), "
+                "não é validação fora da amostra."
+                if "Manual" not in modo
+                else "A alocação manual descreve a amostra histórica, não uma previsão."
+            )
         )
         # Retornos mensais
         section_header(ICO_HEATMAP, "Tabela de Retornos Mensais do Portfólio", "h2")
@@ -985,33 +1017,39 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
                 "Métricas relativas ao IBOVESPA e CAPM ficam "
                 "indisponíveis enquanto a série do benchmark não responder."
             )
-            total_return = (portfolio_value.iloc[-1] / valor_inicial - 1) * 100
-            vol_anual = portfolio_returns.std() * np.sqrt(252) * 100
-            sharpe_val = sharpe(portfolio_returns, rf=taxa_selic_anual)
-            sortino_val = sortino(portfolio_returns, rf=taxa_selic_anual)
-            max_dd = max_drawdown(portfolio_returns) * 100
+            total_return = finite_or_none((portfolio_value.iloc[-1] / valor_inicial - 1) * 100)
+            vol_anual = finite_or_none(portfolio_returns.std() * np.sqrt(252) * 100)
+            sharpe_val = finite_or_none(sharpe(portfolio_returns, rf=taxa_selic_anual))
+            sortino_val = finite_or_none(sortino(portfolio_returns, rf=taxa_selic_anual))
+            max_dd = finite_or_none(max_drawdown(portfolio_returns) * 100)
 
             section_header(ICO_CHART, "Desempenho da Carteira", "h2")
             _fallback_metrics = st.columns(5)
             _fallback_metrics[0].metric(
                 "Retorno Total",
-                f"{total_return:.2f}%",
-                delta="Positivo" if total_return > 0 else "Negativo",
-                delta_color="normal" if total_return > 0 else "inverse",
+                f"{total_return:.2f}%" if total_return is not None else "N/D",
+                delta=("Positivo" if total_return > 0 else "Negativo")
+                if total_return is not None else None,
+                delta_color=("normal" if total_return > 0 else "inverse")
+                if total_return is not None else "off",
             )
             _fallback_metrics[1].metric(
                 "Volatilidade Anual",
-                f"{vol_anual:.2f}%",
-                delta="Baixa"
-                if vol_anual < 15
-                else ("Alta" if vol_anual > 25 else "Moderada"),
-                delta_color="normal"
-                if vol_anual < 15
-                else ("inverse" if vol_anual > 25 else "off"),
+                f"{vol_anual:.2f}%" if vol_anual is not None else "N/D",
+                delta=("Baixa" if vol_anual < 15 else "Alta" if vol_anual > 25 else "Moderada")
+                if vol_anual is not None else None,
+                delta_color=("normal" if vol_anual < 15 else "inverse" if vol_anual > 25 else "off")
+                if vol_anual is not None else "off",
             )
-            _fallback_metrics[2].metric("Índice Sharpe", f"{sharpe_val:.2f}")
-            _fallback_metrics[3].metric("Índice Sortino", f"{sortino_val:.2f}")
-            _fallback_metrics[4].metric("Max Drawdown", f"{max_dd:.2f}%")
+            _fallback_metrics[2].metric(
+                "Índice Sharpe", f"{sharpe_val:.2f}" if sharpe_val is not None else "N/D"
+            )
+            _fallback_metrics[3].metric(
+                "Índice Sortino", f"{sortino_val:.2f}" if sortino_val is not None else "N/D"
+            )
+            _fallback_metrics[4].metric(
+                "Max Drawdown", f"{max_dd:.2f}%" if max_dd is not None else "N/D"
+            )
             st.session_state.update(
                 {
                     "modo": modo,
@@ -1045,11 +1083,11 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
 
 
         # Cálculos de Métricas
-        total_return = (portfolio_value.iloc[-1] / valor_inicial - 1) * 100
-        vol_anual = portfolio_returns.std() * np.sqrt(252) * 100
-        sharpe_val = sharpe(portfolio_returns, rf=taxa_selic_anual)
-        sortino_val = sortino(portfolio_returns, rf=taxa_selic_anual)
-        max_dd = max_drawdown(portfolio_returns) * 100
+        total_return = finite_or_none((portfolio_value.iloc[-1] / valor_inicial - 1) * 100)
+        vol_anual = finite_or_none(portfolio_returns.std() * np.sqrt(252) * 100)
+        sharpe_val = finite_or_none(sharpe(portfolio_returns, rf=taxa_selic_anual))
+        sortino_val = finite_or_none(sortino(portfolio_returns, rf=taxa_selic_anual))
+        max_dd = finite_or_none(max_drawdown(portfolio_returns) * 100)
 
         cov_matrix = np.cov(
             portfolio_returns.squeeze(), retorno_bench.squeeze()
@@ -1063,91 +1101,122 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
                 "A variação do IBOVESPA é insuficiente para calcular métricas "
                 "relativas; beta, alfa, R² e information ratio ficaram indisponíveis."
             )
-            beta = 0.0
+            beta = None
         else:
-            beta = cov_matrix[0, 1] / benchmark_variance
+            beta = finite_or_none(cov_matrix[0, 1] / benchmark_variance)
         # Jensen alpha is defined only when the benchmark has usable variance.
         alfa_val = None
         if benchmark_metrics_valid:
             alfa = (portfolio_returns.mean() - taxa_selic) - beta * (
                 retorno_bench.mean() - taxa_selic
             )
-            alfa_val = (
+            alfa_val = finite_or_none(
                 alfa.values[0]
                 if hasattr(alfa, "values") and len(alfa.values) > 0
                 else alfa
             )
         if benchmark_metrics_valid:
             try:
-                r_quadrado = qs.stats.r_squared(portfolio_returns, retorno_bench)
-                information_ratio = qs.stats.information_ratio(
-                    portfolio_returns, retorno_bench
+                r_quadrado = finite_or_none(
+                    qs.stats.r_squared(portfolio_returns, retorno_bench)
                 )
-                if not np.isfinite(r_quadrado):
-                    r_quadrado = 0.0
-                if not np.isfinite(information_ratio):
-                    information_ratio = 0.0
+                information_ratio = finite_or_none(
+                    qs.stats.information_ratio(portfolio_returns, retorno_bench)
+                )
             except Exception:
                 logger.warning("relative benchmark metrics failed", exc_info=True)
-                r_quadrado = 0.0
-                information_ratio = 0.0
+                r_quadrado = None
+                information_ratio = None
         else:
-            r_quadrado = 0.0
-            information_ratio = 0.0
+            r_quadrado = None
+            information_ratio = None
 
-        # Desempenho Resumido em Cards (st.metric)
-        section_header(ICO_CHART, "Desempenho Resumido da Carteira", "h2")
-        st.caption(
-            "Retornos hipotéticos na amostra, pesos fixos rebalanceados diariamente; "
-            "taxas e impostos excluídos."
+        _elapsed_days = (
+            portfolio_value.index[-1] - portfolio_value.index[0]
+        ).days
+        ret_anual = (
+            finite_or_none(
+                ((portfolio_value.iloc[-1] / valor_inicial) ** (365.25 / _elapsed_days) - 1)
+                * 100
+            )
+            if _elapsed_days > 0
+            else None
         )
+        var_val = finite_or_none(var(portfolio_returns) * 100)
+        alfa_anual = (
+            finite_or_none(alfa_val * 252 * 100) if alfa_val is not None else None
+        )
+
+        # One compact summary replaces the repeated consolidated metric grid below.
+        section_header(ICO_METRICS, "Resumo de Desempenho", "h2")
         col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
         col_m1.metric(
             "Retorno Total",
-            f"{total_return:.2f}%",
-            delta="Positivo" if total_return > 0 else "Negativo",
-            delta_color="normal" if total_return > 0 else "inverse",
-            help="Retorno hipotético na amostra, com pesos fixos rebalanceados diariamente; não é o retorno das cotas compradas.",
+            f"{total_return:.2f}%" if total_return is not None else "N/D",
+            delta=("Positivo" if total_return > 0 else "Negativo")
+            if total_return is not None else None,
+            delta_color=("normal" if total_return > 0 else "inverse")
+            if total_return is not None else "off",
+            help="Retorno histórico hipotético, não retorno futuro nem das cotas compradas.",
         )
         col_m2.metric(
             "Volatilidade Anual",
-            f"{vol_anual:.2f}%",
-            delta="Baixa"
-            if vol_anual < 15
-            else ("Alta" if vol_anual > 25 else "Moderada"),
-            delta_color="normal"
-            if vol_anual < 15
-            else ("inverse" if vol_anual > 25 else "off"),
+            f"{vol_anual:.2f}%" if vol_anual is not None else "N/D",
+            delta=("Baixa" if vol_anual < 15 else "Alta" if vol_anual > 25 else "Moderada")
+            if vol_anual is not None else None,
+            delta_color=("normal" if vol_anual < 15 else "inverse" if vol_anual > 25 else "off")
+            if vol_anual is not None else "off",
             help="Desvio padrão anualizado dos retornos. Mede o risco total.",
         )
         col_m3.metric(
             "Índice Sharpe",
-            f"{sharpe_val:.2f}",
-            delta="Excelente"
-            if sharpe_val > 1
-            else ("Bom" if sharpe_val > 0.5 else "Baixo"),
-            delta_color="normal" if sharpe_val > 0.5 else "inverse",
+            f"{sharpe_val:.2f}" if sharpe_val is not None else "N/D",
+            delta=(
+                "Excelente" if sharpe_val > 1
+                else "Bom" if sharpe_val > 0.5
+                else "Baixo"
+            ) if sharpe_val is not None else None,
+            delta_color=("normal" if sharpe_val > 0.5 else "inverse")
+            if sharpe_val is not None else "off",
             help="Retorno por unidade de risco. Acima de 1.0 é excelente.",
         )
         col_m4.metric(
             "Índice Sortino",
-            f"{sortino_val:.2f}",
-            delta="Excelente"
-            if sortino_val > 1
-            else ("Bom" if sortino_val > 0.5 else "Baixo"),
-            delta_color="normal" if sortino_val > 0.5 else "inverse",
+            f"{sortino_val:.2f}" if sortino_val is not None else "N/D",
+            delta=(
+                "Excelente" if sortino_val > 1
+                else "Bom" if sortino_val > 0.5
+                else "Baixo"
+            ) if sortino_val is not None else None,
+            delta_color=("normal" if sortino_val > 0.5 else "inverse")
+            if sortino_val is not None else "off",
             help="Igual ao Sharpe mas penaliza apenas volatilidade negativa.",
         )
         col_m5.metric(
             "Max Drawdown",
-            f"{max_dd:.2f}%",
-            delta="Controlado"
-            if max_dd > -15
-            else ("Severo" if max_dd < -30 else "Moderado"),
-            delta_color="normal"
-            if max_dd > -15
-            else ("inverse" if max_dd < -30 else "off"),
+            f"{max_dd:.2f}%" if max_dd is not None else "N/D",
+            delta=("Controlado" if max_dd > -15 else "Severo" if max_dd < -30 else "Moderado")
+            if max_dd is not None else None,
+            delta_color=("normal" if max_dd > -15 else "inverse" if max_dd < -30 else "off")
+            if max_dd is not None else "off",
             help="Maior perda de pico a vale. Quanto mais próximo de 0, melhor.",
+        )
+        _extra_metrics = st.columns(5)
+        _extra_metrics[0].metric(
+            "Retorno Anualizado", f"{ret_anual:.2f}%" if ret_anual is not None else "N/D"
+        )
+        _extra_metrics[1].metric(
+            "Beta vs IBOV", f"{beta:.3f}" if beta is not None else "N/D"
+        )
+        _extra_metrics[2].metric(
+            "Alpha Anual", f"{alfa_anual:.2f}%" if alfa_anual is not None else "N/D"
+        )
+        _extra_metrics[3].metric(
+            "VaR Diário (95%)", f"{var_val:.2f}%" if var_val is not None else "N/D"
+        )
+        _extra_metrics[4].metric(
+            "Information Ratio",
+            f"{information_ratio:.2f}" if information_ratio is not None else "N/D",
         )
 
         # ── Painel de Decisão do Investidor ───────────────────────────────────
@@ -1158,7 +1227,11 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
         score = 0
         health_detalhes = []
 
-        if sharpe_val > 1.0:
+        if sharpe_val is None:
+            health_detalhes.append(
+                (ICO_WARN, "Sharpe indisponível — risco não definido", "#ffd600")
+            )
+        elif sharpe_val > 1.0:
             score += 35
             health_detalhes.append((ICO_OK, "Sharpe excelente (>1.0)", "#00ff87"))
         elif sharpe_val > 0.5:
@@ -1169,7 +1242,11 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
                 (ICO_CRIT, "Sharpe baixo (<0.5) — revise a alocação", "#ff3d5a")
             )
 
-        if sortino_val > 1.0:
+        if sortino_val is None:
+            health_detalhes.append(
+                (ICO_WARN, "Sortino indisponível — risco de queda não definido", "#ffd600")
+            )
+        elif sortino_val > 1.0:
             score += 20
             health_detalhes.append((ICO_OK, "Sortino excelente (>1.0)", "#00ff87"))
         elif sortino_val > 0.5:
@@ -1180,7 +1257,9 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
                 (ICO_CRIT, "Sortino baixo — retornos negativos relevantes", "#ff3d5a")
             )
 
-        if max_dd > -10:
+        if max_dd is None:
+            health_detalhes.append((ICO_WARN, "Drawdown indisponível", "#ffd600"))
+        elif max_dd > -10:
             score += 20
             health_detalhes.append((ICO_OK, "Drawdown controlado (<10%)", "#00ff87"))
         elif max_dd > -20:
@@ -1201,8 +1280,10 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
                 )
             )
         else:
-            alfa_anual = alfa_val * 252 * 100
-            if alfa_anual > 5:
+            alfa_anual = finite_or_none(alfa_val * 252 * 100)
+            if alfa_anual is None:
+                health_detalhes.append((ICO_WARN, "Alfa indisponível", "#ffd600"))
+            elif alfa_anual > 5:
                 score += 15
                 health_detalhes.append(
                     (ICO_OK, f"Alfa anual positivo: {alfa_anual:.1f}%", "#00ff87")
@@ -1482,19 +1563,22 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
             pd.Timestamp(start) for start, _ in CRISES_HISTORICAS.values()
         ).date()
 
-        stress_prices = data_yf
+        _stress_tickers_yf = tuple(
+            ticker for ticker, weight in pesos_por_ticker.items() if weight > 0
+        )
+        stress_prices = data_yf.reindex(columns=_stress_tickers_yf)
         stress_benchmark = bench
         stress_history_start = data_inicio
         if st.checkbox(
             f"Carregar histórico longo para crises (desde {stress_start.year})", value=False
         ):
             try:
-                stress_prices = get_portfolio_prices(tickers_yf, stress_start)
+                stress_prices = get_portfolio_prices(_stress_tickers_yf, stress_start)
                 if isinstance(stress_prices.columns, pd.MultiIndex):
                     stress_prices.columns = [
                         "_".join(map(str, col)).strip() for col in stress_prices.columns
                     ]
-                stress_prices = stress_prices.reindex(columns=data_yf.columns)
+                stress_prices = stress_prices.reindex(columns=_stress_tickers_yf)
                 stress_history_start = stress_start
             except Exception as _stress_err:
                 logger.warning("Historical stress prices unavailable: %s", _stress_err)
@@ -1697,59 +1781,6 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
             )
 
         st.markdown("---")
-
-        # Métricas Consolidadas Essenciais
-        dias_totais = (portfolio_value.index[-1] - portfolio_value.index[0]).days
-        ret_total = (portfolio_value.iloc[-1] / valor_inicial - 1) * 100
-        ret_anual = (
-            ((portfolio_value.iloc[-1] / valor_inicial) ** (365.25 / dias_totais) - 1)
-            * 100
-            if dias_totais > 0
-            else 0.0
-        )
-        vol_anual = portfolio_returns.std() * np.sqrt(252) * 100
-
-        excesso_retorno_diario = portfolio_returns - taxa_selic
-        std_dev = portfolio_returns.std()
-        sharpe_anual = (
-            (excesso_retorno_diario.mean() / std_dev) * np.sqrt(252)
-            if std_dev > 0
-            else 0.0
-        )
-
-        max_dd_val = max_drawdown(portfolio_returns) * 100
-        var_val = var(portfolio_returns) * 100
-        alfa_anual = alfa_val * 252 * 100 if alfa_val is not None else None
-
-        detailed_stats = pd.DataFrame(
-            {
-                "Métrica": [
-                    "Retorno Total",
-                    "Retorno Anualizado",
-                    "Volatilidade Anualizada",
-                    "Índice de Sharpe",
-                    "Beta vs IBOVESPA",
-                    "Alfa Anualizado",
-                    "Máximo Drawdown",
-                    "VaR Diário (95%)",
-                    "Information Ratio",
-                ],
-                "Valor": [
-                    f"{ret_total:.2f}%",
-                    f"{ret_anual:.2f}%",
-                    f"{vol_anual:.2f}%",
-                    f"{sharpe_anual:.2f}",
-                    f"{beta:.4f}",
-                    f"{alfa_anual:.2f}%" if alfa_anual is not None else "N/D",
-                    f"{max_dd_val:.2f}%",
-                    f"{var_val:.2f}%",
-                    f"{information_ratio:.2f}",
-                ],
-            }
-        )
-        section_header(ICO_METRICS, "Métricas Consolidadas do Portfólio", "h2")
-        stats_dict = dict(zip(detailed_stats["Métrica"], detailed_stats["Valor"]))
-        render_cards_grid(stats_dict)
 
         st.markdown(
             """

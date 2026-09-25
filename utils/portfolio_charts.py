@@ -47,8 +47,7 @@ def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=
     # instead of looping in Python, then compute return/vol/Sharpe for the
     # whole batch with matrix ops (np.einsum for the quadratic form w'Sw).
     rng = np.random.default_rng(42)
-    weights = rng.random((num_portfolios, len(mu)))
-    weights /= weights.sum(axis=1, keepdims=True)
+    weights = rng.dirichlet(np.ones(len(mu)), size=num_portfolios)
     port_returns = weights @ mu
     port_variances = np.einsum("ij,jk,ik->i", weights, S, weights)
     port_stddevs = np.sqrt(port_variances)
