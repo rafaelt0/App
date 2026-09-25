@@ -62,3 +62,18 @@ def test_compute_target_upside_rejects_invalid_prices():
     assert compute_target_upside(0, 125) is None
     assert compute_target_upside(100, float("nan")) is None
     assert compute_target_upside(None, 125) is None
+
+
+def test_full_market_fetch_records_successful_fetch_time(monkeypatch):
+    import fundamentus.resultado as resultado
+    import utils.market_data as market_data
+
+    raw = pd.DataFrame({"P/L": [10]}, index=["TEST3"])
+    monkeypatch.setattr(market_data, "_clear_fundamentus_http_cache", lambda: None)
+    monkeypatch.setattr(resultado, "get_resultado_raw", lambda: raw.copy())
+    market_data.get_full_market_data.clear()
+
+    fetched = market_data.get_full_market_data()
+
+    assert fetched.attrs["fetched_at"].endswith("+00:00")
+    market_data.get_full_market_data.clear()

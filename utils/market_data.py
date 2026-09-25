@@ -5,9 +5,12 @@ tickers) and several pages need it independently — route them all through
 this single cache instead of each page maintaining its own copy.
 """
 
+import datetime
 import logging
 import math
+import threading
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 import pandas as pd
@@ -15,6 +18,24 @@ import streamlit as st
 from utils.formatting import normalize_numeric_text
 
 logger = logging.getLogger(__name__)
+# ponytail: one global lock serializes Fundamentus' requests.Session patch;
+# use private sessions instead if the shared fetch needs more concurrency.
+FUNDAMENTUS_REQUEST_LOCK = threading.Lock()
+
+
+def _clear_fundamentus_http_cache() -> None:
+    """Remove non-expiring Fundamentus result responses before a fresh fetch."""
+    import requests_cache
+
+    with requests_cache.CachedSession("http_cache") as session:
+        cache = session.cache
+        for key in list(cache.responses.keys()):
+            response = cache.responses.get(key)
+            if response is None:
+                continue
+            url = urlsplit(response.url)
+            if url.hostname == "www.fundamentus.com.br" and url.path == "/resultado.php":
+                cache.delete(key)
 
 
 def _normalize_listed_stocks(frame: pd.DataFrame) -> pd.DataFrame:
@@ -60,10 +81,16 @@ def compute_target_upside(current_price, target_price):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_full_market_data():
-    """Fetch the full Fundamentus `resultado` table (all B3 tickers)."""
+    """Fetch an hourly Fundamentus snapshot and retain its successful fetch time."""
     import fundamentus.resultado as fzr
 
-    return fzr.get_resultado_raw()
+    # The installed Fundamentus scraper wraps requests in a non-expiring HTTP
+    # cache. Evict its result URL whenever Streamlit's one-hour cache misses.
+    with FUNDAMENTUS_REQUEST_LOCK:
+        _clear_fundamentus_http_cache()
+        frame = fzr.get_resultado_raw()
+    frame.attrs["fetched_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return frame
 
 
 @st.cache_data(ttl=86400, show_spinner=False)

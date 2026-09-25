@@ -3,7 +3,6 @@ and pages/4_Valuation.py (fundamentus + yfinance).
 """
 
 import logging
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -13,20 +12,17 @@ import streamlit as st
 import yfinance as yf
 
 from utils import db as _db
-from utils.market_data import clean_numeric_column, get_full_market_data
+from utils.market_data import (
+    FUNDAMENTUS_REQUEST_LOCK,
+    clean_numeric_column,
+    get_full_market_data,
+)
 
 logger = logging.getLogger(__name__)
 
-_fundamentus_lock = threading.Lock()  # ponytail: fundamentus/requests_cache patches requests.Session
-                                       # globally and isn't thread-safe; serialize just this call.
-                                       # Upgrade path if real concurrency is needed: fetch with a
-                                       # private requests.Session instead of fundamentus's internal
-                                       # requests_cache.enabled().
-
-
 def _fetch_one(ticker):
     try:
-        with _fundamentus_lock:
+        with FUNDAMENTUS_REQUEST_LOCK:
             return fundamentus.get_papel(ticker)
     except Exception:
         logger.warning("fundamentus fetch failed for ticker=%s", ticker, exc_info=True)
