@@ -516,7 +516,7 @@ n_plot = st.number_input(
     "Número de trajetórias exibidas",
     min_value=5,
     max_value=n_plot_max,
-    value=min(20, n_plot_max),
+    value=min(10, n_plot_max),
     step=5,
 )
 
@@ -539,6 +539,7 @@ fig_individual.update_layout(
     yaxis_title="Valor do Portfólio (R$)",
 )
 apply_plotly_theme(fig_individual)
+fig_individual.update_layout(showlegend=False, margin=dict(b=55))
 st.plotly_chart(fig_individual, use_container_width=True)
 
 # Fan chart com percentis
@@ -662,13 +663,15 @@ fig_hist.add_vline(
     line_color="#ff1744",
     annotation_text="Q1 (25%)",
     annotation_position="top left",
+    annotation_yshift=0,
 )
 fig_hist.add_vline(
     x=q2,
     line_width=2.5,
     line_color="#00ff87",
     annotation_text="Mediana (50%)",
-    annotation_position="top left",
+    annotation_position="top",
+    annotation_yshift=18,
 )
 fig_hist.add_vline(
     x=q3,
@@ -676,7 +679,8 @@ fig_hist.add_vline(
     line_dash="dash",
     line_color="#ffd600",
     annotation_text="Q3 (75%)",
-    annotation_position="top left",
+    annotation_position="top right",
+    annotation_yshift=36,
 )
 
 apply_plotly_theme(fig_hist)
