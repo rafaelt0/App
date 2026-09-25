@@ -456,7 +456,7 @@ if missing_tickers:
     )
     st.stop()
 
-returns = data_yf.pct_change().dropna()
+returns = data_yf.pct_change(fill_method=None).dropna()
 
 MIN_RETURN_ROWS = 30
 if len(returns) < MIN_RETURN_ROWS:
