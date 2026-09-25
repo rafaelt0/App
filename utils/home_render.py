@@ -22,17 +22,6 @@ from utils.ui import analyst_synthesis_header, loading_overlay
 
 
 
-def _analyst_chip(item, color):
-    text, tooltip = item
-    return (
-        f'<span title="{escape(str(tooltip), quote=True)}" '
-        f'style="display:inline-block;background:{color}14;'
-        f'border:1px solid {color}40;color:{color};border-radius:999px;'
-        f'padding:1px 8px;font-size:0.7rem;font-weight:600;margin:0 4px 4px 0;'
-        f'white-space:nowrap;">{escape(str(text))}</span>'
-    )
-
-
 def render_analyst_synthesis(
     df_ind,
     company_data,
@@ -40,9 +29,13 @@ def render_analyst_synthesis(
     peers_raw,
     b3_data,
 ):
-    """Render peer-relative signals and coverage for the selected tickers."""
+    """Render an easy-to-scan, sector-relative analyst synthesis."""
     analyst_synthesis_header()
-    synthesis_items = []
+    st.markdown(
+        '<p class="analyst-synthesis-guide">Comparação setorial '
+        '· percentil maior indica melhor posição entre os pares.</p>',
+        unsafe_allow_html=True,
+    )
     sector_lookup = {}
     if isinstance(b3_data, pd.DataFrame) and {"Ticker", "Setor"}.issubset(
         b3_data.columns
@@ -53,6 +46,17 @@ def render_analyst_synthesis(
             .to_dict()
         )
 
+    category_labels = {"Yield": "Dividendos"}
+    status_classes = {
+        "Favorável": "positive",
+        "Neutro": "neutral",
+        "Desfavorável": "negative",
+    }
+    verdict_classes = {
+        "ATRATIVO": "positive",
+        "NEUTRO": "neutral",
+        "FRACO": "negative",
+    }
     for ticker in tickers:
         if ticker not in df_ind.index:
             continue
@@ -65,73 +69,90 @@ def render_analyst_synthesis(
             company_name = ticker
 
         sector = sector_lookup.get(str(ticker).strip().upper(), "")
-        if not isinstance(sector, str) or not sector.strip():
-            sector = ""
-        else:
-            sector = sector.strip()
-
-        safe_ticker = escape(str(ticker))
-        safe_company_name = escape(str(company_name))
-        safe_sector = escape(sector or "Setor indisponível")
+        sector = sector.strip() if isinstance(sector, str) else ""
         synthesis = build_analyst_synthesis(peers_raw, ticker, sector, b3_data)
-        verdict_color = synthesis["cor_veredicto"]
-
-        chips_html = "".join(
-            _analyst_chip(item, "#00ff87")
-            for item in synthesis["pontos_positivos"]
-        )
-        chips_html += "".join(
-            _analyst_chip(item, "#ff3d5a")
-            for item in synthesis["pontos_negativos"]
-        )
-        chips_html += "".join(
-            _analyst_chip(item, "#ffd600") for item in synthesis["alertas"]
-        )
-        if not chips_html:
-            chips_html = (
-                '<span style="color:#64748b;font-size:0.72rem;">'
-                "Dados de peers insuficientes.</span>"
+        categories = synthesis["categorias"]
+        verdict = str(synthesis["veredicto"])
+        if synthesis["categorias_validas"] < 2:
+            summary_html = (
+                '<p class="analyst-synthesis-summary analyst-synthesis-insufficient">'
+                "Não há dados suficientes para uma conclusão confiável.</p>"
+            )
+        else:
+            favorable = sum(
+                item["veredicto"] == "Favorável" for item in categories.values()
+            )
+            summary_html = (
+                '<p class="analyst-synthesis-summary">'
+                f'<strong>{favorable}/{len(categories)}</strong>'
+                '<span>áreas favoráveis em relação ao setor</span></p>'
             )
 
-        category_html = "".join(
-            '<span style="display:inline-block;color:#cbd5e1;font-size:0.68rem;'
-            f'margin:0 10px 3px 0;">{escape(str(category))}: '
-            f'{escape(str(summary["veredicto"]))} · '
-            f'P{float(summary["percentil"]):.1f} · '
-            f'{int(summary["indicadores_validos"])} indicador(es)</span>'
-            for category, summary in synthesis["categorias"].items()
+        category_cards = []
+        for category, result in categories.items():
+            label = category_labels.get(category, category)
+            status = str(result["veredicto"])
+            status_class = status_classes.get(status, "neutral")
+            percentile = max(0.0, min(100.0, float(result["percentil"])))
+            category_cards.append(
+                f'<div class="mcard analyst-category is-{status_class}">'
+                f'<div class="mcard-label">{escape(str(label))}</div>'
+                f'<div class="mcard-value analyst-category-status">'
+                f'{escape(status)}</div>'
+                '<div class="analyst-synthesis-meter">'
+                f'<span style="width:{percentile:.0f}%"></span></div>'
+                f'<span class="analyst-synthesis-percentile">'
+                f'Percentil {percentile:.0f}</span></div>'
+            )
+        categories_html = (
+            '<div class="mcard-grid analyst-category-grid">'
+            + "".join(category_cards)
+            + "</div>"
+            if category_cards
+            else (
+                '<p class="analyst-synthesis-empty">'
+                "Sem dados suficientes por categoria.</p>"
+            )
         )
-        if not category_html:
-            category_html = (
-                '<span style="color:#64748b;font-size:0.68rem;">'
-                "Sem categorias com cobertura suficiente.</span>"
+
+        detail_groups = (
+            ("Favoráveis", synthesis["pontos_positivos"]),
+            ("Neutros", synthesis["alertas"]),
+            ("Desfavoráveis", synthesis["pontos_negativos"]),
+        )
+        details_html = ""
+        if any(items for _, items in detail_groups):
+            detail_sections = "".join(
+                '<section class="analyst-synthesis-detail-group">'
+                f'<strong>{escape(label)}</strong><ul>'
+                + "".join(f"<li>{escape(str(text))}</li>" for text, _ in items)
+                + "</ul></section>"
+                for label, items in detail_groups
+                if items
+            )
+            details_html = (
+                '<details class="analyst-synthesis-details">'
+                '<summary>Ver indicadores individuais'
+                f'<span>{synthesis["indicadores_validos"]}</span></summary>'
+                '<div class="analyst-synthesis-detail-body">'
+                '<p>Indicador · valor · percentil · observações; mínimo de '
+                '3 ativos por indicador.</p>'
+                f"{detail_sections}</div></details>"
             )
 
-        coverage_text = (
-            f"Cobertura: {synthesis['indicadores_validos']} indicador(es) "
-            f"válido(s) em {synthesis['categorias_validas']} categoria(s)"
+        st.markdown(
+            f'<article class="analyst-synthesis-card">'
+            f'<header class="analyst-synthesis-card-header">'
+            f'<div><div class="analyst-synthesis-identity">'
+            f'<strong>{escape(str(ticker))}</strong>'
+            f'<span>{escape(str(company_name))}</span></div>'
+            f'<div class="analyst-synthesis-sector">'
+            f'{escape(sector or "Setor indisponível")}</div></div>'
+            f'<span class="analyst-synthesis-verdict is-'
+            f'{verdict_classes.get(verdict, "muted")}">{escape(verdict)}</span>'
+            f'</header>{summary_html}{categories_html}{details_html}</article>',
+            unsafe_allow_html=True,
         )
-        synthesis_items.append(
-            f"""
-<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:10px;padding:0.55rem 0.85rem;margin-bottom:0.4rem;">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.3rem;">
-    <div>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#00d2ff;font-size:0.88rem;">{safe_ticker}</span>
-      <span style="font-size:0.7rem;color:#64748b;margin-left:0.4rem;">{safe_company_name}</span>
-      <span style="font-size:0.62rem;color:#475569;font-style:italic;margin-left:0.4rem;">{safe_sector}</span>
-    </div>
-    <span style="background:rgba(0,0,0,0.3);border:1px solid {verdict_color}40;border-radius:6px;padding:0.1rem 0.6rem;font-size:0.66rem;font-weight:800;color:{verdict_color};letter-spacing:0.06em;">{escape(str(synthesis["veredicto"]))}</span>
-  </div>
-  <div style="margin-bottom:0.2rem;">{category_html}</div>
-  <div style="color:#64748b;font-size:0.62rem;margin-bottom:0.2rem;">{escape(coverage_text)}; mínimo de 3 observações por indicador.</div>
-  <div>{chips_html}</div>
-</div>
-"""
-        )
-
-    if synthesis_items:
-        st.markdown("".join(synthesis_items), unsafe_allow_html=True)
-
 
 
 def render_sector_cards(ticker_name, row):
