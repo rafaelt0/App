@@ -7,8 +7,6 @@ import logging
 import math
 from html import escape
 
-from urllib.parse import quote
-
 logger = logging.getLogger(__name__)
 
 from utils import db as _db
@@ -362,7 +360,6 @@ if _watchlist:
             ):
                 st.session_state["_market_target_handoff_ticker"] = _wt
                 st.session_state["market_target_ticker"] = _wt
-                st.query_params["uid"] = _uid
                 st.query_params["market_target_ticker"] = _wt
                 st.rerun()
         with _c2:
@@ -1017,11 +1014,6 @@ if ready_to_analyze:
             accent="var(--brand-primary)",
             cta_label="Abrir Portfolio",
             cta_page="pages/1_Portfolio.py",
-            cta_url=(
-                "Portfolio?"
-                f"uid={quote(_uid, safe='')}"
-                f"&portfolio_tickers={quote(','.join(tickers), safe='')}"
-            ),
         )
 
     except OSError as e:

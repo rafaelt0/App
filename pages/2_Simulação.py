@@ -3,15 +3,16 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
+import hashlib
 import logging
 import plotly.express as px
 import plotly.graph_objects as go
-from urllib.parse import quote
 
 from utils import db as _db
 from utils.charts import apply_plotly_theme
 from utils.identity import get_browser_uid
 from utils.portfolio_data import get_portfolio_prices
+from utils.simulation import simulate_portfolio
 from utils.ui import (
     analyst_synthesis_header,
     empty_state_card,
@@ -107,12 +108,14 @@ render_page_header(
     "simulation",
 )
 
+_session_uid = get_browser_uid()
+
 def _restore_saved_portfolio_context() -> None:
     """Restore a saved portfolio when this page opens in a fresh session."""
     if "selected_tickers" in st.session_state:
         return
 
-    saved_tickers, saved_weights = _db.portfolio_get(get_browser_uid())
+    saved_tickers, saved_weights = _db.portfolio_get(_session_uid)
     tickers = [str(ticker).replace(".SA", "") for ticker in saved_tickers]
     if len(tickers) < 2:
         return
@@ -364,7 +367,15 @@ with st.form("form_simulacao"):
         "Rodar Simulação", type="primary", use_container_width=True
     )
 
-if not submitted:
+_simulation_fingerprint = hashlib.sha256(
+    repr((
+        int(n_simulations), int(valor), years, modo,
+        peso_manual_df.to_json(), returns.to_json(),
+    )).encode()
+).hexdigest()
+if submitted:
+    st.session_state["_simulation_fingerprint"] = _simulation_fingerprint
+elif st.session_state.get("_simulation_fingerprint") != _simulation_fingerprint:
     st.info(
         "Configure os parâmetros acima e clique em 'Rodar Simulação' para ver os resultados."
     )
@@ -405,23 +416,10 @@ log_returns = np.log(1 + aligned_returns)
 mu = log_returns.mean().values
 cov = log_returns.cov().values
 
-np.random.seed(42)  # para reprodutibilidade
-
-# Simular retornos multivariados normais correlacionados
-retornos_simulados = np.random.multivariate_normal(
-    mu, cov, size=(n_dias, n_simulations)
+sim_df = simulate_portfolio(
+    tuple(mu), tuple(map(tuple, cov)), tuple(pesos), n_dias, int(n_simulations),
+    float(valor_inicial), datetime.date.today().isoformat(),
 )
-
-# Calcular trajetórias para cada ativo em cada simulação
-precos_simulados = np.exp(retornos_simulados.cumsum(axis=0))
-
-# Calcular valor do portfólio: soma ponderada dos ativos para cada dia e simulação
-valor_portfolio = (precos_simulados * pesos).sum(axis=2) * valor_inicial
-
-# Criar DataFrame para facilitar manipulação e plotagem
-datas = pd.date_range(start=datetime.date.today(), periods=n_dias + 1, freq="B")
-valor_portfolio = np.vstack([np.ones(n_simulations) * valor_inicial, valor_portfolio])
-sim_df = pd.DataFrame(valor_portfolio, index=datas)
 
 # Estatísticas finais da simulação
 valores_finais = sim_df.iloc[-1]
@@ -794,7 +792,6 @@ next_step_card(
     accent="var(--brand-info)",
     cta_label="Abrir Notícias",
     cta_page="pages/3_Notícias.py",
-    cta_url=f"Not%C3%ADcias?uid={quote(get_browser_uid(), safe='')}",
 )
 
 st.session_state["sim_estatisticas"] = estatisticas

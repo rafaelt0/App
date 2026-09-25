@@ -1,6 +1,6 @@
 # Screener: implementation brief
 
-This is a handoff for the next agent, **not an implementation**. The goal is a trustworthy, simpler screener for exploring B3 stocks—not a claim to reproduce famous investment strategies. Preserve unrelated working-tree changes; the market-target panel is integrated into `Main_Page.py`.
+This brief records the accepted product direction and acceptance criteria for a trustworthy, simpler B3 screener—not a claim to reproduce famous investment strategies. The implementation lives in `pages/5_Screener.py` and `utils/screener.py`; keep this document aligned with their behavior. The market-target panel is integrated into `Main_Page.py`.
 
 ## Agreed product direction
 
@@ -26,8 +26,8 @@ A fourth **Crescimento com lucro** preset was discussed but is **deferred**, not
 
 ## Data correctness to fix alongside the UI
 
-1. **Debt filter is a silent no-op.** `get_full_market_data()` returns a Fundamentus column named `Dív.Líq/ Patrim.` in the local cached snapshot; `carregar_dados()` only detects debt columns containing `brut` + `patrim`, so `divbpatr` never exists and the condition is skipped. Map the actual column; label it *net debt/equity* if kept as an optional custom filter. When enabled, missing data must not count as passing.
-2. **Freshness is misleading.** `utils/market_data.py:get_full_market_data()` calls Fundamentus `get_resultado_raw()`, which internally uses `requests_cache.enabled()` with non-expiring defaults. The sidebar prints today's date, and `clear_fundamentus_cache()` plus `carregar_dados.clear()` do not expire that underlying HTTP cache. Make hourly freshness/explicit refresh real or drop the hourly claim; display the actual fetch/cache timestamp rather than `date.today()`.
+1. The debt metric is mapped from Fundamentus' `Dív.Líq/ Patrim.` header. No debt filter is currently exposed; if one is added, label it *net debt/equity* and make missing data fail while active.
+2. Freshness is implemented by evicting Fundamentus' non-expiring `/resultado.php` HTTP response whenever the one-hour Streamlit cache misses. The page shows the successful fetch timestamp; keep refresh/cache invalidation covered by offline tests.
 3. **Sector coverage is incomplete.** `get_listed_stocks()` uses `acoes-listadas-b3.csv`; in the local cached snapshot, 333 of 994 Fundamentus tickers match. The old Magic exclusion lets unknown sectors through via `~df['setor'].isin(...)`. The three new presets are not sector-dependent, so **defer** rebuilding sector coverage, but do not silently reintroduce sector-based exclusions or present unknown sectors as classified.
 4. Keep data-source failure and missing required columns distinct from “zero matches”; no preset should silently turn into a weaker one when Fundamentus changes a header.
 

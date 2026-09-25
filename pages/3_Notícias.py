@@ -25,6 +25,7 @@ from utils.ui import (
 
 # CSS customizado
 load_css()
+_session_uid = get_browser_uid()
 
 
 # ─── SVG Icon Library ─────────────────────────────────────────────────────────
@@ -339,7 +340,7 @@ def _restore_saved_portfolio_context() -> None:
     if "selected_tickers" in st.session_state:
         return
 
-    saved_tickers, saved_weights = _db.portfolio_get(get_browser_uid())
+    saved_tickers, saved_weights = _db.portfolio_get(_session_uid)
     tickers = [str(ticker).replace(".SA", "") for ticker in saved_tickers]
     if not tickers:
         return

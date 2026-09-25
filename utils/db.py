@@ -1,7 +1,7 @@
-"""SQLite-backed persistent cache, watchlist and portfolio for B3 Explorer.
+"""SQLite-backed cache, watchlist and portfolio for B3 Explorer.
 
-Watchlist and portfolio are keyed by an anonymous per-browser `uid`
-(see utils/identity.py) so different visitors don't share the same data.
+Watchlist and portfolio are keyed by a random Streamlit-session identity
+(see utils/identity.py); they are not recoverable after that session ends.
 """
 import sqlite3
 import json

@@ -52,6 +52,7 @@ from utils.icons import (
 )
 from utils.portfolio_data import (
     align_benchmark_returns,
+    align_weights_to_columns,
     bound_efficient_return,
     get_benchmark_prices,
     get_portfolio_prices,
@@ -172,6 +173,8 @@ _uid = get_browser_uid()
 _saved_tickers, _saved_weights = _db.portfolio_get(_uid)
 
 _query_handoff = str(st.query_params.get("portfolio_tickers", "")).strip()
+if "portfolio_tickers" in st.query_params:
+    del st.query_params["portfolio_tickers"]
 _handoff_tickers = [
     ticker
     for ticker in (
@@ -576,6 +579,9 @@ if (
             if pd.notna(weight)
         }
         _db.portfolio_save(_uid, tickers, _persisted_weights)
+        # Keep market-data ticker labels for calculations; the display frame below
+        # strips .SA because the simulation page expects bare ticker names.
+        pesos_por_ticker = peso_manual_df["Peso"].to_dict()
 
         # Mostrar pesos
         st.subheader("Pesos do Portfólio (%)")
@@ -807,7 +813,10 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             )
 
         # Cálculo do portfólio com os pesos escolhidos
-        portfolio_returns = returns.dot(pesos_manuais_arr)
+        pesos_alinhados = align_weights_to_columns(
+            pesos_por_ticker, returns.columns
+        )
+        portfolio_returns = returns.dot(pesos_alinhados)
 
         # O benchmark é complementar: se o IBOVESPA falhar, preserve a análise
         # do portfólio e sinalize que o gráfico está sem comparação.
@@ -1505,8 +1514,9 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             if len(period_prices) < 5:
                 continue
             period_ret = period_prices.pct_change().dropna()
-            pesos_dict = dict(zip(data_yf.columns, pesos_manuais_arr))
-            pesos_period = np.array([pesos_dict.get(c, 0) for c in period_ret.columns])
+            pesos_period = np.array(
+                align_weights_to_columns(pesos_por_ticker, period_ret.columns)
+            )
             if pesos_period.sum() > 0:
                 pesos_period = pesos_period / pesos_period.sum()
             port_ret_period = period_ret.dot(pesos_period)
