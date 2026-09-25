@@ -17,6 +17,19 @@ PRESET_FILTERS = {
         "roe_min": 0.10,
         "liq2m_min": 1_000_000,
     },
+    "Qualidade rentável": {
+        "pl_min": 0,
+        "pl_min_exclusive": True,
+        "pl_max": 20,
+        "roe_min": 0.18,
+        "liq2m_min": 2_000_000,
+    },
+    "Alta liquidez": {"liq2m_min": 10_000_000},
+    "Crescimento com lucro": {
+        "c5y_min": 0.10,
+        "roe_min": 0.12,
+        "liq2m_min": 1_000_000,
+    },
     "Personalizado": {},
 }
 
@@ -25,6 +38,7 @@ _FILTER_COLUMNS = {
     "pl_max": "pl",
     "roe_min": "roe",
     "dy_min": "dy",
+    "c5y_min": "c5y",
     "liq2m_min": "liq2m",
 }
 

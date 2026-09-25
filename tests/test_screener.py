@@ -16,6 +16,7 @@ def stocks():
             "roe": [0.15, 0.20, 0.12, None, 0.10],
             "dy": [0.06, 0.05, 0.04, 0.08, 0.07],
             "liq2m": [2_000_000, 3_000_000, 4_000_000, 2_000_000, 500_000],
+            "c5y": [0.10, 0.12, 0.15, None, 0.09],
         },
         index=["AAA3", "BBB3", "CCC3", "DDD3", "EEE3"],
     )
@@ -31,6 +32,9 @@ def test_presets_include_only_stocks_meeting_their_criteria(stocks):
     assert set(filter_stocks(stocks, PRESET_FILTERS["Renda atual"]).index) == {
         "AAA3", "BBB3"
     }
+    assert set(filter_stocks(stocks, PRESET_FILTERS["Crescimento com lucro"]).index) == {
+        "AAA3", "BBB3", "CCC3"
+    }
 
 
 def test_missing_active_values_fail_but_inactive_missing_columns_do_not(stocks):
@@ -43,6 +47,41 @@ def test_missing_active_values_fail_but_inactive_missing_columns_do_not(stocks):
 def test_missing_active_column_is_an_error(stocks):
     with pytest.raises(ValueError, match="Coluna necessária"):
         filter_stocks(stocks.drop(columns="dy"), {"dy_min": 0.05})
+    with pytest.raises(ValueError, match="Coluna necessária"):
+        filter_stocks(stocks.drop(columns="c5y"), {"c5y_min": 0.10})
+
+
+def test_new_presets_apply_only_their_stated_thresholds():
+    candidates = pd.DataFrame(
+        {
+            "pl": [10, 0, 21, 10, None, None, None, 10, 21, 10, 10, 10],
+            "roe": [
+                0.20, 0.30, 0.30, 0.17, None, None, None,
+                0.12, 0.20, 0.119, 0.20, None,
+            ],
+            "liq2m": [
+                2_000_000, 2_000_000, 2_000_000, 2_000_000,
+                10_000_000, 9_999_999, 10_000_000, 1_000_000,
+                10_000_000, 10_000_000, 999_999, 10_000_000,
+            ],
+            "c5y": [None, None, None, None, None, None, None, 0.10, 0.099, 0.20, 0.20, 0.20],
+        },
+        index=[
+            "QUALITY", "ZERO_PL", "HIGH_PL", "LOW_ROE", "LIQUID", "LOW_LIQUID",
+            "LIQUID_2", "GROWTH", "LOW_GROWTH", "LOW_GROWTH_ROE",
+            "LOW_GROWTH_LIQ", "MISSING_GROWTH_ROE",
+        ],
+    )
+
+    assert list(
+        filter_stocks(candidates, PRESET_FILTERS["Qualidade rentável"]).index
+    ) == ["QUALITY"]
+    assert set(filter_stocks(candidates, PRESET_FILTERS["Alta liquidez"]).index) == {
+        "LIQUID", "LIQUID_2", "LOW_GROWTH", "LOW_GROWTH_ROE", "MISSING_GROWTH_ROE"
+    }
+    assert list(
+        filter_stocks(candidates, PRESET_FILTERS["Crescimento com lucro"]).index
+    ) == ["GROWTH"]
 
 
 def test_sorting_does_not_change_which_stocks_match(stocks):
@@ -83,6 +122,22 @@ def test_screener_migrates_stale_session_filters_to_explorar_b3():
     assert any("1 de 1 ativos" in item.value for item in app.caption)
 
 
+def test_screener_migrates_old_freeform_liquidity_values():
+    raw = pd.DataFrame(
+        {"P/L": [10.0], "ROE": [0.15], "Div.Yield": [0.06], "Liq.2meses": [2_000_000]},
+        index=["AAA3"],
+    )
+    app = AppTest.from_file("pages/5_Screener.py")
+    app.session_state["_screener_filter_version"] = 2
+    app.session_state["preset_select"] = "Explorar B3"
+    app.session_state["liq2m_min"] = 1_234_567
+    with patch("utils.market_data.get_full_market_data", return_value=raw):
+        app.run().run()
+
+    assert not app.exception
+    assert app.select_slider(key="liq2m_min").value == 1_000_000
+
+
 def test_screener_preset_change_and_manual_edit_update_ui_state():
     raw = pd.DataFrame(
         {
@@ -92,6 +147,7 @@ def test_screener_preset_change_and_manual_edit_update_ui_state():
             "Div.Yield": [0.06, 0.07, 0.04],
             "ROE": [0.15, 0.12, 0.12],
             "ROIC": [0.1, 0.11, 0.1],
+            "Cresc. Rec.5a": [0.15, 0.12, 0.20],
             "EV/EBITDA": [5.0, 6.0, 7.0],
             "Patrim. Líq": [100_000.0, 200_000.0, 300_000.0],
             "Dív.Líq/ Patrim.": [0.4, 0.2, 0.3],
@@ -105,10 +161,34 @@ def test_screener_preset_change_and_manual_edit_update_ui_state():
         assert not app.exception
         assert any("3 de 3 ativos" in item.value for item in app.caption)
         assert "P/L" in app.dataframe[0].value.columns
+        liquidity = app.select_slider(key="liq2m_min")
+        assert liquidity.value == 1_000_000
+        assert liquidity.options[10:12] == ["1 milhão", "1,1 milhões"]
+        assert liquidity.options[20] == "2 milhões"
+
+        liquidity.set_value(3_000_000).run()
+        assert app.selectbox(key="preset_select").value == "Personalizado"
+        assert any("2 de 3 ativos" in item.value for item in app.caption)
 
         app.selectbox(key="preset_select").select("Renda atual").run()
+        assert app.select_slider(key="liq2m_min").value == 1_000_000
         assert app.selectbox(key="preset_select").value == "Renda atual"
         assert any("DY ≥ 5%" in item.value and "ROE ≥ 10%" in item.value for item in app.caption)
 
         app.number_input(key="roe_min").set_value(20).run()
         assert app.selectbox(key="preset_select").value == "Personalizado"
+
+        app.selectbox(key="preset_select").select("Qualidade rentável").run()
+        assert app.number_input(key="roe_min").value == 18
+        assert app.number_input(key="pl_max").value == 20
+        assert app.select_slider(key="liq2m_min").value == 2_000_000
+
+        app.selectbox(key="preset_select").select("Alta liquidez").run()
+        assert app.select_slider(key="liq2m_min").value == 10_000_000
+        assert not app.checkbox(key="filter_pl_enabled").value
+        assert not app.checkbox(key="filter_roe_enabled").value
+
+        app.selectbox(key="preset_select").select("Crescimento com lucro").run()
+        assert app.number_input(key="c5y_min").value == 10
+        assert app.checkbox(key="filter_c5y_enabled").value
+        assert any("Cresc. Rec. 5a ≥ 10%" in item.value for item in app.caption)
