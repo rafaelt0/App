@@ -65,6 +65,22 @@ def test_export_uses_percentage_points_and_keeps_every_row(stocks):
     assert exported.index.name == "Papel"
 
 
+def test_screener_migrates_stale_session_filters_to_explorar_b3():
+    raw = pd.DataFrame(
+        {"P/L": [10.0], "ROE": [0.15], "Div.Yield": [0.06], "Liq.2meses": [2_000_000]},
+        index=["AAA3"],
+    )
+    app = AppTest.from_file("pages/5_Screener.py")
+    app.session_state["preset_select"] = "Greenblatt — Magic Formula"
+    app.session_state["liq2m_min"] = 100_000_000
+    with patch("utils.market_data.get_full_market_data", return_value=raw):
+        app.run()
+
+    assert not app.exception
+    assert app.selectbox(key="preset_select").value == "Explorar B3"
+    assert any("1 de 1 ativos" in item.value for item in app.caption)
+
+
 def test_screener_preset_change_and_manual_edit_update_ui_state():
     raw = pd.DataFrame(
         {

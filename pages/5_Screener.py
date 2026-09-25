@@ -114,7 +114,7 @@ _FILTER_WIDGETS = {
     "filter_dy_enabled": ("dy_min",),
     "filter_liq2m_enabled": ("liq2m_min",),
 }
-for key, value in {
+_screener_defaults = {
     "preset_select": "Explorar B3",
     "filter_pl_enabled": False,
     "filter_roe_enabled": False,
@@ -127,10 +127,17 @@ for key, value in {
     "dy_min": 5.0,
     "liq2m_min": 1_000_000,
     "sort_by": "Liquidez 2m",
-}.items():
-    st.session_state.setdefault(key, value)
-if st.session_state["preset_select"] not in PRESET_FILTERS:
-    st.session_state["preset_select"] = "Explorar B3"
+}
+if (
+    st.session_state.get("_screener_filter_version") != 1
+    or st.session_state.get("preset_select") not in PRESET_FILTERS
+):
+    for key, value in _screener_defaults.items():
+        st.session_state[key] = value
+    st.session_state["_screener_filter_version"] = 1
+else:
+    for key, value in _screener_defaults.items():
+        st.session_state.setdefault(key, value)
 
 
 def _mark_custom(changed_key=None):
