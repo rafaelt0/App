@@ -36,7 +36,6 @@ _PAGE_HEADER_CONFIG = {
     "portfolio": ("icons/portfolio.svg", "Portfolio"),
     "simulation": ("icons/simulation.svg", "Simulação"),
     "news": ("icons/news.svg", "Notícias"),
-    "valuation": ("icons/valuation.svg", "Visão_de_mercado"),
     "screener": ("icons/screener.svg", "Screener"),
 }
 

@@ -1,8 +1,7 @@
-"""Shared, cached access to bulk B3 market data.
+"""Shared cached access to B3 fundamentals and Yahoo Finance market targets.
 
 Fetching the full Fundamentus table is expensive (scrapes & parses ~300+
-tickers) and several pages need it independently — route them all through
-this single cache instead of each page maintaining its own copy.
+tickers), so route callers through this module's shared cache.
 """
 
 import datetime
@@ -15,6 +14,7 @@ from urllib.parse import urlsplit
 
 import pandas as pd
 import streamlit as st
+import yfinance as yf
 from utils.formatting import normalize_numeric_text
 
 logger = logging.getLogger(__name__)
@@ -77,6 +77,30 @@ def compute_target_upside(current_price, target_price):
     if not math.isfinite(current) or not math.isfinite(target) or current <= 0 or target <= 0:
         return None
     return (target / current - 1) * 100
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_market_target_data(ticker_b3):
+    """Fetch Yahoo Finance's target-price and recommendation data for a B3 ticker."""
+    try:
+        info = yf.Ticker(f"{ticker_b3}.SA").info or {}
+        return {
+            "company_name": info.get("longName") or info.get("shortName"),
+            "currency": info.get("currency") or "BRL",
+            "price": info.get("currentPrice"),
+            "regular_price": info.get("regularMarketPrice"),
+            "target_low": info.get("targetLowPrice"),
+            "target_mean": info.get("targetMeanPrice"),
+            "target_median": info.get("targetMedianPrice"),
+            "target_high": info.get("targetHighPrice"),
+            "analyst_count": info.get("numberOfAnalystOpinions"),
+            "recommendation": info.get("recommendationKey"),
+            "recommendation_mean": info.get("recommendationMean"),
+        }
+    except Exception as exc:
+        logger.warning("Market target fetch failed for %s: %s", ticker_b3, exc)
+        logger.debug("Market target fetch details", exc_info=True)
+        return {"_error": str(exc)}
 
 
 @st.cache_data(ttl=3600, show_spinner=False)

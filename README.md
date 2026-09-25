@@ -2,10 +2,10 @@
 
 ## 📈 Descrição
 
-O **B3 Explorer** é uma aplicação web interativa desenvolvida com **Streamlit** para análise quantitativa de ações listadas na B3 (Bolsa de Valores do Brasil). A plataforma reúne, em um único fluxo de trabalho, análise fundamentalista, otimização de portfólio, simulação Monte Carlo, monitoramento de notícias com análise de sentimento, valuation por Enterprise DCF e um screener de mercado.
+O **B3 Explorer** é uma aplicação web interativa desenvolvida com **Streamlit** para análise quantitativa de ações listadas na B3 (Bolsa de Valores do Brasil). A plataforma reúne, em um único fluxo de trabalho, análise fundamentalista, consenso de preços-alvo de analistas, otimização de portfólio, simulação Monte Carlo, monitoramento de notícias com análise de sentimento e um screener de mercado.
 
 O projeto integra dados históricos do Yahoo Finance (`yfinance`), indicadores fundamentalistas do Fundamentus e a taxa Selic do Banco Central (`python-bcb`), oferecendo uma ferramenta completa de apoio à decisão de investimento.
-As seis páginas compartilham cabeçalho, navegação e componentes de análise, com adaptação para telas menores.
+As cinco páginas compartilham cabeçalho, navegação e componentes de análise, com adaptação para telas menores.
 
 🔗 **Acesse a aplicação:** https://b3explorer.streamlit.app/
 
@@ -13,13 +13,14 @@ As seis páginas compartilham cabeçalho, navegação e componentes de análise,
 
 ## ⚙️ Funcionalidades
 
-A aplicação é organizada como um **fluxo de análise em 6 etapas**:
+A aplicação é organizada como um **fluxo de análise em 5 etapas**:
 
 ### 1. Análise Fundamentalista *(página inicial)*
 * Panorama de todo o mercado com dados atualizados do Fundamentus (a cada hora).
 * Cartões de preço, indicadores por setor e ranking setorial de ativos.
 * Painel de endividamento e watchlist personalizada (favoritos por navegador).
 * Síntese do Analista compara valuation, rentabilidade e dividend yield com pares do mesmo setor, atribui um voto por categoria e informa quando a cobertura é insuficiente.
+* Painel de preços-alvo do Yahoo Finance: cotação, faixa de consenso, potencial implícito e recomendação agregada.
 
 ### 2. Portfolio — Análise & Otimização
 * Importação de preços históricos ajustados via `yfinance`.
@@ -38,12 +39,7 @@ A aplicação é organizada como um **fluxo de análise em 6 etapas**:
 * Análise de sentimento com o modelo de deep learning **FinBERT-PT-BR** (classificação otimista / neutro / pessimista).
 * Agregação do impacto qualitativo sobre o portfólio.
 
-### 5. Valuation — McKinsey / Koller
-* **Enterprise DCF** completo em 8 etapas: NOPLAT → Invested Capital → ROIC histórico → Projeção → Continuing Value → WACC/CAPM → Enterprise Value → Validação por múltiplos.
-* Cálculo de WACC via CAPM, com custo de capital derivado da Selic.
-* Validação cruzada por múltiplos de mercado e ranking setorial.
-
-### 6. Screener B3
+### 5. Screener B3
 * Filtragem de todas as ações listadas na B3 por indicadores fundamentalistas.
 * Ordenação e busca de candidatos de investimento.
 * Dados atualizados a cada hora via Fundamentus.
@@ -103,14 +99,13 @@ pytest
 
 ```
 .
-├── Main_Page.py              # Página inicial — Análise Fundamentalista
+├── Main_Page.py              # Análise fundamentalista e preços-alvo de mercado
 ├── pages/
 │   ├── 1_Portfolio.py        # Análise & otimização de portfólio
 │   ├── 2_Simulação.py        # Simulação Monte Carlo
 │   ├── 3_Notícias.py         # Notícias & análise de sentimento (FinBERT)
-│   ├── 4_Valuation.py        # Enterprise DCF (McKinsey / Koller)
 │   └── 5_Screener.py         # Screener de ações da B3
-├── utils/                    # Módulos de dados, gráficos, valuation e UI
+├── utils/                    # Módulos de dados, mercado, gráficos e UI
 ├── tests/                    # Testes com pytest
 ├── .streamlit/config.toml    # Tema e configurações do Streamlit
 ├── requirements.txt

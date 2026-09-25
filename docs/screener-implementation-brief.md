@@ -1,6 +1,6 @@
 # Screener: implementation brief
 
-This is a handoff for the next agent, **not an implementation**. The goal is a trustworthy, simpler screener for exploring B3 stocks—not a claim to reproduce famous investment strategies. Preserve unrelated working-tree changes; `pages/5_Screener.py` and the market page already have local edits.
+This is a handoff for the next agent, **not an implementation**. The goal is a trustworthy, simpler screener for exploring B3 stocks—not a claim to reproduce famous investment strategies. Preserve unrelated working-tree changes; the market-target panel is integrated into `Main_Page.py`.
 
 ## Agreed product direction
 
@@ -20,7 +20,7 @@ A fourth **Crescimento com lucro** preset was discussed but is **deferred**, not
 
 - Show **matched / total**, real data age, and all active limits **above** the results (including the liquidity threshold in Explorar B3). Provide one clear reset to Explorar B3. Don't label active default filters simply “configuração padrão.”
 - Use **one visible preset selector**; remove the duplicate quick-preset buttons. Keep custom controls grouped (e.g., Valuation, Quality, Dividends, Liquidity), with optional/disabled state clear. Validate `min <= max` for ranges and make the zero-results state actionable.
-- Make the table the focus: keep numeric columns numeric so header sorting is numeric; use Streamlit's native numeric formatting where practical. Show a manageable set of columns initially, with a way to see the others. Remove the three “Destaques” cards if they cannot represent the selected sort; allow **any** displayed ticker, not only the top three, to be opened in `pages/4_Visão_de_mercado.py` or favorited.
+- Make the table the focus: keep numeric columns numeric so header sorting is numeric; use Streamlit's native numeric formatting where practical. Show a manageable set of columns initially, with a way to see the others. Remove the three “Destaques” cards if they cannot represent the selected sort; allow **any** displayed ticker, not only the top three, to be opened in `Main_Page.py` with its ticker loaded in the market-target panel, or favorited.
 - Export **all** matched rows to CSV and compute summary averages over the same full result set. `df_filtrado.head(200)` currently runs before both export and averages. With ~1,000 source rows, removing the cap entirely is simpler than adding pagination. If a cap remains, it may apply only to the on-screen display and must be explicit.
 - Treat the composite Score as a heuristic, not an investment recommendation; avoid highlighting its top three as “picks.” Avoid extra dependencies, new strategy engines, or complex ranking logic.
 
@@ -36,4 +36,4 @@ A fourth **Crescimento com lucro** preset was discussed but is **deferred**, not
 - Page and filter state: `pages/5_Screener.py`; shared bulk data: `utils/market_data.py`; cache clearing: `utils/home_data.py:clear_fundamentus_cache`; ticker/sector CSV: `acoes-listadas-b3.csv`; existing test conventions: `tests/test_market_data.py`.
 - Check with small fixture rows that each preset has **exactly** its listed predicates, a missing active field fails, disabled filters have no effect, manual edits show modified/custom state, and changing sort doesn't change the matched ticker set.
 - Check that the CSV row count equals the total shown, numeric columns still sort numerically, reset restores only Explorar B3, and refresh can actually obtain newer data. Keep any network-dependent test mocked; do not rely on the live Fundamentus site.
-- Existing working-tree edits include a new market page path. Preserve them and verify the any-row navigation target in the current checkout instead of reverting to `pages/4_Valuation.py`.
+- The market-target panel lives in `Main_Page.py`; preserve its ticker handoff/query parameter when updating screener navigation.
