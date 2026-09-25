@@ -98,169 +98,76 @@ def _recommendation_label(key, score):
     return "Venda"
 
 
-def _render_market_target_panel(tickers, uid):
-    handoff_ticker = str(
-        st.session_state.pop("_market_target_handoff_ticker", "")
-    ).strip().upper()
-    query_ticker = str(st.query_params.get("market_target_ticker", "")).strip().upper()
-    if handoff_ticker:
-        st.session_state["market_target_ticker"] = handoff_ticker
-    elif "market_target_ticker" not in st.session_state:
-        st.session_state["market_target_ticker"] = query_ticker or (
-            tickers[0] if tickers else ""
-        )
+def _render_market_target_panel(tickers):
+    if not tickers:
+        return
 
     section_header(ICO_MARKET, "Preço-alvo e consenso", "h2")
-    input_col, refresh_col = st.columns([5, 1], vertical_alignment="bottom")
-    with input_col:
-        ticker = st.text_input(
-            "Ticker para preço-alvo",
-            placeholder="Digite um ticker, ex.: PETR4",
-            help="Digite o código de uma ação listada na B3.",
-            key="market_target_ticker",
-        ).strip().upper().removesuffix(".SA")
-
-    if ticker:
-        st.query_params["market_target_ticker"] = ticker
-    elif "market_target_ticker" in st.query_params:
-        del st.query_params["market_target_ticker"]
-
-    if not ticker:
-        return
-    if not ticker.isalnum() or not 4 <= len(ticker) <= 8:
-        st.warning("Digite um ticker B3 válido (4 a 8 letras ou números).")
-        return
-
-    with refresh_col:
-        st.button(
-            "Atualizar dados",
-            key=f"market_target_refresh_{ticker}",
-            use_container_width=True,
-            on_click=lambda value=ticker: get_market_target_data.clear(value),
-            help="Busca novamente os dados de mercado no Yahoo Finance.",
-        )
-
-    with loading_overlay(f"Buscando preços-alvo de {ticker}…", tickers=[ticker]):
-        market = get_market_target_data(ticker)
-    if not market or "_error" in market:
-        st.error(f"Não foi possível carregar os dados de mercado de {ticker}.")
-        return
-
-    price = _positive_number(market.get("price")) or _positive_number(
-        market.get("regular_price")
-    )
-    target_low = _positive_number(market.get("target_low"))
-    target_mean = _positive_number(market.get("target_mean"))
-    target_median = _positive_number(market.get("target_median"))
-    target_high = _positive_number(market.get("target_high"))
-    upside = compute_target_upside(price, target_mean)
-    currency = str(market.get("currency") or "BRL").upper()
-    currency_symbol = {"BRL": "R$", "USD": "US$", "EUR": "€"}.get(currency, currency)
-    company_name = market.get("company_name") or ticker
-    st.markdown(f"**{company_name} · {ticker}**")
-
-    metrics = st.columns(3)
-    with metrics[0]:
-        st.metric("Cotação atual", _money(price, currency_symbol))
-    with metrics[1]:
-        st.metric("Preço-alvo médio", _money(target_mean, currency_symbol))
-    with metrics[2]:
-        st.metric(
-            "Potencial até o alvo médio",
-            f"{upside:+.1f}%" if upside is not None else "—",
-            help="(Preço-alvo médio ÷ cotação atual − 1) × 100.",
-        )
-
-    if target_mean is None:
-        st.info("O Yahoo Finance não informa um preço-alvo médio para este ticker.")
-
-    st.markdown("#### Faixa de preços-alvo dos analistas")
-    for column, label, value in zip(
-        st.columns(3),
-        ("Alvo mínimo", "Alvo mediano", "Alvo máximo"),
-        (target_low, target_median, target_high),
-    ):
-        with column:
-            st.metric(label, _money(value, currency_symbol))
-
-    if target_low is not None and target_high is not None:
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=sorted((target_low, target_high)),
-                y=[0, 0],
-                mode="lines",
-                line={"color": "#475569", "width": 12},
-                hovertemplate="Faixa estimada: %{x:,.2f}<extra></extra>",
-                showlegend=False,
-            )
-        )
-        for value, label, color in (
-            (price, "Cotação atual", "#94a3b8"),
-            (target_mean, "Alvo médio", "#a855f7"),
-            (target_median, "Alvo mediano", "#00d2ff"),
-        ):
-            if value is not None:
-                fig.add_trace(
-                    go.Scatter(
-                        x=[value],
-                        y=[0],
-                        mode="markers",
-                        name=label,
-                        marker={"color": color, "size": 12},
-                        hovertemplate=f"{label}: %{{x:,.2f}}<extra></extra>",
-                    )
-                )
-        apply_plotly_theme(fig)
-        fig.update_layout(
-            height=230,
-            margin={"t": 40, "b": 60, "l": 15, "r": 15},
-            legend={
-                "orientation": "h",
-                "x": 0.5,
-                "xanchor": "center",
-                "y": 1.08,
-                "yanchor": "bottom",
-            },
-            xaxis={"title": f"Preço por ação ({currency_symbol})"},
-            yaxis={"visible": False, "fixedrange": True},
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.caption("A faixa visual exige que a fonte informe os alvos mínimo e máximo.")
-
-    analyst_count = _positive_number(market.get("analyst_count"))
-    recommendation = _recommendation_label(
-        market.get("recommendation"), market.get("recommendation_mean")
-    )
-    context_cols = st.columns(2)
-    with context_cols[0]:
-        st.metric(
-            "Opiniões de analistas (Yahoo)",
-            str(int(analyst_count)) if analyst_count else "—",
-            help=(
-                "Contagem agregada informada pelo Yahoo Finance; não é uma contagem verificada "
-                "de colaboradores da faixa de preços-alvo."
-            ),
-        )
-    with context_cols[1]:
-        st.metric("Recomendação agregada", recommendation)
-    st.caption(
-        "Fonte: Yahoo Finance. O preço-alvo reflete estimativas de analistas disponíveis na fonte; "
-        "é uma referência de mercado, não uma previsão garantida nem recomendação de investimento."
-    )
-
-    is_starred = _db.wl_has(uid, ticker)
     if st.button(
-        "★ Remover dos Favoritos" if is_starred else "☆ Salvar nos Favoritos",
-        key="market_target_watchlist_btn",
-        help="Ticker salvo na watchlist da página principal.",
+        "Atualizar consensos",
+        key="market_target_refresh_selected",
+        help="Busca novamente os dados selecionados no Yahoo Finance.",
     ):
-        if is_starred:
-            _db.wl_remove(uid, ticker)
-        else:
-            _db.wl_add(uid, ticker)
-        st.rerun()
+        for ticker in tickers:
+            get_market_target_data.clear(ticker)
+
+    rows = []
+    failed_tickers = []
+    has_targets = False
+    with loading_overlay(
+        "Buscando preços-alvo dos ativos analisados…", tickers=tickers
+    ):
+        for ticker in tickers:
+            market = get_market_target_data(ticker) or {}
+            if "_error" in market:
+                failed_tickers.append(ticker)
+                market = {}
+
+            price = _positive_number(market.get("price")) or _positive_number(
+                market.get("regular_price")
+            )
+            target_low = _positive_number(market.get("target_low"))
+            target_mean = _positive_number(market.get("target_mean"))
+            target_median = _positive_number(market.get("target_median"))
+            target_high = _positive_number(market.get("target_high"))
+            has_targets |= any(
+                value is not None
+                for value in (target_low, target_mean, target_median, target_high)
+            )
+            currency = str(market.get("currency") or "BRL").upper()
+            symbol = {"BRL": "R$", "USD": "US$", "EUR": "€"}.get(
+                currency, currency
+            )
+            upside = compute_target_upside(price, target_mean)
+            analyst_count = _positive_number(market.get("analyst_count"))
+            rows.append(
+                {
+                    "Ticker": ticker,
+                    "Empresa": market.get("company_name") or ticker,
+                    "Cotação atual": _money(price, symbol),
+                    "Alvo mínimo": _money(target_low, symbol),
+                    "Alvo mediano": _money(target_median, symbol),
+                    "Alvo médio": _money(target_mean, symbol),
+                    "Alvo máximo": _money(target_high, symbol),
+                    "Potencial": f"{upside:+.1f}%" if upside is not None else "—",
+                    "Opiniões": str(int(analyst_count)) if analyst_count else "—",
+                    "Recomendação": _recommendation_label(
+                        market.get("recommendation"), market.get("recommendation_mean")
+                    ),
+                }
+            )
+
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    if failed_tickers:
+        st.warning(
+            "Consenso indisponível para: " + ", ".join(failed_tickers) + "."
+        )
+    elif not has_targets:
+        st.info("O Yahoo Finance não informa preços-alvo para as ações selecionadas.")
+    st.caption(
+        "Fonte: Yahoo Finance. Potencial calculado sobre o alvo médio; opiniões e recomendações "
+        "são agregadas pela fonte e não constituem recomendação de investimento."
+    )
 
 
 # Configurar temas de plotagem escuros
@@ -352,16 +259,8 @@ if _watchlist:
                     if _wt not in _cur:
                         st.session_state["selected_tickers"] = _cur + [_wt]
                     st.rerun()
-            elif st.button(
-                f"{_wt} · Preço-alvo",
-                key=f"wl_val_{_wt}",
-                use_container_width=True,
-                help="Ticker fora da lista local; carregar o preço-alvo nesta página.",
-            ):
-                st.session_state["_market_target_handoff_ticker"] = _wt
-                st.session_state["market_target_ticker"] = _wt
-                st.query_params["market_target_ticker"] = _wt
-                st.rerun()
+            else:
+                st.caption(f"{_wt} · fora da lista B3")
         with _c2:
             if st.button("✕", key=f"wl_rm_{_wt}", help="Remover dos favoritos"):
                 _db.wl_remove(_uid, _wt)
@@ -514,8 +413,6 @@ if _saved_count:
         f"Carregamos as primeiras {MAX_ANALYSIS_TICKERS} para manter a análise estável."
     )
 
-_render_market_target_panel(tickers, _uid)
-
 # A new selection must always require an explicit analysis click. This avoids
 # reusing results from an earlier selection when the user returns to it later.
 if st.session_state.get("analyzed_tickers", []) != list(tickers):
@@ -549,7 +446,7 @@ if not tickers:
     </div>
     <div class="onboarding-tip onboarding-tip-purple">
       <div class="onboarding-tip-label"><span class="onboarding-tip-badge">3</span>Aprofunde</div>
-      <div class="onboarding-tip-copy">Use o Portfolio e o Screener; consulte preços-alvo e consenso nesta página.</div>
+      <div class="onboarding-tip-copy">Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</div>
     </div>
   </div>
 </div>
@@ -1002,6 +899,8 @@ if ready_to_analyze:
             )
             apply_plotly_theme(fig_comp)
             st.plotly_chart(fig_comp, use_container_width=True)
+
+        _render_market_target_panel(tickers)
 
         # ── Síntese do Analista ──────────────────────────────────────────────
         st.markdown("---")
