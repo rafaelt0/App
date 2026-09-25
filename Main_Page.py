@@ -513,16 +513,14 @@ if ready_to_analyze:
         df_sector = df[["Empresa", "Setor", "Subsetor"]]
 
         if len(tickers) > 1:
-            tabs_sector = st.tabs(tickers)
-            for tab, ticker in zip(tabs_sector, tickers):
-                with tab:
-                    if ticker in df_sector.index:
-                        row_s = df_sector.loc[ticker]
-                        if isinstance(row_s, pd.DataFrame):
-                            row_s = row_s.iloc[-1]
-                        render_sector_cards(ticker, row_s)
-                    else:
-                        st.warning(f"Sem dados de setor para {ticker}")
+            df_sector_rows = df_sector[
+                ~df_sector.index.duplicated(keep="last")
+            ].reindex(tickers)
+            st.dataframe(
+                df_sector_rows.rename_axis("Ticker").reset_index(),
+                hide_index=True,
+                use_container_width=True,
+            )
         else:
             ticker = tickers[0]
             if ticker in df_sector.index:
@@ -565,16 +563,14 @@ if ready_to_analyze:
             df_price[col] = clean_numeric_column(df_price[col]).fillna(0)
 
         if len(tickers) > 1:
-            tabs_price = st.tabs(tickers)
-            for tab, ticker in zip(tabs_price, tickers):
-                with tab:
-                    if ticker in df_price.index:
-                        row_p = df_price.loc[ticker]
-                        if isinstance(row_p, pd.DataFrame):
-                            row_p = row_p.iloc[-1]
-                        render_price_cards(ticker, row_p)
-                    else:
-                        st.warning(f"Sem dados de mercado para {ticker}")
+            df_price_rows = df_price[
+                ~df_price.index.duplicated(keep="last")
+            ].reindex(tickers)
+            st.dataframe(
+                df_price_rows.rename_axis("Ticker").reset_index(),
+                hide_index=True,
+                use_container_width=True,
+            )
         else:
             ticker = tickers[0]
             if ticker in df_price.index:
@@ -640,16 +636,17 @@ if ready_to_analyze:
         # Remove duplicate indices if any
         df_ind = df_ind[~df_ind.index.duplicated(keep="last")]
 
-        # Exibição dos cards
+        # Exibe todos os ativos selecionados juntos para facilitar a comparação.
         if len(tickers) > 1:
-            tabs_tickers = st.tabs(tickers)
-            for idx, ticker in enumerate(tickers):
-                with tabs_tickers[idx]:
+            favorite_columns = st.columns(min(4, len(tickers)))
+            for index, ticker in enumerate(tickers):
+                with favorite_columns[index % len(favorite_columns)]:
                     render_star_button(ticker, _uid)
-                    if ticker in df_ind.index:
-                        render_ticker_cards(
-                            df_ind.loc[ticker], setor=get_ticker_setor(df, ticker)
-                        )
+            st.dataframe(
+                df_ind.reindex(tickers).rename_axis("Ticker").reset_index(),
+                hide_index=True,
+                use_container_width=True,
+            )
         else:
             ticker = tickers[0]
             render_star_button(ticker, _uid)
@@ -664,24 +661,16 @@ if ready_to_analyze:
             "Dívida/PL acima de 3x e Liquidez abaixo de 1x são sinais de alerta."
         )
 
-        if len(tickers) > 1:
-            tabs_debt = st.tabs(tickers)
-            for tab, ticker in zip(tabs_debt, tickers):
-                with tab:
-                    if ticker in df.index:
-                        row_debt = df.loc[ticker]
-                        if isinstance(row_debt, pd.DataFrame):
-                            row_debt = row_debt.iloc[-1]
-                        render_debt_panel(ticker, row_debt)
-                    else:
-                        st.warning(f"Sem dados para {ticker}")
-        else:
-            ticker = tickers[0]
+        for ticker in tickers:
             if ticker in df.index:
                 row_debt = df.loc[ticker]
                 if isinstance(row_debt, pd.DataFrame):
                     row_debt = row_debt.iloc[-1]
+                if len(tickers) > 1:
+                    st.markdown(f"**{ticker}**")
                 render_debt_panel(ticker, row_debt)
+            else:
+                st.warning(f"Sem dados para {ticker}")
 
         # ── Comparação Visual de Múltiplos ───────────────────────────────────
         if len(tickers) > 1:
