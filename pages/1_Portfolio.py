@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 import plotly.express as px
 import plotly.graph_objects as go
 from pypfopt.hierarchical_portfolio import HRPOpt
-from pypfopt import expected_returns, risk_models, objective_functions
+from pypfopt import objective_functions
 from pypfopt.efficient_frontier import EfficientFrontier
 from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
@@ -28,7 +28,7 @@ from utils.ui import (
     render_page_header,
     section_header,
 )
-from utils.market_data import get_listed_stocks, get_sorted_tickers_by_liquidity
+from utils.market_data import get_listed_stocks
 from utils.icons import (
     ICO_BOX,
     ICO_CAPM,
@@ -58,6 +58,7 @@ from utils.portfolio_data import (
     get_benchmark_prices,
     get_portfolio_prices,
     get_selic_rate,
+    estimate_markowitz_inputs,
 )
 from utils.portfolio_charts import (
     apply_matplotlib_theme,
@@ -168,7 +169,6 @@ except (OSError, ValueError) as exc:
     st.stop()
 
 stocks = list(data["Ticker"].values)
-stocks = get_sorted_tickers_by_liquidity(stocks)
 
 _uid = get_browser_uid()
 _saved_tickers, _saved_weights = _db.portfolio_get(_uid)
@@ -290,7 +290,7 @@ valor_inicial = st.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
 modo = st.radio(
     "Modo de alocação",
     (
-        "Otimização de Markowitz (Média-Variância / Sharpe Máximo)",
+        "Otimização de Markowitz (Média-Variância)",
         "Otimização Hierarchical Risk Parity (Machine Learning)",
         "Alocação Manual",
     ),
@@ -418,10 +418,17 @@ if "Markowitz" in modo:
     )
     st.markdown("---")
 
-# Pré-carrega cotações (resultado cacheado após primeira execução).
-# Usa um spinner discreto (não a animação cheia) para não disparar a
-# animação de carregamento só por selecionar um ativo — essa fica
-# reservada para o clique em "Carregar Portfolio".
+# Keep the analysis visible across widget reruns, but fetch only after loading.
+if st.button("Carregar portfólio", type="primary", use_container_width=True):
+    st.session_state["portfolio_loaded"] = True
+    st.session_state["portfolio_loaded_tickers"] = list(tickers)
+
+_loaded_tickers = st.session_state.get("portfolio_loaded_tickers", [])
+if st.session_state.get("portfolio_loaded") and _loaded_tickers != list(tickers):
+    st.info("A seleção mudou. Clique em **Carregar portfólio** para atualizar a análise.")
+if not st.session_state.get("portfolio_loaded") or _loaded_tickers != list(tickers):
+    st.stop()
+
 _price_status = st.empty()
 _price_status.markdown(
     '<div class="discreet-status">Baixando cotações históricas…</div>',
@@ -466,11 +473,13 @@ if len(returns) < MIN_RETURN_ROWS:
     # data) can collapse `returns` to near-empty even when most tickers
     # have plenty of data. Surface which ones before optimizers choke on it.
     first_valid = data_yf.apply(lambda col: col.first_valid_index())
-    short_history = first_valid.sort_values(ascending=False).head(5)
+    short_history = first_valid.dropna().sort_values(ascending=False).head(5)
     culprits = ", ".join(
-        f"{col.replace('.SA', '')} (dados desde {date.strftime('%d/%m/%Y')})"
-        for col, date in short_history.items()
-        if pd.notna(date)
+        [f"{col.replace('.SA', '')} (sem cotações)" for col in first_valid[first_valid.isna()].index]
+        + [
+            f"{col.replace('.SA', '')} (dados desde {date.strftime('%d/%m/%Y')})"
+            for col, date in short_history.items()
+        ]
     )
     st.error(
         f"Histórico de cotações em comum insuficiente entre os ativos selecionados "
@@ -483,19 +492,6 @@ if len(returns) < MIN_RETURN_ROWS:
     st.stop()
 
 page_container = st.empty()
-
-# Latch the "loaded" state in session_state. Without this, the whole analysis
-# lived inside `if st.button(...)`, which is only True on the click run — any
-# widget interaction below (e.g. the LAC "% em ativos de risco" slider) reruns
-# the script, the button reads False, and the entire block (slider included)
-# disappears. Persisting the flag keeps the analysis rendered across reruns.
-if st.button("Carregar portfólio", type="primary", use_container_width=True):
-    st.session_state["portfolio_loaded"] = True
-    st.session_state["portfolio_loaded_tickers"] = list(tickers)
-
-_loaded_tickers = st.session_state.get("portfolio_loaded_tickers", [])
-if st.session_state.get("portfolio_loaded") and _loaded_tickers != list(tickers):
-    st.info("A seleção mudou. Clique em **Carregar portfólio** para atualizar a análise.")
 
 if (
     st.session_state.get("portfolio_loaded")
@@ -532,12 +528,12 @@ if (
             ].values
         else:
             st.subheader("Otimização de Markowitz (Média-Variância)")
-            mu = expected_returns.mean_historical_return(data_yf, frequency=252)
-            S = risk_models.sample_cov(data_yf, frequency=252)
+            mu, S = estimate_markowitz_inputs(returns)
             selic_anual = (1 + taxa_selic) ** 252 - 1
             try:
                 ef = EfficientFrontier(mu, S)
                 raw_weights = ef.max_sharpe(risk_free_rate=selic_anual)
+                allocation_label = "Max Sharpe (Markowitz)"
                 if gamma_l2 > 0:
                     # L2_reg does not compose with max_sharpe (it internally
                     # transforms the problem, so the penalty is ignored). To
@@ -555,9 +551,11 @@ if (
                         # With effectively identical expected returns there is
                         # no meaningful target-return frontier to solve.
                         raw_weights = ef.min_volatility()
+                        allocation_label = "Mínima Volatilidade"
                     else:
                         ef.add_objective(objective_functions.L2_reg, gamma=gamma_l2)
                         raw_weights = ef.efficient_return(target_return=target_return)
+                        allocation_label = "Retorno-alvo com L2"
                 cleaned_weights = ef.clean_weights()
             except Exception as e:
                 logger.exception("max_sharpe optimization failed")
@@ -568,6 +566,7 @@ if (
                 if gamma_l2 > 0:
                     ef.add_objective(objective_functions.L2_reg, gamma=gamma_l2)
                 raw_weights = ef.min_volatility()
+                allocation_label = "Mínima Volatilidade"
                 cleaned_weights = ef.clean_weights()
             peso_manual_df = pd.DataFrame.from_dict(
                 cleaned_weights, orient="index", columns=["Peso"]
@@ -613,6 +612,10 @@ if (
 
         # ── Sugestão de Compra de Cotas (Alocação Discreta) ───────────────────
         st.subheader("Sugestão de Compra de Cotas")
+        st.caption(
+            f"Preços históricos até {data_yf.index.max():%d/%m/%Y}; "
+            "confira a cotação atual antes de comprar."
+        )
         st.markdown(
             f"Estimativa de cotas a comprar considerando o valor total de **R$ {valor_inicial:,.2f}**."
         )
@@ -739,32 +742,32 @@ if (
             with loading_overlay("Gerando fronteira eficiente e simulando portfólios…"):
                 selic_anual = (1 + taxa_selic) ** 252 - 1
                 fig_frontier = plot_efficient_frontier_and_random_portfolios(
-                    mu, S, cleaned_weights, selic_anual
+                    mu, S, cleaned_weights, selic_anual, allocation_label
                 )
                 st.plotly_chart(fig_frontier, use_container_width=True)
 
-            # Calcula parâmetros da carteira tangente
+            # Calcula parâmetros da carteira selecionada
             _opt_w = np.array(list(cleaned_weights.values()))
-            _et = float(np.sum(_opt_w * mu))  # E[R] tangente
-            _st = float(np.sqrt(np.dot(_opt_w.T, np.dot(S, _opt_w))))  # σ tangente
+            _et = float(np.sum(_opt_w * mu))
+            _st = float(np.sqrt(np.dot(_opt_w.T, np.dot(S, _opt_w))))
             _sharpe_t = (_et - selic_anual) / _st if _st > 0 else 0
 
-            st.markdown("**Simulador da LAC — quanto você aloca em ativos de risco?**")
+            st.markdown("**Linha de alocação — quanto você aloca em ativos de risco?**")
             st.caption(
                 "Mova o slider para ver como o retorno esperado e o risco do seu portfólio mudam "
-                "ao longo da Linha de Alocação de Capital. "
-                "O Sharpe permanece constante — essa é a essência do Teorema da Separação."
+                f"ao longo da linha entre Selic e {allocation_label}. "
+                "O Sharpe dessa combinação permanece constante para alocações positivas."
             )
 
             _w = (
                 st.number_input(
-                    "% em ativos de risco (Carteira Tangente)",
+                    f"% em ativos de risco ({allocation_label})",
                     min_value=0,
                     max_value=150,
                     value=100,
                     step=5,
                     format="%d",
-                    help="0% = 100% na Selic (sem risco). 100% = Carteira Tangente pura. >100% = alavancagem.",
+                    help=f"0% = 100% na Selic (sem risco). 100% = {allocation_label}. >100% = alavancagem.",
                 )
                 / 100.0
             )
@@ -776,9 +779,9 @@ if (
             _perfil = (
                 "🏦 Conservador — grande parte em Rf (Selic)"
                 if _w < 0.4
-                else "⚖️ Moderado — equilíbrio entre Rf e Carteira Tangente"
+                else "⚖️ Moderado — equilíbrio entre Rf e ativos de risco"
                 if _w < 0.8
-                else "🚀 Arrojado — próximo ou na Carteira Tangente"
+                else "🚀 Arrojado — próximo ou na carteira selecionada"
                 if _w <= 1.0
                 else "⚡ Alavancado — tomou emprestado ao Rf para investir mais"
             )
@@ -794,9 +797,9 @@ if (
             tc4.metric(
                 "Sharpe do Portfólio",
                 f"{_shp:.3f}",
-                delta=f"= Sharpe tangente ({_sharpe_t:.3f})",
+                delta=f"= Sharpe da carteira selecionada ({_sharpe_t:.3f})",
                 delta_color="off",
-                help="O Sharpe é CONSTANTE em toda a LAC — essa é a prova do Teorema da Separação.",
+                help="O Sharpe é constante para combinações positivas da Selic e da carteira selecionada.",
             )
 
             st.markdown(
@@ -805,8 +808,8 @@ if (
 border-radius:0 8px 8px 0;padding:0.6rem 1rem;font-size:0.78rem;color:#cbd5e1;margin-top:0.3rem">
 <b style="color:#f59e0b">Perfil:</b> {_perfil}<br>
 <span style="color:#64748b;font-size:0.68rem">
-Sharpe constante = {_sharpe_t:.3f} ao longo de toda a LAC.
-Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente = {_st * 100:.2f}%
+Sharpe da carteira selecionada = {_sharpe_t:.3f} (alocação positiva).
+Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selecionado = {_st * 100:.2f}%
 </span>
 </div>
 """,
@@ -822,6 +825,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         # O benchmark é complementar: se o IBOVESPA falhar, preserve a análise
         # do portfólio e sinalize que o gráfico está sem comparação.
         retorno_bench = None
+        bench = None
         try:
             bench = get_benchmark_prices(data_inicio)
             portfolio_returns, retorno_bench = align_benchmark_returns(
@@ -878,6 +882,10 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         )
         apply_plotly_theme(fig)
         st.plotly_chart(fig, use_container_width=True)
+        st.caption(
+            "Simulação hipotética no período da amostra: pesos fixos rebalanceados diariamente, "
+            "não retorno realizado nem buy-and-hold das cotas sugeridas. Taxas e impostos excluídos."
+        )
         # Retornos mensais
         section_header(ICO_HEATMAP, "Tabela de Retornos Mensais do Portfólio", "h2")
         try:
@@ -1004,7 +1012,7 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         if not benchmark_available:
             st.info(
-                "Métricas relativas ao IBOVESPA, CAPM e stress test ficam "
+                "Métricas relativas ao IBOVESPA e CAPM ficam "
                 "indisponíveis enquanto a série do benchmark não responder."
             )
             total_return = (portfolio_value.iloc[-1] / valor_inicial - 1) * 100
@@ -1034,17 +1042,34 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             _fallback_metrics[2].metric("Índice Sharpe", f"{sharpe_val:.2f}")
             _fallback_metrics[3].metric("Índice Sortino", f"{sortino_val:.2f}")
             _fallback_metrics[4].metric("Max Drawdown", f"{max_dd:.2f}%")
-            st.session_state["modo"] = modo
-            st.session_state["returns"] = returns
-            st.session_state["portfolio_analysis_tickers"] = list(tickers)
-            st.session_state["peso_manual_df"] = peso_manual_df
-            st.session_state["portfolio_returns"] = portfolio_returns
-            st.session_state["retorno_bench"] = None
-            st.session_state["lookback"] = lookback_opcao
-            st.session_state["total_return"] = total_return
+            st.session_state.update(
+                {
+                    "modo": modo,
+                    "returns": returns,
+                    "portfolio_analysis_tickers": list(tickers),
+                    "peso_manual_df": peso_manual_df,
+                    "pesos_manuais": pesos_por_ticker,
+                    "portfolio_returns": portfolio_returns,
+                    "retorno_bench": None,
+                    "lookback": lookback_opcao,
+                    "total_return": total_return,
+                    "vol_anual": vol_anual,
+                    "sharpe_val": sharpe_val,
+                    "sortino_val": sortino_val,
+                    "max_dd": max_dd,
+                }
+            )
+            for key in ("beta", "alfa_val", "r_quadrado", "information_ratio"):
+                st.session_state.pop(key, None)
             st.caption(
                 "Atualize as cotações quando o IBOVESPA estiver disponível para "
                 "reativar beta, alfa, CAPM e as comparações relativas."
+            )
+            next_step_card(
+                message="Portfólio configurado — projete trajetórias com Monte Carlo.",
+                accent="var(--brand-secondary)",
+                cta_label="Abrir Simulação",
+                cta_page="pages/2_Simulação.py",
             )
             st.stop()
 
@@ -1102,13 +1127,17 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         # Desempenho Resumido em Cards (st.metric)
         section_header(ICO_CHART, "Desempenho Resumido da Carteira", "h2")
+        st.caption(
+            "Retornos hipotéticos na amostra, pesos fixos rebalanceados diariamente; "
+            "taxas e impostos excluídos."
+        )
         col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
         col_m1.metric(
             "Retorno Total",
             f"{total_return:.2f}%",
             delta="Positivo" if total_return > 0 else "Negativo",
             delta_color="normal" if total_return > 0 else "inverse",
-            help="Retorno total do portfólio no período selecionado.",
+            help="Retorno hipotético na amostra, com pesos fixos rebalanceados diariamente; não é o retorno das cotas compradas.",
         )
         col_m2.metric(
             "Volatilidade Anual",
@@ -1461,26 +1490,6 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 "🟢 Acima da SML = Alpha positivo (gerou valor além do risco assumido)  ·  🔴 Abaixo = Alpha negativo"
             )
 
-            # Decomposição de risco
-            st.markdown("##### Decomposição de Risco: Sistemático vs Não-Sistemático")
-            st.caption(
-                "R² = risco sistemático (mercado) / risco total.  1 − R² = risco idiossincrático (diversificável)."
-            )
-            risco_cols = st.columns(len(capm_rows))
-            for i, row in enumerate(capm_rows):
-                with risco_cols[i]:
-                    r2_val = row["R² (Risco Sist.)"]
-                    st.markdown(
-                        f"""
-<div style="text-align:center;padding:0.6rem;border:1px solid #1e293b;border-radius:10px">
-  <div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:0.4rem">{escape(str(row["Ativo"]))}</div>
-  <div style="font-size:1.1rem;font-weight:700;color:#a855f7">{r2_val:.0f}%</div>
-  <div style="font-size:0.6rem;color:#64748b">sistemático</div>
-  <div style="font-size:0.9rem;color:#334155">{100 - r2_val:.0f}%</div>
-  <div style="font-size:0.6rem;color:#64748b">idiossincrático</div>
-</div>""",
-                        unsafe_allow_html=True,
-                    )
         else:
             st.info("Dados insuficientes para calcular CAPM individual por ativo.")
 
@@ -1488,8 +1497,8 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         st.markdown("---")
         section_header(ICO_STRESS, "Stress Test — Crises Históricas", "h2")
         st.caption(
-            "Desempenho hipotético com os pesos atuais, durante crises históricas. "
-            "O histórico das crises é independente do lookback da otimização."
+            "Desempenho hipotético com pesos atuais rebalanceados diariamente, sem taxas ou impostos. "
+            "Por padrão usa o lookback selecionado; histórico longo é opcional."
         )
 
         CRISES_HISTORICAS = {
@@ -1504,24 +1513,32 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         ).date()
 
         stress_prices = data_yf
-        try:
-            stress_prices = get_portfolio_prices(tickers_yf, stress_start)
-            if isinstance(stress_prices.columns, pd.MultiIndex):
-                stress_prices.columns = [
-                    "_".join(map(str, col)).strip() for col in stress_prices.columns
-                ]
-            stress_prices = stress_prices.reindex(columns=data_yf.columns)
-        except Exception as _stress_err:
-            logger.warning("Historical stress prices unavailable: %s", _stress_err)
-            st.warning("Não foi possível carregar o histórico longo para o stress test.")
-
-        try:
-            stress_benchmark = get_benchmark_prices(stress_start)
-        except Exception as _stress_bench_err:
-            logger.warning(
-                "Historical stress benchmark unavailable: %s", _stress_bench_err
-            )
-            stress_benchmark = None
+        stress_benchmark = bench
+        if st.checkbox(
+            f"Carregar histórico longo para crises (desde {stress_start.year})", value=False
+        ):
+            try:
+                stress_prices = get_portfolio_prices(tickers_yf, stress_start)
+                if isinstance(stress_prices.columns, pd.MultiIndex):
+                    stress_prices.columns = [
+                        "_".join(map(str, col)).strip() for col in stress_prices.columns
+                    ]
+                stress_prices = stress_prices.reindex(columns=data_yf.columns)
+            except Exception as _stress_err:
+                logger.warning("Historical stress prices unavailable: %s", _stress_err)
+                st.warning(
+                    "Não foi possível carregar o histórico longo para o stress test."
+                )
+                stress_prices = data_yf
+            try:
+                stress_benchmark = get_benchmark_prices(stress_start)
+            except Exception as _stress_bench_err:
+                logger.warning(
+                    "Historical stress benchmark unavailable: %s", _stress_bench_err
+                )
+                st.warning(
+                    "IBOV histórico indisponível; comparação limitada ao lookback selecionado."
+                )
 
         stress_results = calculate_historical_stress(
             stress_prices, stress_benchmark, pesos_por_ticker, CRISES_HISTORICAS
@@ -1529,8 +1546,8 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
 
         if not stress_results:
             st.info(
-                "Não há crises com pelo menos 5 pregões completos para todos os ativos. "
-                "Ativos com histórico recente podem não cobrir esses períodos."
+                "Não há pelo menos 5 pregões completos nas crises para todos os ativos "
+                "selecionados. Amplie o histórico acima para incluir crises mais antigas."
             )
         else:
             for r in stress_results:

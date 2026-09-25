@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 import yfinance as yf
 from bcb import sgs
+from pypfopt import expected_returns, risk_models
 
 logger = logging.getLogger(__name__)
 _YF_DOWNLOAD_ATTEMPTS = 3
@@ -82,6 +83,14 @@ def get_portfolio_prices(tickers_yf, start_date):
 def get_benchmark_prices(start_date):
     return _download_close("^BVSP", start_date).squeeze()
 
+def estimate_markowitz_inputs(returns):
+    """Estimate both optimizer inputs from the same gap-free return rows."""
+    return (
+        expected_returns.mean_historical_return(returns, returns_data=True, frequency=252),
+        risk_models.sample_cov(returns, returns_data=True, frequency=252),
+    )
+
+
 def align_weights_to_columns(weights, columns):
     """Return weights in column order, failing when a required ticker is absent."""
     missing = [column for column in columns if column not in weights]
@@ -92,14 +101,14 @@ def align_weights_to_columns(weights, columns):
 
 
 def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, crises):
-    """Calculate fixed-weight crisis returns using complete daily observations."""
+    """Calculate fixed-weight portfolio returns for crises with enough shared data."""
     if portfolio_prices is None or portfolio_prices.empty:
         return []
 
     benchmark_returns = (
         benchmark_prices.pct_change(fill_method=None).dropna()
         if benchmark_prices is not None and not benchmark_prices.empty
-        else pd.Series(index=pd.DatetimeIndex([]), dtype=float)
+        else pd.Series(dtype=float, index=pd.DatetimeIndex([]))
     )
     results = []
     for name, (start, end) in crises.items():
@@ -144,7 +153,7 @@ def align_benchmark_returns(portfolio_returns, benchmark_prices):
     if benchmark_prices is None or benchmark_prices.empty:
         return portfolio_returns, None
 
-    benchmark_returns = benchmark_prices.pct_change().dropna()
+    benchmark_returns = benchmark_prices.pct_change(fill_method=None).dropna()
     common_idx = portfolio_returns.index.intersection(benchmark_returns.index)
     if len(common_idx) < 30:
         return portfolio_returns, None
