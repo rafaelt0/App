@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import math
-import re
-import unicodedata
+import datetime
 import urllib.request
 import urllib.parse
 from html import escape
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 from utils.charts import apply_plotly_theme
@@ -16,9 +17,15 @@ from utils.identity import get_browser_uid
 from utils.news import (
     NEWS_IMPORTANCE_LABELS,
     aggregate_ticker_sentiment,
+    analise_sentimento_pln,
     build_news_query,
+    merge_shared_articles,
     parse_rss_items,
     rank_news_importance,
+    recent_rss_sample,
+    extract_article_text,
+    sentiment_intensity as _intensidade_sentimento,
+    ticker_tone_rows,
 )
 
 from utils.ui import (
@@ -96,149 +103,70 @@ render_page_header(
 )
 
 
-# ─── ALGORITMO PLN DE SENTIMENTO (Lexicon-Based Fallback) ────────────────────────
-def analise_sentimento_pln(title, summary):
-    # Converte para minúsculas
-    text = (title + " " + summary).lower()
-    
-    # Normalização de acentos para robustez do matching
-    def remover_acentos(txt):
-        return "".join(c for c in unicodedata.normalize('NFD', txt) if unicodedata.category(c) != 'Mn')
-    
-    text_normalized = remover_acentos(text)
-    
-    # Lexicon Financeiro em Português
-    pos_words = [
-        'alta', 'lucro', 'lucros', 'recorde', 'recordes', 'crescimento', 'crescimentos', 'descoberta', 
-        'descobertas', 'acordo', 'acordos', 'aprova', 'aprovou', 'aprovado', 'aprovados', 'aprovacao', 
-        'expande', 'expandiu', 'expansao', 'liderança', 'lider', 'lidera', 'recuperacao', 'recuperou', 
-        'forte', 'fortes', 'positivo', 'positiva', 'positivos', 'ganho', 'ganhos', 'ganhou', 'compra', 
-        'compras', 'dividendos', 'dividendo', 'jcp', 'eficiencia', 'eficiente', 'modernizacao', 
-        'parceria', 'parcerias', 'valorizacao', 'valorizou', 'descarbonizacao', 'melhora', 'melhorou', 
-        'subiu', 'subiram', 'superou', 'superaram', 'estabilizou', 'estabilidade', 'confortavel'
-    ]
-    
-    neg_words = [
-        'queda', 'quedas', 'prejuizo', 'prejuizos', 'greve', 'greves', 'suspende', 'suspendeu', 
-        'inadimplencia', 'atraso', 'atrasos', 'pressao', 'pressoes', 'perda', 'perdas', 'reducao', 
-        'rebaixado', 'rebaixada', 'rebaixamento', 'concorrencia', 'fraca', 'fraco', 'sofre', 'sofreu', 
-        'paralisacao', 'divida', 'dividas', 'pessimista', 'crise', 'risco', 'riscos', 'cair', 'caiu', 
-        'recua', 'recuou', 'defasagem', 'alavancagem'
-    ]
-    
-    # Compostos Semânticos (Modificadores)
-    pos_compounds = [
-        'reduz divida', 'reduz dividas', 'reduz custo', 'reduz custos', 
-        'reduz inadimplencia', 'reducao de divida', 'reducao de dividas', 
-        'reducao de custos', 'reducao de custo', 'queda da inadimplencia',
-        'queda de inadimplencia', 'reduzindo divida', 'reduz alavancagem',
-        'reduzir divida', 'reducao de alavancagem', 'renegociacao de dividas'
-    ]
-    
-    neg_compounds = [
-        'aumento de custos', 'aumento de despesas', 'alta da inadimplencia', 
-        'aumento de divida', 'aumento de dividas', 'aumento da inadimplencia'
-    ]
-    
-    matched_pos = []
-    matched_neg = []
-    
-    # 1. Verifica compostos primeiro e limpa do texto para evitar contagem dupla
-    for comp in pos_compounds:
-        if comp in text_normalized:
-            matched_pos.append(comp)
-            text_normalized = text_normalized.replace(comp, "")
-            
-    for comp in neg_compounds:
-        if comp in text_normalized:
-            matched_neg.append(comp)
-            text_normalized = text_normalized.replace(comp, "")
-            
-    # 2. Tokenização simples com regex
-    words = re.findall(r'\b\w+\b', text_normalized)
-    for w in words:
-        if w in pos_words:
-            matched_pos.append(w)
-        elif w in neg_words:
-            matched_neg.append(w)
-            
-    # 3. Cálculo matemático do score
-    num_pos = len(matched_pos)
-    num_neg = len(matched_neg)
-    
-    if num_pos + num_neg > 0:
-        score = (num_pos - num_neg) / (num_pos + num_neg)
-    else:
-        score = 0.0
-        
-    # Classificação por limiar
-    if score >= 0.20:
-        sentiment = "Otimista"
-    elif score <= -0.20:
-        sentiment = "Pessimista"
-    else:
-        sentiment = "Neutro"
-        
-    return {
-        "sentiment": sentiment,
-        "score": round(score, 2),
-        "pos_terms": matched_pos,
-        "neg_terms": matched_neg,
-        "raw_text_length": len(words)
-    }
-
-_INTENSITY_LEVELS = ("Alto", "Médio-Alto", "Médio", "Baixo-Médio", "Baixo")
-
-
-def _intensidade_sentimento(score):
-    try:
-        intensity = abs(float(score))
-    except (TypeError, ValueError):
-        return "Baixo"
-    if intensity >= 0.8:
-        return "Alto"
-    if intensity >= 0.6:
-        return "Médio-Alto"
-    if intensity >= 0.3:
-        return "Médio"
-    if intensity >= 0.1:
-        return "Baixo-Médio"
-    return "Baixo"
+# Lexicon fallback and RSS parsing/aggregation live in utils.news.
+_INTENSITY_LEVELS = (
+    "Alto", "Médio-Alto", "Médio", "Baixo-Médio", "Baixo", "Evidência limitada"
+)
 
 # ─── REAL-TIME NEWS RSS FETCHING ──────────────────────────────────────────────
 NEWS_REQUEST_TIMEOUT_SECONDS = 8
 
 @st.cache_data(ttl=600, show_spinner=False)
-def get_brazilian_news(ticker_name):
+def _fetch_brazilian_news(ticker_name):
     query = build_news_query(ticker_name)
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419"
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+    with urllib.request.urlopen(req, timeout=NEWS_REQUEST_TIMEOUT_SECONDS) as response:
+        xml = response.read(2 * 1024 * 1024 + 1)
+        if len(xml) > 2 * 1024 * 1024:
+            raise ValueError("RSS excede 2 MB; feed indisponível, nenhum item pontuado")
+        return parse_rss_items(xml)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_brazilian_news(ticker_name):
     try:
-        with urllib.request.urlopen(req, timeout=NEWS_REQUEST_TIMEOUT_SECONDS) as response:
-            xml_data = response.read()
-        return {"ok": True, "items": parse_rss_items(xml_data)}
+        return {"ok": True, "items": _fetch_brazilian_news(ticker_name)}
     except Exception as exc:
         logger.warning("news RSS fetch/parse failed: %s", exc)
         logger.debug("news RSS failure details", exc_info=True)
         return {"ok": False, "items": []}
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_article_text(url):
+    try:
+        return extract_article_text(url)
+    except Exception:
+        logger.debug("Article extraction unavailable: %s", url, exc_info=True)
+        return ""
+
+
 # ─── DEEP LEARNING MODEL LOAD (FinBERT-PT-BR) ───────────────────────────────
 @st.cache_resource(show_spinner=False)
+def _load_finbert_pipeline_cached():
+    from transformers import AutoTokenizer, BertForSequenceClassification, pipeline
+
+    model_name = "lucas-leme/FinBERT-PT-BR"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = BertForSequenceClassification.from_pretrained(model_name)
+    return pipeline(
+        "text-classification",
+        model=model,
+        tokenizer=tokenizer,
+        top_k=None,
+        function_to_apply="sigmoid",
+    )
+
+
 def load_finbert_pipeline():
     try:
-        from transformers import AutoTokenizer, BertForSequenceClassification, pipeline
-        model_name = "lucas-leme/FinBERT-PT-BR"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = BertForSequenceClassification.from_pretrained(model_name)
-        nlp = pipeline("text-classification", model=model, tokenizer=tokenizer, top_k=None)
-        return nlp
+        return _load_finbert_pipeline_cached()
     except ModuleNotFoundError as exc:
         logger.info("FinBERT opcional indisponível; usando PLN léxico: %s", exc)
-        return None
     except Exception:
         logger.warning("FinBERT pipeline load failed", exc_info=True)
-        return None
+    return None
 
 
 
@@ -246,7 +174,7 @@ def analise_sentimento_finbert(title, summary, nlp):
     text = title
     if summary:
         text += " " + summary
-        
+    # The model accepts at most 512 tokens including special tokens.
     if nlp is None:
         # Fallback to the lexicon-based model
         res_pln = analise_sentimento_pln(title, summary)
@@ -263,11 +191,13 @@ def analise_sentimento_finbert(title, summary, nlp):
             "engine": "PLN Léxico (fallback)",
             "pos_terms": res_pln["pos_terms"],
             "neg_terms": res_pln["neg_terms"],
-            "raw_text_length": res_pln["raw_text_length"]
+            "raw_text_length": res_pln["raw_text_length"],
+            "evidence_count": res_pln["evidence_count"],
         }
         
     try:
-        # FinBERT prediction
+        # FinBERT prediction, bounded including special tokens.
+        text = nlp.tokenizer.decode(nlp.tokenizer.encode(text, add_special_tokens=False, truncation=True, max_length=510), skip_special_tokens=True)
         res = nlp([text])[0]
         # Map label scores
         score_dict = {item['label']: item['score'] for item in res}
@@ -302,7 +232,8 @@ def analise_sentimento_finbert(title, summary, nlp):
             "engine": "PLN Léxico (fallback)",
             "pos_terms": res_pln["pos_terms"],
             "neg_terms": res_pln["neg_terms"],
-            "raw_text_length": res_pln["raw_text_length"]
+            "raw_text_length": res_pln["raw_text_length"],
+            "evidence_count": res_pln["evidence_count"],
         }
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -409,75 +340,125 @@ if st.button(
     use_container_width=True,
     help="Limpa o cache de 10 minutos e busca novas notícias para os ativos da carteira.",
 ):
+    _fetch_brazilian_news.clear()
     get_brazilian_news.clear()
+    _cached_article_text.clear()
+    st.session_state.pop("_finbert_retry_after", None)
     st.session_state["noticias_page"] = 1
     st.session_state.pop("_noticias_filter_key", None)
     st.rerun()
 
-# O modelo pesado só é carregado quando há uma carteira válida para analisar.
-if "finbert_nlp" not in st.session_state:
-    with loading_overlay("Carregando modelo de IA (FinBERT-PT-BR)…"):
-        st.session_state["finbert_nlp"] = load_finbert_pipeline()
-finbert_nlp = st.session_state["finbert_nlp"]
-
-# Recupera ativos e pesos
+# Recupera ativos e pesos.
 peso_df = st.session_state["peso_manual_df"]
 tickers = [t.replace(".SA", "") for t in peso_df.index]
 pesos = {t.replace(".SA", ""): row.iloc[0] for t, row in peso_df.iterrows()}
 
-# Informar o estado do algoritmo NLP na barra lateral
-if finbert_nlp is not None:
+# Fetch concurrently; executor.map keeps ticker ordering stable.
+feed_status = {}
+fetched_items = []
+with loading_overlay("Buscando feeds de notícias…", tickers=tickers):
+    with ThreadPoolExecutor(max_workers=min(8, len(tickers))) as executor:
+        for ticker, result in zip(tickers, executor.map(get_brazilian_news, tickers)):
+            feed_status[ticker] = result["ok"]
+            now = datetime.datetime.now(datetime.timezone.utc)
+            fetched_items.extend(
+                {**item, "ticker": ticker} for item in recent_rss_sample(result["items"], now)
+            )
+
+# Merge before extraction and classification; cached RSS may outlive the rolling cutoff.
+fetched_articles = merge_shared_articles(fetched_items)
+
+# Load FinBERT only when there is text to classify. Retry failed loads after five
+# minutes, or immediately after an explicit refresh. The versioned session key
+# avoids reusing pipelines created before the sigmoid correction.
+_nlp_state_key = "finbert_nlp_sigmoid_v1"
+if fetched_items and (
+    _nlp_state_key not in st.session_state
+    or (
+        st.session_state[_nlp_state_key] is None
+        and time.time() >= st.session_state.get("_finbert_retry_after", 0)
+    )
+):
+    with loading_overlay("Carregando modelo de IA (FinBERT-PT-BR)…"):
+        st.session_state[_nlp_state_key] = load_finbert_pipeline()
+    if st.session_state[_nlp_state_key] is None:
+        st.session_state["_finbert_retry_after"] = time.time() + 300
+    else:
+        st.session_state.pop("_finbert_retry_after", None)
+finbert_nlp = st.session_state.get(_nlp_state_key)
+
+if fetched_items and finbert_nlp is not None:
     st.sidebar.markdown(
         f'<div style="margin:0.5rem 0;padding:0.6rem 0.85rem;background:rgba(0,255,135,0.06);'
         f'border:1px solid rgba(0,255,135,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">'
-        f'{ICO_CPU}<span style="font-size:0.82rem;color:#b0ffe0;font-weight:600">FinBERT-PT-BR Ativo</span></div>',
+        f'{ICO_CPU}<span style="font-size:0.82rem;color:#b0ffe0;font-weight:600">FinBERT-PT-BR disponível</span></div>',
         unsafe_allow_html=True,
     )
 else:
     st.sidebar.markdown(
         f'<div style="margin:0.5rem 0;padding:0.6rem 0.85rem;background:rgba(0,210,255,0.06);'
         f'border:1px solid rgba(0,210,255,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">'
-        f'{ICO_LEXICON}<span style="font-size:0.82rem;color:#b8eeff;font-weight:600">PLN Léxico Ativo (Fallback)</span></div>',
+        f'{ICO_LEXICON}<span style="font-size:0.82rem;color:#b8eeff;font-weight:600">{"PLN Léxico (fallback)" if fetched_items else "Sem notícias classificadas"}</span></div>',
         unsafe_allow_html=True,
     )
 
-# Build the feed exclusively from recent, parseable RSS entries.
-news_items = []
-feed_status = {}
-with loading_overlay("Buscando notícias e processando sentimento NLP…", tickers=tickers):
-    for t in tickers:
-        result = get_brazilian_news(t)
-        feed_status[t] = result["ok"]
-        for item in result["items"]:
+classified_items = []
+if fetched_items:
+    with loading_overlay("Classificando notícias…", tickers=tickers):
+        with ThreadPoolExecutor(max_workers=min(4, len(fetched_articles))) as executor:
+            article_texts = list(executor.map(_cached_article_text, (item["link"] for item in fetched_articles)))
+        for item, article_text in zip(fetched_articles, article_texts):
             sentiment_res = _cached_sentiment(
-                item["title"], item.get("summary", ""),
-                "lucas-leme/FinBERT-PT-BR:v1" if finbert_nlp is not None else "lexicon:v1",
+                item["title"], article_text or item.get("summary", ""),
+                "lucas-leme/FinBERT-PT-BR:sigmoid-v1" if finbert_nlp is not None else "lexicon:v3",
                 finbert_nlp,
             )
-            news_items.append({
-                "ticker": t, "title": item["title"],
+            is_finbert = sentiment_res.get("is_finbert", False)
+            evidence_count = sentiment_res.get("evidence_count")
+            classified_items.append({
+                "ticker": item["ticker"],
+                "tickers": item["tickers"],
+                "title": item["title"],
                 "importance_rank": rank_news_importance(item["title"], item.get("summary", "")),
-                "summary": item["summary"] or "Clique no link do título para ler os detalhes da notícia na fonte oficial.",
-                "sentiment": sentiment_res["sentiment"], "score": sentiment_res["score"],
-                "scores": sentiment_res.get("scores", []), "is_finbert": sentiment_res.get("is_finbert", False),
-                "engine": sentiment_res["engine"], "pos_terms": sentiment_res.get("pos_terms", []),
-                "neg_terms": sentiment_res.get("neg_terms", []), "raw_text_length": sentiment_res.get("raw_text_length", 0),
-                "provider": item["provider"], "intensity": _intensidade_sentimento(sentiment_res["score"]),
-                "pub_time": item["date"], "published": item["published"], "link": item["link"], "peso": pesos[t],
+                "summary": item["summary"] or article_text[:600],
+                "text_source": "Texto do artigo" if article_text else "Título + descrição RSS" if item["summary"] else "Somente título (RSS)",
+                "sentiment": sentiment_res["sentiment"],
+                "score": sentiment_res["score"],
+                "scores": sentiment_res.get("scores", []),
+                "is_finbert": is_finbert,
+                "engine": sentiment_res["engine"],
+                "pos_terms": sentiment_res.get("pos_terms", []),
+                "neg_terms": sentiment_res.get("neg_terms", []),
+                "raw_text_length": sentiment_res.get("raw_text_length", 0),
+                "evidence_count": evidence_count,
+                "provider": item["provider"],
+                "intensity": _intensidade_sentimento(
+                    sentiment_res["score"], None if is_finbert else evidence_count
+                ),
+                "pub_time": item["date"],
+                "published": item["published"],
+                "link": item["link"],
+                "peso": pesos[item["ticker"]],
             })
+
 for ticker, succeeded in feed_status.items():
     if not succeeded:
         st.warning(f"Feed de notícias indisponível para {ticker}; nenhum item foi usado na análise.")
-    elif not any(item["ticker"] == ticker for item in news_items):
+    elif not any(item["ticker"] == ticker for item in fetched_items):
         st.info(f"Nenhuma notícia recente (últimos 7 dias) encontrada para {ticker}.")
 
-live_news_items = news_items
-
-# Cálculos de sentimentos consolidados baseados nas métricas dinâmicas do NLP
+# One card per article; expand to per-ticker observations before weighting.
+live_news_items = classified_items
+ticker_news_items = [
+    {"ticker": ticker, "score": item["score"]}
+    for item in live_news_items
+    for ticker in item["tickers"]
+]
 pos_count = sum(item["sentiment"] == "Otimista" for item in live_news_items)
 neg_count = sum(item["sentiment"] == "Pessimista" for item in live_news_items)
 neu_count = sum(item["sentiment"] == "Neutro" for item in live_news_items)
-avg_score, news_coverage = aggregate_ticker_sentiment(live_news_items, pesos)
+avg_score, news_coverage = aggregate_ticker_sentiment(ticker_news_items, pesos)
+tone_rows = ticker_tone_rows(live_news_items, tickers, pesos, feed_status)
 
 # Normaliza score global de -1 a +1 para 0 a 100
 if news_coverage > 0:
@@ -489,9 +470,9 @@ if news_coverage > 0:
         if normalized_score >= 60
         else "NEUTRO / EQUILIBRADO"
         if normalized_score >= 40
-        else "PREOCUPANTE"
+        else "PESSIMISTA"
         if normalized_score >= 20
-        else "CRÍTICO"
+        else "FORTEMENTE PESSIMISTA"
     )
     score_color = (
         "#00ff87"
@@ -513,7 +494,8 @@ col_g1, col_g2 = st.columns([1, 2])
 
 with col_g1:
     # Card do Score de Sentimento
-    nlp_engine_label = "FinBERT-PT-BR" if finbert_nlp is not None else "PLN Léxico"
+    engines = {item["engine"] for item in classified_items}
+    nlp_engine_label = " / ".join(sorted(engines)) if engines else "sem classificação"
     st.markdown(f"""
     <div style="background: linear-gradient(135deg, #0e1b2f, #080c14); 
                 border: 2px solid {score_color}; 
@@ -522,13 +504,14 @@ with col_g1:
                 text-align: center; 
                 box-shadow: 0 0 20px {score_color}1a;
                 margin-bottom: 1.5rem;">
-        <div style="font-size: 0.75rem; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase;">Sentimento das notícias disponíveis ({nlp_engine_label})</div>
+        <div style="font-size: 0.75rem; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase;">Tom da amostra disponível ({nlp_engine_label})</div>
         <div style="font-size: 3.5rem; font-weight: 900; color: {score_color}; font-family: 'JetBrains Mono', monospace; margin: 0.5rem 0;">
             {score_display}<span style="font-size: 1.5rem; font-weight: 500; color: #94a3b8;">/100</span>
         </div>
         <div style="font-size: 0.85rem; font-weight: 700; color: {score_color}; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.8rem;">
             {sentiment_label}
         </div>
+        <div style="color:#94a3b8;font-size:0.75rem;margin-bottom:0.6rem">Cobertura: {news_coverage:.1%} do peso · escala 0–100 do tom, não retorno; ativos sem notícias excluídos</div>
         <div style="display: flex; justify-content: space-around; border-top: 1px solid #1e293b; padding-top: 0.8rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">
             <div>
                 <span style="color: #4ade80; font-weight: 700;">{pos_count}</span>
@@ -543,6 +526,7 @@ with col_g1:
                 <div style="color: #94a3b8; font-size: 0.65rem;">Negativas</div>
             </div>
         </div>
+        <div style="color:#94a3b8;font-size:0.7rem;margin-top:0.6rem">Artigos únicos, antes dos filtros do feed</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -550,7 +534,7 @@ with col_g2:
     # Gráfico de Distribuição do Sentimento por Ativo
     asset_sentiments = []
     for t in tickers:
-        t_items = [x for x in live_news_items if x["ticker"] == t]
+        t_items = [x for x in live_news_items if t in x["tickers"]]
         pos = sum(1 for x in t_items if x["sentiment"] == "Otimista")
         neu = sum(1 for x in t_items if x["sentiment"] == "Neutro")
         neg = sum(1 for x in t_items if x["sentiment"] == "Pessimista")
@@ -585,11 +569,11 @@ with col_g2:
     fig.update_layout(
         title=dict(text="Notícias por ativo", x=0, xanchor="left"),
         height=max(280, 190 + len(tickers) * 40),
-        margin=dict(l=48, r=12, t=46, b=96),
+        margin=dict(l=48, r=12, t=46, b=118),
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=-0.16,
+            y=-0.27,
             xanchor="left",
             x=0,
         ),
@@ -599,6 +583,8 @@ with col_g2:
         use_container_width=True,
         config={"displayModeBar": False, "displaylogo": False, "responsive": True},
     )
+    with st.expander("Tabela dos dados do gráfico (contagens por ativo)"):
+        st.dataframe(df_sent, hide_index=True, use_container_width=True)
 
 st.markdown("---")
 
@@ -608,16 +594,24 @@ st.markdown("---")
 # Filtro lateral/superior de notícias
 section_header(ICO_NEWS, "Feed de Notícias da Carteira", "h2")
 st.caption(
-    "O sentimento resume notícias por ativo e não prevê retorno. A importância é uma "
-    "triagem por palavras-chave do título, não uma análise de materialidade; os filtros afetam só o feed."
+    f"Analisamos até 10 notícias únicas mais recentes por ativo nos últimos 7 dias "
+    f"({len(live_news_items)} artigos únicos, {len(ticker_news_items)} observações artigo-ativo) antes dos filtros; "
+    f"feeds indisponíveis: {', '.join(t for t in tickers if not feed_status[t]) or 'nenhum'}. "
+    "A cobertura depende dos resultados retornados pelo Google News e dos feeds acessíveis. "
+    "Quando o texto da matéria não está acessível, usamos descrição RSS ou só o título. "
+    "O sentimento resume o tom textual e não prevê retorno; importância é triagem por palavras-chave, "
+    "não uma análise de materialidade. ‘Ver mais’ limita apenas cartões exibidos; filtros não alteram o score."
 )
 
 
-col_filter, col_sort, col_sentiment, col_intensity = st.columns([1, 1, 1, 1])
+col_filter, col_sort = st.columns(2)
 with col_filter:
     selected_ticker = st.selectbox(
         "Filtrar por ativo",
-        ["Todos os Ativos"] + [f"{t} ({sum(1 for x in news_items if x['ticker']==t)} notícias)" for t in tickers],
+        ["Todos os Ativos"] + [
+            f"{t} ({sum(1 for x in live_news_items if t in x['tickers'])} notícias)"
+            for t in tickers
+        ],
     )
     # Normaliza a seleção (remove o sufixo de contagem)
     selected_ticker_clean = selected_ticker.split(" (")[0] if selected_ticker != "Todos os Ativos" else "Todos os Ativos"
@@ -626,20 +620,28 @@ with col_sort:
         "Ordenar por",
         ["Mais importantes", "Mais recentes", "Maior intensidade", "Mais otimistas", "Mais pessimistas"]
     )
+col_sentiment, col_intensity = st.columns(2)
 with col_sentiment:
     sentiment_filter = st.selectbox(
         "Filtrar por sentimento",
         ["Todos", "Otimistas", "Neutras", "Pessimistas"],
-        help="Mostra apenas notícias classificadas pelo PLN com o sentimento escolhido.",
+        help="Mostra apenas notícias classificadas pelo modelo disponível.",
     )
+with col_intensity:
     intensity_filter = st.selectbox(
         "Filtrar por intensidade do sentimento",
-        ["Todos", *_INTENSITY_LEVELS],
-        help="Faixas de intensidade baseadas apenas no score de sentimento; não representam materialidade financeira.",
+        ["Todos", *(_INTENSITY_LEVELS if any(not x["is_finbert"] for x in live_news_items) else _INTENSITY_LEVELS[:-1])],
+        help=(
+            "Faixas baseadas no score, não em materialidade financeira. "
+            "No PLN léxico, menos de dois termos indica evidência limitada."
+        ),
     )
 
-
-filtered_news = news_items if selected_ticker_clean == "Todos os Ativos" else [x for x in news_items if x["ticker"] == selected_ticker_clean]
+filtered_news = (
+    live_news_items
+    if selected_ticker_clean == "Todos os Ativos"
+    else [x for x in live_news_items if selected_ticker_clean in x["tickers"]]
+)
 if sentiment_filter != "Todos":
     _sentiment_value = {
         "Otimistas": "Otimista",
@@ -673,17 +675,11 @@ total_news = len(filtered_news)
 pos_f = sum(1 for x in filtered_news if x["sentiment"] == "Otimista")
 neg_f = sum(1 for x in filtered_news if x["sentiment"] == "Pessimista")
 neu_f = total_news - pos_f - neg_f
-st.caption(
-    f"Exibindo {total_news} notícias recentes · {pos_f} otimistas · "
-    f"{neu_f} neutras · {neg_f} pessimistas"
-)
-st.metric("Cobertura de notícias da carteira", f"{news_coverage:.1%}",
-          help="Soma do peso dos ativos com pelo menos uma notícia recente; ativos sem notícias não são tratados como neutros.")
-
 if not filtered_news:
     st.info(
-        "Nenhuma notícia corresponde aos filtros atuais. "
-        "Tente outro filtro ou aguarde notícias recentes para os ativos selecionados."
+        "Nenhuma notícia corresponde aos filtros atuais." if live_news_items else
+        "Feeds indisponíveis; não foi possível verificar notícias recentes." if not any(feed_status.values()) else
+        "Nenhuma notícia recente encontrada nos feeds disponíveis."
     )
 
 
@@ -698,6 +694,10 @@ if "noticias_page" not in st.session_state:
 
 n_show = st.session_state["noticias_page"] * ITEMS_PER_PAGE
 news_to_show = filtered_news[:n_show]
+st.caption(
+    f"{len(news_to_show)} de {total_news} notícias após filtros · "
+    f"{pos_f} otimistas · {neu_f} neutras · {neg_f} pessimistas (totais após filtros)"
+)
 
 for news in news_to_show:
     badge_bg = "rgba(74, 222, 128, 0.1)" if news["sentiment"] == "Otimista" else \
@@ -705,19 +705,30 @@ for news in news_to_show:
     badge_color = "#4ade80" if news["sentiment"] == "Otimista" else \
                   "#f87171" if news["sentiment"] == "Pessimista" else "#60a5fa"
                   
-    intensity_color = "#4ade80" if news["intensity"] == "Baixo" else \
-                      "#ffd600" if "Médio" in news["intensity"] else "#ff3d5a"
+    intensity_color = (
+        "#94a3b8" if news["intensity"] == "Evidência limitada"
+        else "#4ade80" if news["intensity"] == "Baixo"
+        else "#ffd600" if "Médio" in news["intensity"]
+        else "#ff3d5a"
+    )
     importance_rank = news["importance_rank"]
     importance_color = {3: "#00d2ff", 2: "#ffd600", 1: "#94a3b8"}[importance_rank]
 
     # Escape external feed content before embedding it in custom HTML.
-    _news_ticker = escape(str(news["ticker"]))
+    _news_tickers = " ".join(
+        f'<span style="background:rgba(0, 210, 255, 0.1);color:var(--secondary-color);'
+        f'border:1px solid rgba(0, 210, 255, 0.25);border-radius:4px;padding:0.1rem 0.4rem;'
+        f'font-family:JetBrains Mono,monospace;font-size:0.72rem;font-weight:700">'
+        f'{escape(str(ticker))}</span>'
+        for ticker in news["tickers"]
+    )
     _news_provider = escape(str(news["provider"]))
     _news_pub_time = escape(str(news["pub_time"]))
     _news_sentiment = escape(str(news["sentiment"]).upper())
     _news_importance = escape(NEWS_IMPORTANCE_LABELS[importance_rank].upper())
     _news_intensity = escape(str(news["intensity"]).upper())
     _news_engine = escape(str(news["engine"]))
+    _news_source = escape(str(news["text_source"]))
     _news_title = escape(str(news["title"]))
     _news_summary = escape(str(news["summary"]))
     _raw_link = str(news.get("link", "")).strip()
@@ -733,6 +744,11 @@ for news in news_to_show:
         if _safe_link
         else _news_title
     )
+    summary_html = (
+        f'<p style="margin:0;color:var(--text-muted);font-size:0.85rem;line-height:1.5;margin-bottom:0.6rem">'
+        f'{_news_summary}</p>'
+        if _news_summary else ""
+    )
 
     # News Card Container
     st.markdown(f"""
@@ -744,11 +760,9 @@ for news in news_to_show:
                 box-shadow: var(--shadow-dark);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <span style="background: rgba(0, 210, 255, 0.1); color: var(--secondary-color); border: 1px solid rgba(0, 210, 255, 0.25); border-radius: 4px; padding: 0.1rem 0.4rem; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;">
-                    {_news_ticker}
-                </span>
+                {_news_tickers}
                 <span style="color: var(--text-muted); font-size: 0.72rem; font-family: 'JetBrains Mono', monospace;">
-                    {_news_provider} • {_news_pub_time} • {_news_engine}
+                    {_news_provider} • {_news_pub_time} • {_news_engine} • Analisado: {_news_source}
                 </span>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -763,12 +777,10 @@ for news in news_to_show:
                 </span>
             </div>
         </div>
-        <h4 style="margin: 0.3rem 0 0.5rem 0 !important; font-size: 1rem !important; font-weight: 600; line-height: 1.4; color: var(--text-main);">
+        <h3 style="margin: 0.3rem 0 0.5rem 0 !important; font-size: 1rem !important; font-weight: 600; line-height: 1.4; color: var(--text-main);">
             {title_html}
-        </h4>
-        <p style="margin: 0; color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 0.6rem;">
-            {_news_summary}
-        </p>
+        </h3>
+        {summary_html}
     </div>
     """, unsafe_allow_html=True)
     
@@ -784,7 +796,7 @@ for news in news_to_show:
             st.markdown(f"""
             <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #1e293b; border-radius: 12px; padding: 1rem; margin-top: 0.2rem;">
                 <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; margin-bottom: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase;">
-                    Distribuição de Probabilidade — FinBERT-PT-BR (LLM)
+                    Scores independentes (sigmoid) — FinBERT-PT-BR
                 </div>
                 
                 <div style="margin-bottom: 0.6rem;">
@@ -817,7 +829,7 @@ for news in news_to_show:
                     </div>
                 </div>
                 <p style="font-size:0.7rem; color:#64748b; margin-top:8px; margin-bottom:0;">
-                    Classificação baseada em modelo de linguagem BERT pré-treinado em finanças. Tamanho do texto: {news['raw_text_length']} palavras.
+                    Score = POSITIVE − NEGATIVE; ≥ 0,20 otimista, ≤ −0,20 pessimista, demais neutro. Scores não somam 100%. Tamanho do texto: {news['raw_text_length']} palavras.
                 </p>
             </div>
             """, unsafe_allow_html=True)
@@ -868,29 +880,42 @@ elif len(filtered_news) > ITEMS_PER_PAGE:
 
 st.markdown("---")
 
-# Painel de Decisão de Notícias / Insights de Alocação
-section_header(ICO_TARGET, "Insights Estratégicos & Análise de Risco Qualitativo", "h2")
-
-insights_html = []
-
+# Síntese do tom textual, independente dos filtros e da paginação do feed.
+section_header(ICO_CHART, "Síntese do tom das notícias por ativo", "h2")
+st.caption(
+    f"{len(live_news_items)} artigos únicos analisados · Cobertura: {news_coverage:.1%} do peso da carteira "
+    "(não é medida de confiança). Tom textual não mede retorno nem risco financeiro."
+)
 if not live_news_items:
-    insights_html.append(get_diag_row_html(ICO_WARN,
-        "<b>Dados recentes indisponíveis:</b> Nenhuma observação de sentimento pode ser feita.", "#64748b"))
-else:
-    coverage_pct = news_coverage * 100
-    insights_html.append(get_diag_row_html(ICO_IDEA,
-        f"<b>Cobertura:</b> há notícias recentes para {coverage_pct:.1f}% do peso da carteira; a parcela sem cobertura foi excluída do sentimento.", "#00d2ff"))
-    means = {}
-    for item in live_news_items:
-        means.setdefault(item["ticker"], []).append(item["score"])
-    for ticker, scores in means.items():
-        mean_score = sum(scores) / len(scores)
-        label = "favorável" if mean_score >= 0.2 else "desfavorável" if mean_score <= -0.2 else "misto/neutro"
-        insights_html.append(get_diag_row_html(ICO_WARN,
-            f"<b>{escape(str(ticker))}:</b> tom médio {label} ({mean_score:+.2f}); observação textual, sem implicação de retorno.", "#ffd600"))
-
-st.markdown(f"""
-<div class="financial-panel">
-    {"".join(insights_html)}
-</div>
-""", unsafe_allow_html=True)
+    st.info(
+        "Feeds indisponíveis; não foi possível verificar notícias recentes." if not any(feed_status.values()) else
+        "Nenhuma notícia recente nos feeds acessíveis; alguns feeds falharam." if not all(feed_status.values()) else
+        "Nenhuma notícia recente retornada pelos feeds consultados."
+    )
+st.markdown(f"**Nota do tom da carteira: {score_display if news_coverage > 0 else '—'}/100**" if news_coverage > 0 else
+            "**Nota do tom da carteira: — (sem peso coberto)**")
+st.dataframe(pd.DataFrame([
+    {
+        "Ativo": row["ticker"], "Estado do feed": row["state"],
+        "Artigos": row["count"], "+": row["positive"], "0": row["neutral"], "−": row["negative"],
+        "Média (−1 a +1)": f'{row["mean"]:+.2f}' if row["mean"] is not None else "—",
+        "% do peso coberto": f'{row["covered_share"]:.1%}' if row["covered_share"] is not None else "—",
+        "Contribuição (pontos vs. 50)": f'{row["contribution"]:+.2f}' if row["contribution"] is not None else "—",
+    }
+    for row in tone_rows
+]), hide_index=True, use_container_width=True)
+with st.expander("Como é calculada a nota e a cobertura?"):
+    st.markdown(
+        "Cada notícia recebe um score entre −1 e +1. Com FinBERT, usamos saída sigmoid POSITIVE − NEGATIVE; "
+        "esses valores não são probabilidades calibradas nem somam 100%. No fallback, o léxico usa "
+        "(termos positivos − negativos) / total de termos encontrados; sem termos, score 0. "
+        "As duas rotas não são medidas diretamente comparáveis. "
+        "Para cada ativo, calculamos a média simples dos scores de suas notícias, incluindo artigos compartilhados. "
+        "O score coberto é Σ(peso × média do ativo) / Σ(pesos dos ativos com notícias). "
+        "A contribuição do ativo, em pontos relativos ao neutro, é 50 × peso/cobertura × média; "
+        "a nota é int(50 + soma das contribuições), de 0 a 100; 50 é neutro. "
+        "Ativos sem notícias são excluídos, não tratados como neutros; sem peso coberto a nota é —, não 50. "
+        "Cobertura é a soma dos pesos cobertos dividida pelo peso total da carteira, não uma medida de confiança. "
+        "Contagens e notas usam até 10 notícias únicas mais recentes por ativo nos últimos 7 dias, "
+        "antes dos filtros e da paginação do feed; o provedor pode limitar seus resultados."
+    )
