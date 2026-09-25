@@ -1,6 +1,20 @@
 import datetime
 
-from utils.news import aggregate_ticker_sentiment, parse_rss_items
+from utils.news import (
+    TICKER_TO_COMPANY,
+    aggregate_ticker_sentiment,
+    build_news_query,
+    parse_rss_items,
+)
+
+
+def test_news_queries_use_quoted_tickers_and_specific_issuer_names():
+    for ticker, company in TICKER_TO_COMPANY.items():
+        assert build_news_query(ticker) == f'"{ticker}" OR "{company}"'
+
+    assert build_news_query("VALE3") == '"VALE3" OR "Vale S.A."'
+    assert build_news_query("RENT3") == '"RENT3" OR "Localiza Rent a Car"'
+    assert build_news_query("UNKNOWN") == '"UNKNOWN"'
 
 
 def test_rss_filters_recent_parseable_items_deduplicates_and_sorts():

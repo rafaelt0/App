@@ -5,6 +5,47 @@ import unicodedata
 import xml.etree.ElementTree as ET
 
 
+# Use issuer names rather than ambiguous shorthand in Google News searches.
+TICKER_TO_COMPANY = {
+    "PETR3": "Petrobras", "PETR4": "Petrobras",
+    "VALE3": "Vale S.A.",
+    "ITUB3": "Itaú Unibanco", "ITUB4": "Itaú Unibanco",
+    "BBDC3": "Bradesco", "BBDC4": "Bradesco",
+    "BBAS3": "Banco do Brasil",
+    "WEGE3": "WEG S.A.",
+    "MGLU3": "Magazine Luiza",
+    "ABEV3": "Ambev",
+    "ELET3": "Eletrobras", "ELET6": "Eletrobras",
+    "RENT3": "Localiza Rent a Car",
+    "LREN3": "Lojas Renner",
+    "PRIO3": "PRIO S.A.",
+    "HAPV3": "Hapvida",
+    "SANB11": "Santander Brasil",
+    "VVAR3": "Via Varejo", "BHIA3": "Casas Bahia",
+    "GGBR4": "Gerdau",
+    "ITSA4": "Itaúsa",
+    "SUZB3": "Suzano S.A.",
+    "JBSS3": "JBS",
+    "UGPA3": "Ultrapar",
+    "RADL3": "Raia Drogasil",
+    "EQTL3": "Equatorial Energia",
+    "CSAN3": "Cosan",
+    "CPFE3": "CPFL Energia",
+    "SBSP3": "Sabesp",
+    "TAEE11": "Taesa",
+    "KLBN11": "Klabin",
+}
+
+
+def build_news_query(ticker):
+    """Search exact tickers and issuer names; unknown tickers stay ticker-only."""
+    terms = [f'"{ticker}"']
+    company = TICKER_TO_COMPANY.get(ticker)
+    if company:
+        terms.append(f'"{company}"')
+    return " OR ".join(terms)
+
+
 def parse_rss_items(xml_data, now=None, limit=3):
     """Parse recent RSS entries; return newest unique articles with aware dates."""
     if limit <= 0:
