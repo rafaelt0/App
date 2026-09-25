@@ -75,6 +75,8 @@ def test_screener_preset_change_and_manual_edit_update_ui_state():
             "ROE": [0.15, 0.12, 0.12],
             "ROIC": [0.1, 0.11, 0.1],
             "EV/EBITDA": [5.0, 6.0, 7.0],
+            "Patrim. Líq": [100_000.0, 200_000.0, 300_000.0],
+            "Dív.Líq/ Patrim.": [0.4, 0.2, 0.3],
             "Liq.2meses": [2_000_000, 3_000_000, 4_000_000],
         },
         index=["AAA3", "BBB3", "CCC3"],

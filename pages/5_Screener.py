@@ -61,7 +61,11 @@ def carregar_dados():
     # Debt labels can vary slightly between Fundamentus table versions.
     for col in raw.columns:
         normalized = col.lower().replace(" ", "").replace(".", "")
-        if "patrim" in normalized and ("brut" in normalized or "líq" in normalized or "liq" in normalized):
+        if (
+            "patrim" in normalized
+            and ("dív" in normalized or "div" in normalized)
+            and ("líq" in normalized or "liq" in normalized)
+        ):
             renames[col] = "divbpatr"
     renamed = raw.rename(columns={source: target for source, target in renames.items() if source in raw.columns})
     renamed.attrs.update(raw.attrs)
