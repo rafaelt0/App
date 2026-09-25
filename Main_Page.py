@@ -629,6 +629,13 @@ if ready_to_analyze:
                 df_sector_rows.rename_axis("Ticker").reset_index(),
                 hide_index=True,
                 use_container_width=True,
+                height=min(35 * (len(tickers) + 1) + 8, 760),
+                column_config={
+                    "Ticker": st.column_config.TextColumn(width="small"),
+                    "Empresa": st.column_config.TextColumn(width="medium"),
+                    "Setor": st.column_config.TextColumn(width="medium"),
+                    "Subsetor": st.column_config.TextColumn(width="medium"),
+                },
             )
         else:
             ticker = tickers[0]
@@ -669,16 +676,51 @@ if ready_to_analyze:
             "Volume Médio (2 meses)",
             "Valor de Mercado",
         ]:
-            df_price[col] = clean_numeric_column(df_price[col]).fillna(0)
+            df_price[col] = clean_numeric_column(df_price[col])
 
         if len(tickers) > 1:
             df_price_rows = df_price[
                 ~df_price.index.duplicated(keep="last")
             ].reindex(tickers)
             st.dataframe(
-                df_price_rows.rename_axis("Ticker").reset_index(),
+                df_price_rows.rename_axis("Ticker").reset_index().style.format(
+                    {
+                        "Cotação": "R$ {:,.2f}",
+                        "Mínimo (52 semanas)": "R$ {:,.2f}",
+                        "Máximo (52 semanas)": "R$ {:,.2f}",
+                        "Volume Médio (2 meses)": "{:,.0f}",
+                        "Valor de Mercado": "R$ {:,.0f}",
+                    },
+                    thousands=".",
+                    decimal=",",
+                    na_rep="—",
+                ),
                 hide_index=True,
                 use_container_width=True,
+                height=min(35 * (len(tickers) + 1) + 8, 760),
+                column_config={
+                    "Ticker": st.column_config.TextColumn(width="small"),
+                    "Cotação": st.column_config.Column(width="small"),
+                    "Mínimo (52 semanas)": st.column_config.Column(
+                        "Mín. 52 sem.", width="small"
+                    ),
+                    "Máximo (52 semanas)": st.column_config.Column(
+                        "Máx. 52 sem.", width="small"
+                    ),
+                    "Volume Médio (2 meses)": st.column_config.Column(
+                        "Vol. médio 2m", width="medium"
+                    ),
+                    "Valor de Mercado": st.column_config.Column(
+                        "Valor de mercado", width="medium"
+                    ),
+                    "Data Última Cotação": st.column_config.TextColumn(
+                        "Última cotação", width="small"
+                    ),
+                },
+            )
+            st.caption(
+                "Preços e valor de mercado em R$ · volume com separador de milhar · "
+                "— indica dados indisponíveis."
             )
         else:
             ticker = tickers[0]
@@ -686,7 +728,7 @@ if ready_to_analyze:
                 row_p = df_price.loc[ticker]
                 if isinstance(row_p, pd.DataFrame):
                     row_p = row_p.iloc[-1]
-                render_price_cards(ticker, row_p)
+                render_price_cards(ticker, row_p.fillna(0))
             else:
                 st.warning(f"Sem dados de mercado para {ticker}")
 
@@ -756,7 +798,10 @@ if ready_to_analyze:
                 "Dividend Yield (%)",
                 "Receita 5a (%)",
             ]
-            st.caption("Percentuais em % · múltiplos em × · sem dados ficam em branco.")
+            st.caption(
+                "Margens, rentabilidade e crescimento em % · múltiplos em × · "
+                "dados indisponíveis ficam em branco."
+            )
             st.dataframe(
                 comparison,
                 hide_index=True,
