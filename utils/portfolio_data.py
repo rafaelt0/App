@@ -5,6 +5,8 @@ import logging
 import math
 import time
 
+import numpy as np
+import pandas as pd
 import streamlit as st
 import yfinance as yf
 from bcb import sgs
@@ -87,6 +89,54 @@ def align_weights_to_columns(weights, columns):
         tickers = ", ".join(map(str, missing))
         raise ValueError(f"Missing portfolio weights for: {tickers}")
     return [weights[column] for column in columns]
+
+
+def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, crises):
+    """Calculate fixed-weight crisis returns using complete daily observations."""
+    if portfolio_prices is None or portfolio_prices.empty:
+        return []
+
+    benchmark_returns = (
+        benchmark_prices.pct_change(fill_method=None).dropna()
+        if benchmark_prices is not None and not benchmark_prices.empty
+        else pd.Series(index=pd.DatetimeIndex([]), dtype=float)
+    )
+    results = []
+    for name, (start, end) in crises.items():
+        start, end = pd.Timestamp(start), pd.Timestamp(end)
+        period_prices = portfolio_prices.loc[
+            (portfolio_prices.index >= start) & (portfolio_prices.index <= end)
+        ]
+        period_returns = period_prices.pct_change(fill_method=None).dropna()
+        if len(period_returns) < 5:
+            continue
+
+        aligned_weights = np.asarray(
+            align_weights_to_columns(weights, period_returns.columns)
+        )
+        weight_sum = aligned_weights.sum()
+        if weight_sum <= 0:
+            continue
+        portfolio_return = (
+            1 + period_returns.dot(aligned_weights / weight_sum)
+        ).prod() - 1
+        period_benchmark = benchmark_returns.loc[
+            (benchmark_returns.index >= start) & (benchmark_returns.index <= end)
+        ]
+        results.append(
+            {
+                "Crise": name,
+                "Período": (
+                    f"{period_returns.index.min().strftime('%b/%Y')} → "
+                    f"{period_returns.index.max().strftime('%b/%Y')}"
+                ),
+                "Portfólio": portfolio_return,
+                "IBOV": (1 + period_benchmark).prod() - 1
+                if len(period_benchmark) >= 5
+                else None,
+            }
+        )
+    return results
 
 
 def align_benchmark_returns(portfolio_returns, benchmark_prices):

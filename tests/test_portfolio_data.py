@@ -31,3 +31,53 @@ def test_bound_efficient_return_returns_none_for_non_finite_values():
 
 def test_bound_efficient_return_returns_none_for_degenerate_range():
     assert bound_efficient_return(0.5, 1.0, 1.0) is None
+
+
+def test_historical_stress_calculates_recent_crisis_and_skips_missing_history():
+    import pandas as pd
+
+    from utils.portfolio_data import calculate_historical_stress
+
+    dates = pd.bdate_range("2024-11-26", periods=7)
+    prices = pd.DataFrame(
+        {
+            "AAA.SA": [100, 90, 80, 80, 80, 80, 80],
+            "BBB.SA": [100, 100, 100, 100, 100, 100, 100],
+        },
+        index=dates,
+    )
+    benchmark = pd.Series(100.0, index=dates)
+    crises = {
+        "Crise fiscal brasileira (2024)": ("2024-11-26", "2024-12-30"),
+        "Sem histórico": ("2018-01-01", "2018-01-31"),
+    }
+
+    results = calculate_historical_stress(
+        prices, benchmark, {"AAA.SA": 0.5, "BBB.SA": 0.5}, crises
+    )
+
+    expected = (
+        1 + prices.pct_change(fill_method=None).dropna().dot([0.5, 0.5])
+    ).prod() - 1
+    assert len(results) == 1
+    assert results[0]["Crise"] == "Crise fiscal brasileira (2024)"
+    assert abs(results[0]["Portfólio"] - expected) < 1e-12
+    assert results[0]["IBOV"] == 0
+
+
+def test_historical_stress_does_not_bridge_missing_price_gaps():
+    import pandas as pd
+
+    from utils.portfolio_data import calculate_historical_stress
+
+    dates = pd.bdate_range("2020-01-01", periods=8)
+    prices = pd.DataFrame(
+        {"AAA.SA": [100, 100, 100, None, 110, 110, 110, 110]}, index=dates
+    )
+    results = calculate_historical_stress(
+        prices, None, {"AAA.SA": 1.0}, {"COVID": ("2020-01-01", "2020-01-31")}
+    )
+
+    assert len(results) == 1
+    assert results[0]["Portfólio"] == 0
+    assert results[0]["IBOV"] is None
