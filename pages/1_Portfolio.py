@@ -53,6 +53,7 @@ from utils.icons import (
 from utils.portfolio_data import (
     align_benchmark_returns,
     align_weights_to_columns,
+    calculate_historical_stress,
     bound_efficient_return,
     get_benchmark_prices,
     get_portfolio_prices,
@@ -1487,8 +1488,8 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
         st.markdown("---")
         section_header(ICO_STRESS, "Stress Test — Crises Históricas", "h2")
         st.caption(
-            "Desempenho estimado do portfólio durante períodos de turbulência histórica. "
-            "Exibe apenas crises dentro do período de dados selecionado."
+            "Desempenho hipotético com os pesos atuais, durante crises históricas. "
+            "O histórico das crises é independente do lookback da otimização."
         )
 
         CRISES_HISTORICAS = {
@@ -1496,47 +1497,40 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
             "Recessão/Impeachment (2015–16)": ("2014-12-31", "2016-12-31"),
             "Joesley Day (2017)": ("2017-05-17", "2017-06-30"),
             "Crise Global (2008–09)": ("2008-08-01", "2009-03-31"),
+            "Crise fiscal brasileira (2024)": ("2024-11-26", "2024-12-30"),
         }
+        stress_start = min(
+            pd.Timestamp(start) for start, _ in CRISES_HISTORICAS.values()
+        ).date()
 
-        data_start = data_yf.index.min()
-        data_end = data_yf.index.max()
-        stress_results = []
+        stress_prices = data_yf
+        try:
+            stress_prices = get_portfolio_prices(tickers_yf, stress_start)
+            if isinstance(stress_prices.columns, pd.MultiIndex):
+                stress_prices.columns = [
+                    "_".join(map(str, col)).strip() for col in stress_prices.columns
+                ]
+            stress_prices = stress_prices.reindex(columns=data_yf.columns)
+        except Exception as _stress_err:
+            logger.warning("Historical stress prices unavailable: %s", _stress_err)
+            st.warning("Não foi possível carregar o histórico longo para o stress test.")
 
-        for crise_nome, (s_str, e_str) in CRISES_HISTORICAS.items():
-            s_ts = pd.Timestamp(s_str)
-            e_ts = pd.Timestamp(e_str)
-            if s_ts > data_end or e_ts < data_start:
-                continue
-            s_clip = max(s_ts, data_start)
-            e_clip = min(e_ts, data_end)
-            mask_p = (data_yf.index >= s_clip) & (data_yf.index <= e_clip)
-            period_prices = data_yf[mask_p]
-            if len(period_prices) < 5:
-                continue
-            period_ret = period_prices.pct_change().dropna()
-            pesos_period = np.array(
-                align_weights_to_columns(pesos_por_ticker, period_ret.columns)
+        try:
+            stress_benchmark = get_benchmark_prices(stress_start)
+        except Exception as _stress_bench_err:
+            logger.warning(
+                "Historical stress benchmark unavailable: %s", _stress_bench_err
             )
-            if pesos_period.sum() > 0:
-                pesos_period = pesos_period / pesos_period.sum()
-            port_ret_period = period_ret.dot(pesos_period)
-            cum_port = (1 + port_ret_period).prod() - 1
-            mask_b = (retorno_bench.index >= s_clip) & (retorno_bench.index <= e_clip)
-            ibov_period = retorno_bench[mask_b]
-            cum_ibov = (1 + ibov_period).prod() - 1 if len(ibov_period) >= 5 else None
-            stress_results.append(
-                {
-                    "Crise": crise_nome,
-                    "Período": f"{s_clip.strftime('%b/%Y')} → {e_clip.strftime('%b/%Y')}",
-                    "Portfólio": cum_port,
-                    "IBOV": cum_ibov,
-                }
-            )
+            stress_benchmark = None
+
+        stress_results = calculate_historical_stress(
+            stress_prices, stress_benchmark, pesos_por_ticker, CRISES_HISTORICAS
+        )
 
         if not stress_results:
             st.info(
-                "Nenhuma crise histórica está no intervalo de dados selecionado. "
-                "Selecione um período mais longo (3+ anos) para ativar o stress test."
+                "Não há crises com pelo menos 5 pregões completos para todos os ativos. "
+                "Ativos com histórico recente podem não cobrir esses períodos."
             )
         else:
             for r in stress_results:
@@ -1576,9 +1570,11 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                 crises_names = [r["Crise"].split(" (")[0] for r in stress_results]
                 port_vals = [r["Portfólio"] * 100 for r in stress_results]
                 ibov_vals = [
-                    (r["IBOV"] * 100 if r["IBOV"] is not None else 0)
+                    r["IBOV"] * 100 if r["IBOV"] is not None else None
                     for r in stress_results
                 ]
+                stress_values = port_vals + [v for v in ibov_vals if v is not None]
+                stress_padding = max((max(stress_values) - min(stress_values)) * 0.12, 1)
                 fig_stress = go.Figure()
                 fig_stress.add_trace(
                     go.Bar(
@@ -1598,10 +1594,12 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                         x=crises_names,
                         y=ibov_vals,
                         marker_color=[
-                            "rgba(0,210,255,0.6)" if v >= 0 else "rgba(255,150,0,0.6)"
+                            "rgba(0,210,255,0.6)"
+                            if v is not None and v >= 0
+                            else "rgba(255,150,0,0.6)"
                             for v in ibov_vals
                         ],
-                        text=[f"{v:+.1f}%" for v in ibov_vals],
+                        text=[f"{v:+.1f}%" if v is not None else "" for v in ibov_vals],
                         textposition="outside",
                     )
                 )
@@ -1614,6 +1612,12 @@ Rf = {selic_anual * 100:.2f}% · E[R tangente] = {_et * 100:.2f}% · σ tangente
                     legend=dict(
                         orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
                     ),
+                )
+                fig_stress.update_yaxes(
+                    range=[
+                        min(stress_values) - stress_padding,
+                        max(stress_values) + stress_padding,
+                    ]
                 )
                 apply_plotly_theme(fig_stress)
                 st.plotly_chart(fig_stress, use_container_width=True)
