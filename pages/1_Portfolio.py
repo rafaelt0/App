@@ -1145,7 +1145,6 @@ if (
         )
 
         # ── Painel de Decisão do Investidor ───────────────────────────────────
-        st.markdown("---")
         section_header(ICO_TARGET, "Painel de Decisão do Investidor", "h2")
 
         # ── Score de Saúde do Portfólio ──────────────────────────────────────
@@ -1249,32 +1248,16 @@ if (
                 )
             )
 
-        score_color = (
-            "#00ff87" if score >= 70 else "#ffd600" if score >= 40 else "#ff1744"
-        )
         score_label = (
-            "SAUDÁVEL" if score >= 70 else "ATENÇÃO" if score >= 40 else "CRÍTICO"
+            "Saudável" if score >= 70 else "Atenção" if score >= 40 else "Crítico"
         )
 
-        col_score, col_details = st.columns([1, 2])
+        col_score, col_details = st.columns([1, 2], gap="large")
         with col_score:
-            st.markdown(
-                f"""
-            <div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:2px solid {score_color};
-                        border-radius:16px;padding:1.5rem;text-align:center;
-                        box-shadow:0 0 20px {score_color}33;">
-                <div style="font-size:3.5rem;font-weight:900;color:{score_color};
-                            font-family:'JetBrains Mono',monospace;
-                            text-shadow:0 0 15px {score_color}66;">{score}</div>
-                <div style="font-size:0.65rem;color:#94a3b8;letter-spacing:0.12em;margin-top:0.2rem;">DE 100 PONTOS</div>
-                <div style="font-size:0.9rem;font-weight:700;color:{score_color};margin-top:0.5rem;
-                            letter-spacing:0.08em;">{score_label}</div>
-            </div>
-            """,
-                unsafe_allow_html=True,
-            )
+            st.metric("Indicador heurístico", f"{score}/100")
+            st.caption(score_label)
         with col_details:
-            st.markdown("**Diagnóstico por indicador:**")
+            st.markdown("**Indicadores considerados**")
             for ico, msg, color in health_detalhes:
                 diag_row(ico, msg, color)
 
