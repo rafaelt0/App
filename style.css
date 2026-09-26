@@ -1378,24 +1378,8 @@ footer::after { display: none !important; }
   font-size: 0.7rem;
 }
 
-.analyst-synthesis-verdict {
-  --analyst-signal: var(--text-muted);
-  flex: 0 0 auto;
-  padding: 0.3rem 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--analyst-signal) 42%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--analyst-signal) 9%, transparent);
-  color: var(--analyst-signal);
-  font-size: 0.67rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-
-.analyst-synthesis-verdict.is-positive,
 .analyst-category.is-positive { --analyst-signal: var(--brand-primary); }
-.analyst-synthesis-verdict.is-neutral,
 .analyst-category.is-neutral { --analyst-signal: var(--brand-accent); }
-.analyst-synthesis-verdict.is-negative,
 .analyst-category.is-negative { --analyst-signal: var(--brand-danger); }
 
 .analyst-synthesis-summary {
@@ -1518,7 +1502,6 @@ footer::after { display: none !important; }
 @media (max-width: 520px) {
   .analyst-synthesis-card { padding: 0.85rem; }
   .analyst-synthesis-card-header { align-items: flex-start; }
-  .analyst-synthesis-verdict { font-size: 0.6rem; }
   .analyst-category { flex-basis: 115px; }
 }
 
