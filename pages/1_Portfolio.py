@@ -727,81 +727,6 @@ if (
                 )
                 st.plotly_chart(fig_frontier, use_container_width=True)
 
-            # Calcula parâmetros da carteira selecionada
-            _opt_w = np.array(list(cleaned_weights.values()))
-            _et = float(np.sum(_opt_w * mu))
-            _st = float(np.sqrt(np.dot(_opt_w.T, np.dot(S, _opt_w))))
-            _sharpe_t = (
-                finite_or_none((_et - selic_anual) / _st) if _st > 0 else None
-            )
-
-            st.markdown("**Linha de alocação — quanto você aloca em ativos de risco?**")
-            st.caption(
-                "Mova o slider para ver como o retorno esperado e o risco do seu portfólio mudam "
-                f"ao longo da linha entre Selic e {allocation_label}. "
-                "O Sharpe dessa combinação permanece constante para alocações positivas."
-            )
-
-            _w = (
-                st.number_input(
-                    f"% em ativos de risco ({allocation_label})",
-                    min_value=0,
-                    max_value=150,
-                    value=100,
-                    step=5,
-                    format="%d",
-                    help=f"0% = 100% na Selic (sem risco). 100% = {allocation_label}. >100% = alavancagem.",
-                )
-                / 100.0
-            )
-
-            _ep = selic_anual + _w * (_et - selic_anual)  # E[Rp] na LAC
-            _sp = abs(_w) * _st  # σp na LAC (Rf tem σ=0)
-            _shp = finite_or_none((_ep - selic_anual) / _sp) if _sp > 0 else None
-
-            _perfil = (
-                "🏦 Conservador — grande parte em Rf (Selic)"
-                if _w < 0.4
-                else "⚖️ Moderado — equilíbrio entre Rf e ativos de risco"
-                if _w < 0.8
-                else "🚀 Arrojado — próximo ou na carteira selecionada"
-                if _w <= 1.0
-                else "⚡ Alavancado — tomou emprestado ao Rf para investir mais"
-            )
-
-            tc1, tc2, tc3, tc4 = st.columns(4)
-            tc1.metric("% em Rf (Selic)", f"{(1 - _w) * 100:.0f}%")
-            tc2.metric(
-                "E[Retorno] a.a.",
-                f"{_ep * 100:.2f}%",
-                delta=f"{(_ep - selic_anual) * 100:+.2f}% acima do Rf",
-            )
-            tc3.metric("Volatilidade a.a.", f"{_sp * 100:.2f}%")
-            tc4.metric(
-                "Sharpe do Portfólio",
-                f"{_shp:.3f}" if _shp is not None else "N/D",
-                delta=(
-                    f"= carteira selecionada ({_sharpe_t:.3f})"
-                    if _sharpe_t is not None
-                    else None
-                ),
-                delta_color="off",
-                help="O Sharpe é constante para combinações positivas da Selic e da carteira selecionada.",
-            )
-
-            st.markdown(
-                f"""
-<div style="background:rgba(245,158,11,0.06);border-left:3px solid #f59e0b;
-border-radius:0 8px 8px 0;padding:0.6rem 1rem;font-size:0.78rem;color:#cbd5e1;margin-top:0.3rem">
-<b style="color:#f59e0b">Perfil:</b> {_perfil}<br>
-<span style="color:#64748b;font-size:0.68rem">
-Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selecionado = {_st * 100:.2f}%
-</span>
-</div>
-""",
-                unsafe_allow_html=True,
-            )
-
         # Cálculo do portfólio com os pesos escolhidos
         pesos_alinhados = align_weights_to_columns(
             pesos_por_ticker, returns.columns
@@ -1779,8 +1704,6 @@ Rf = {selic_anual * 100:.2f}% · E[R selecionado] = {_et * 100:.2f}% · σ selec
                 f"<b>Boa Diversificação (HHI={hhi:.0f}):</b> {hhi_equiv} ativos efetivos — distribuição equilibrada.",
                 "#00ff87",
             )
-
-        st.markdown("---")
 
         st.markdown(
             """
