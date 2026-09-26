@@ -31,7 +31,6 @@ from utils.ui import (
 from utils.market_data import get_listed_stocks
 from utils.icons import (
     ICO_BOX,
-    ICO_CAPM,
     ICO_CHART,
     ICO_CRIT,
     ICO_DOWN,
@@ -939,7 +938,7 @@ if (
 
         if not benchmark_available:
             st.info(
-                "Métricas relativas ao IBOVESPA e CAPM ficam "
+                "Métricas relativas ao IBOVESPA ficam "
                 "indisponíveis enquanto a série do benchmark não responder."
             )
             total_return = finite_or_none((portfolio_value.iloc[-1] / valor_inicial - 1) * 100)
@@ -996,7 +995,7 @@ if (
                 st.session_state.pop(key, None)
             st.caption(
                 "Atualize as cotações quando o IBOVESPA estiver disponível para "
-                "reativar beta, alfa, CAPM e as comparações relativas."
+                "reativar beta, alfa e as comparações relativas."
             )
             next_step_card(
                 message="Portfólio configurado — projete trajetórias com Monte Carlo.",
@@ -1261,196 +1260,6 @@ if (
             for ico, msg, color in health_detalhes:
                 diag_row(ico, msg, color)
 
-        # ── Análise CAPM por Ativo — EAE1242 (Sharpe, 1964) ─────────────────
-        st.markdown("---")
-        section_header(ICO_CAPM, "Análise CAPM por Ativo", "h2")
-        st.caption(
-            "**CAPM (Sharpe, 1964):** E[Rᵢ] = Rƒ + βᵢ × (E[Rₘ] − Rƒ)  ·  "
-            "β > 1 = mais volátil que o mercado  ·  α > 0 = retorno acima do esperado pelo risco"
-        )
-
-        selic_anual_capm = (1 + taxa_selic) ** 252 - 1
-        bench_sq = retorno_bench.squeeze()
-        rm_anual = bench_sq.mean() * 252
-
-        def _clean_col(c):
-            return (
-                c.replace("Close_", "").replace("close_", "").replace(".SA", "").strip()
-            )
-
-        capm_rows = []
-        for col in returns.columns:
-            ri = returns[col].dropna()
-            rm = bench_sq.reindex(ri.index).dropna()
-            ri = ri.reindex(rm.index)
-            if len(ri) < 20:
-                continue
-            cov_mat = np.cov(ri.values, rm.values)
-            var_m = cov_mat[1, 1]
-            if not np.isfinite(var_m) or var_m <= 0:
-                continue
-            beta_i = cov_mat[0, 1] / var_m
-            alpha_i = (
-                (ri.mean() - taxa_selic)
-                - beta_i * (rm.mean() - taxa_selic)
-            ) * 252  # Jensen's alpha a.a.
-            ri_var = np.var(ri.values)
-            r2 = (cov_mat[0, 1] ** 2) / (ri_var * var_m) if ri_var * var_m > 0 else 0
-            ri_anual = ri.mean() * 252
-            er_capm = selic_anual_capm + beta_i * (rm_anual - selic_anual_capm)
-            treynor = (
-                (ri_anual - selic_anual_capm) / beta_i if beta_i != 0 else float("nan")
-            )
-            capm_rows.append(
-                {
-                    "Ativo": _clean_col(col),
-                    "Beta (β)": round(beta_i, 3),
-                    "Alpha Jensen (a.a.)": round(alpha_i * 100, 2),
-                    "R² (Risco Sist.)": round(r2 * 100, 1),
-                    "E[Ri] CAPM": round(er_capm * 100, 2),
-                    "Retorno Real": round(ri_anual * 100, 2),
-                    "Treynor": round(treynor, 3),
-                    "_alpha_sign": alpha_i,
-                }
-            )
-
-        if capm_rows:
-            df_capm = pd.DataFrame(capm_rows)
-
-            # Tabela CAPM
-            df_display = df_capm.drop(columns=["_alpha_sign"]).copy()
-            df_display["Alpha Jensen (a.a.)"] = df_display["Alpha Jensen (a.a.)"].apply(
-                lambda x: f"{x:+.2f}%"
-            )
-            df_display["R² (Risco Sist.)"] = df_display["R² (Risco Sist.)"].apply(
-                lambda x: f"{x:.1f}%"
-            )
-            df_display["E[Ri] CAPM"] = df_display["E[Ri] CAPM"].apply(
-                lambda x: f"{x:.2f}%"
-            )
-            df_display["Retorno Real"] = df_display["Retorno Real"].apply(
-                lambda x: f"{x:.2f}%"
-            )
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
-            st.caption(
-                "**Beta (β):** sensibilidade ao mercado.  "
-                "**Alpha (α):** retorno acima do previsto pelo CAPM — Jensen's Alpha.  "
-                "**R²:** % do risco total explicado pelo mercado (risco sistemático).  "
-                "**Treynor:** retorno excedente por unidade de risco sistemático."
-            )
-
-            # SML — Security Market Line
-            st.markdown("##### Security Market Line (SML)")
-            betas = df_capm["Beta (β)"].values
-            b_min = min(-0.2, betas.min() - 0.2)
-            b_max = max(1.6, betas.max() + 0.3)
-            b_line = np.linspace(b_min, b_max, 120)
-            sml_y = (selic_anual_capm + b_line * (rm_anual - selic_anual_capm)) * 100
-
-            fig_sml = go.Figure()
-            fig_sml.add_trace(
-                go.Scatter(
-                    x=b_line,
-                    y=sml_y,
-                    mode="lines",
-                    line=dict(color="#a855f7", width=2),
-                    name="SML — Retorno Esperado CAPM",
-                    hovertemplate="β=%{x:.2f}<br>E[R]=%{y:.2f}%<extra></extra>",
-                )
-            )
-            # Reference lines
-            fig_sml.add_vline(
-                x=1.0, line_dash="dot", line_color="#334155", line_width=1
-            )
-            fig_sml.add_hline(
-                y=selic_anual_capm * 100,
-                line_dash="dot",
-                line_color="#334155",
-                line_width=1,
-            )
-            # Rf point
-            fig_sml.add_trace(
-                go.Scatter(
-                    x=[0],
-                    y=[selic_anual_capm * 100],
-                    mode="markers+text",
-                    marker=dict(color="#ffd600", size=9, symbol="diamond"),
-                    text=["Rf"],
-                    textposition="top right",
-                    textfont=dict(color="#ffd600", size=10),
-                    name="Rf (Selic)",
-                    hovertemplate=f"Rf = {selic_anual_capm:.2%}<extra></extra>",
-                )
-            )
-            # IBOVESPA (β=1)
-            fig_sml.add_trace(
-                go.Scatter(
-                    x=[1.0],
-                    y=[rm_anual * 100],
-                    mode="markers+text",
-                    marker=dict(color="#00d2ff", size=10, symbol="star"),
-                    text=["IBOV"],
-                    textposition="top right",
-                    textfont=dict(color="#00d2ff", size=10),
-                    name="IBOVESPA (β=1)",
-                    hovertemplate=f"IBOV<br>β=1.00<br>Retorno={rm_anual:.2%}<extra></extra>",
-                )
-            )
-            # Each asset
-            for _, row in df_capm.iterrows():
-                cor = "#00ff87" if row["_alpha_sign"] > 0 else "#ff3d5a"
-                fig_sml.add_trace(
-                    go.Scatter(
-                        x=[row["Beta (β)"]],
-                        y=[row["Retorno Real"]],
-                        mode="markers+text",
-                        marker=dict(
-                            size=11, color=cor, line=dict(color="#f8fafc", width=1)
-                        ),
-                        text=[row["Ativo"]],
-                        textposition="top center",
-                        textfont=dict(size=9, color=cor),
-                        name=row["Ativo"],
-                        hovertemplate=(
-                            f"<b>{row['Ativo']}</b><br>"
-                            f"β = {row['Beta (β)']:.3f}<br>"
-                            f"Retorno Real: {row['Retorno Real']:.2f}%<br>"
-                            f"E[R] CAPM: {row['E[Ri] CAPM']:.2f}%<br>"
-                            f"Alpha: {row['Alpha Jensen (a.a.)']:+.2f}%<extra></extra>"
-                        ),
-                    )
-                )
-            fig_sml.update_layout(
-                xaxis_title="Beta (β) — Risco Sistemático vs IBOVESPA",
-                yaxis_title="Retorno Anualizado (%)",
-                showlegend=False,
-                annotations=[
-                    dict(
-                        x=b_max - 0.1,
-                        y=sml_y[-1] + 4,
-                        text="Acima da SML: α > 0",
-                        showarrow=False,
-                        font=dict(color="#00ff87", size=10),
-                        xanchor="right",
-                    ),
-                    dict(
-                        x=b_max - 0.1,
-                        y=sml_y[-1] - 4,
-                        text="Abaixo da SML: α < 0",
-                        showarrow=False,
-                        font=dict(color="#ff3d5a", size=10),
-                        xanchor="right",
-                    ),
-                ],
-            )
-            apply_plotly_theme(fig_sml)
-            st.plotly_chart(fig_sml, use_container_width=True)
-            st.caption(
-                "🟢 Acima da SML = Alpha positivo (gerou valor além do risco assumido)  ·  🔴 Abaixo = Alpha negativo"
-            )
-
-        else:
-            st.info("Dados insuficientes para calcular CAPM individual por ativo.")
 
         # ── Stress Test — Crises Históricas ──────────────────────────────────
         st.markdown("---")

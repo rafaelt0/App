@@ -194,14 +194,6 @@ ICO_FLAT = _svg(
     '<path d="M16 8l4 4-4 4" stroke="#ffd600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
     14,
 )
-ICO_CAPM = _svg(
-    '<line x1="3" y1="21" x2="21" y2="3" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/>'
-    '<circle cx="8" cy="16" r="2.5" fill="#00ff87"/>'
-    '<circle cx="14" cy="10" r="2.5" fill="#ff3d5a"/>'
-    '<circle cx="18" cy="6" r="2.5" fill="#ffd600"/>'
-    '<line x1="3" y1="21" x2="21" y2="3" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 2"/>',
-    16,
-)
 ICO_STRESS = _svg(
     '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" '
     'stroke="#ff3d5a" stroke-width="1.8" fill="none"/>'
