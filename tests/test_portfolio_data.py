@@ -3,6 +3,7 @@ from utils.portfolio_data import (
     align_weights_to_columns,
     bound_efficient_return,
     estimate_markowitz_inputs,
+    evaluate_portfolio_health,
     finite_or_none,
 )
 
@@ -12,6 +13,24 @@ def test_undefined_metric_ratios_render_as_unavailable():
     assert finite_or_none(float("inf")) is None
     assert finite_or_none(0.0) == 0.0
     assert finite_or_none(1.25) == 1.25
+
+
+def test_health_score_averages_risk_metrics_with_equal_dimensions():
+    score, coverage = evaluate_portfolio_health(1.2, 0.4, -5, 6, 20)
+
+    assert (score, coverage) == (88, 100)
+
+
+def test_health_score_normalizes_missing_dimensions_and_reports_coverage():
+    score, coverage = evaluate_portfolio_health(1.2, None, -5, None, 20)
+
+    assert (score, coverage) == (100, 75)
+
+
+def test_health_score_requires_75_percent_coverage():
+    score, coverage = evaluate_portfolio_health(None, None, -25, None, 60)
+
+    assert (score, coverage) == (None, 50)
 
 
 def test_trade_price_fetch_uses_unadjusted_close(monkeypatch):
