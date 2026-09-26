@@ -174,6 +174,8 @@ def test_loaded_markowitz_keeps_frontier_without_allocation_row_or_extra_drawdow
                        for trace in chart["data"]) for chart in charts)
     assert not any("% em ativos de risco" in item.label for item in app.number_input)
     markup = [item.value for item in app.markdown]
+    assert any(metric.label == "Indicador heurístico" for metric in app.metric)
+    assert not any("box-shadow:0 0 20px" in value for value in markup)
     assert not any("Linha de alocação — quanto você aloca" in value for value in markup)
     regime = next(i for i, value in enumerate(markup) if "Regime de Mercado" in value)
     drawdown = next(i for i, value in enumerate(markup) if "Análise de Drawdown" in value)
