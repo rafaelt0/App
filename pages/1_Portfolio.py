@@ -54,6 +54,7 @@ from utils.portfolio_data import (
     align_weights_to_columns,
     calculate_historical_stress,
     finite_or_none,
+    evaluate_portfolio_health,
     find_crisis_history_gaps,
     bound_efficient_return,
     get_benchmark_prices,
@@ -1147,7 +1148,6 @@ if (
         section_header(ICO_TARGET, "Painel de Decisão do Investidor", "h2")
 
         # ── Score de Saúde do Portfólio ──────────────────────────────────────
-        score = 0
         health_detalhes = []
 
         if sharpe_val is None:
@@ -1155,10 +1155,8 @@ if (
                 (ICO_WARN, "Sharpe indisponível — risco não definido", "#ffd600")
             )
         elif sharpe_val > 1.0:
-            score += 35
             health_detalhes.append((ICO_OK, "Sharpe excelente (>1.0)", "#00ff87"))
         elif sharpe_val > 0.5:
-            score += 17
             health_detalhes.append((ICO_WARN, "Sharpe razoável (0.5–1.0)", "#ffd600"))
         else:
             health_detalhes.append(
@@ -1170,10 +1168,8 @@ if (
                 (ICO_WARN, "Sortino indisponível — risco de queda não definido", "#ffd600")
             )
         elif sortino_val > 1.0:
-            score += 20
             health_detalhes.append((ICO_OK, "Sortino excelente (>1.0)", "#00ff87"))
         elif sortino_val > 0.5:
-            score += 10
             health_detalhes.append((ICO_WARN, "Sortino razoável (0.5–1.0)", "#ffd600"))
         else:
             health_detalhes.append(
@@ -1183,14 +1179,16 @@ if (
         if max_dd is None:
             health_detalhes.append((ICO_WARN, "Drawdown indisponível", "#ffd600"))
         elif max_dd > -10:
-            score += 20
             health_detalhes.append((ICO_OK, "Drawdown controlado (<10%)", "#00ff87"))
         elif max_dd > -20:
-            score += 10
             health_detalhes.append((ICO_WARN, "Drawdown moderado (10–20%)", "#ffd600"))
         else:
             health_detalhes.append(
-                (ICO_CRIT, "Drawdown severo (>20%) — risco de ruína elevado", "#ff3d5a")
+                (
+                    ICO_CRIT,
+                    "Drawdown severo (>20%) — perda de pico a vale elevada",
+                    "#ff3d5a",
+                )
             )
 
         if alfa_val is None:
@@ -1207,12 +1205,10 @@ if (
             if alfa_anual is None:
                 health_detalhes.append((ICO_WARN, "Alfa indisponível", "#ffd600"))
             elif alfa_anual > 5:
-                score += 15
                 health_detalhes.append(
                     (ICO_OK, f"Alfa anual positivo: {alfa_anual:.1f}%", "#00ff87")
                 )
             elif alfa_anual > 0:
-                score += 7
                 health_detalhes.append(
                     (ICO_WARN, f"Alfa marginal: {alfa_anual:.1f}%", "#ffd600")
                 )
@@ -1220,7 +1216,8 @@ if (
                 health_detalhes.append(
                     (
                         ICO_CRIT,
-                        f"Alfa negativo ({alfa_anual:.1f}%) — portfólio perde pro índice",
+                        f"Alfa negativo ({alfa_anual:.1f}%) — "
+                        "abaixo do retorno ajustado ao risco do IBOVESPA",
                         "#ff3d5a",
                     )
                 )
@@ -1229,32 +1226,49 @@ if (
             pesos_manuais_arr
         )  # sempre definido independente do modo
         max_peso = pesos_arr_dec.max() * 100
+        score, score_coverage = evaluate_portfolio_health(
+            sharpe_val, sortino_val, max_dd, alfa_anual, max_peso
+        )
         if max_peso <= 30:
-            score += 10
             health_detalhes.append(
-                (ICO_OK, f"Concentração saudável (máx: {max_peso:.1f}%)", "#00ff87")
+                (
+                    ICO_OK,
+                    f"Maior posição: {max_peso:.1f}% (concentração baixa)",
+                    "#00ff87",
+                )
             )
         elif max_peso <= 50:
             health_detalhes.append(
-                (ICO_WARN, f"Concentração elevada (máx: {max_peso:.1f}%)", "#ffd600")
+                (
+                    ICO_WARN,
+                    f"Maior posição: {max_peso:.1f}% (concentração elevada)",
+                    "#ffd600",
+                )
             )
         else:
             health_detalhes.append(
                 (
                     ICO_CRIT,
-                    f"Hiper-concentração (máx: {max_peso:.1f}%) — diversifique",
+                    f"Maior posição: {max_peso:.1f}% (concentração muito alta)",
                     "#ff3d5a",
                 )
             )
 
         score_label = (
-            "Saudável" if score >= 70 else "Atenção" if score >= 40 else "Crítico"
+            "Dados insuficientes"
+            if score is None
+            else "Favorável" if score >= 70
+            else "Intermediário" if score >= 40
+            else "Desfavorável"
         )
 
         col_score, col_details = st.columns([1, 2], gap="large")
         with col_score:
-            st.metric("Indicador heurístico", f"{score}/100")
-            st.caption(score_label)
+            st.metric(
+                "Indicador heurístico",
+                f"{score}/100" if score is not None else "N/D",
+            )
+            st.caption(f"{score_label} · cobertura de {score_coverage}%")
         with col_details:
             st.markdown("**Indicadores considerados**")
             for ico, msg, color in health_detalhes:

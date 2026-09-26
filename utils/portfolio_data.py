@@ -58,6 +58,44 @@ def finite_or_none(value):
     return value if math.isfinite(value) else None
 
 
+def evaluate_portfolio_health(
+    sharpe_ratio,
+    sortino_ratio,
+    max_drawdown_pct,
+    annual_alpha_pct,
+    max_position_pct,
+):
+    """Return an equal-weighted heuristic score and its data coverage."""
+    dimensions = []
+    risk_adjusted = [
+        1.0 if value > 1.0 else 0.5 if value > 0.5 else 0.0
+        for value in (finite_or_none(sharpe_ratio), finite_or_none(sortino_ratio))
+        if value is not None
+    ]
+    if risk_adjusted:
+        dimensions.append(sum(risk_adjusted) / len(risk_adjusted))
+
+    drawdown = finite_or_none(max_drawdown_pct)
+    if drawdown is not None:
+        dimensions.append(1.0 if drawdown > -10 else 0.5 if drawdown > -20 else 0.0)
+
+    alpha = finite_or_none(annual_alpha_pct)
+    if alpha is not None:
+        dimensions.append(1.0 if alpha > 5 else 0.5 if alpha > 0 else 0.0)
+
+    concentration = finite_or_none(max_position_pct)
+    if concentration is not None:
+        dimensions.append(
+            1.0 if concentration <= 30 else 0.5 if concentration <= 50 else 0.0
+        )
+
+    coverage = len(dimensions) * 25
+    # ponytail: heuristic 75% coverage gate; validate before decision-grade use.
+    if coverage < 75:
+        return None, coverage
+    return round(sum(dimensions) / len(dimensions) * 100), coverage
+
+
 def bound_efficient_return(
     target_return: float,
     minimum_return: float,
