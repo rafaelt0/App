@@ -137,3 +137,45 @@ def test_zero_weight_manual_asset_does_not_limit_return_sample():
         assert list(app.session_state["returns"].columns) == ["PETR4.SA"]
         assert app.session_state["pesos_manuais"] == {"PETR4.SA": 1.0, "VALE3.SA": 0.0}
         assert any("Ativos com peso zero foram excluídos" in item.value for item in app.caption)
+
+
+def test_loaded_markowitz_keeps_frontier_without_allocation_row_or_extra_drawdown_rule():
+    import json
+    import numpy as np
+
+    dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=70)
+    days = np.arange(len(dates))
+    prices = pd.DataFrame(
+        {"PETR4.SA": 100 + days + 2 * np.sin(days),
+         "VALE3.SA": 90 + 0.8 * days + np.cos(days)},
+        index=dates,
+    )
+    stocks = pd.DataFrame({"Ticker": ["PETR4", "VALE3"], "Empresa": ["Petrobras", "Vale"]})
+    with (
+        patch("utils.market_data.get_listed_stocks", return_value=stocks),
+        patch("utils.portfolio_data.get_portfolio_prices", lambda *args: prices.copy()),
+        patch("utils.portfolio_data.get_portfolio_trade_prices", lambda *args: prices.copy()),
+        patch("utils.portfolio_data.get_benchmark_prices", lambda *args: pd.Series(100 + 0.5 * days + np.sin(days), index=dates)),
+        patch("utils.portfolio_data.get_selic_rate", lambda: 0.0005),
+        patch("utils.db.portfolio_get", lambda uid: ([], {})),
+        patch("utils.db.portfolio_save", lambda *args: None),
+        patch("utils.identity.get_browser_uid", lambda: "test-visitor"),
+        patch("streamlit.page_link", lambda *args, **kwargs: None),
+    ):
+        app = AppTest.from_file("pages/1_Portfolio.py", default_timeout=30)
+        app.session_state["selected_tickers"] = ["PETR4", "VALE3"]
+        app.run()
+        next(button for button in app.button if button.label == "Carregar portfólio").click().run()
+
+    assert not app.exception
+    charts = [json.loads(chart.proto.spec) for chart in app.get("plotly_chart")]
+    assert any("Fronteira Eficiente de Markowitz" in chart["layout"]["title"]["text"]
+               and any(trace["name"] == "Linha de alocação (carteira selecionada)"
+                       for trace in chart["data"]) for chart in charts)
+    assert not any("% em ativos de risco" in item.label for item in app.number_input)
+    markup = [item.value for item in app.markdown]
+    assert not any("Linha de alocação — quanto você aloca" in value for value in markup)
+    regime = next(i for i, value in enumerate(markup) if "Regime de Mercado" in value)
+    drawdown = next(i for i, value in enumerate(markup) if "Análise de Drawdown" in value)
+    assert any("background:linear-gradient(90deg" in value for value in markup[regime:drawdown])
+    assert "---" not in markup[regime:drawdown]
