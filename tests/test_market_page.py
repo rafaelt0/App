@@ -78,12 +78,14 @@ def test_market_consensus_waits_for_analysis_and_uses_selected_tickers():
         assert not app.selectbox
         assert not any(button.label == "Buscar" for button in app.button)
 
-        selector.set_value(["PETR4"]).run()
-        assert app.multiselect(key="selected_tickers").value == ["PETR4"]
-        assert app.session_state["selected_tickers"] == ["PETR4"]
+        selector.set_value(["VALE3"]).run()
+        assert app.multiselect(key="selected_tickers").value == ["VALE3"]
+        assert app.session_state["selected_tickers"] == ["VALE3"]
+        assert app.multiselect(key="selected_tickers").options == selector.options
         assert not fetch_targets.called
         assert not fetch_fundamentals.called
         app.multiselect(key="selected_tickers").set_value(["PETR4", "VALE3"]).run()
+        assert app.multiselect(key="selected_tickers").options == selector.options
         assert not fetch_targets.called
         assert not fetch_fundamentals.called
 

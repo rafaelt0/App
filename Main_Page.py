@@ -390,7 +390,9 @@ def _stock_label(ticker):
     return "  ·  ".join(filter(None, (ticker, _ticker_empresa.get(ticker), _ticker_setor.get(ticker))))
 
 
-_options = list(dict.fromkeys([*st.session_state["selected_tickers"], *tickers_filtrados]))
+# Keep options stable as stocks are selected: changing their order remounts the
+# widget and closes its open menu. Sector matches remain first as suggestions.
+_options = list(dict.fromkeys([*tickers_filtrados, *stocks]))
 
 tickers = st.multiselect(
     "Escolha ações para analisar",

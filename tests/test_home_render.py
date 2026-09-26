@@ -56,6 +56,8 @@ def test_analyst_synthesis_shows_simple_category_summary():
 
     rendered = "\n".join(call.args[0] for call in markdown.call_args_list)
     assert "2/3" in rendered
+    assert "ATRATIVO" not in rendered
+    assert "analyst-synthesis-verdict" not in rendered
     assert "Dividendos" in rendered
     assert 'class="analyst-synthesis-card"' in rendered
     assert '<details class="analyst-synthesis-details">' in rendered

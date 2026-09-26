@@ -52,11 +52,6 @@ def render_analyst_synthesis(
         "Neutro": "neutral",
         "Desfavorável": "negative",
     }
-    verdict_classes = {
-        "ATRATIVO": "positive",
-        "NEUTRO": "neutral",
-        "FRACO": "negative",
-    }
     for ticker in tickers:
         if ticker not in df_ind.index:
             continue
@@ -72,7 +67,6 @@ def render_analyst_synthesis(
         sector = sector.strip() if isinstance(sector, str) else ""
         synthesis = build_analyst_synthesis(peers_raw, ticker, sector, b3_data)
         categories = synthesis["categorias"]
-        verdict = str(synthesis["veredicto"])
         if synthesis["categorias_validas"] < 2:
             summary_html = (
                 '<p class="analyst-synthesis-summary analyst-synthesis-insufficient">'
@@ -148,8 +142,6 @@ def render_analyst_synthesis(
             f'<span>{escape(str(company_name))}</span></div>'
             f'<div class="analyst-synthesis-sector">'
             f'{escape(sector or "Setor indisponível")}</div></div>'
-            f'<span class="analyst-synthesis-verdict is-'
-            f'{verdict_classes.get(verdict, "muted")}">{escape(verdict)}</span>'
             f'</header>{summary_html}{categories_html}{details_html}</article>',
             unsafe_allow_html=True,
         )
