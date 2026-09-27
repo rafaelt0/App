@@ -185,12 +185,9 @@ def test_minimum_volatility_is_first_strategy_and_minimizes_portfolio_variance()
 
     assert not app.exception
     assert app.session_state["modo"] == "Otimização de Mínima Volatilidade"
-    assert app.session_state["pesos_manuais"]["PETR4.SA"] == pytest.approx(
-        0.6923, abs=0.01
-    )
-    assert app.session_state["pesos_manuais"]["VALE3.SA"] == pytest.approx(
-        0.3077, abs=0.01
-    )
+    weights = app.session_state["peso_manual_df"]["Peso"]
+    assert weights["PETR4"] == pytest.approx(0.6923, abs=0.01)
+    assert weights["VALE3"] == pytest.approx(0.3077, abs=0.01)
 
 
 def test_loaded_markowitz_keeps_frontier_without_allocation_row_or_extra_drawdown_rule():
