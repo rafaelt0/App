@@ -9,7 +9,17 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils import db as _db
-from utils.charts import apply_plotly_theme
+from utils.charts import (
+    CHART_ACCENT,
+    CHART_DANGER,
+    CHART_INFO,
+    CHART_INFO_FILL,
+    CHART_MUTED,
+    CHART_PRIMARY,
+    CHART_SECONDARY,
+    CHART_TEXT,
+    apply_plotly_theme,
+)
 from utils.formatting import (
     extract_debt_metric,
     format_large_br_currency,
@@ -363,21 +373,21 @@ def render_debt_panel(ticker_name, row):
     if db_val is not None:
         debt_cards["Dívida / Patrimônio"] = f"{db_val:.2f}×"
         debt_colors["Dívida / Patrimônio"] = (
-            "#ff3d5a" if db_val > 3 else ("#ffd600" if db_val > 1.5 else "#00ff87")
+            CHART_DANGER if db_val > 3 else (CHART_ACCENT if db_val > 1.5 else CHART_PRIMARY)
         )
 
     if lc_val is not None:
         debt_cards["Liquidez Corrente"] = f"{lc_val:.2f}×"
         debt_colors["Liquidez Corrente"] = (
-            "#ff3d5a" if lc_val < 1 else ("#ffd600" if lc_val < 1.5 else "#00ff87")
+            CHART_DANGER if lc_val < 1 else (CHART_ACCENT if lc_val < 1.5 else CHART_PRIMARY)
         )
 
     if ev_ebit_val is not None:
         debt_cards["EV / EBIT"] = f"{ev_ebit_val:.1f}×"
         debt_colors["EV / EBIT"] = (
-            "#ff3d5a"
+            CHART_DANGER
             if ev_ebit_val > 20
-            else ("#ffd600" if ev_ebit_val > 12 else "#00ff87")
+            else (CHART_ACCENT if ev_ebit_val > 12 else CHART_PRIMARY)
         )
 
     cards_html = "".join(
@@ -394,15 +404,15 @@ def render_debt_panel(ticker_name, row):
                 (
                     ICO_ALERT,
                     f"Dívida/PL de {db_val:.1f}× é elevada — verifique capacidade de pagamento",
-                    "#ff3d5a",
+                    CHART_DANGER,
                 )
             )
         elif db_val > 1.5:
             diags.append(
-                (ICO_BOLT, f"Dívida/PL de {db_val:.1f}× é moderada — monitorar", "#ffd600")
+                (ICO_BOLT, f"Dívida/PL de {db_val:.1f}× é moderada — monitorar", CHART_ACCENT)
             )
         else:
-            diags.append((ICO_CHECK_SM, f"Dívida/PL de {db_val:.1f}× é saudável", "#00ff87"))
+            diags.append((ICO_CHECK_SM, f"Dívida/PL de {db_val:.1f}× é saudável", CHART_PRIMARY))
 
     if lc_val is not None:
         if lc_val < 1:
@@ -410,19 +420,19 @@ def render_debt_panel(ticker_name, row):
                 (
                     ICO_ALERT,
                     f"Liquidez Corrente {lc_val:.2f}× < 1 — risco de dificuldade de caixa",
-                    "#ff3d5a",
+                    CHART_DANGER,
                 )
             )
         elif lc_val < 1.5:
             diags.append(
-                (ICO_BOLT, f"Liquidez Corrente {lc_val:.2f}× — margem estreita", "#ffd600")
+                (ICO_BOLT, f"Liquidez Corrente {lc_val:.2f}× — margem estreita", CHART_ACCENT)
             )
         else:
             diags.append(
                 (
                     ICO_CHECK_SM,
                     f"Liquidez Corrente {lc_val:.2f}× — empresa com boa folga de caixa",
-                    "#00ff87",
+                    CHART_PRIMARY,
                 )
             )
 
@@ -458,18 +468,26 @@ def render_star_button(tkr, uid):
 
 def color_veredicto(val):
     """Estilo CSS para coluna Veredicto na tabela de percentis."""
-    m = {"Favorável": "#00ff8722", "Neutro": "#ffd60022", "Desfavorável": "#ff3d5a22"}
-    c = {"Favorável": "#00ff87", "Neutro": "#ffd600", "Desfavorável": "#ff3d5a"}
+    m = {
+        "Favorável": "color-mix(in srgb, var(--brand-primary) 12%, transparent)",
+        "Neutro": "color-mix(in srgb, var(--brand-accent) 12%, transparent)",
+        "Desfavorável": "color-mix(in srgb, var(--brand-danger) 12%, transparent)",
+    }
+    c = {
+        "Favorável": "var(--brand-primary)",
+        "Neutro": "var(--brand-accent)",
+        "Desfavorável": "var(--brand-danger)",
+    }
     return f"background-color:{m.get(val, '')};color:{c.get(val, '')};font-weight:600"
 
 
 def color_pct(val):
     """Estilo CSS para coluna Percentil na tabela de percentis."""
     if val >= 70:
-        return "color:#00ff87;font-weight:700"
+        return "color:var(--brand-primary);font-weight:700"
     if val >= 40:
-        return "color:#ffd600;font-weight:700"
-    return "color:#ff3d5a;font-weight:700"
+        return "color:var(--brand-accent);font-weight:700"
+    return "color:var(--brand-danger);font-weight:700"
 
 
 def get_ticker_setor(df, ticker):
@@ -515,7 +533,7 @@ def render_hist_section(tkr):
                 else (1, "R$")
             )
             df_rev = df_rev / scale
-            clr = {"Receita": "#00d2ff", "Lucro Líquido": "#00ff87"}
+            clr = {"Receita": CHART_SECONDARY, "Lucro Líquido": CHART_PRIMARY}
             fig_rev = go.Figure()
             for col in cols_rev:
                 vals = df_rev[col].fillna(0)
@@ -524,10 +542,10 @@ def render_hist_section(tkr):
                         name=col,
                         x=df_rev.index.astype(str),
                         y=vals,
-                        marker_color=clr.get(col, "#94a3b8"),
+                        marker_color=clr.get(col, CHART_MUTED),
                         text=[f"{v:.1f}" if v != 0 else "" for v in vals],
                         textposition="outside",
-                        textfont=dict(size=10, color="#f8fafc"),
+                        textfont=dict(size=10, color=CHART_TEXT),
                     )
                 )
             fig_rev.update_layout(
@@ -548,7 +566,7 @@ def render_hist_section(tkr):
             st.info("Dados de margem não disponíveis.")
         else:
             df_m = df_h[cols_m].dropna(how="all")
-            clr_m = {"Margem Líquida (%)": "#00ff87", "Margem EBIT (%)": "#ffd600"}
+            clr_m = {"Margem Líquida (%)": CHART_PRIMARY, "Margem EBIT (%)": CHART_ACCENT}
             fig_m = go.Figure()
             for col in cols_m:
                 vals = df_m[col]
@@ -558,11 +576,11 @@ def render_hist_section(tkr):
                         x=df_m.index.astype(str),
                         y=vals,
                         mode="lines+markers+text",
-                        line=dict(color=clr_m.get(col, "#94a3b8"), width=2.5),
+                        line=dict(color=clr_m.get(col, CHART_MUTED), width=2.5),
                         marker=dict(size=8),
                         text=[f"{v:.1f}%" if pd.notna(v) else "" for v in vals],
                         textposition="top center",
-                        textfont=dict(size=10, color="#f8fafc"),
+                        textfont=dict(size=10, color=CHART_TEXT),
                     )
                 )
             fig_m.update_layout(
@@ -585,25 +603,25 @@ def render_hist_section(tkr):
                     x=df_roe.index.astype(str),
                     y=df_roe["ROE (%)"],
                     mode="lines+markers+text",
-                    line=dict(color="#a855f7", width=2.5),
-                    marker=dict(size=9, color="#a855f7"),
+                    line=dict(color=CHART_INFO, width=2.5),
+                    marker=dict(size=9, color=CHART_INFO),
                     fill="tozeroy",
-                    fillcolor="rgba(168,85,247,0.08)",
+                    fillcolor=CHART_INFO_FILL,
                     text=[
                         f"{v:.1f}%" if pd.notna(v) else "" for v in df_roe["ROE (%)"]
                     ],
                     textposition="top center",
-                    textfont=dict(size=10, color="#f8fafc"),
+                    textfont=dict(size=10, color=CHART_TEXT),
                 )
             )
             fig_roe.add_hline(
                 y=15,
                 line_dash="dash",
-                line_color="#00ff87",
+                line_color=CHART_PRIMARY,
                 line_width=1.5,
                 annotation_text="Referência: 15%",
                 annotation_position="top right",
-                annotation_font=dict(color="#00ff87", size=10),
+                annotation_font=dict(color=CHART_PRIMARY, size=10),
             )
             fig_roe.update_layout(
                 xaxis_title="Ano",

@@ -1,29 +1,57 @@
-def apply_plotly_theme(fig):
+from typing import Final
+
+import plotly.graph_objects as go
+
+
+CHART_PRIMARY: Final = "#76d5c5"
+CHART_SECONDARY: Final = "#91b9e7"
+CHART_ACCENT: Final = "#e7bd69"
+CHART_DANGER: Final = "#ef969d"
+CHART_INFO: Final = "#b7a3e2"
+CHART_TEXT: Final = "#eef4f2"
+CHART_MUTED: Final = "#9cafae"
+CHART_GRID: Final = "#63787c"
+CHART_BORDER: Final = "#33464a"
+CHART_SURFACE: Final = "#142126"
+CHART_SECONDARY_FILL: Final = "rgba(145, 185, 231, 0.14)"
+CHART_SECONDARY_FILL_STRONG: Final = "rgba(145, 185, 231, 0.24)"
+CHART_DANGER_FILL: Final = "rgba(239, 150, 157, 0.16)"
+CHART_INFO_FILL: Final = "rgba(183, 163, 226, 0.12)"
+CHART_COLORWAY: Final = (
+    CHART_PRIMARY,
+    CHART_SECONDARY,
+    CHART_ACCENT,
+    CHART_DANGER,
+    CHART_INFO,
+)
+
+
+def apply_plotly_theme(fig: go.Figure) -> go.Figure:
     fig.update_layout(
         template="plotly_dark",
-        paper_bgcolor="rgba(0, 0, 0, 0)",
-        plot_bgcolor="rgba(0, 0, 0, 0)",
-        colorway=["#61d4c6", "#8cb4f2", "#e7b96b", "#e58a93", "#b7a2e6"],
+        paper_bgcolor=CHART_SURFACE,
+        plot_bgcolor=CHART_SURFACE,
+        colorway=CHART_COLORWAY,
         font=dict(
             family='-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            color="#f0f4f8",
+            color=CHART_TEXT,
         ),
         xaxis=dict(
-            gridcolor="#28384b",
-            linecolor="#405873",
-            zerolinecolor="#34465b",
+            gridcolor=CHART_GRID,
+            linecolor=CHART_BORDER,
+            zerolinecolor=CHART_GRID,
             tickfont=dict(
                 family='"SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace',
-                color="#aebaca",
+                color=CHART_MUTED,
             ),
         ),
         yaxis=dict(
-            gridcolor="#28384b",
-            linecolor="#405873",
-            zerolinecolor="#34465b",
+            gridcolor=CHART_GRID,
+            linecolor=CHART_BORDER,
+            zerolinecolor=CHART_GRID,
             tickfont=dict(
                 family='"SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace',
-                color="#aebaca",
+                color=CHART_MUTED,
             ),
         ),
         legend=dict(
@@ -32,14 +60,14 @@ def apply_plotly_theme(fig):
             y=-0.3,
             xanchor="center",
             x=0.5,
-            bgcolor="rgba(21, 29, 42, 0.8)",
-            bordercolor="rgba(52, 70, 91, 0.65)",
+            bgcolor=CHART_SURFACE,
+            bordercolor=CHART_BORDER,
             borderwidth=1,
         ),
         hoverlabel=dict(
-            bgcolor="#151d2a",
-            bordercolor="#34465b",
-            font=dict(color="#f0f4f8"),
+            bgcolor=CHART_SURFACE,
+            bordercolor=CHART_BORDER,
+            font=dict(color=CHART_TEXT),
         ),
         margin=dict(b=80),
     )

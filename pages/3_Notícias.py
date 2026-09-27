@@ -11,7 +11,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
-from utils.charts import apply_plotly_theme
+from utils.charts import (
+    CHART_ACCENT,
+    CHART_DANGER,
+    CHART_MUTED,
+    CHART_PRIMARY,
+    CHART_SECONDARY,
+    apply_plotly_theme,
+)
 from utils import db as _db
 from utils.identity import get_browser_uid
 from utils.news import (
@@ -107,6 +114,19 @@ render_page_header(
 _INTENSITY_LEVELS = (
     "Alto", "Médio-Alto", "Médio", "Baixo-Médio", "Baixo", "Evidência limitada"
 )
+_SENTIMENT_COLORS = {
+    "Otimista": CHART_PRIMARY,
+    "Neutro": CHART_SECONDARY,
+    "Pessimista": CHART_DANGER,
+}
+_INTENSITY_COLORS = {
+    "Alto": CHART_SECONDARY,
+    "Médio-Alto": CHART_ACCENT,
+    "Médio": CHART_ACCENT,
+    "Baixo-Médio": CHART_PRIMARY,
+    "Baixo": CHART_PRIMARY,
+    "Evidência limitada": CHART_MUTED,
+}
 
 # ─── REAL-TIME NEWS RSS FETCHING ──────────────────────────────────────────────
 NEWS_REQUEST_TIMEOUT_SECONDS = 8
@@ -311,21 +331,21 @@ if not _portfolio_ready:
         _empty_title = "Atualize o portfólio"
         _empty_message = (
             "A seleção de ativos mudou desde a última análise. "
-            "Volte para <strong style=\"color:#61d4c6\">Portfolio</strong> e clique em "
+            "Volte para <strong style=\"color:var(--brand-primary)\">Portfolio</strong> e clique em "
             "<strong>Carregar portfólio</strong> antes de consultar as notícias."
         )
     else:
         _empty_title = "Portfólio não configurado"
         _empty_message = (
-            "Configure seu portfólio na página <strong style=\"color:#61d4c6\">Portfolio</strong> "
+            "Configure seu portfólio na página <strong style=\"color:var(--brand-primary)\">Portfolio</strong> "
             "e carregue a análise para filtrar as notícias dos seus ativos."
         )
     empty_state_card(
         icon_svg="""<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" style="opacity:0.4;margin-bottom:1rem">
-            <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" stroke="#94a3b8" stroke-width="1.5"/>
-            <path d="M14 4v4h4" stroke="#94a3b8" stroke-width="1.5"/>
-            <line x1="7" y1="13" x2="17" y2="13" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="7" y1="17" x2="17" y2="17" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" stroke="var(--text-muted)" stroke-width="1.5"/>
+            <path d="M14 4v4h4" stroke="var(--text-muted)" stroke-width="1.5"/>
+            <line x1="7" y1="13" x2="17" y2="13" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="7" y1="17" x2="17" y2="17" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round"/>
         </svg>""",
         title=_empty_title,
         message=_empty_message,
@@ -389,16 +409,16 @@ finbert_nlp = st.session_state.get(_nlp_state_key)
 
 if fetched_items and finbert_nlp is not None:
     st.sidebar.markdown(
-        f'<div style="margin:0.5rem 0;padding:0.6rem 0.85rem;background:rgba(0,255,135,0.06);'
-        f'border:1px solid rgba(0,255,135,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">'
-        f'{ICO_CPU}<span style="font-size:0.82rem;color:#b0ffe0;font-weight:600">FinBERT-PT-BR disponível</span></div>',
+        f'<div style="margin:0.5rem 0;padding:0.6rem 0.85rem;background:color-mix(in srgb,var(--brand-primary) 8%,var(--panel-bg));'
+        f'border:1px solid color-mix(in srgb,var(--brand-primary) 30%,var(--panel-border));border-radius:var(--radius-md);display:flex;align-items:center;gap:8px;">'
+        f'{ICO_CPU}<span style="font-size:0.875rem;color:var(--brand-primary);font-weight:600">FinBERT-PT-BR disponível</span></div>',
         unsafe_allow_html=True,
     )
 else:
     st.sidebar.markdown(
-        f'<div style="margin:0.5rem 0;padding:0.6rem 0.85rem;background:rgba(0,210,255,0.06);'
-        f'border:1px solid rgba(0,210,255,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">'
-        f'{ICO_LEXICON}<span style="font-size:0.82rem;color:#b8eeff;font-weight:600">{"PLN Léxico (fallback)" if fetched_items else "Sem notícias classificadas"}</span></div>',
+        f'<div style="margin:0.5rem 0;padding:0.6rem 0.85rem;background:color-mix(in srgb,var(--brand-secondary) 8%,var(--panel-bg));'
+        f'border:1px solid color-mix(in srgb,var(--brand-secondary) 30%,var(--panel-border));border-radius:var(--radius-md);display:flex;align-items:center;gap:8px;">'
+        f'{ICO_LEXICON}<span style="font-size:0.875rem;color:var(--brand-secondary);font-weight:600">{"PLN Léxico (fallback)" if fetched_items else "Sem notícias classificadas"}</span></div>',
         unsafe_allow_html=True,
     )
 
@@ -475,17 +495,17 @@ if news_coverage > 0:
         else "FORTEMENTE PESSIMISTA"
     )
     score_color = (
-        "#00ff87"
+        CHART_PRIMARY
         if normalized_score >= 60
-        else "#ffd600"
+        else CHART_ACCENT
         if normalized_score >= 40
-        else "#ff3d5a"
+        else CHART_DANGER
     )
 else:
     avg_score = 0.0
     normalized_score = 50
     sentiment_label = "SEM DADOS RECENTES"
-    score_color = "#64748b"
+    score_color = CHART_MUTED
 
 score_display = str(normalized_score) if news_coverage > 0 else "—"
 
@@ -497,36 +517,17 @@ with col_g1:
     engines = {item["engine"] for item in classified_items}
     nlp_engine_label = " / ".join(sorted(engines)) if engines else "sem classificação"
     st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #0e1b2f, #080c14); 
-                border: 2px solid {score_color}; 
-                border-radius: 16px; 
-                padding: 1.8rem 1.5rem; 
-                text-align: center; 
-                box-shadow: 0 0 20px {score_color}1a;
-                margin-bottom: 1.5rem;">
-        <div style="font-size: 0.75rem; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase;">Tom da amostra disponível ({nlp_engine_label})</div>
-        <div style="font-size: 3.5rem; font-weight: 900; color: {score_color}; font-family: 'JetBrains Mono', monospace; margin: 0.5rem 0;">
-            {score_display}<span style="font-size: 1.5rem; font-weight: 500; color: #94a3b8;">/100</span>
+    <div class="news-score-card" style="--score-color:{score_color}">
+        <div class="news-score-label">Tom da amostra disponível ({escape(nlp_engine_label)})</div>
+        <div class="news-score-value">{score_display}<span class="news-score-scale">/100</span></div>
+        <div class="news-score-sentiment">{escape(sentiment_label)}</div>
+        <div class="news-score-note">Cobertura: {news_coverage:.1%} do peso · escala 0–100 do tom, não retorno; ativos sem notícias excluídos</div>
+        <div class="news-score-stats">
+            <div><span class="news-score-positive">{pos_count}</span><div>Positivas</div></div>
+            <div><span class="news-score-neutral">{neu_count}</span><div>Neutras</div></div>
+            <div><span class="news-score-negative">{neg_count}</span><div>Negativas</div></div>
         </div>
-        <div style="font-size: 0.85rem; font-weight: 700; color: {score_color}; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.8rem;">
-            {sentiment_label}
-        </div>
-        <div style="color:#94a3b8;font-size:0.75rem;margin-bottom:0.6rem">Cobertura: {news_coverage:.1%} do peso · escala 0–100 do tom, não retorno; ativos sem notícias excluídos</div>
-        <div style="display: flex; justify-content: space-around; border-top: 1px solid #1e293b; padding-top: 0.8rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">
-            <div>
-                <span style="color: #4ade80; font-weight: 700;">{pos_count}</span>
-                <div style="color: #94a3b8; font-size: 0.65rem;">Positivas</div>
-            </div>
-            <div>
-                <span style="color: #60a5fa; font-weight: 700;">{neu_count}</span>
-                <div style="color: #94a3b8; font-size: 0.65rem;">Neutras</div>
-            </div>
-            <div>
-                <span style="color: #f87171; font-weight: 700;">{neg_count}</span>
-                <div style="color: #94a3b8; font-size: 0.65rem;">Negativas</div>
-            </div>
-        </div>
-        <div style="color:#94a3b8;font-size:0.7rem;margin-top:0.6rem">Artigos únicos, antes dos filtros do feed</div>
+        <div class="news-score-note">Artigos únicos, antes dos filtros do feed</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -545,15 +546,15 @@ with col_g2:
     fig = go.Figure()
     fig.add_trace(go.Bar(
         name='Pessimista', y=df_sent['Ativo'], x=df_sent['Pessimista'], 
-        orientation='h', marker=dict(color='#f87171')
+        orientation='h', marker=dict(color=CHART_DANGER)
     ))
     fig.add_trace(go.Bar(
         name='Neutro', y=df_sent['Ativo'], x=df_sent['Neutro'], 
-        orientation='h', marker=dict(color='#60a5fa')
+        orientation='h', marker=dict(color=CHART_SECONDARY)
     ))
     fig.add_trace(go.Bar(
         name='Otimista', y=df_sent['Ativo'], x=df_sent['Otimista'], 
-        orientation='h', marker=dict(color='#4ade80')
+        orientation='h', marker=dict(color=CHART_PRIMARY)
     ))
     
     fig.update_layout(
@@ -700,25 +701,14 @@ st.caption(
 )
 
 for news in news_to_show:
-    badge_bg = "rgba(74, 222, 128, 0.1)" if news["sentiment"] == "Otimista" else \
-               "rgba(248, 113, 113, 0.1)" if news["sentiment"] == "Pessimista" else "rgba(96, 165, 250, 0.1)"
-    badge_color = "#4ade80" if news["sentiment"] == "Otimista" else \
-                  "#f87171" if news["sentiment"] == "Pessimista" else "#60a5fa"
-                  
-    intensity_color = (
-        "#94a3b8" if news["intensity"] == "Evidência limitada"
-        else "#4ade80" if news["intensity"] == "Baixo"
-        else "#ffd600" if "Médio" in news["intensity"]
-        else "#ff3d5a"
-    )
+    badge_color = _SENTIMENT_COLORS.get(news["sentiment"], CHART_MUTED)
+    intensity_color = _INTENSITY_COLORS.get(news["intensity"], CHART_MUTED)
     importance_rank = news["importance_rank"]
-    importance_color = {3: "#00d2ff", 2: "#ffd600", 1: "#94a3b8"}[importance_rank]
+    importance_color = {3: CHART_SECONDARY, 2: CHART_ACCENT, 1: CHART_MUTED}[importance_rank]
 
     # Escape external feed content before embedding it in custom HTML.
     _news_tickers = " ".join(
-        f'<span style="background:rgba(0, 210, 255, 0.1);color:var(--secondary-color);'
-        f'border:1px solid rgba(0, 210, 255, 0.25);border-radius:4px;padding:0.1rem 0.4rem;'
-        f'font-family:JetBrains Mono,monospace;font-size:0.72rem;font-weight:700">'
+        f'<span class="news-ticker-chip">'
         f'{escape(str(ticker))}</span>'
         for ticker in news["tickers"]
     )
@@ -745,43 +735,38 @@ for news in news_to_show:
         else _news_title
     )
     summary_html = (
-        f'<p style="margin:0;color:var(--text-muted);font-size:0.85rem;line-height:1.5;margin-bottom:0.6rem">'
+        '<p class="news-card-summary">'
         f'{_news_summary}</p>'
         if _news_summary else ""
     )
 
     # News Card Container
     st.markdown(f"""
-    <div style="background-color: var(--panel-bg); 
-                border: 1px solid var(--border-color); 
-                border-radius: 12px; 
-                padding: 1.2rem; 
-                margin-bottom: 0.5rem; 
-                box-shadow: var(--shadow-dark);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
+    <article class="news-article-card">
+        <div class="news-card-header">
+            <div class="news-card-source">
                 {_news_tickers}
-                <span style="color: var(--text-muted); font-size: 0.72rem; font-family: 'JetBrains Mono', monospace;">
+                <span class="news-card-metadata">
                     {_news_provider} • {_news_pub_time} • {_news_engine} • Analisado: {_news_source}
                 </span>
             </div>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <span style="background: rgba(148, 163, 184, 0.1); color: {importance_color}; border: 1px solid {importance_color}40; border-radius: 10rem; padding: 0.15rem 0.5rem; font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem; font-weight: 700;">
+            <div class="news-card-badges">
+                <span class="news-card-badge" style="--badge-color:{importance_color}">
                     IMPORTÂNCIA {_news_importance}
                 </span>
-                <span style="background: {badge_bg}; color: {badge_color}; border: 1px solid {badge_color}40; border-radius: 10rem; padding: 0.15rem 0.5rem; font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem; font-weight: 700;">
+                <span class="news-card-badge" style="--badge-color:{badge_color}">
                     {_news_sentiment}
                 </span>
-                <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">
-                    INTENSIDADE DO SENTIMENTO: <span style="color: {intensity_color}; font-weight: 800;">{_news_intensity}</span>
+                <span class="news-card-intensity" style="--intensity-color:{intensity_color}">
+                    INTENSIDADE DO SENTIMENTO: <strong>{_news_intensity}</strong>
                 </span>
             </div>
         </div>
-        <h3 style="margin: 0.3rem 0 0.5rem 0 !important; font-size: 1rem !important; font-weight: 600; line-height: 1.4; color: var(--text-main);">
+        <h3 class="news-card-title">
             {title_html}
         </h3>
         {summary_html}
-    </div>
+    </article>
     """, unsafe_allow_html=True)
     
     # NLP Explainer Expander
@@ -794,41 +779,41 @@ for news in news_to_show:
             neu_prob = scores_dict.get('NEUTRAL', 0.0) * 100
             
             st.markdown(f"""
-            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #1e293b; border-radius: 12px; padding: 1rem; margin-top: 0.2rem;">
-                <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; margin-bottom: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase;">
+            <div class="news-model-details">
+                <div class="news-model-heading">
                     Scores independentes (sigmoid) — FinBERT-PT-BR
                 </div>
                 
-                <div style="margin-bottom: 0.6rem;">
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #e2e8f0; margin-bottom: 3px;">
-                        <span style="font-weight: 500;">Otimista (POSITIVE)</span>
-                        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #00ff87;">{pos_prob:.1f}%</span>
+                <div class="news-model-row">
+                    <div class="news-model-row-header">
+                        <span>Otimista (POSITIVE)</span>
+                        <span class="news-model-value is-positive">{pos_prob:.1f}%</span>
                     </div>
-                    <div style="background: #0f172a; border-radius: 4px; height: 6px; overflow: hidden; border: 1px solid #1e293b;">
-                        <div style="background: #00ff87; width: {pos_prob:.1f}%; height: 100%; box-shadow: 0 0 8px #00ff8780;"></div>
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 0.6rem;">
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #e2e8f0; margin-bottom: 3px;">
-                        <span style="font-weight: 500;">Pessimista (NEGATIVE)</span>
-                        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #ff3d5a;">{neg_prob:.1f}%</span>
-                    </div>
-                    <div style="background: #0f172a; border-radius: 4px; height: 6px; overflow: hidden; border: 1px solid #1e293b;">
-                        <div style="background: #ff3d5a; width: {neg_prob:.1f}%; height: 100%; box-shadow: 0 0 8px #ff3d5a80;"></div>
+                    <div class="news-model-track">
+                        <div class="news-model-fill is-positive" style="width:{pos_prob:.1f}%"></div>
                     </div>
                 </div>
                 
-                <div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #e2e8f0; margin-bottom: 3px;">
-                        <span style="font-weight: 500;">Neutro (NEUTRAL)</span>
-                        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #ffd600;">{neu_prob:.1f}%</span>
+                <div class="news-model-row">
+                    <div class="news-model-row-header">
+                        <span>Pessimista (NEGATIVE)</span>
+                        <span class="news-model-value is-negative">{neg_prob:.1f}%</span>
                     </div>
-                    <div style="background: #0f172a; border-radius: 4px; height: 6px; overflow: hidden; border: 1px solid #1e293b;">
-                        <div style="background: #ffd600; width: {neu_prob:.1f}%; height: 100%; box-shadow: 0 0 8px #ffd60080;"></div>
+                    <div class="news-model-track">
+                        <div class="news-model-fill is-negative" style="width:{neg_prob:.1f}%"></div>
                     </div>
                 </div>
-                <p style="font-size:0.7rem; color:#64748b; margin-top:8px; margin-bottom:0;">
+                
+                <div class="news-model-row">
+                    <div class="news-model-row-header">
+                        <span>Neutro (NEUTRAL)</span>
+                        <span class="news-model-value is-neutral">{neu_prob:.1f}%</span>
+                    </div>
+                    <div class="news-model-track">
+                        <div class="news-model-fill is-neutral" style="width:{neu_prob:.1f}%"></div>
+                    </div>
+                </div>
+                <p class="news-model-note">
                     Score = POSITIVE − NEGATIVE; ≥ 0,20 otimista, ≤ −0,20 pessimista, demais neutro. Scores não somam 100%. Tamanho do texto: {news['raw_text_length']} palavras.
                 </p>
             </div>
@@ -837,33 +822,39 @@ for news in news_to_show:
         with st.expander(f"📝 Detalhes do Algoritmo PLN (Léxico - Score: {news['score']})"):
             col_exp1, col_exp2 = st.columns([1, 1])
             with col_exp1:
-                st.markdown("<p style='font-size:0.75rem; color:#94a3b8; margin-bottom:2px; font-weight:600;'> termos positivos encontrados </p>", unsafe_allow_html=True)
+                st.markdown('<p class="news-model-label">termos positivos encontrados</p>', unsafe_allow_html=True)
                 if news["pos_terms"]:
-                    pos_html = " ".join([f"<span style='background:rgba(74, 222, 128, 0.15); color:#4ade80; border:1px solid #4ade8040; border-radius:4px; padding:2px 6px; font-size:0.72rem; font-family:\"JetBrains Mono\", monospace;'>{escape(str(w))}</span>" for w in news["pos_terms"]])
+                    pos_html = " ".join(
+                        f'<span class="news-term-chip is-positive">{escape(str(word))}</span>'
+                        for word in news["pos_terms"]
+                    )
                     st.markdown(pos_html, unsafe_allow_html=True)
                 else:
-                    st.markdown("<span style='font-size:0.72rem; color:#64748b; font-style:italic;'>Nenhum</span>", unsafe_allow_html=True)
+                    st.markdown('<span class="news-model-note">Nenhum</span>', unsafe_allow_html=True)
                     
-                st.markdown("<p style='font-size:0.75rem; color:#94a3b8; margin-top:8px; margin-bottom:2px; font-weight:600;'> termos negativos encontrados </p>", unsafe_allow_html=True)
+                st.markdown('<p class="news-model-label">termos negativos encontrados</p>', unsafe_allow_html=True)
                 if news["neg_terms"]:
-                    neg_html = " ".join([f"<span style='background:rgba(248, 113, 113, 0.15); color:#f87171; border:1px solid #f8717140; border-radius:4px; padding:2px 6px; font-size:0.72rem; font-family:\"JetBrains Mono\", monospace;'>{escape(str(w))}</span>" for w in news["neg_terms"]])
+                    neg_html = " ".join(
+                        f'<span class="news-term-chip is-negative">{escape(str(word))}</span>'
+                        for word in news["neg_terms"]
+                    )
                     st.markdown(neg_html, unsafe_allow_html=True)
                 else:
-                    st.markdown("<span style='font-size:0.72rem; color:#64748b; font-style:italic;'>Nenhum</span>", unsafe_allow_html=True)
+                    st.markdown('<span class="news-model-note">Nenhum</span>', unsafe_allow_html=True)
             with col_exp2:
-                st.markdown("<p style='font-size:0.75rem; color:#94a3b8; margin-bottom:2px; font-weight:600;'> equação do score pln </p>", unsafe_allow_html=True)
+                st.markdown('<p class="news-model-label">equação do score pln</p>', unsafe_allow_html=True)
                 pos_len = len(news["pos_terms"])
                 neg_len = len(news["neg_terms"])
                 denom = pos_len + neg_len
                 denom_str = str(denom) if denom > 0 else "1 (suavizado)"
                 st.markdown(f"""
-                <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #1e293b; border-radius: 8px; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;">
+                <div class="news-model-formula">
                     Score = (Pos - Neg) / (Pos + Neg)<br>
                     Score = ({pos_len} - {neg_len}) / {denom_str}<br>
                     <b>Score Final = {news['score']}</b>
                 </div>
                 """, unsafe_allow_html=True)
-                st.markdown(f"<p style='font-size:0.7rem; color:#64748b; margin-top:4px;'>Tamanho do texto tokenizado: {news['raw_text_length']} palavras.</p>", unsafe_allow_html=True)
+                st.markdown(f'<p class="news-model-note">Tamanho do texto tokenizado: {news["raw_text_length"]} palavras.</p>', unsafe_allow_html=True)
                 
     st.markdown("<div style='margin-bottom:1rem;'></div>", unsafe_allow_html=True)
 

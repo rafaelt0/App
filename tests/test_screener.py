@@ -160,6 +160,8 @@ def test_screener_preset_change_and_manual_edit_update_ui_state():
         app = AppTest.from_file("pages/5_Screener.py").run()
         assert not app.exception
         assert any("3 de 3 ativos" in item.value for item in app.caption)
+        assert any("Liquidez 2m ≥ R$ 1.000.000" in item.value for item in app.caption)
+        assert [metric.value for metric in app.metric] == ["3", "5,67%", "13,00%"]
         assert "P/L" in app.dataframe[0].value.columns
         liquidity = app.select_slider(key="liq2m_min")
         assert liquidity.value == 1_000_000
@@ -169,11 +171,15 @@ def test_screener_preset_change_and_manual_edit_update_ui_state():
         liquidity.set_value(3_000_000).run()
         assert app.selectbox(key="preset_select").value == "Personalizado"
         assert any("2 de 3 ativos" in item.value for item in app.caption)
+        assert any("Liquidez 2m ≥ R$ 3.000.000" in item.value for item in app.caption)
 
         app.selectbox(key="preset_select").select("Renda atual").run()
         assert app.select_slider(key="liq2m_min").value == 1_000_000
         assert app.selectbox(key="preset_select").value == "Renda atual"
         assert any("DY ≥ 5%" in item.value and "ROE ≥ 10%" in item.value for item in app.caption)
+
+        app.number_input(key="dy_min").set_value(5.5).run()
+        assert any("DY ≥ 5,5%" in item.value for item in app.caption)
 
         app.number_input(key="roe_min").set_value(20).run()
         assert app.selectbox(key="preset_select").value == "Personalizado"

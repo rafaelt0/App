@@ -16,7 +16,17 @@ from pypfopt.efficient_frontier import EfficientFrontier
 from quantstats.stats import sharpe, sortino, max_drawdown, var
 import quantstats as qs
 from utils import db as _db
-from utils.charts import apply_plotly_theme
+from utils.charts import (
+    CHART_ACCENT,
+    CHART_DANGER,
+    CHART_DANGER_FILL,
+    CHART_GRID,
+    CHART_MUTED,
+    CHART_PRIMARY,
+    CHART_SECONDARY,
+    CHART_TEXT,
+    apply_plotly_theme,
+)
 from utils.identity import get_browser_uid
 from utils.ui import (
     diag_row,
@@ -175,7 +185,7 @@ st.markdown(
     body:has(.page-hero[data-page="portfolio"]) .main .stNumberInput input,
     body:has(.page-hero[data-page="portfolio"]) .main .stSelectbox [data-baseweb="select"] > div,
     body:has(.page-hero[data-page="portfolio"]) .main .stMultiSelect [data-baseweb="select"] > div {
-      border-color: #405873 !important;
+      border-color: var(--border-strong) !important;
       border-radius: 6px !important;
       background: var(--panel-bg) !important;
       color: var(--text-main) !important;
@@ -227,7 +237,7 @@ st.markdown(
     }
     body:has(.page-hero[data-page="portfolio"]) .main button[data-testid^="baseButton-"] {
       min-height: 2.6rem;
-      border: 1px solid #405873 !important;
+      border: 1px solid var(--border-strong) !important;
       border-radius: 6px !important;
       background: var(--panel-raised) !important;
       color: var(--brand-primary) !important;
@@ -239,8 +249,8 @@ st.markdown(
       background: var(--surface-hover) !important;
     }
     body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stPageLink"] a {
-      border-color: #405873 !important;
-      background: #0e1524 !important;
+      border-color: var(--border-strong) !important;
+      background: var(--panel-bg) !important;
       color: var(--brand-secondary) !important;
     }
     body:has(.page-hero[data-page="portfolio"]) .main [data-testid="baseButton-primary"] {
@@ -264,7 +274,6 @@ st.markdown(
     body:has(.page-hero[data-page="portfolio"]) .main [style*="#64748b"] { color: var(--text-faint) !important; }
     body:has(.page-hero[data-page="portfolio"]) .main [style*="#475569"] { color: var(--text-muted) !important; }
     body:has(.page-hero[data-page="portfolio"]) .main [style*="#1e293b"] { border-color: var(--panel-border) !important; }
-    body:has(.page-hero[data-page="portfolio"]) .main [style*="linear-gradient"] { background: var(--panel-raised) !important; }
     body:has(.page-hero[data-page="portfolio"]) .main :focus-visible {
       outline: none !important;
       box-shadow: var(--focus-ring) !important;
@@ -342,7 +351,7 @@ def _refresh_portfolio_data() -> None:
 
 
 with st.container(border=True):
-    period_title, refresh_col = st.columns([3, 1])
+    period_title, refresh_col = st.columns([2, 1])
     with period_title:
         section_header(ICO_RULER, "Janela de análise", "h3")
     with refresh_col:
@@ -474,7 +483,7 @@ def _clear_saved_portfolio():
 
 with st.container(border=True):
     section_header(ICO_BOX, "Ativos e distribuição", "h3")
-    col_tickers, col_clear = st.columns([5, 1])
+    col_tickers, col_clear = st.columns([2, 1])
     with col_tickers:
         tickers = st.multiselect(
             "Ações da carteira",
@@ -509,7 +518,7 @@ with st.container(border=True):
             on_click=_clear_saved_portfolio,
         )
 
-    col_capital, col_strategy = st.columns([1, 2], gap="large")
+    col_capital, col_strategy = st.columns([1.4, 2], gap="large")
     with col_capital:
         valor_inicial = st.number_input(
             "Capital disponível (R$)", 100, 1_000_000, 10_000
@@ -1015,7 +1024,7 @@ if (
                 y=portfolio_value,
                 mode="lines",
                 name="Portfólio",
-                line=dict(color="#61d4c6", width=2.5),
+                line=dict(color=CHART_PRIMARY, width=2.5),
             )
         )
         if benchmark_available:
@@ -1025,7 +1034,7 @@ if (
                     y=bench_value,
                     mode="lines",
                     name="IBOVESPA",
-                    line=dict(color="#8cb4f2", width=1.5, dash="dash"),
+                    line=dict(color=CHART_SECONDARY, width=1.5, dash="dash"),
                 )
             )
         fig.update_layout(
@@ -1088,8 +1097,8 @@ if (
 
             html_rows = []
             for year, row in monthly_ret_df.iterrows():
-                row_html = '<tr style="border-bottom: 1px solid #1e293b; font-size: 0.88rem;">'
-                row_html += f"<td style=\"padding: 0.7rem 0.5rem; font-weight: 700; text-align: left; color: #f8fafc; font-family: 'JetBrains Mono', monospace;\">{year}</td>"
+                row_html = '<tr style="border-bottom: 1px solid var(--border-default); font-size: 0.88rem;">'
+                row_html += f'<td style="padding:var(--space-2);font-weight:700;text-align:left;color:var(--text-primary);font-family:var(--font-mono)">{year}</td>'
                 for m in [
                     "Jan",
                     "Fev",
@@ -1106,45 +1115,45 @@ if (
                 ]:
                     val = row[m]
                     if pd.isna(val):
-                        row_html += "<td style=\"padding: 0.7rem 0.5rem; color: #475569; font-family: 'JetBrains Mono', monospace;\">-</td>"
+                        row_html += '<td style="padding:var(--space-2);color:var(--text-muted);font-family:var(--font-mono)">-</td>'
                     else:
                         color = (
-                            "#4ade80"
+                            CHART_PRIMARY
                             if val > 0
-                            else "#f87171"
+                            else CHART_DANGER
                             if val < 0
-                            else "#94a3b8"
+                            else CHART_MUTED
                         )
                         sign = "+" if val > 0 else ""
-                        row_html += f"<td style=\"padding: 0.7rem 0.5rem; color: {color}; font-family: 'JetBrains Mono', monospace; font-weight: 700;\">{sign}{val:.2f}%</td>"
+                        row_html += f'<td style="padding:var(--space-2);color:{color};font-family:var(--font-mono);font-weight:700">{sign}{val:.2f}%</td>'
 
                 ytd_val = row["YTD"]
                 if pd.isna(ytd_val):
-                    row_html += "<td style=\"padding: 0.7rem 0.5rem; border-left: 1px solid #1e293b; color: #475569; font-family: 'JetBrains Mono', monospace;\">-</td>"
+                    row_html += '<td style="padding:var(--space-2);border-left:1px solid var(--border-default);color:var(--text-muted);font-family:var(--font-mono)">-</td>'
                 else:
                     ytd_color = (
-                        "#4ade80"
+                        CHART_PRIMARY
                         if ytd_val > 0
-                        else "#f87171"
+                        else CHART_DANGER
                         if ytd_val < 0
-                        else "#94a3b8"
+                        else CHART_MUTED
                     )
                     ytd_sign = "+" if ytd_val > 0 else ""
-                    row_html += f"<td style=\"padding: 0.7rem 0.5rem; border-left: 1px solid #1e293b; color: {ytd_color}; font-family: 'JetBrains Mono', monospace; font-weight: 800;\">{ytd_sign}{ytd_val:.2f}%</td>"
+                    row_html += f'<td style="padding:var(--space-2);border-left:1px solid var(--border-default);color:{ytd_color};font-family:var(--font-mono);font-weight:700">{ytd_sign}{ytd_val:.2f}%</td>'
                 row_html += "</tr>"
                 html_rows.append(row_html)
 
             table_html = f"""
-            <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                        border: 1px solid #1e293b; 
-                        border-radius: 12px; 
-                        padding: 1.2rem; 
+            <div style="background:var(--panel-bg);
+                        border: 1px solid var(--panel-border);
+                        border-radius: var(--radius-md);
+                        padding: var(--space-4);
                         overflow-x: auto; 
-                        margin-bottom: 1.5rem;
-                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                <table style="width: 100%; border-collapse: collapse; text-align: center; color: #f8fafc; font-family: 'Space Grotesk', sans-serif;">
+                        margin-bottom: var(--space-6);
+                        box-shadow: none;">
+                <table style="width: 100%; border-collapse: collapse; text-align: center; color: var(--text-primary); font-family: var(--font-display);">
                     <thead>
-                        <tr style="border-bottom: 2px solid #1e293b; color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                        <tr style="border-bottom: 1px solid var(--border-default); color: var(--text-muted); font-size: 0.875rem;">
                             <th style="padding: 0.8rem 0.5rem; text-align: left;">Ano</th>
                             <th style="padding: 0.8rem 0.5rem;">Jan</th>
                             <th style="padding: 0.8rem 0.5rem;">Fev</th>
@@ -1158,7 +1167,7 @@ if (
                             <th style="padding: 0.8rem 0.5rem;">Out</th>
                             <th style="padding: 0.8rem 0.5rem;">Nov</th>
                             <th style="padding: 0.8rem 0.5rem;">Dez</th>
-                            <th style="padding: 0.8rem 0.5rem; border-left: 1px solid #1e293b; font-weight: 700; color: #38bdf8;">YTD</th>
+                            <th style="padding: var(--space-2); border-left: 1px solid var(--border-default); font-weight: 700; color: var(--brand-secondary);">YTD</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1748,7 +1757,7 @@ if (
 
         st.markdown(
             """
-<div style="background:linear-gradient(90deg,rgba(0,210,255,0.12) 0%,transparent 100%);height:2px;border-radius:2px;margin:2rem 0 1.5rem 0;"></div>
+<div class="portfolio-section-divider"></div>
 """,
             unsafe_allow_html=True,
         )
@@ -1765,8 +1774,8 @@ if (
                 x=drawdown.index,
                 y=drawdown.values,
                 fill="tozeroy",
-                fillcolor="rgba(194,124,127,0.22)",
-                line=dict(color="#e58a93", width=1.5),
+                fillcolor=CHART_DANGER_FILL,
+                line=dict(color=CHART_DANGER, width=1.5),
                 name="Drawdown",
                 hovertemplate="%{x|%d/%m/%Y}<br>%{y:.2%}<extra></extra>",
             )
@@ -1813,22 +1822,22 @@ if (
                 with col:
                     st.markdown(
                         f"""
-                    <div style="background: linear-gradient(135deg, #0e1726, #070c14); 
-                                border: 1px solid #1e293b; 
-                                border-radius: 10px; 
-                                padding: 0.8rem; 
+                    <div style="background:var(--panel-bg);
+                                border: 1px solid var(--panel-border);
+                                border-radius: var(--radius-md);
+                                padding: var(--space-3);
                                 text-align: center; 
-                                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                                margin-bottom: 0.5rem;
+                                box-shadow: none;
+                                margin-bottom: var(--space-2);
                                 min-height: 110px;
                                 display: flex;
                                 flex-direction: column;
                                 justify-content: center;
                                 align-items: center;">
-                        <div style="font-size: 1.1rem; color: #38bdf8; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-bottom: 0.2rem;">{ticker}</div>
-                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Máx. Drawdown</div>
-                        <div style="font-size: 1.2rem; color: #ff1744; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-bottom: 0.3rem;">{m_dd:.2f}%</div>
-                        <div style="font-size: 0.65rem; color: #64748b; font-family: 'JetBrains Mono', monospace;">{dt_dd}</div>
+                        <div style="font-size: 1.1rem; color: var(--brand-secondary); font-weight: 700; font-family: var(--font-mono); margin-bottom: var(--space-1);">{ticker}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: var(--space-1);">Máx. Drawdown</div>
+                        <div style="font-size: 1.2rem; color: var(--brand-danger); font-weight: 700; font-family: var(--font-mono); margin-bottom: var(--space-1);">{m_dd:.2f}%</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">{dt_dd}</div>
                     </div>
                     """,
                         unsafe_allow_html=True,
@@ -1847,7 +1856,7 @@ if (
             go.Scatter(
                 x=rolling_beta.index,
                 y=rolling_beta.values,
-                line=dict(color="#8cb4f2", width=2),
+                line=dict(color=CHART_SECONDARY, width=2),
                 name="Beta Móvel",
                 hovertemplate="%{x|%d/%m/%Y}<br>β=%{y:.3f}<extra></extra>",
             )
@@ -1855,10 +1864,10 @@ if (
         fig2.add_hline(
             y=1,
             line_dash="dash",
-            line_color="#e7b96b",
+            line_color=CHART_ACCENT,
             line_width=1.5,
             annotation_text="β = 1",
-            annotation_font=dict(color="#e7b96b", size=10),
+            annotation_font=dict(color=CHART_ACCENT, size=10),
         )
         fig2.update_layout(
             title=f"Beta Móvel ({window} dias) vs IBOVESPA",
@@ -1882,12 +1891,12 @@ if (
             go.Scatter(
                 x=rolling_sharpe.index,
                 y=rolling_sharpe.values,
-                line=dict(color="#61d4c6", width=2),
+                line=dict(color=CHART_PRIMARY, width=2),
                 name="Sharpe Móvel",
                 hovertemplate="%{x|%d/%m/%Y}<br>Sharpe=%{y:.2f}<extra></extra>",
             )
         )
-        fig_3.add_hline(y=0, line_dash="dash", line_color="#94a3b8", line_width=1)
+        fig_3.add_hline(y=0, line_dash="dash", line_color=CHART_GRID, line_width=1)
         fig_3.update_layout(
             title=f"Índice de Sharpe Móvel Anualizado ({window} dias)",
             xaxis_title="Data",

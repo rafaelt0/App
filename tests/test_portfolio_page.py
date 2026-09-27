@@ -3,6 +3,8 @@ from unittest.mock import patch
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
+from utils.charts import CHART_GRID, CHART_SURFACE
+
 
 def test_portfolio_loads_quotes_only_on_click_and_names_missing_ticker():
     dates = pd.bdate_range("2025-01-01", periods=40)
@@ -224,6 +226,13 @@ def test_loaded_markowitz_keeps_frontier_without_allocation_row_or_extra_drawdow
 
     assert not app.exception
     charts = [json.loads(chart.proto.spec) for chart in app.get("plotly_chart")]
+    assert all(chart["layout"]["paper_bgcolor"] == CHART_SURFACE for chart in charts)
+    assert all(chart["layout"]["plot_bgcolor"] == CHART_SURFACE for chart in charts)
+    assert all(
+        chart["layout"]["xaxis"]["gridcolor"] == CHART_GRID
+        and chart["layout"]["yaxis"]["gridcolor"] == CHART_GRID
+        for chart in charts
+    )
     assert any("Fronteira Eficiente de Markowitz" in chart["layout"]["title"]["text"]
                and any(trace["name"] == "Linha de alocação (carteira selecionada)"
                        for trace in chart["data"]) for chart in charts)
@@ -238,5 +247,5 @@ def test_loaded_markowitz_keeps_frontier_without_allocation_row_or_extra_drawdow
     assert not any("Linha de alocação — quanto você aloca" in value for value in markup)
     regime = next(i for i, value in enumerate(markup) if "Regime de Mercado" in value)
     drawdown = next(i for i, value in enumerate(markup) if "Análise de Drawdown" in value)
-    assert any("background:linear-gradient(90deg" in value for value in markup[regime:drawdown])
+    assert any('class="portfolio-section-divider"' in value for value in markup[regime:drawdown])
     assert "---" not in markup[regime:drawdown]
