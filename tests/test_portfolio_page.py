@@ -139,6 +139,60 @@ def test_zero_weight_manual_asset_does_not_limit_return_sample():
         assert any("Ativos com peso zero foram excluídos" in item.value for item in app.caption)
 
 
+def test_minimum_volatility_is_first_strategy_and_minimizes_portfolio_variance():
+    import numpy as np
+    import pytest
+
+    dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=70)
+    days = np.arange(len(dates))
+    prices = pd.DataFrame(
+        {
+            "PETR4.SA": 100 + days + 2 * np.sin(days),
+            "VALE3.SA": 90 + 0.8 * days + np.cos(days),
+        },
+        index=dates,
+    )
+    tickers = ["PETR4.SA", "VALE3.SA"]
+    mu = pd.Series([0.1, 0.2], index=tickers)
+    covariance = pd.DataFrame(
+        [[0.04, 0.0], [0.0, 0.09]], index=tickers, columns=tickers
+    )
+    stocks = pd.DataFrame(
+        {"Ticker": ["PETR4", "VALE3"], "Empresa": ["Petrobras", "Vale"]}
+    )
+    with (
+        patch("utils.market_data.get_listed_stocks", return_value=stocks),
+        patch("utils.portfolio_data.get_portfolio_prices", lambda *args: prices.copy()),
+        patch("utils.portfolio_data.get_portfolio_trade_prices", lambda *args: prices.copy()),
+        patch(
+            "utils.portfolio_data.get_benchmark_prices",
+            lambda *args: pd.Series(100 + days + np.sin(days), index=dates),
+        ),
+        patch("utils.portfolio_data.get_selic_rate", lambda: 0.0005),
+        patch("utils.portfolio_data.estimate_markowitz_inputs", lambda returns: (mu, covariance)),
+        patch("utils.db.portfolio_get", lambda uid: ([], {})),
+        patch("utils.db.portfolio_save", lambda *args: None),
+        patch("utils.identity.get_browser_uid", lambda: "test-visitor"),
+        patch("streamlit.page_link", lambda *args, **kwargs: None),
+    ):
+        app = AppTest.from_file("pages/1_Portfolio.py", default_timeout=30)
+        app.session_state["selected_tickers"] = ["PETR4", "VALE3"]
+        app.run()
+
+        assert app.radio[0].options[0] == "Otimização de Mínima Volatilidade"
+        assert app.radio[0].value == app.radio[0].options[0]
+        next(button for button in app.button if button.label == "Carregar portfólio").click().run()
+
+    assert not app.exception
+    assert app.session_state["modo"] == "Otimização de Mínima Volatilidade"
+    assert app.session_state["pesos_manuais"]["PETR4.SA"] == pytest.approx(
+        0.6923, abs=0.01
+    )
+    assert app.session_state["pesos_manuais"]["VALE3.SA"] == pytest.approx(
+        0.3077, abs=0.01
+    )
+
+
 def test_loaded_markowitz_keeps_frontier_without_allocation_row_or_extra_drawdown_rule():
     import json
     import numpy as np
@@ -165,6 +219,7 @@ def test_loaded_markowitz_keeps_frontier_without_allocation_row_or_extra_drawdow
         app = AppTest.from_file("pages/1_Portfolio.py", default_timeout=30)
         app.session_state["selected_tickers"] = ["PETR4", "VALE3"]
         app.run()
+        app.radio[0].set_value("Otimização de Markowitz (Média-Variância)").run()
         next(button for button in app.button if button.label == "Carregar portfólio").click().run()
 
     assert not app.exception

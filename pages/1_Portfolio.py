@@ -495,6 +495,7 @@ with st.container(border=True):
         modo = st.radio(
             "Estratégia de alocação",
             (
+                "Otimização de Mínima Volatilidade",
                 "Otimização de Markowitz (Média-Variância)",
                 "Otimização Hierarchical Risk Parity (Machine Learning)",
                 "Alocação Manual",
@@ -752,6 +753,16 @@ if (
             pesos_manuais_arr = peso_manual_df[
                 "Sample_Vol" if "Sample_Vol" in peso_manual_df.columns else "Peso"
             ].values
+        elif "Mínima Volatilidade" in modo:
+            st.subheader("Otimização de Mínima Volatilidade")
+            mu, S = estimate_markowitz_inputs(returns)
+            ef = EfficientFrontier(mu, S)
+            ef.min_volatility()
+            cleaned_weights = ef.clean_weights()
+            peso_manual_df = pd.DataFrame.from_dict(
+                cleaned_weights, orient="index", columns=["Peso"]
+            )
+            pesos_manuais_arr = peso_manual_df["Peso"].values
         else:
             st.subheader("Otimização de Markowitz (Média-Variância)")
             mu, S = estimate_markowitz_inputs(returns)
@@ -1896,6 +1907,8 @@ if (
             clean_modo = "Alocação Manual"
         elif "Hierarchical" in modo:
             clean_modo = "Otimização Hierarchical Risk Parity (HRP)"
+        elif "Mínima Volatilidade" in modo:
+            clean_modo = "Otimização de Mínima Volatilidade"
         else:
             clean_modo = "Otimização de Markowitz (Média-Variância)"
         st.session_state["modo"] = clean_modo
