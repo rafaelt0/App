@@ -121,18 +121,24 @@ ICO_X_SM = _svg(
 
 # ─── pages/1_Portfolio.py ──────────────────────────────────────────────────────
 ICO_OK = _svg(
-    '<circle cx="12" cy="12" r="9" stroke="#00ff87" stroke-width="1.8"/>'
-    '<path d="M8 12l3 3 5-5" stroke="#00ff87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+    '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/>'
+    '<path d="m8.5 12 2.3 2.3 4.8-4.8" stroke="currentColor" stroke-width="1.7" '
+    'stroke-linecap="round" stroke-linejoin="round"/>',
+    16,
 )
 ICO_WARN = _svg(
-    '<path d="M12 3L22 21H2L12 3Z" stroke="#ffd600" stroke-width="1.8" stroke-linejoin="round"/>'
-    '<line x1="12" y1="10" x2="12" y2="14" stroke="#ffd600" stroke-width="2" stroke-linecap="round"/>'
-    '<circle cx="12" cy="17.5" r="1" fill="#ffd600"/>'
+    '<path d="m10.3 3.9-7.6 13a1.9 1.9 0 0 0 1.7 2.8h15.2a1.9 1.9 0 0 0 1.7-2.8l-7.6-13a1.9 1.9 0 0 0-3.4 0Z" '
+    'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>'
+    '<path d="M12 9v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+    '<path d="M12 17h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+    16,
 )
 ICO_CRIT = _svg(
-    '<circle cx="12" cy="12" r="9" stroke="#ff3d5a" stroke-width="1.8"/>'
-    '<line x1="9" y1="9" x2="15" y2="15" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>'
-    '<line x1="15" y1="9" x2="9" y2="15" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>'
+    '<path d="M8.5 3h7L21 8.5v7L15.5 21h-7L3 15.5v-7Z" stroke="currentColor" '
+    'stroke-width="1.6" stroke-linejoin="round"/>'
+    '<path d="M12 8v4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+    '<path d="M12 16h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+    16,
 )
 ICO_TARGET = _svg(
     '<circle cx="12" cy="12" r="9" stroke="#00d2ff" stroke-width="1.8"/>'
