@@ -71,6 +71,225 @@ from utils.portfolio_charts import (
 
 # CSS customizado
 load_css()
+st.markdown(
+    """
+    <style>
+    body:has(.page-hero[data-page="portfolio"]) .main {
+      color-scheme: dark;
+      background: var(--bg-color) !important;
+      color: var(--text-main) !important;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) [data-testid="stHeader"] {
+      background: var(--bg-color) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main .block-container {
+      max-width: 1460px;
+      padding-bottom: 4rem;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] {
+      margin: 0.7rem 0 1rem;
+      padding: 0.2rem 1.1rem 0.9rem;
+      border: 1px solid var(--panel-border) !important;
+      border-radius: 8px !important;
+      background: var(--panel-bg) !important;
+      box-shadow: none !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .ui-section-heading {
+      margin-top: 1.5rem !important;
+      padding-bottom: 0.65rem !important;
+      border-bottom-color: var(--panel-border) !important;
+      color: var(--text-main) !important;
+      font-size: clamp(1.05rem, 1.5vw, 1.25rem) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .ui-section-heading svg {
+      color: var(--brand-secondary) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .ui-section-heading svg [stroke] {
+      stroke: var(--brand-secondary) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] .ui-section-heading {
+      margin-top: 0.55rem !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stMetric"] {
+      min-height: 92px;
+      padding: 0.75rem 0.8rem !important;
+      border: 0 !important;
+      border-top: 2px solid var(--panel-border) !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stMetricValue"],
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stMetricValue"] > div {
+      color: var(--brand-primary) !important;
+      font-family: inherit !important;
+      font-size: clamp(1.2rem, 2vw, 1.65rem) !important;
+      font-variant-numeric: tabular-nums;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main .mcard-value {
+      font-family: inherit !important;
+      font-variant-numeric: tabular-nums;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stMetricLabel"],
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stMetricLabel"] > div {
+      color: var(--text-muted) !important;
+      font-size: 0.76rem !important;
+      font-weight: 600 !important;
+      letter-spacing: 0 !important;
+      text-transform: none !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stPlotlyChart"] {
+      margin: 0.35rem 0 1rem;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+      border-radius: 7px;
+      background: var(--panel-bg);
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stDataFrame"] {
+      border: 1px solid var(--panel-border);
+      border-radius: 7px;
+      background: var(--panel-bg);
+      box-shadow: none !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main table {
+      color: var(--text-main) !important;
+      font-family: inherit !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main th,
+    body:has(.page-hero[data-page="portfolio"]) .main td {
+      border-color: var(--panel-border) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main .stSelectbox label,
+    body:has(.page-hero[data-page="portfolio"]) .main .stMultiSelect label,
+    body:has(.page-hero[data-page="portfolio"]) .main .stNumberInput label,
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stRadio"] > label {
+      color: var(--text-muted) !important;
+      font-size: 0.82rem !important;
+      font-weight: 650 !important;
+      letter-spacing: 0 !important;
+      text-transform: none !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main .stTextInput input,
+    body:has(.page-hero[data-page="portfolio"]) .main .stNumberInput input,
+    body:has(.page-hero[data-page="portfolio"]) .main .stSelectbox [data-baseweb="select"] > div,
+    body:has(.page-hero[data-page="portfolio"]) .main .stMultiSelect [data-baseweb="select"] > div {
+      border-color: #405873 !important;
+      border-radius: 6px !important;
+      background: var(--panel-bg) !important;
+      color: var(--text-main) !important;
+      font-family: inherit !important;
+      font-variant-numeric: tabular-nums;
+      box-shadow: none !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main .stMultiSelect [data-baseweb="tag"] {
+      border: 1px solid var(--panel-border);
+      background: var(--panel-raised);
+      color: var(--brand-primary);
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main .stMultiSelect input {
+      color: var(--text-main) !important;
+      caret-color: var(--brand-primary) !important;
+      font-family: inherit !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main .stMultiSelect input::placeholder {
+      color: var(--text-faint) !important;
+      opacity: 1 !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main .stMultiSelect [data-baseweb="select"] input + div {
+      color: var(--text-faint) !important;
+      opacity: 1 !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stRadio"] label[data-baseweb="radio"] p,
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stRadio"] label[data-baseweb="radio"] [data-testid="stMarkdownContainer"] {
+      color: var(--text-main) !important;
+      opacity: 1 !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) > div:first-child {
+      background: var(--brand-primary) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) [data-baseweb="popover"] [data-baseweb="menu"] {
+      border-color: var(--panel-border) !important;
+      background: var(--panel-bg) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) [data-baseweb="popover"] [role="option"] {
+      color: var(--text-main) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) [data-baseweb="popover"] [role="option"]:hover,
+    body:has(.page-hero[data-page="portfolio"]) [data-baseweb="popover"] [role="option"][aria-selected="true"] {
+      background: var(--panel-raised) !important;
+      color: var(--brand-primary) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid^="stNumberInput-Step"] {
+      background: var(--panel-raised) !important;
+      color: var(--brand-primary) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main button[data-testid^="baseButton-"] {
+      min-height: 2.6rem;
+      border: 1px solid #405873 !important;
+      border-radius: 6px !important;
+      background: var(--panel-raised) !important;
+      color: var(--brand-primary) !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main button[data-testid^="baseButton-"]:hover {
+      border-color: var(--brand-primary) !important;
+      background: var(--surface-hover) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stPageLink"] a {
+      border-color: #405873 !important;
+      background: #0e1524 !important;
+      color: var(--brand-secondary) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="baseButton-primary"] {
+      border-color: var(--brand-primary) !important;
+      background: var(--brand-primary) !important;
+      color: var(--panel-bg) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [data-testid="baseButton-primary"]:hover {
+      background: var(--brand-primary) !important;
+    }
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#00ff87"],
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#4ade80"] { color: var(--brand-primary) !important; }
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#ffd600"] { color: var(--brand-accent) !important; }
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#ff3d5a"],
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#ff1744"],
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#f87171"] { color: var(--brand-danger) !important; }
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#00d2ff"],
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#38bdf8"] { color: var(--brand-secondary) !important; }
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#f8fafc"] { color: var(--text-main) !important; }
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#94a3b8"],
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#64748b"] { color: var(--text-faint) !important; }
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#475569"] { color: var(--text-muted) !important; }
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="#1e293b"] { border-color: var(--panel-border) !important; }
+    body:has(.page-hero[data-page="portfolio"]) .main [style*="linear-gradient"] { background: var(--panel-raised) !important; }
+    body:has(.page-hero[data-page="portfolio"]) .main :focus-visible {
+      outline: none !important;
+      box-shadow: var(--focus-ring) !important;
+    }
+    @media (max-width: 640px) {
+      body:has(.page-hero[data-page="portfolio"]) .main .block-container {
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+      }
+      body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] {
+        padding: 0.1rem 0.7rem 0.65rem;
+      }
+      body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stMetric"] {
+        min-height: 78px;
+        padding: 0.6rem 0.35rem !important;
+      }
+      body:has(.page-hero[data-page="portfolio"]) .main [data-testid="stPlotlyChart"] {
+        margin-left: -0.2rem;
+        margin-right: -0.2rem;
+      }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -82,6 +301,10 @@ render_page_header(
     "Otimização de portfólio",
     "Monte uma carteira, compare risco e retorno e revise os pesos antes de investir.",
     "portfolio",
+)
+section_header(ICO_RULER, "Montagem da carteira", "h2")
+st.caption(
+    "Escolha o histórico e os papéis; depois defina o capital e a forma de alocação."
 )
 
 def _refresh_portfolio_data() -> None:
@@ -95,60 +318,64 @@ def _refresh_portfolio_data() -> None:
     st.session_state["_portfolio_refresh_notice"] = True
 
 
-st.button(
-    "Atualizar cotações",
-    key="portfolio_refresh",
-    use_container_width=True,
-    on_click=_refresh_portfolio_data,
-    help=(
-        "Limpa o cache de cotações, benchmark e Selic. "
-        "A análise precisa ser carregada novamente."
-    ),
-)
-if st.session_state.pop("_portfolio_refresh_notice", False):
-    st.info("Cotações atualizadas. Clique em **Carregar portfólio** para recalcular a análise.")
-
-# Configurações
-col_config1, col_config2 = st.columns(2)
-with col_config1:
-    lookback_opcao = st.selectbox(
-        "Lookback da Otimização",
-        (
-            "2 Anos (Padrão)",
-            "1 Ano",
-            "3 Anos",
-            "5 Anos",
-            "6 Meses",
-            "Personalizado (Dias)",
-        ),
-    )
-with col_config2:
-    today = datetime.date.today()
-    if lookback_opcao == "6 Meses":
-        data_inicio = today - datetime.timedelta(days=180)
-        st.info(f"Data Inicial calculada: {data_inicio.strftime('%d/%m/%Y')}")
-    elif lookback_opcao == "1 Ano":
-        data_inicio = today - datetime.timedelta(days=365)
-        st.info(f"Data Inicial calculada: {data_inicio.strftime('%d/%m/%Y')}")
-    elif lookback_opcao == "2 Anos (Padrão)":
-        data_inicio = today - datetime.timedelta(days=365 * 2)
-        st.info(f"Data Inicial calculada: {data_inicio.strftime('%d/%m/%Y')}")
-    elif lookback_opcao == "3 Anos":
-        data_inicio = today - datetime.timedelta(days=365 * 3)
-        st.info(f"Data Inicial calculada: {data_inicio.strftime('%d/%m/%Y')}")
-    elif lookback_opcao == "5 Anos":
-        data_inicio = today - datetime.timedelta(days=365 * 5)
-        st.info(f"Data Inicial calculada: {data_inicio.strftime('%d/%m/%Y')}")
-    else:
-        lookback_dias = st.number_input(
-            "Dias de Lookback",
-            min_value=60,
-            max_value=5000,
-            value=500,
-            step=10,
-            help="Mínimo de 60 dias para garantir ao menos 30 retornos úteis.",
+with st.container(border=True):
+    period_title, refresh_col = st.columns([3, 1])
+    with period_title:
+        section_header(ICO_RULER, "Janela de análise", "h3")
+    with refresh_col:
+        st.button(
+            "Atualizar cotações",
+            key="portfolio_refresh",
+            use_container_width=True,
+            on_click=_refresh_portfolio_data,
+            help=(
+                "Limpa o cache de cotações, benchmark e Selic. "
+                "A análise precisa ser carregada novamente."
+            ),
         )
-        data_inicio = today - datetime.timedelta(days=lookback_dias)
+    if st.session_state.pop("_portfolio_refresh_notice", False):
+        st.info("Cotações atualizadas. Clique em **Carregar portfólio** para recalcular a análise.")
+
+    col_config1, col_config2 = st.columns([1, 2], gap="large")
+    with col_config1:
+        lookback_opcao = st.selectbox(
+            "Período de análise",
+            (
+                "2 Anos (Padrão)",
+                "1 Ano",
+                "3 Anos",
+                "5 Anos",
+                "6 Meses",
+                "Personalizado (Dias)",
+            ),
+        )
+    with col_config2:
+        today = datetime.date.today()
+        if lookback_opcao == "6 Meses":
+            data_inicio = today - datetime.timedelta(days=180)
+            st.info(f"Dados a partir de {data_inicio.strftime('%d/%m/%Y')}")
+        elif lookback_opcao == "1 Ano":
+            data_inicio = today - datetime.timedelta(days=365)
+            st.info(f"Dados a partir de {data_inicio.strftime('%d/%m/%Y')}")
+        elif lookback_opcao == "2 Anos (Padrão)":
+            data_inicio = today - datetime.timedelta(days=365 * 2)
+            st.info(f"Dados a partir de {data_inicio.strftime('%d/%m/%Y')}")
+        elif lookback_opcao == "3 Anos":
+            data_inicio = today - datetime.timedelta(days=365 * 3)
+            st.info(f"Dados a partir de {data_inicio.strftime('%d/%m/%Y')}")
+        elif lookback_opcao == "5 Anos":
+            data_inicio = today - datetime.timedelta(days=365 * 5)
+            st.info(f"Dados a partir de {data_inicio.strftime('%d/%m/%Y')}")
+        else:
+            lookback_dias = st.number_input(
+                "Dias de lookback",
+                min_value=60,
+                max_value=5000,
+                value=500,
+                step=10,
+                help="Mínimo de 60 dias para garantir ao menos 30 retornos úteis.",
+            )
+            data_inicio = today - datetime.timedelta(days=lookback_dias)
 
 try:
     taxa_selic = get_selic_rate()
@@ -222,54 +449,57 @@ def _clear_saved_portfolio():
     st.session_state["portfolio_analysis_tickers"] = []
 
 
-col_tickers, col_clear = st.columns([5, 1])
-with col_tickers:
-    tickers = st.multiselect(
-        "Selecione as ações do portfólio",
-        options=stocks,
-        format_func=lambda t: f"{t}  ·  {_ticker_empresa[t]}" if _ticker_empresa.get(t) else t,
-        placeholder="Digite o ticker ou nome da empresa…",
-        key="selected_tickers",
-        max_selections=MAX_TICKERS,
-        help=(
-            f"Digite o ticker ou nome da empresa para filtrar. Limite de {MAX_TICKERS} ativos "
-            "para manter o download de cotações e a otimização estáveis."
-        ),
-    )
+with st.container(border=True):
+    section_header(ICO_BOX, "Ativos e distribuição", "h3")
+    col_tickers, col_clear = st.columns([5, 1])
+    with col_tickers:
+        tickers = st.multiselect(
+            "Ações da carteira",
+            options=stocks,
+            format_func=lambda t: f"{t}  ·  {_ticker_empresa[t]}" if _ticker_empresa.get(t) else t,
+            placeholder="Busque pelo ticker ou nome da empresa…",
+            key="selected_tickers",
+            max_selections=MAX_TICKERS,
+            help=(
+                f"Digite ticker ou empresa. Limite de {MAX_TICKERS} ativos "
+                "para manter os cálculos estáveis."
+            ),
+        )
 
-if st.session_state.pop("_portfolio_handoff_notice", None):
-    st.info(
-        "Seleção da análise carregada no Portfolio. "
-        "Confira os ativos e clique em **Carregar portfólio**."
-    )
+    if st.session_state.pop("_portfolio_handoff_notice", None):
+        st.info(
+            "Seleção carregada da análise de ativos. "
+            "Confira os papéis e clique em **Carregar portfólio**."
+        )
 
-if st.session_state.pop("_portfolio_restore_notice", False):
-    st.info(
-        "Carteira salva restaurada na seleção. "
-        "Clique em **Carregar portfólio** para atualizar a análise."
-    )
-with col_clear:
-    st.write("")
-    st.write("")
-    st.button(
-        "Limpar carteira",
-        use_container_width=True,
-        help="Remove os ativos salvos desta carteira e limpa a seleção atual.",
-        on_click=_clear_saved_portfolio,
-    )
+    if st.session_state.pop("_portfolio_restore_notice", False):
+        st.info(
+            "Carteira salva restaurada. Clique em **Carregar portfólio** para atualizar a análise."
+        )
+    with col_clear:
+        st.write("")
+        st.write("")
+        st.button(
+            "Limpar carteira",
+            use_container_width=True,
+            help="Remove os ativos salvos desta carteira e limpa a seleção atual.",
+            on_click=_clear_saved_portfolio,
+        )
 
-# Valor inicial
-valor_inicial = st.number_input("Valor Investido (R$)", 100, 1_000_000, 10_000)
-
-# Escolha modo: manual ou otimizado
-modo = st.radio(
-    "Modo de alocação",
-    (
-        "Otimização de Markowitz (Média-Variância)",
-        "Otimização Hierarchical Risk Parity (Machine Learning)",
-        "Alocação Manual",
-    ),
-)
+    col_capital, col_strategy = st.columns([1, 2], gap="large")
+    with col_capital:
+        valor_inicial = st.number_input(
+            "Capital disponível (R$)", 100, 1_000_000, 10_000
+        )
+    with col_strategy:
+        modo = st.radio(
+            "Estratégia de alocação",
+            (
+                "Otimização de Markowitz (Média-Variância)",
+                "Otimização Hierarchical Risk Parity (Machine Learning)",
+                "Alocação Manual",
+            ),
+        )
 
 if len(tickers) == 0:
     empty_state_card(
@@ -301,49 +531,50 @@ tickers_yf = [t + ".SA" for t in tickers]
 # Inputs de peso manual devem aparecer ANTES do botão
 pesos_manuais_inputs = {}
 if "Manual" in modo:
-    st.markdown("---")
-    section_header(ICO_BOX, "Alocação Manual dos Pesos", "h3")
+    with st.container(border=True):
+        section_header(ICO_BOX, "Pesos por ativo", "h3")
 
-    def _equalize_manual_weights():
-        n_assets = len(tickers)
-        base_pct = round(100 / n_assets, 2)
-        last_pct = round(100 - base_pct * (n_assets - 1), 2)
+        def _equalize_manual_weights():
+            n_assets = len(tickers)
+            base_pct = round(100 / n_assets, 2)
+            last_pct = round(100 - base_pct * (n_assets - 1), 2)
+            for index, ticker in enumerate(tickers):
+                st.session_state[f"peso_manual_{ticker}"] = (
+                    last_pct if index == n_assets - 1 else base_pct
+                )
+
+        st.button(
+            "Distribuir igualmente",
+            key="equalize_manual_weights",
+            on_click=_equalize_manual_weights,
+            help="Divide o capital igualmente entre os ativos e ajusta o arredondamento para totalizar 100%.",
+            use_container_width=True,
+        )
+
+        total_pesos = 0.0
+        manual_columns = st.columns(min(len(tickers), 4))
         for index, ticker in enumerate(tickers):
-            st.session_state[f"peso_manual_{ticker}"] = (
-                last_pct if index == n_assets - 1 else base_pct
+            with manual_columns[index % len(manual_columns)]:
+                _saved_pct = _saved_weights.get(ticker + ".SA")
+                default_pct = _saved_pct * 100 if _saved_pct is not None else 100 / len(tickers)
+                _weight_key = f"peso_manual_{ticker}"
+                st.session_state.setdefault(_weight_key, round(default_pct, 2))
+                p = st.number_input(
+                    f"Peso % de {ticker}",
+                    min_value=0.0,
+                    max_value=100.0,
+                    step=0.01,
+                    key=_weight_key,
+                )
+            pesos_manuais_inputs[ticker + ".SA"] = p / 100
+            total_pesos += p
+
+        if abs(total_pesos - 100) > 0.01:
+            st.error(
+                f"Soma dos pesos: **{total_pesos:.2f}%** — ajuste para exatamente 100%."
             )
-
-    st.button(
-        "Distribuir igualmente",
-        key="equalize_manual_weights",
-        on_click=_equalize_manual_weights,
-        help="Divide o capital igualmente entre os ativos e ajusta o arredondamento para totalizar 100%.",
-        use_container_width=True,
-    )
-
-    total_pesos = 0.0
-    for ticker in tickers:
-        _saved_pct = _saved_weights.get(ticker + ".SA")
-        default_pct = _saved_pct * 100 if _saved_pct is not None else 100 / len(tickers)
-        _weight_key = f"peso_manual_{ticker}"
-        st.session_state.setdefault(_weight_key, round(default_pct, 2))
-        p = st.number_input(
-            f"Peso % de {ticker}",
-            min_value=0.0,
-            max_value=100.0,
-            step=0.01,
-            key=_weight_key,
-        )
-        pesos_manuais_inputs[ticker + ".SA"] = p / 100
-        total_pesos += p
-
-    if abs(total_pesos - 100) > 0.01:
-        st.error(
-            f"Soma dos pesos: **{total_pesos:.2f}%** — ajuste para exatamente 100%."
-        )
-    else:
-        st.success(f"Soma dos pesos: {total_pesos:.2f}% ✓")
-    st.markdown("---")
+        else:
+            st.success(f"Soma dos pesos: {total_pesos:.2f}% ✓")
 
 # Controle de diversificação para Markowitz. A otimização média-variância é um
 # problema de canto: ela concentra o capital em poucos ativos e zera o resto.
@@ -351,45 +582,44 @@ if "Manual" in modo:
 # reduzindo os pesos zerados de forma suave — gamma maior = mais distribuído.
 gamma_l2 = 0.0
 if "Markowitz" in modo:
-    st.session_state.setdefault("portfolio_gamma_l2_input", 1.0)
+    with st.container(border=True):
+        section_header(ICO_RULER, "Diversificação", "h3")
+        st.session_state.setdefault("portfolio_gamma_l2_input", 1.0)
 
-    def _set_gamma_preset(value: float) -> None:
-        st.session_state["portfolio_gamma_l2_input"] = value
+        def _set_gamma_preset(value: float) -> None:
+            st.session_state["portfolio_gamma_l2_input"] = value
 
-    st.caption("Escolha rapidamente quanto a otimização deve evitar concentração:")
-    _gamma_presets = (
-        ("Concentrada", 0.0, "Markowitz puro; pode concentrar em poucos ativos."),
-        ("Equilibrada", 1.0, "Ponto de partida balanceado entre retorno e diversificação."),
-        ("Diversificada", 2.0, "Penaliza mais a concentração e distribui melhor os pesos."),
-    )
-    _gamma_cols = st.columns(len(_gamma_presets))
-    for _index, (_label, _value, _help) in enumerate(_gamma_presets):
-        with _gamma_cols[_index]:
-            st.button(
-                _label,
-                key=f"gamma_preset_{_index}",
-                use_container_width=True,
-                help=_help,
-                on_click=_set_gamma_preset,
-                args=(_value,),
-            )
+        st.caption("Controle quanto a otimização evita concentrar o capital:")
+        _gamma_presets = (
+            ("Concentrada", 0.0, "Markowitz puro; pode concentrar em poucos ativos."),
+            ("Equilibrada", 1.0, "Ponto de partida balanceado entre retorno e diversificação."),
+            ("Diversificada", 2.0, "Penaliza mais a concentração e distribui melhor os pesos."),
+        )
+        _gamma_cols = st.columns(len(_gamma_presets))
+        for _index, (_label, _value, _help) in enumerate(_gamma_presets):
+            with _gamma_cols[_index]:
+                st.button(
+                    _label,
+                    key=f"gamma_preset_{_index}",
+                    use_container_width=True,
+                    help=_help,
+                    on_click=_set_gamma_preset,
+                    args=(_value,),
+                )
 
-    st.markdown("---")
-    gamma_l2 = st.number_input(
-        "Diversificação (regularização L2)",
-        min_value=0.0,
-        max_value=3.0,
-        value=1.0,
-        step=0.1,
-        key="portfolio_gamma_l2_input",
-        help=(
-            "Penaliza a concentração para evitar pesos zerados. "
-            "0 = Markowitz puro (concentra em poucos ativos); valores maiores "
-            "distribuem o capital entre mais ativos, aproximando-se da carteira "
-            "igualmente ponderada."
-        ),
-    )
-    st.markdown("---")
+        gamma_l2 = st.number_input(
+            "Diversificação (regularização L2)",
+            min_value=0.0,
+            max_value=3.0,
+            value=1.0,
+            step=0.1,
+            key="portfolio_gamma_l2_input",
+            help=(
+                "Penaliza a concentração para evitar pesos zerados. "
+                "0 = Markowitz puro; valores maiores distribuem o capital "
+                "entre mais ativos, aproximando-se de pesos iguais."
+            ),
+        )
 
 if "Manual" in modo:
     _required_tickers_yf = [
@@ -780,7 +1010,7 @@ if (
                 y=portfolio_value,
                 mode="lines",
                 name="Portfólio",
-                line=dict(color="#00ff87", width=2.5),
+                line=dict(color="#61d4c6", width=2.5),
             )
         )
         if benchmark_available:
@@ -790,7 +1020,7 @@ if (
                     y=bench_value,
                     mode="lines",
                     name="IBOVESPA",
-                    line=dict(color="#ffd600", width=1.5, dash="dash"),
+                    line=dict(color="#8cb4f2", width=1.5, dash="dash"),
                 )
             )
         fig.update_layout(
@@ -1394,7 +1624,7 @@ if (
                         x=crises_names,
                         y=port_vals,
                         marker_color=[
-                            "#00ff87" if v >= 0 else "#ff3d5a" for v in port_vals
+                            "#61d4c6" if v >= 0 else "#e58a93" for v in port_vals
                         ],
                         text=[f"{v:+.1f}%" for v in port_vals],
                         textposition="outside",
@@ -1406,9 +1636,9 @@ if (
                         x=crises_names,
                         y=ibov_vals,
                         marker_color=[
-                            "rgba(0,210,255,0.6)"
+                            "rgba(138,177,188,0.8)"
                             if v is not None and v >= 0
-                            else "rgba(255,150,0,0.6)"
+                            else "rgba(169,116,67,0.72)"
                             for v in ibov_vals
                         ],
                         text=[f"{v:+.1f}%" if v is not None else "" for v in ibov_vals],
@@ -1530,8 +1760,8 @@ if (
                 x=drawdown.index,
                 y=drawdown.values,
                 fill="tozeroy",
-                fillcolor="rgba(255,23,68,0.25)",
-                line=dict(color="#ff1744", width=1.5),
+                fillcolor="rgba(194,124,127,0.22)",
+                line=dict(color="#e58a93", width=1.5),
                 name="Drawdown",
                 hovertemplate="%{x|%d/%m/%Y}<br>%{y:.2%}<extra></extra>",
             )
@@ -1612,7 +1842,7 @@ if (
             go.Scatter(
                 x=rolling_beta.index,
                 y=rolling_beta.values,
-                line=dict(color="#00d2ff", width=2),
+                line=dict(color="#8cb4f2", width=2),
                 name="Beta Móvel",
                 hovertemplate="%{x|%d/%m/%Y}<br>β=%{y:.3f}<extra></extra>",
             )
@@ -1620,10 +1850,10 @@ if (
         fig2.add_hline(
             y=1,
             line_dash="dash",
-            line_color="#ffd600",
+            line_color="#e7b96b",
             line_width=1.5,
             annotation_text="β = 1",
-            annotation_font=dict(color="#ffd600", size=10),
+            annotation_font=dict(color="#e7b96b", size=10),
         )
         fig2.update_layout(
             title=f"Beta Móvel ({window} dias) vs IBOVESPA",
@@ -1647,7 +1877,7 @@ if (
             go.Scatter(
                 x=rolling_sharpe.index,
                 y=rolling_sharpe.values,
-                line=dict(color="#00ff87", width=2),
+                line=dict(color="#61d4c6", width=2),
                 name="Sharpe Móvel",
                 hovertemplate="%{x|%d/%m/%Y}<br>Sharpe=%{y:.2f}<extra></extra>",
             )
