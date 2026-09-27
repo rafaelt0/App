@@ -24,7 +24,7 @@ A aplicação é organizada como um **fluxo de análise em 5 etapas**:
 
 ### 2. Portfolio — Análise & Otimização
 * Importação de preços históricos ajustados via `yfinance`.
-* Otimização de alocação por **Markowitz** (fronteira eficiente) e **Hierarchical Risk Parity (HRP)**, além de alocação manual de pesos.
+* Otimização de alocação por **Mínima Volatilidade**, **Markowitz** (fronteira eficiente) e **Hierarchical Risk Parity (HRP)**, além de alocação manual de pesos.
 * Métricas institucionais de risco/retorno: Sharpe, Sortino, VaR, CVaR e Drawdown.
 * Visualização do valor do portfólio vs. benchmark (IBOVESPA), beta móvel, Sharpe móvel e drawdown.
 * Taxa livre de risco baseada na Selic real.
