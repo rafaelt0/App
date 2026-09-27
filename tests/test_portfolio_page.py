@@ -80,11 +80,14 @@ def test_ibov_outage_still_passes_portfolio_to_simulation():
         app.session_state["selected_tickers"] = ["PETR4", "VALE3"]
         app.run()
         app.radio[0].set_value("Alocação Manual").run()
+        app.number_input(key="cotas_manual_PETR4").set_value(1)
+        app.number_input(key="cotas_manual_VALE3").set_value(1)
+        app.run()
         next(button for button in app.button if button.label == "Carregar portfólio").click().run()
 
         assert not app.exception
         assert app.session_state["portfolio_analysis_tickers"] == ["PETR4", "VALE3"]
-        assert app.session_state["pesos_manuais"] == {"PETR4.SA": 0.5, "VALE3.SA": 0.5}
+        assert app.session_state["pesos_manuais"] == {"PETR4.SA": 1 / 3, "VALE3.SA": 2 / 3}
         assert app.session_state["retorno_bench"] is None
         pd.testing.assert_frame_equal(
             app.session_state["returns"], prices.pct_change(fill_method=None).dropna()
@@ -95,8 +98,8 @@ def test_ibov_outage_still_passes_portfolio_to_simulation():
         )
         assert trade_table.loc[0, "Preço Unitário"] == "R$ 10.00"
         assert trade_table.loc[1, "Preço Unitário"] == "R$ 20.00"
-        assert trade_table.loc[0, "Cotas a Comprar"] == "500"
-        assert trade_table.loc[1, "Cotas a Comprar"] == "250"
+        assert trade_table.loc[0, "Cotas a Comprar"] == "333"
+        assert trade_table.loc[1, "Cotas a Comprar"] == "333"
         assert any("69 retornos diários completos" in item.value for item in app.caption)
         assert any("A alocação manual descreve" in item.value for item in app.caption)
 
@@ -128,8 +131,8 @@ def test_zero_weight_manual_asset_does_not_limit_return_sample():
         app.session_state["selected_tickers"] = ["PETR4", "VALE3"]
         app.run()
         app.radio[0].set_value("Alocação Manual").run()
-        app.number_input(key="peso_manual_PETR4").set_value(100)
-        app.number_input(key="peso_manual_VALE3").set_value(0)
+        app.number_input(key="cotas_manual_PETR4").set_value(1)
+        app.number_input(key="cotas_manual_VALE3").set_value(0)
         app.run()
         next(button for button in app.button if button.label == "Carregar portfólio").click().run()
 

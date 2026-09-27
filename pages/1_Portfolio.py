@@ -296,6 +296,29 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
+def _get_trade_quotes(tickers):
+    try:
+        prices = get_portfolio_trade_prices(tuple(tickers))
+    except Exception:
+        logger.warning("unadjusted trade quotes unavailable", exc_info=True)
+        return {}, True
+    if prices is None:
+        return {}, False
+    if isinstance(prices.columns, pd.MultiIndex):
+        prices.columns = [
+            "_".join(map(str, column)).strip() for column in prices.columns
+        ]
+    quotes = {}
+    for ticker in tickers:
+        if ticker in prices.columns:
+            available = prices[ticker].dropna()
+            if not available.empty:
+                latest_price = finite_or_none(available.iloc[-1])
+                if latest_price is not None and latest_price > 0:
+                    quotes[ticker] = (latest_price, available.index[-1])
+    return quotes, False
+
+
 # ── Page header ───────────────────────────────────────────────────────────────
 render_page_header(
     "Otimização de portfólio",
@@ -403,7 +426,7 @@ stocks = list(data["Ticker"].values)
 _ticker_empresa = dict(zip(data["Ticker"], data["Empresa"])) if "Empresa" in data else {}
 
 _uid = get_browser_uid()
-_saved_tickers, _saved_weights = _db.portfolio_get(_uid)
+_saved_tickers, _ = _db.portfolio_get(_uid)
 
 _query_handoff = str(st.query_params.get("portfolio_tickers", "")).strip()
 if "portfolio_tickers" in st.query_params:
@@ -523,59 +546,33 @@ if len(tickers) == 1:
     st.stop()
 
 
-# Any portfolio rerun can change lookback, mode, or manual weights. Invalidate
+# Any portfolio rerun can change lookback, mode, or manual shares. Invalidate
 # cross-page results until this run completes successfully.
 if st.session_state.get("portfolio_loaded"):
     st.session_state["portfolio_analysis_tickers"] = []
 tickers_yf = [t + ".SA" for t in tickers]
 
-# Inputs de peso manual devem aparecer ANTES do botão
-pesos_manuais_inputs = {}
+# Inputs de cotas manuais devem aparecer ANTES do botão
+cotas_manuais_inputs = {}
 if "Manual" in modo:
     with st.container(border=True):
-        section_header(ICO_BOX, "Pesos por ativo", "h3")
-
-        def _equalize_manual_weights():
-            n_assets = len(tickers)
-            base_pct = round(100 / n_assets, 2)
-            last_pct = round(100 - base_pct * (n_assets - 1), 2)
-            for index, ticker in enumerate(tickers):
-                st.session_state[f"peso_manual_{ticker}"] = (
-                    last_pct if index == n_assets - 1 else base_pct
-                )
-
-        st.button(
-            "Distribuir igualmente",
-            key="equalize_manual_weights",
-            on_click=_equalize_manual_weights,
-            help="Divide o capital igualmente entre os ativos e ajusta o arredondamento para totalizar 100%.",
-            use_container_width=True,
+        section_header(ICO_BOX, "Cotas por ativo", "h3")
+        st.caption(
+            "Os pesos serão calculados pelo valor de mercado das cotas informadas; "
+            "o capital disponível continua sendo a base da simulação."
         )
-
-        total_pesos = 0.0
         manual_columns = st.columns(min(len(tickers), 4))
         for index, ticker in enumerate(tickers):
             with manual_columns[index % len(manual_columns)]:
-                _saved_pct = _saved_weights.get(ticker + ".SA")
-                default_pct = _saved_pct * 100 if _saved_pct is not None else 100 / len(tickers)
-                _weight_key = f"peso_manual_{ticker}"
-                st.session_state.setdefault(_weight_key, round(default_pct, 2))
-                p = st.number_input(
-                    f"Peso % de {ticker}",
-                    min_value=0.0,
-                    max_value=100.0,
-                    step=0.01,
-                    key=_weight_key,
+                _shares_key = f"cotas_manual_{ticker}"
+                st.session_state.setdefault(_shares_key, 0)
+                shares = st.number_input(
+                    f"Cotas de {ticker}",
+                    min_value=0,
+                    step=1,
+                    key=_shares_key,
                 )
-            pesos_manuais_inputs[ticker + ".SA"] = p / 100
-            total_pesos += p
-
-        if abs(total_pesos - 100) > 0.01:
-            st.error(
-                f"Soma dos pesos: **{total_pesos:.2f}%** — ajuste para exatamente 100%."
-            )
-        else:
-            st.success(f"Soma dos pesos: {total_pesos:.2f}% ✓")
+            cotas_manuais_inputs[ticker + ".SA"] = int(shares)
 
 # Controle de diversificação para Markowitz. A otimização média-variância é um
 # problema de canto: ela concentra o capital em poucos ativos e zera o resto.
@@ -624,10 +621,10 @@ if "Markowitz" in modo:
 
 if "Manual" in modo:
     _required_tickers_yf = [
-        ticker for ticker in tickers_yf if pesos_manuais_inputs.get(ticker, 0) > 0
+        ticker for ticker in tickers_yf if cotas_manuais_inputs.get(ticker, 0) > 0
     ]
     if not _required_tickers_yf:
-        st.error("A alocação manual precisa ter ao menos um peso positivo.")
+        st.error("A alocação manual precisa ter ao menos uma cota positiva.")
         st.stop()
 else:
     _required_tickers_yf = tickers_yf
@@ -642,6 +639,34 @@ if st.session_state.get("portfolio_loaded") and _loaded_tickers != list(tickers)
     st.info("A seleção mudou. Clique em **Carregar portfólio** para atualizar a análise.")
 if not st.session_state.get("portfolio_loaded") or _loaded_tickers != list(tickers):
     st.stop()
+
+trade_quotes = {}
+quote_fetch_error = False
+pesos_manuais = {}
+if "Manual" in modo:
+    trade_tickers = tuple(_required_tickers_yf)
+    trade_quotes, quote_fetch_error = _get_trade_quotes(trade_tickers)
+    missing_manual_quotes = [
+        ticker for ticker in trade_tickers if ticker not in trade_quotes
+    ]
+    if quote_fetch_error or missing_manual_quotes:
+        missing_labels = ", ".join(
+            ticker.removesuffix(".SA") for ticker in missing_manual_quotes
+        ) or ", ".join(ticker.removesuffix(".SA") for ticker in trade_tickers)
+        st.error(
+            f"Não foi possível obter cotações atuais para {missing_labels}; "
+            "elas são necessárias para calcular os pesos por cotas."
+        )
+        st.stop()
+    market_values = {
+        ticker: cotas_manuais_inputs[ticker] * trade_quotes[ticker][0]
+        for ticker in trade_tickers
+    }
+    total_market_value = sum(market_values.values())
+    pesos_manuais = {
+        ticker: market_values.get(ticker, 0.0) / total_market_value
+        for ticker in tickers_yf
+    }
 
 _price_status = st.empty()
 _price_status.markdown(
@@ -728,17 +753,6 @@ if (
     # Overlay de carregamento global
     with loading_overlay("Carregando dados, aguarde…", tickers=tickers):
         if "Manual" in modo:
-            pesos_manuais = {}
-            total = 0.0
-            for ticker in tickers:
-                p = st.session_state.get(
-                    f"peso_manual_{ticker}", round(100 / len(tickers), 2)
-                )
-                pesos_manuais[ticker + ".SA"] = p / 100
-                total += p
-            if abs(total - 100) > 0.01:
-                st.error(f"A soma dos pesos é {total:.2f}%, deve ser 100%")
-                st.stop()
             pesos_manuais_arr = np.array(list(pesos_manuais.values()))
             peso_manual_df = pd.DataFrame.from_dict(
                 pesos_manuais, orient="index", columns=["Peso"]
@@ -860,28 +874,8 @@ if (
         trade_tickers = tuple(
             ticker for ticker, weight in pesos_por_ticker.items() if weight > 0
         )
-        trade_prices = pd.DataFrame()
-        quote_fetch_error = False
-        try:
-            trade_prices = get_portfolio_trade_prices(trade_tickers)
-        except Exception:
-            quote_fetch_error = True
-            logger.warning("unadjusted trade quotes unavailable", exc_info=True)
-        if trade_prices is None:
-            trade_prices = pd.DataFrame()
-        if isinstance(trade_prices.columns, pd.MultiIndex):
-            trade_prices.columns = [
-                "_".join(map(str, column)).strip() for column in trade_prices.columns
-            ]
-
-        trade_quotes = {}
-        for ticker in trade_tickers:
-            if ticker in trade_prices.columns:
-                available = trade_prices[ticker].dropna()
-                if not available.empty:
-                    latest_price = finite_or_none(available.iloc[-1])
-                    if latest_price is not None and latest_price > 0:
-                        trade_quotes[ticker] = (latest_price, available.index[-1])
+        if "Manual" not in modo:
+            trade_quotes, quote_fetch_error = _get_trade_quotes(trade_tickers)
 
         missing_quotes = [
             ticker.removesuffix(".SA")
@@ -1932,7 +1926,7 @@ if (
         if "Manual" in modo:
             st.session_state["pesos_manuais"] = pesos_manuais
         else:
-            st.session_state["pesos_manuais"] = peso_manual_df["Peso"].to_dict()
+            st.session_state["pesos_manuais"] = pesos_por_ticker
 
         # ── Próximo Passo ────────────────────────────────────────────────────
         st.markdown("---")
