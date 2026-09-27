@@ -10,6 +10,7 @@ import streamlit as st
 import yfinance as yf
 
 from utils import db as _db
+from utils.charts import CHART_ACCENT, CHART_DANGER, CHART_MUTED, CHART_PRIMARY
 from utils.market_data import (
     FUNDAMENTUS_REQUEST_LOCK,
     clean_numeric_column,
@@ -71,7 +72,7 @@ def build_analyst_synthesis(
         "indicadores_validos": 0,
         "categorias_validas": 0,
         "veredicto": "DADOS INSUFICIENTES",
-        "cor_veredicto": "#94a3b8",
+        "cor_veredicto": CHART_MUTED,
         "fonte": "comparação setorial",
     }
     if (
@@ -157,13 +158,13 @@ def build_analyst_synthesis(
         category["veredicto"] == "Desfavorável" for category in categories.values()
     )
     if categories_valid < 2:
-        verdict, color = "DADOS INSUFICIENTES", "#94a3b8"
+        verdict, color = "DADOS INSUFICIENTES", CHART_MUTED
     elif positive_categories >= 2 and positive_categories > negative_categories:
-        verdict, color = "ATRATIVO", "#00ff87"
+        verdict, color = "ATRATIVO", CHART_PRIMARY
     elif negative_categories >= 2 and negative_categories > positive_categories:
-        verdict, color = "FRACO", "#ff3d5a"
+        verdict, color = "FRACO", CHART_DANGER
     else:
-        verdict, color = "NEUTRO", "#ffd600"
+        verdict, color = "NEUTRO", CHART_ACCENT
 
     return {
         "pontos_positivos": positive_points,

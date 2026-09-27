@@ -7,28 +7,38 @@ import plotly.graph_objects as go
 import streamlit as st
 from pypfopt.efficient_frontier import EfficientFrontier
 
-from utils.charts import apply_plotly_theme
+from utils.charts import (
+    CHART_ACCENT,
+    CHART_BORDER,
+    CHART_DANGER,
+    CHART_MUTED,
+    CHART_PRIMARY,
+    CHART_SECONDARY,
+    CHART_SURFACE,
+    CHART_TEXT,
+    apply_plotly_theme,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def apply_matplotlib_theme(fig):
-    fig.set_facecolor("#0b111a")
+    fig.set_facecolor(CHART_SURFACE)
     for ax in fig.axes:
-        ax.set_facecolor("#151d2a")
-        ax.tick_params(colors="#aebaca", which="both")
-        ax.yaxis.label.set_color("#f0f4f8")
-        ax.xaxis.label.set_color("#f0f4f8")
+        ax.set_facecolor(CHART_SURFACE)
+        ax.tick_params(colors=CHART_MUTED, which="both")
+        ax.yaxis.label.set_color(CHART_TEXT)
+        ax.xaxis.label.set_color(CHART_TEXT)
         if ax.title:
-            ax.title.set_color("#f8fafc")
+            ax.title.set_color(CHART_TEXT)
         for spine in ax.spines.values():
-            spine.set_color("#34465b")
+            spine.set_color(CHART_BORDER)
         legend = ax.get_legend()
         if legend:
-            legend.get_frame().set_facecolor("#151d2a")
-            legend.get_frame().set_edgecolor("#34465b")
+            legend.get_frame().set_facecolor(CHART_SURFACE)
+            legend.get_frame().set_edgecolor(CHART_BORDER)
             for text in legend.get_texts():
-                text.set_color("#f8fafc")
+                text.set_color(CHART_TEXT)
     return fig
 
 
@@ -133,8 +143,8 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
                 colorscale="Viridis",
                 showscale=True,
                 colorbar=dict(
-                    title=dict(text="Índice Sharpe", font=dict(color="#f8fafc")),
-                    tickfont=dict(color="#f8fafc"),
+                    title=dict(text="Índice Sharpe", font=dict(color=CHART_TEXT)),
+                    tickfont=dict(color=CHART_TEXT),
                 ),
                 opacity=0.6,
             ),
@@ -153,7 +163,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
                 x=efficient_vols,
                 y=efficient_returns,
                 mode="lines",
-                line=dict(color="#61d4c6", width=3),
+                line=dict(color=CHART_PRIMARY, width=3),
                 name="Fronteira Eficiente",
             )
         )
@@ -164,10 +174,10 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
             y=[opt_return],
             mode="markers",
             marker=dict(
-                color="#e58a93",
+                color=CHART_DANGER,
                 size=12,
                 symbol="star",
-                line=dict(color="#f8fafc", width=2),
+                line=dict(color=CHART_SURFACE, width=2),
             ),
             name=allocation_label,
             text=[
@@ -183,10 +193,10 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
             y=[min_return],
             mode="markers",
             marker=dict(
-                color="#e7b96b",
+                color=CHART_ACCENT,
                 size=10,
                 symbol="diamond",
-                line=dict(color="#f8fafc", width=1.5),
+                line=dict(color=CHART_SURFACE, width=1.5),
             ),
             name="Mínima Volatilidade",
             text=[
@@ -205,7 +215,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
                 x=[0, lac_x_end],
                 y=[rf, rf + lac_slope * lac_x_end],
                 mode="lines",
-                line=dict(color="#8cb4f2", width=2, dash="dash"),
+                line=dict(color=CHART_SECONDARY, width=2, dash="dash"),
                 name="Linha de alocação (carteira selecionada)",
                 hovertemplate="Alocação<br>Vol: %{x:.2%}<br>Retorno: %{y:.2%}<extra></extra>",
             )
@@ -215,10 +225,10 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
                 x=[0],
                 y=[rf],
                 mode="markers+text",
-                marker=dict(color="#8cb4f2", size=8, symbol="circle"),
+                marker=dict(color=CHART_SECONDARY, size=8, symbol="circle"),
                 text=["Rf (Selic)"],
                 textposition="top right",
-                textfont=dict(color="#8cb4f2", size=10),
+                textfont=dict(color=CHART_SECONDARY, size=10),
                 name="Taxa Livre de Risco (Rf)",
                 hovertemplate=f"Rf (Selic) = {rf:.2%}<extra></extra>",
             )

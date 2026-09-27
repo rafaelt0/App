@@ -9,7 +9,20 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from utils import db as _db
-from utils.charts import apply_plotly_theme
+from utils.charts import (
+    CHART_ACCENT,
+    CHART_COLORWAY,
+    CHART_DANGER,
+    CHART_GRID,
+    CHART_MUTED,
+    CHART_PRIMARY,
+    CHART_SECONDARY,
+    CHART_SECONDARY_FILL,
+    CHART_SECONDARY_FILL_STRONG,
+    CHART_SURFACE,
+    CHART_TEXT,
+    apply_plotly_theme,
+)
 from utils.identity import get_browser_uid
 from utils.portfolio_data import get_portfolio_prices
 from utils.simulation import (
@@ -40,28 +53,28 @@ load_css()
 _svg = svg_icon
 
 ICO_CHART = _svg(
-    '<rect x="3" y="12" width="3" height="9" rx="1" fill="#00ff87"/>'
-    '<rect x="9" y="7"  width="3" height="14" rx="1" fill="#00d2ff"/>'
-    '<rect x="15" y="9" width="3" height="12" rx="1" fill="#ffd600"/>',
+    f'<rect x="3" y="12" width="3" height="9" rx="1" fill="{CHART_PRIMARY}"/>'
+    f'<rect x="9" y="7" width="3" height="14" rx="1" fill="{CHART_SECONDARY}"/>'
+    f'<rect x="15" y="9" width="3" height="12" rx="1" fill="{CHART_ACCENT}"/>',
     16,
 )
 ICO_SIGNAL = _svg(
-    '<path d="M2 12 Q6 4 12 12 Q18 20 22 12" stroke="#00d2ff" stroke-width="2" '
+    f'<path d="M2 12 Q6 4 12 12 Q18 20 22 12" stroke="{CHART_SECONDARY}" stroke-width="2" '
     'stroke-linecap="round" fill="none"/>'
-    '<circle cx="12" cy="12" r="2" fill="#ffd600"/>',
+    f'<circle cx="12" cy="12" r="2" fill="{CHART_ACCENT}"/>',
     16,
 )
 ICO_FRONTIER = _svg(
-    '<path d="M3 20 Q8 8 14 10 Q18 12 21 4" stroke="#00ff87" stroke-width="2" stroke-linecap="round" fill="none"/>'
-    '<circle cx="18" cy="6" r="2.5" fill="#ff3d5a"/>'
-    '<circle cx="10" cy="17" r="2" fill="#ffd600"/>',
+    f'<path d="M3 20 Q8 8 14 10 Q18 12 21 4" stroke="{CHART_PRIMARY}" stroke-width="2" stroke-linecap="round" fill="none"/>'
+    f'<circle cx="18" cy="6" r="2.5" fill="{CHART_DANGER}"/>'
+    f'<circle cx="10" cy="17" r="2" fill="{CHART_ACCENT}"/>',
     16,
 )
 ICO_METRICS = _svg(
-    '<rect x="3" y="3" width="18" height="18" rx="3" stroke="#94a3b8" stroke-width="1.5"/>'
-    '<line x1="7" y1="9"  x2="17" y2="9"  stroke="#00ff87" stroke-width="1.8" stroke-linecap="round"/>'
-    '<line x1="7" y1="13" x2="14" y2="13" stroke="#94a3b8" stroke-width="1.2" stroke-linecap="round"/>'
-    '<line x1="7" y1="17" x2="15" y2="17" stroke="#94a3b8" stroke-width="1.2" stroke-linecap="round"/>',
+    f'<rect x="3" y="3" width="18" height="18" rx="3" stroke="{CHART_MUTED}" stroke-width="1.5"/>'
+    f'<line x1="7" y1="9" x2="17" y2="9" stroke="{CHART_PRIMARY}" stroke-width="1.8" stroke-linecap="round"/>'
+    f'<line x1="7" y1="13" x2="14" y2="13" stroke="{CHART_MUTED}" stroke-width="1.2" stroke-linecap="round"/>'
+    f'<line x1="7" y1="17" x2="15" y2="17" stroke="{CHART_MUTED}" stroke-width="1.2" stroke-linecap="round"/>',
     16,
 )
 
@@ -75,16 +88,7 @@ def section_header(icon_svg, text, tag="h2"):
 
 def render_cards_grid(data_dict, colors_sequence=None):
     if not colors_sequence:
-        colors_sequence = [
-            "#38bdf8",
-            "#4ade80",
-            "#fbbf24",
-            "#fb7185",
-            "#c084fc",
-            "#f472b6",
-            "#34d399",
-            "#60a5fa",
-        ]
+        colors_sequence = list(CHART_COLORWAY)
     items = list(data_dict.items())
     cards_html = "".join(
         f'<div class="mcard"><div class="mcard-label">{lbl}</div>'
@@ -94,15 +98,15 @@ def render_cards_grid(data_dict, colors_sequence=None):
     st.markdown(f'<div class="mcard-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 
-# Configurar temas de plotagem escuros
-plt.style.use("dark_background")
-plt.rcParams["figure.facecolor"] = "#0b111a"
-plt.rcParams["axes.facecolor"] = "#151d2a"
-plt.rcParams["text.color"] = "#f0f4f8"
-plt.rcParams["axes.labelcolor"] = "#aebaca"
-plt.rcParams["xtick.color"] = "#aebaca"
-plt.rcParams["ytick.color"] = "#aebaca"
-plt.rcParams["grid.color"] = "#34465b"
+# Configure Matplotlib charts for the shared dark palette.
+plt.style.use("default")
+plt.rcParams["figure.facecolor"] = CHART_SURFACE
+plt.rcParams["axes.facecolor"] = CHART_SURFACE
+plt.rcParams["text.color"] = CHART_TEXT
+plt.rcParams["axes.labelcolor"] = CHART_MUTED
+plt.rcParams["xtick.color"] = CHART_MUTED
+plt.rcParams["ytick.color"] = CHART_MUTED
+plt.rcParams["grid.color"] = CHART_GRID
 plt.rcParams["font.family"] = "sans-serif"
 
 # ── Page header ───────────────────────────────────────────────────────────────
@@ -239,20 +243,20 @@ if not _portfolio_ready:
         _empty_title = "Atualize o portfólio"
         _empty_message = (
             "A seleção de ativos mudou desde a última análise. "
-            "Volte para <strong style=\"color:#61d4c6\">Portfolio</strong> e clique em "
+            "Volte para <strong style=\"color:var(--brand-primary)\">Portfolio</strong> e clique em "
             "<strong>Carregar portfólio</strong> antes de rodar a simulação."
         )
     elif _simulation_restore_error:
         _empty_title = "Não foi possível restaurar a carteira"
         _empty_message = (
             "A carteira salva foi encontrada, mas as cotações históricas não "
-            "puderam ser carregadas. Abra <strong style=\"color:#61d4c6\">Portfolio</strong> "
+            "puderam ser carregadas. Abra <strong style=\"color:var(--brand-primary)\">Portfolio</strong> "
             "e carregue a análise novamente."
         )
     else:
         _empty_title = "Portfólio não configurado"
         _empty_message = (
-            "Configure seu portfólio na página <strong style=\"color:#61d4c6\">Portfolio</strong> "
+            "Configure seu portfólio na página <strong style=\"color:var(--brand-primary)\">Portfolio</strong> "
             "e carregue a análise para liberar a Simulação Monte Carlo."
         )
     empty_state_card(
@@ -612,7 +616,7 @@ col_exp1, col_exp2 = st.columns(2)
 with col_exp1:
     st.markdown(
         """
-    <div style="background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#b8eeff;">
+    <div style="background:color-mix(in srgb,var(--brand-secondary) 8%,var(--panel-bg));border:1px solid var(--panel-border);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);font-size:0.875rem;color:var(--text-secondary);">
     <b>Valor final P5:</b> percentil 5 dos valores finais simulados; não é uma medida VaR de perda.
     </div>
     """,
@@ -621,7 +625,7 @@ with col_exp1:
 with col_exp2:
     st.markdown(
         """
-    <div style="background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#fff3b0;">
+    <div style="background:color-mix(in srgb,var(--brand-accent) 8%,var(--panel-bg));border:1px solid var(--panel-border);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);font-size:0.875rem;color:var(--text-secondary);">
     <b>Média dos 5% menores valores:</b> média dos resultados finais na cauda inferior simulada.
     </div>
     """,
@@ -693,7 +697,7 @@ fig_fan.add_trace(
     go.Scatter(
         x=fan_chart.index,
         y=fan_chart["P95"],
-        line=dict(color="rgba(0, 210, 255, 0.05)"),
+        line=dict(color=CHART_SECONDARY, width=1),
         showlegend=False,
     )
 )
@@ -702,8 +706,8 @@ fig_fan.add_trace(
         x=fan_chart.index,
         y=fan_chart["P5"],
         fill="tonexty",
-        fillcolor="rgba(0, 210, 255, 0.1)",
-        line=dict(color="rgba(0, 210, 255, 0.05)"),
+        fillcolor=CHART_SECONDARY_FILL,
+        line=dict(color=CHART_SECONDARY, width=1),
         name="Faixa 5%-95%",
     )
 )
@@ -711,7 +715,7 @@ fig_fan.add_trace(
     go.Scatter(
         x=fan_chart.index,
         y=fan_chart["P75"],
-        line=dict(color="rgba(0, 210, 255, 0.1)"),
+        line=dict(color=CHART_SECONDARY, width=1),
         showlegend=False,
     )
 )
@@ -720,8 +724,8 @@ fig_fan.add_trace(
         x=fan_chart.index,
         y=fan_chart["P25"],
         fill="tonexty",
-        fillcolor="rgba(0, 210, 255, 0.25)",
-        line=dict(color="rgba(0, 210, 255, 0.1)"),
+        fillcolor=CHART_SECONDARY_FILL_STRONG,
+        line=dict(color=CHART_SECONDARY, width=1),
         name="Faixa 25%-75%",
     )
 )
@@ -729,7 +733,7 @@ fig_fan.add_trace(
     go.Scatter(
         x=fan_chart.index,
         y=fan_chart["P50"],
-        line=dict(color="#00ff87", width=2.5),
+        line=dict(color=CHART_PRIMARY, width=2.5),
         name="Mediana",
     )
 )
@@ -742,11 +746,11 @@ apply_plotly_theme(fig_fan)
 fig_fan.add_hline(
     y=valor_inicial,
     line_dash="dash",
-    line_color="#94a3b8",
+    line_color=CHART_MUTED,
     line_width=1.5,
     annotation_text=f"Capital Inicial: R$ {valor_inicial:,.0f}",
     annotation_position="bottom right",
-    annotation_font=dict(color="#94a3b8", size=11),
+    annotation_font=dict(color=CHART_MUTED, size=11),
 )
 st.plotly_chart(fig_fan, use_container_width=True)
 
@@ -795,7 +799,7 @@ fig_hist = px.histogram(
     nbins=30,
     title="Distribuição dos Valores Finais da Simulação Monte Carlo (modelo normal)",
     labels={"x": "Valor Final do Portfólio (R$)", "y": "Frequência"},
-    color_discrete_sequence=["#00d2ff"],
+    color_discrete_sequence=[CHART_SECONDARY],
 )
 fig_hist.update_layout(
     xaxis_title="Valor Final do Portfólio (R$)", yaxis_title="Frequência", bargap=0.05
@@ -805,7 +809,7 @@ fig_hist.add_vline(
     x=q1,
     line_width=2,
     line_dash="dash",
-    line_color="#ff1744",
+    line_color=CHART_DANGER,
     annotation_text="Q1 (25%)",
     annotation_position="top left",
     annotation_yshift=0,
@@ -813,7 +817,7 @@ fig_hist.add_vline(
 fig_hist.add_vline(
     x=q2,
     line_width=2.5,
-    line_color="#00ff87",
+    line_color=CHART_PRIMARY,
     annotation_text="Mediana (50%)",
     annotation_position="top",
     annotation_yshift=18,
@@ -822,7 +826,7 @@ fig_hist.add_vline(
     x=q3,
     line_width=2,
     line_dash="dash",
-    line_color="#ffd600",
+    line_color=CHART_ACCENT,
     annotation_text="Q3 (75%)",
     annotation_position="top right",
     annotation_yshift=36,
@@ -879,14 +883,14 @@ sintese_sim_items = [
 
 st.markdown(
     f"""
-<div style="background:linear-gradient(135deg,#0e1b2f,#080c14);border:1px solid #1e293b;border-radius:14px;padding:1.2rem 1.4rem;margin-bottom:1rem;">
+<div style="background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-6);margin-bottom:var(--space-4);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;flex-wrap:wrap;gap:0.5rem;">
-    <span style="font-weight:700;color:#f8fafc;font-size:0.95rem;">Projeção {years} ano(s) — {n_simulations} simulações</span>
+    <span style="font-weight:700;color:var(--text-primary);font-size:0.95rem;">Projeção {years} ano(s) — {n_simulations} simulações</span>
   </div>
-  <ul style="margin:0;padding-left:1.1rem;font-size:0.82rem;line-height:1.9;list-style:disc;">
+  <ul style="margin:0;padding-left:1.1rem;font-size:0.9rem;line-height:1.6;list-style:disc;">
     {"".join(sintese_sim_items)}
   </ul>
-  <p style="font-size:0.75rem;color:#94a3b8;margin:0.75rem 0 0;">Modelo normal de retornos logarítmicos multivariados ({len(aligned_returns)} observações, {periodo}); pesos rebalanceados diariamente. Não inclui taxas nem impostos. Resultados são cenários, não previsões.</p>
+  <p style="font-size:0.875rem;color:var(--text-muted);margin:var(--space-3) 0 0;">Modelo normal de retornos logarítmicos multivariados ({len(aligned_returns)} observações, {periodo}); pesos rebalanceados diariamente. Não inclui taxas nem impostos. Resultados são cenários, não previsões.</p>
 </div>
 """,
     unsafe_allow_html=True,

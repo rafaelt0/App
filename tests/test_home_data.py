@@ -1,5 +1,6 @@
 import pandas as pd
 
+from utils.charts import CHART_ACCENT, CHART_DANGER, CHART_MUTED, CHART_PRIMARY
 from utils.home_data import build_analyst_synthesis, compute_sector_ranking
 
 
@@ -100,7 +101,7 @@ def test_build_analyst_synthesis_marks_three_favorable_categories_attractive():
     synthesis = build_analyst_synthesis(peers_raw, "AAA1", "Bancos", _b3_data())
 
     assert synthesis["veredicto"] == "ATRATIVO"
-    assert synthesis["cor_veredicto"] == "#00ff87"
+    assert synthesis["cor_veredicto"] == CHART_PRIMARY
     assert synthesis["categorias_validas"] == 3
     assert all(
         category["veredicto"] == "Favorável"
@@ -132,7 +133,7 @@ def test_build_analyst_synthesis_marks_three_unfavorable_categories_weak():
     synthesis = build_analyst_synthesis(peers_raw, "AAA1", "Bancos", _b3_data())
 
     assert synthesis["veredicto"] == "FRACO"
-    assert synthesis["cor_veredicto"] == "#ff3d5a"
+    assert synthesis["cor_veredicto"] == CHART_DANGER
     assert synthesis["categorias_validas"] == 3
     assert all(
         category["veredicto"] == "Desfavorável"
@@ -149,7 +150,7 @@ def test_build_analyst_synthesis_returns_insufficient_without_peers():
     )
 
     assert synthesis["veredicto"] == "DADOS INSUFICIENTES"
-    assert synthesis["cor_veredicto"] == "#94a3b8"
+    assert synthesis["cor_veredicto"] == CHART_MUTED
     assert synthesis["indicadores_validos"] == 0
     assert synthesis["categorias_validas"] == 0
 

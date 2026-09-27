@@ -28,7 +28,7 @@ B3 Explorer is a Python 3.11 Streamlit app for quantitative analysis of Brazilia
 | Change a feature page | `pages/` | Streamlit discovers these scripts as multipage entries |
 | Change shared data or calculations | `utils/` | Module-specific guidance is in `utils/AGENTS.md` |
 | Change screener requirements | `docs/screener-implementation-brief.md` | Product direction and acceptance checks |
-| Change visual design | `brand/B3Lab-brand.md`, `style.css`, `.streamlit/config.toml` | Brand tokens, shared CSS, and Streamlit theme |
+| Change visual design | `DESIGN.md`, `brand/B3Lab-brand.md`, `style.css`, `.streamlit/config.toml` | Design contract, brand identity, shared CSS, and Streamlit theme |
 | Add or update tests | `tests/` | Page behavior and utility tests use pytest |
 | Change CI or local environment | `.github/workflows/tests.yml`, `requirements*.txt` | CI uses Python 3.11 and `PYTHONPATH=. pytest` |
 
@@ -47,7 +47,7 @@ B3 Explorer is a Python 3.11 Streamlit app for quantitative analysis of Brazilia
 | `parse_rss_items` | Function | `utils/news.py` | 10 | Parses and filters RSS items |
 
 ## CONVENTIONS
-- Keep user-facing copy in Brazilian Portuguese; the app uses a dark financial-dashboard theme.
+- Keep user-facing copy in Brazilian Portuguese; the app uses the dark editorial research system in `DESIGN.md`.
 - Tests use pytest, deterministic input data, injected timestamps where needed, and `tmp_path`/`monkeypatch` to isolate side effects.
 - Mock network-dependent behavior in tests; CI runs `PYTHONPATH=. pytest` on Python 3.11.
 - Shared page headers and presentation helpers live in `utils/`; follow the B3Lab page accents and semantic color tokens.
@@ -60,7 +60,7 @@ B3 Explorer is a Python 3.11 Streamlit app for quantitative analysis of Brazilia
 - Do not treat the random session identity as a durable user account; it is intentionally not derived from URL parameters.
 
 ## UNIQUE STYLES
-- The Streamlit UI is in Brazilian Portuguese and uses the B3Lab brand's flat dark palette with semantic accents.
+- The Streamlit UI is in Brazilian Portuguese and uses B3Lab's layered charcoal surfaces, serif page titles, and semantic financial accents.
 - The home page and four numbered scripts in `pages/` form the app's feature flow; shared helpers are imported from `utils/`.
 - Portfolio and watchlist records are keyed by a random session identity in SQLite and may not survive the Streamlit session.
 

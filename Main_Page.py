@@ -10,7 +10,19 @@ from html import escape
 logger = logging.getLogger(__name__)
 
 from utils import db as _db
-from utils.charts import apply_plotly_theme
+from utils.charts import (
+    CHART_ACCENT,
+    CHART_COLORWAY,
+    CHART_DANGER,
+    CHART_GRID,
+    CHART_INFO,
+    CHART_MUTED,
+    CHART_PRIMARY,
+    CHART_SECONDARY,
+    CHART_SURFACE,
+    CHART_TEXT,
+    apply_plotly_theme,
+)
 from utils.identity import get_browser_uid
 from utils.ui import (
     load_css,
@@ -170,15 +182,15 @@ def _render_market_target_panel(tickers):
     )
 
 
-# Configurar temas de plotagem escuros
-plt.style.use("dark_background")
-plt.rcParams["figure.facecolor"] = "#0b111a"
-plt.rcParams["axes.facecolor"] = "#151d2a"
-plt.rcParams["text.color"] = "#f0f4f8"
-plt.rcParams["axes.labelcolor"] = "#aebaca"
-plt.rcParams["xtick.color"] = "#aebaca"
-plt.rcParams["ytick.color"] = "#aebaca"
-plt.rcParams["grid.color"] = "#34465b"
+# Configure Matplotlib charts for the shared dark palette.
+plt.style.use("default")
+plt.rcParams["figure.facecolor"] = CHART_SURFACE
+plt.rcParams["axes.facecolor"] = CHART_SURFACE
+plt.rcParams["text.color"] = CHART_TEXT
+plt.rcParams["axes.labelcolor"] = CHART_MUTED
+plt.rcParams["xtick.color"] = CHART_MUTED
+plt.rcParams["ytick.color"] = CHART_MUTED
+plt.rcParams["grid.color"] = CHART_GRID
 plt.rcParams["font.family"] = "sans-serif"
 
 
@@ -243,7 +255,7 @@ if "selected_tickers" not in st.session_state:
 _watchlist = _db.wl_get(_uid)
 if _watchlist:
     st.sidebar.markdown(
-        f'<div class="sidebar-section-label" style="color:#ffd600">{ICO_STAR} Favoritos</div>',
+            f'<div class="sidebar-section-label" style="color:var(--brand-accent)">{ICO_STAR} Favoritos</div>',
         unsafe_allow_html=True,
     )
     for _wt in _watchlist:
@@ -468,14 +480,14 @@ if not tickers:
     )
 
     _QUICK = [
-        ("WEGE3", "Máquinas", "#61d4c6"),
-        ("PETR4", "Petróleo", "#e7b96b"),
-        ("VALE3", "Mineração", "#e58a93"),
-        ("ITUB4", "Banco", "#8cb4f2"),
-        ("RENT3", "Locação", "#b7a2e6"),
-        ("ABEV3", "Bebidas", "#d79b6f"),
-        ("EGIE3", "Energia", "#7fcea3"),
-        ("RADL3", "Farmácia", "#84b8e8"),
+        ("WEGE3", "Máquinas", CHART_PRIMARY),
+        ("PETR4", "Petróleo", CHART_ACCENT),
+        ("VALE3", "Mineração", CHART_DANGER),
+        ("ITUB4", "Banco", CHART_SECONDARY),
+        ("RENT3", "Locação", CHART_INFO),
+        ("ABEV3", "Bebidas", CHART_ACCENT),
+        ("EGIE3", "Energia", CHART_PRIMARY),
+        ("RADL3", "Farmácia", CHART_SECONDARY),
     ]
     _cols = st.columns(4)
     for i, (tkr, setor, cor) in enumerate(_QUICK):
@@ -870,7 +882,7 @@ if ready_to_analyze:
             st.markdown(
                 """
 <h4 style="display:flex;align-items:center;gap:6px;margin-top:1.5rem;margin-bottom:.4rem">
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="20" x2="18" y2="10"></line>
     <line x1="12" y1="20" x2="12" y2="4"></line>
     <line x1="6" y1="20" x2="6" y2="14"></line>
@@ -922,13 +934,7 @@ if ready_to_analyze:
                 else:
                     text_labels.append(f"{v:.2f}")
 
-            chart_palette = (
-                "#61d4c6",
-                "#8cb4f2",
-                "#e7b96b",
-                "#e58a93",
-                "#b7a2e6",
-            )
+            chart_palette = CHART_COLORWAY
             fig_comp = go.Figure(
                 go.Bar(
                     x=df_chart.index.tolist(),
@@ -942,14 +948,14 @@ if ready_to_analyze:
                     text=text_labels,
                     textposition="outside",
                     cliponaxis=False,
-                    textfont=dict(size=10, color="#f8fafc"),
+                    textfont=dict(size=10, color=CHART_TEXT),
                 )
             )
 
             fig_comp.update_layout(
                 title=dict(
                     text=f"Comparativo de {selected_comp_mult} — Ações Selecionadas",
-                    font=dict(size=14, color="#f8fafc"),
+                    font=dict(size=14, color=CHART_TEXT),
                 ),
                 xaxis_title="Ação",
                 yaxis_title=f"{selected_comp_mult} (%)"

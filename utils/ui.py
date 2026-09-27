@@ -6,6 +6,8 @@ from pathlib import Path
 
 import streamlit as st
 
+from utils.charts import CHART_COLORWAY
+
 
 def svg_icon(body: str, size: int = 14) -> str:
     """Wrap raw SVG path/shape markup in a small inline `<svg>` icon.
@@ -47,8 +49,8 @@ def render_page_header(title: str, subtitle: str, icon: str) -> None:
         f"""
 <style>
 [data-testid="stSidebarNavLink"][href$="/{page_path}"] {{
-  border-left-color: var(--brand-primary) !important;
-  background: rgba(97, 212, 198, 0.12) !important;
+  border-left-color: transparent !important;
+  background: color-mix(in srgb, var(--brand-primary) 10%, var(--panel-bg)) !important;
 }}
 [data-testid="stSidebarNavLink"][href$="/{page_path}"] span {{
   color: var(--brand-primary) !important;
@@ -75,8 +77,8 @@ def analyst_synthesis_header() -> None:
 <h3 class="analyst-synthesis-heading">
   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
        fill="none" aria-hidden="true" focusable="false">
-    <circle cx="12" cy="12" r="10" stroke="#a855f7" stroke-width="1.8"/>
-    <path d="M12 8v4l3 3" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="12" cy="12" r="10" stroke="var(--brand-info)" stroke-width="1.8"/>
+    <path d="M12 8v4l3 3" stroke="var(--brand-info)" stroke-width="2" stroke-linecap="round"/>
   </svg>
   <span class="analyst-synthesis-title">Síntese do Analista</span>
 </h3>
@@ -96,16 +98,7 @@ def diag_row(icon_svg: str, text: str, color: str) -> None:
     )
 
 
-_CARD_GRID_COLORS = [
-    "#38bdf8",
-    "#4ade80",
-    "#fbbf24",
-    "#fb7185",
-    "#c084fc",
-    "#f472b6",
-    "#34d399",
-    "#60a5fa",
-]
+_CARD_GRID_COLORS = CHART_COLORWAY
 
 
 def render_cards_grid(data_dict: dict, colors_sequence=None) -> None:

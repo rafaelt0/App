@@ -39,7 +39,7 @@ State exactly what you will change and why, before editing anything.
 - Make targeted edits — do NOT rewrite whole files
 - Preserve existing behavior unless fixing a bug
 - Keep Brazilian Portuguese strings as-is (UI is in PT-BR)
-- Respect the dark theme (`neo-financial obsidian`)
+- Follow the dark-first B3Lab system in `DESIGN.md` and `brand/B3Lab-brand.md`
 - Do not add new dependencies without a clear reason
 
 ### 4. Verify

@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 st.set_page_config(page_title="Screener B3", page_icon="favicon.svg", layout="wide")
 load_css()
 
+
+def _format_pt_number(value: float, decimals: int | None = None) -> str:
+    formatted = f"{value:g}" if decimals is None else f"{value:,.{decimals}f}"
+    return formatted.translate(str.maketrans(".,", ",."))
+
+
 _screener_uid = get_browser_uid()
 ICO_FILTER = svg_icon(
     '<path d="M3 4.5h18l-6.75 8v6.5l-4.5 2v-8.5z" stroke="#00d2ff" stroke-width="1.8" '
@@ -318,16 +324,23 @@ df_filtrado = df_filtrado.sort_values(
 
 active_filters = []
 if "liq2m_min" in criteria:
-    active_filters.append(f"Liquidez 2m ≥ R$ {criteria['liq2m_min']:,.0f}")
+    active_filters.append(
+        f"Liquidez 2m ≥ R$ {_format_pt_number(criteria['liq2m_min'], decimals=0)}"
+    )
 if "pl_min" in criteria:
     low_op = ">" if criteria.get("pl_min_exclusive") else "≥"
-    active_filters.append(f"P/L {low_op} {criteria['pl_min']:g} e ≤ {criteria['pl_max']:g}")
+    active_filters.append(
+        f"P/L {low_op} {_format_pt_number(criteria['pl_min'])} "
+        f"e ≤ {_format_pt_number(criteria['pl_max'])}"
+    )
 if "roe_min" in criteria:
-    active_filters.append(f"ROE ≥ {criteria['roe_min'] * 100:g}%")
+    active_filters.append(f"ROE ≥ {_format_pt_number(criteria['roe_min'] * 100)}%")
 if "dy_min" in criteria:
-    active_filters.append(f"DY ≥ {criteria['dy_min'] * 100:g}%")
+    active_filters.append(f"DY ≥ {_format_pt_number(criteria['dy_min'] * 100)}%")
 if "c5y_min" in criteria:
-    active_filters.append(f"Cresc. Rec. 5a ≥ {criteria['c5y_min'] * 100:g}%")
+    active_filters.append(
+        f"Cresc. Rec. 5a ≥ {_format_pt_number(criteria['c5y_min'] * 100)}%"
+    )
 
 st.markdown("### Resultados")
 st.caption(
@@ -350,8 +363,18 @@ avg_dy = df_filtrado["dy"].mean() * 100 if "dy" in df_filtrado.columns and not d
 avg_roe = df_filtrado["roe"].mean() * 100 if "roe" in df_filtrado.columns and not df_filtrado.empty else None
 col_count, col_dy, col_roe = st.columns(3)
 col_count.metric("Ações correspondentes", len(df_filtrado))
-col_dy.metric("DY médio", f"{avg_dy:.2f}%" if avg_dy is not None and pd.notna(avg_dy) else "—")
-col_roe.metric("ROE médio", f"{avg_roe:.2f}%" if avg_roe is not None and pd.notna(avg_roe) else "—")
+col_dy.metric(
+    "DY médio",
+    f"{_format_pt_number(avg_dy, decimals=2)}%"
+    if avg_dy is not None and pd.notna(avg_dy)
+    else "—",
+)
+col_roe.metric(
+    "ROE médio",
+    f"{_format_pt_number(avg_roe, decimals=2)}%"
+    if avg_roe is not None and pd.notna(avg_roe)
+    else "—",
+)
 
 if df_filtrado.empty:
     st.warning("Nenhuma ação encontrada. Reduza os limites ou desative critérios; dados ausentes não são considerados aprovação.")
@@ -399,35 +422,39 @@ visible_columns = st.multiselect(
 display_columns = [column for column in available_columns if column in visible_columns]
 
 number_formats = {
-    "Cotação (R$)": "R$ %.2f",
-    "P/L": "%.2f",
-    "P/VP": "%.2f",
-    "Div. Yield (%)": "%.2f%%",
-    "ROE (%)": "%.2f%%",
-    "ROIC (%)": "%.2f%%",
-    "EV/EBITDA": "%.2f",
-    "EV/EBIT": "%.2f",
-    "Mrg. EBIT (%)": "%.2f%%",
-    "Mrg. Líq. (%)": "%.2f%%",
-    "Liq. Corrente": "%.2f",
-    "Liq. 2m (R$)": "R$ %.0f",
-    "Dív. Líq./Patrim.": "%.2f",
-    "Cresc. Rec. 5a (%)": "%.2f%%",
-    "Patrim. Líq. (R$)": "R$ %.0f",
+    "Cotação (R$)": "R$ {:,.2f}",
+    "P/L": "{:,.2f}",
+    "P/VP": "{:,.2f}",
+    "Div. Yield (%)": "{:,.2f}%",
+    "ROE (%)": "{:,.2f}%",
+    "ROIC (%)": "{:,.2f}%",
+    "EV/EBITDA": "{:,.2f}",
+    "EV/EBIT": "{:,.2f}",
+    "Mrg. EBIT (%)": "{:,.2f}%",
+    "Mrg. Líq. (%)": "{:,.2f}%",
+    "Liq. Corrente": "{:,.2f}",
+    "Liq. 2m (R$)": "R$ {:,.0f}",
+    "Dív. Líq./Patrim.": "{:,.2f}",
+    "Cresc. Rec. 5a (%)": "{:,.2f}%",
+    "Patrim. Líq. (R$)": "R$ {:,.0f}",
 }
-column_config = {
-    column: st.column_config.NumberColumn(column, format=number_formats[column])
-    for column in display_columns
-    if column in number_formats
-}
+formatted_display = display[display_columns].style.format(
+    {
+        column: number_formats[column]
+        for column in display_columns
+        if column in number_formats
+    },
+    thousands=".",
+    decimal=",",
+    na_rep="—",
+)
 
 st.caption("Selecione uma linha para abrir a análise de preço-alvo ou gerenciar favoritos.")
 rows_digest = hashlib.sha1("|".join(map(str, display.index)).encode()).hexdigest()[:12]
 table_event = st.dataframe(
-    display[display_columns],
+    formatted_display,
     use_container_width=True,
     height=600,
-    column_config=column_config,
     key=f"screener_results_{rows_digest}",
     on_select="rerun",
     selection_mode="single-row",
