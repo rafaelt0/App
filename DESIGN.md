@@ -4,7 +4,9 @@
 
 B3Lab is a dark-first workspace for researching Brazilian equities. Cool neutral
 dark grays, a single vivid indigo brand accent, sans-serif typography, and
-precise tabular numerals keep long analysis sessions calm and readable. The
+precise tabular numerals keep long analysis sessions calm and readable. Analytical
+content sits directly on the canvas, grouped by whitespace and fine rules.
+Reserve enclosed surfaces for controls, menus, and selection states. The
 brand color marks primary actions, active state, and section identity only.
 Financial semantics use their own colors: green for gains, coral red for
 losses, and amber for warnings. Every page shares the same indigo accent;
@@ -25,8 +27,8 @@ use the same palette. Verify their rendered colors on the live surface.
 | Role | Token | Value | Use |
 |---|---|---|---|
 | Canvas | `--surface-canvas` | `#0E1015` | Main application background, inputs |
-| Sidebar | `--sidebar-bg` | `#12151C` | Navigation rail |
-| Panel | `--surface-panel` | `#161A22` | Cards, charts, tables, forms |
+| Mobile navigation | `--sidebar-bg` | `#12151C` | Mobile header and menu |
+| Panel | `--surface-panel` | `#161A22` | Table headers and supporting surfaces |
 | Grouped surface | `--surface-muted` | `#1D222C` | Buttons, table headers, hover rows, chips |
 | Raised surface | `--surface-raised` | `#252B37` | Menus, tooltips, button hover |
 | Primary text | `--text-primary` | `#F3F5F9` | Headings, body copy, and values |
@@ -67,7 +69,7 @@ components so primary states and selected surfaces share the same shades.
 | `--indigo-700` | `#444CA3` | `--brand-primary-border`, decorative icon borders |
 | `--indigo-800` | `#343B78` | Dark shade |
 | `--indigo-900` | `#282E57` | Dark shade |
-| `--indigo-950` | `#252A41` | `--brand-primary-surface`, selected backgrounds and icon tiles |
+| `--indigo-950` | `#252A41` | `--brand-primary-surface`, selected control backgrounds |
 
 Primary buttons and links use `--text-on-primary` in their default, hover,
 and pressed states. Their text contrast is 6.99:1, 9.28:1, and 5.02:1,
@@ -81,11 +83,11 @@ for text or control outlines. Keep selection labels, borders, and
 
 | Role | Font | Size | Weight | Line height |
 |---|---|---:|---:|---:|
-| Page title | IBM Plex Sans | `clamp(26px–30px)` | 700 | 1.2 |
-| Section heading | IBM Plex Sans | 18–20px | 650 | 1.3 |
+| Page title | IBM Plex Sans | `clamp(26px–32px)` | 500 | 1.2 |
+| Section heading | IBM Plex Sans | 18–20px | 500 | 1.3 |
 | Body | IBM Plex Sans | 14–16px | 400 | 1.5 |
 | Labels | IBM Plex Sans | 13px | 500–600 | 1.4 |
-| Financial values | IBM Plex Sans with tabular numerals | 14–24px | 600–700 | 1.3 |
+| Financial values | IBM Plex Sans with tabular numerals | 14–30px | 500–650 | 1.3 |
 | Chips and code | System monospace | 12px | 400–600 | 1.4 |
 
 Interface text uses locally bundled IBM Plex Sans with a system sans fallback
@@ -106,15 +108,17 @@ cards and columns reflow without horizontal page scrolling. Wide tables may
 scroll inside their own container.
 
 Keep the page sequence clear: page identity, task controls, key metrics, then
-evidence and next steps. Use cards only when they group one analytical task.
+evidence and next steps. Use spacing and dividers to group analytical tasks.
+Avoid enclosing forms, metrics, charts, or article lists in cards.
 
 The desktop navigation reserves 232px, or 72px when collapsed. A slim workspace
 bar names the current page above its header without adding a second divider.
+Hide this redundant bar below 769px to bring the task controls into view sooner.
 Each page uses the same shell:
 
 - Fundamentos puts search and quick selections before source metadata and pairs
-  the empty selection with a short guide. Once an asset is
-  selected, the task fills the available width. Loaded results lead with ticker
+  the empty selection with compact ticker rows. Instructions live in a collapsed
+  disclosure after sectors and favorites. The task uses the available width. Loaded results lead with ticker
   summaries, followed by section navigation and evidence.
 - Portfólio puts asset selection beside parameters on wide screens, then groups
   headline metrics with the allocation before the historical evidence.
@@ -129,57 +133,57 @@ Each page uses the same shell:
 
 | Token | Value | Use |
 |---|---:|---|
-| `--radius-sm` | 6px | Chips, tags, code |
-| `--radius-md` | 8px | Buttons, inputs, menus, nav links |
-| `--radius-lg` | 12px | Cards, metrics, charts, tables, alerts |
-| `--radius-xl` | 16px | Large containers: onboarding, empty state, analyst synthesis |
+| `--radius-sm` | 3px | Chips, tags, code |
+| `--radius-md` | 4px | Buttons, inputs, menus |
+| `--radius-lg` | 4px | Remaining compact control groups |
+| `--radius-xl` | 4px | Compatibility token for compact controls |
 | `--radius-pill` | 999px | Badges, meters, progress tracks |
+
+Analytical sections have no corner radius or enclosing background.
 
 ## Components
 
 ### Page header
 
-One page-level heading with its icon in a 44px indigo-tinted tile, a short
-subtitle, and a bottom border. Title uses primary text. Decorative SVGs remain
-hidden from assistive technology. The active navigation link uses a 3px indigo
-left border, an indigo-tinted background, and `aria-current`.
-
-Keep the icon visible at every viewport width. At widths up to 768px, use a
-40px tile and keep the header flex layout so long titles and subtitles wrap.
+One page-level heading with a bare indigo icon, a short subtitle, and a bottom
+rule. The icon occupies a 28px column and stays visible on mobile. Page titles
+use weight 500. Decorative SVGs remain hidden from assistive technology.
+The active navigation link uses indigo text and icon, a 3px left rule, and
+`aria-current`. The desktop sidebar shares the main canvas color.
 
 ### Section headings
 
-Sans, 18–20px, weight 650, primary text, with the icon in the brand color. No
+Sans, 18–20px, weight 500, primary text, with the icon in the brand color. No
 underline or uppercase.
 
 ### Metrics and cards
 
-Panel surface, 1px default border, 12px radius, 20px padding. Values are
-neutral primary text with tabular numerals; metric deltas use positive/danger
-colors and keep their arrow icon. Hover changes the border only; do not lift
-cards.
+Metrics sit on the canvas with a thin top rule and 16px vertical padding.
+Use a 24px column gap, tabular numerals, and weight 500 for headline values.
+Metric deltas keep their semantic colors and textual or icon assessments.
+Do not add a border box, background fill, or hover treatment to passive metrics.
 
 Supporting guides and allocation context use the canvas with a single divider
-and 16px secondary headings. Primary tasks keep the panel surface and 20px
+and 16px secondary headings. Primary tasks use the canvas and 20px
 headings. On narrow screens, the supporting divider moves above the content.
 
 ### Controls
 
-Buttons: 44px minimum height, 8px radius, muted surface with strong border;
+Buttons: 44px minimum height, 4px radius, transparent surface with strong border;
 hover raises the surface and turns the border indigo. Primary buttons are
 indigo-filled with `--text-on-primary`. Inputs use the canvas surface with a
 strong border; focus turns it indigo. Tabs use an indigo 2px highlight. Keep
 visible labels, keyboard operation, and clear default, hover, focus, disabled,
 and error states.
 
-Quick-selection shortcuts use the canvas and default border. Their hover and
+Quick-selection shortcuts use compact ticker rows with a bottom rule. Their hover and
 focus states keep the indigo border or outline. Primary task actions have 24px
-horizontal padding. Active screener criteria use a subdued indigo border;
+horizontal padding. Active screener criteria use a subdued indigo top rule;
 their checkbox and textual state identify which filters are enabled.
 
 Disabled inputs and selects drop to 50% opacity with a not-allowed cursor, the
 same as disabled buttons. A page's primary task form sits in one `.task-panel`
-(panel surface, 12px radius, 24px padding). The order inside it is the
+with no enclosing border, background, or padding. The order inside it is the
 selection first, then parameters in a `.controls-grid`, then one `.actions`
 row that leads with the primary button. Multi-choice options with up to about
 15 entries, such as table columns, use a `.checkbox-group` of 44px checkbox
@@ -198,15 +202,15 @@ and disabled states; do not depend on framework-generated wrapper markup.
 
 ### Alerts and empty states
 
-Alerts tint the panel with the semantic color (info cyan, success green, warning
-amber, error coral) and color the icon. Empty states are centered panels with an
-indigo icon tile, a title, a message, and a primary recovery action. Loading feedback keeps
+Alerts use a semantic left rule and icon on the canvas. Empty states are
+left-aligned sections with a top rule, a bare icon, a message, and a recovery
+action. Loading feedback uses an inline spinner and operation label, with
 `role="status"` and `aria-live="polite"`.
 
 ### Diagnostics, next step, and loading
 
 Financial diagnostics pair their semantic color with a textual assessment.
-Next-step cards use a 3px indigo left border. Loading uses an indigo spinner
+Next steps use a horizontal rule above the action. Loading uses an indigo spinner
 with an actual operation label and an accessible status region.
 
 React consumes calculated financial states from the Python API. Keep fixed
@@ -215,10 +219,10 @@ colors in stylesheet tokens. Page icons reuse the SVG assets in
 
 ### Charts and tables
 
-Plotly charts sit on a bordered panel with 12px radius. Keep readable axes,
+Plotly charts use transparent paper and plot backgrounds on the canvas. Keep readable axes,
 visible grid lines, semantic series colors, tooltips, and the existing table
-alternative where available. Tables use muted headers, row borders, and a muted
-hover row. Data must be readable before any animation.
+alternative where available. Tables use panel-colored headers, row rules, and a
+muted hover row. Tables have no enclosing side borders or rounded corners. Data must be readable before any animation.
 
 Chart toolbar actions stay local. Do not expose cloud sharing of session
 analyses. CSV exports come from the owned Python result, not visible table cells.
@@ -237,8 +241,9 @@ final state and disable transitions, animations, and smooth scrolling.
 
 ## Surface treatment
 
-Create depth with adjacent neutral dark surface values and clear borders. Do
-not use shadows, gradients, glow, blur, or texture.
+Keep analytical content on one continuous canvas. Use fine dividers, consistent
+alignment, and spacing for hierarchy. Reserve filled surfaces for interaction.
+Do not use shadows, gradients, glow, blur, or texture.
 
 ## Accessibility and responsive checks
 
@@ -249,7 +254,9 @@ not use shadows, gradients, glow, blur, or texture.
 - Primary controls use a minimum 44px target.
 - Check 375, 768, 1024, and 1440px widths.
 - Honor `prefers-reduced-motion`.
-- Keep chart grid lines distinct from the panel surface.
+- Run `scripts/check_ui_layout.js` in the browser console on each loaded page.
+  It checks document overflow, analytical containers, primary targets, and titles.
+- Keep chart grid lines distinct from the canvas.
 
 ## Accepted debt
 
