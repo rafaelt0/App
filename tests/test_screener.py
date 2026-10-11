@@ -26,12 +26,12 @@ def test_presets_include_only_stocks_meeting_their_criteria(stocks):
     assert set(filter_stocks(stocks, PRESET_FILTERS["Lucro a preço moderado"]).index) == {
         "AAA3"
     }
-    assert set(filter_stocks(stocks, PRESET_FILTERS["Renda atual"]).index) == {
-        "AAA3", "BBB3"
+    assert set(filter_stocks(stocks, PRESET_FILTERS["Dividendos sustentáveis"]).index) == {
+        "AAA3"
     }
-    assert set(filter_stocks(stocks, PRESET_FILTERS["Crescimento com lucro"]).index) == {
-        "AAA3", "BBB3", "CCC3"
-    }
+    assert set(
+        filter_stocks(stocks, PRESET_FILTERS["Crescimento a preço razoável"]).index
+    ) == {"AAA3"}
 
 
 def test_missing_active_values_fail_but_inactive_missing_columns_do_not(stocks):
@@ -73,12 +73,34 @@ def test_new_presets_apply_only_their_stated_thresholds():
     assert list(
         filter_stocks(candidates, PRESET_FILTERS["Qualidade rentável"]).index
     ) == ["QUALITY"]
-    assert set(filter_stocks(candidates, PRESET_FILTERS["Alta liquidez"]).index) == {
-        "LIQUID", "LIQUID_2", "LOW_GROWTH", "LOW_GROWTH_ROE", "MISSING_GROWTH_ROE"
+
+
+def test_brazilian_presets_apply_only_their_stated_thresholds():
+    frame = pd.DataFrame(
+        {
+            "pl": [8, 8.1, 0, 8, 20, 20.1, 25, 25, 26],
+            "roe": [0.12, 0.20, 0.30, 0.119, 0.15, 0.20, 0.10, 0.10, 0.20],
+            "dy": [0.06, 0.06, 0.06, 0.06, None, None, None, None, None],
+            "liq2m": [
+                2_000_000, 2_000_000, 2_000_000, 2_000_000, 2_000_000,
+                2_000_000, 20_000_000, 19_999_999, 20_000_000,
+            ],
+            "c5y": [None, None, None, None, 0.10, 0.20, None, None, None],
+        },
+        index=[
+            "VALUE", "HIGH_PL", "ZERO_PL", "LOW_ROE", "GARP", "GARP_HIGH_PL",
+            "BIG", "BIG_ILLIQUID", "BIG_HIGH_PL",
+        ],
+    )
+
+    assert list(filter_stocks(frame, PRESET_FILTERS["Valor descontado"]).index) == ["VALUE"]
+    assert set(filter_stocks(frame, PRESET_FILTERS["Dividendos sustentáveis"]).index) == {
+        "VALUE", "HIGH_PL", "LOW_ROE"
     }
     assert list(
-        filter_stocks(candidates, PRESET_FILTERS["Crescimento com lucro"]).index
-    ) == ["GROWTH"]
+        filter_stocks(frame, PRESET_FILTERS["Crescimento a preço razoável"]).index
+    ) == ["GARP"]
+    assert list(filter_stocks(frame, PRESET_FILTERS["Grandes e líquidas"]).index) == ["BIG"]
 
 
 def test_export_uses_percentage_points_and_keeps_every_row(stocks):
