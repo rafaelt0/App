@@ -1,7 +1,7 @@
 
 .sim-workbench { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; margin: 24px 0 0; }
 .sim-workbench > * { min-width: 0; }
-@media (min-width: 1200px) {
+@container workspace (min-width: 960px) {
   .sim-workbench { grid-template-columns: minmax(0, 1fr) minmax(280px, 320px); }
 }
 
@@ -49,7 +49,7 @@
 .sim-prereq-outputs ul { margin: 0 0 16px; padding-left: 20px; display: grid; gap: 10px; color: var(--text-primary); }
 .sim-prereq-outputs li::marker { color: var(--brand-primary); }
 .sim-prereq-outputs p { margin: 0; color: var(--text-muted); font-size: 13px; }
-@media (min-width: 1024px) {
+@container workspace (min-width: 880px) {
   .sim-prereq { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; padding: 32px; }
   .sim-prereq-outputs { padding-top: 0; padding-left: 32px; border-top: 0; border-left: 1px solid var(--border-default); }
 }
@@ -88,7 +88,7 @@
   .sim-kpis .mcard-value { font-size: 22px; }
   .sim-task .actions button.primary { width: 100%; min-width: 0; }
 }
-@media (min-width: 1200px) {
+@container workspace (min-width: 960px) {
   .sim-context .analysis-section { padding: 8px 0 8px 24px; border-top: 0; border-left: 1px solid var(--border-default); }
 }
 @media (max-width: 480px) {
