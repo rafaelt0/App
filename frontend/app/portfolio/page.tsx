@@ -183,54 +183,65 @@ export default function PortfolioPage() {
     {notice && <Notice>{notice}</Notice>}
     {error && <Notice tone="negative">{error}</Notice>}
     <Section title="Montagem da carteira">
-      <div className="task-panel">
-      <h3 className="pf-step">1. Escolha os papéis</h3>
-      <p className="pf-hint">Selecione de 2 a 20 ações para compor a carteira.</p>
-      <TickerPicker value={session.selection} stocks={stocks} max={20} label="Ações da carteira" onChange={changeSelection} />
-      <p className="pf-count" role="status">{count} {count === 1 ? "ativo selecionado" : "ativos selecionados"} · mínimo de 2, máximo de 20</p>
-      <h3 className="pf-step">2. Defina os parâmetros</h3>
-      <div className="controls-grid">
-        <label>Período de análise<select value={windowChoice} onChange={event => { const value = event.target.value; setWindowChoice(value); setInputs(previous => ({ ...previous, lookback_days: value === "custom" ? customDays : Number(value) })); }}>
-          <option value="730">2 Anos (Padrão)</option><option value="365">1 Ano</option><option value="1095">3 Anos</option><option value="1825">5 Anos</option><option value="180">6 Meses</option><option value="custom">Personalizado (Dias)</option>
-        </select></label>
-        {windowChoice === "custom" && <label>Dias de lookback<input type="number" min={60} max={5000} step={10} value={customDays} onChange={event => { const days = Number(event.target.value); setCustomDays(days); setInputs(previous => ({ ...previous, lookback_days: days })); }} /></label>}
-        <label>Capital disponível (R$)<input type="number" min={100} max={1000000} step={100} value={inputs.capital} onChange={event => setInputs(previous => ({ ...previous, capital: Number(event.target.value) }))} /></label>
-        <label>Estratégia de alocação<select value={inputs.strategy} onChange={event => setInputs(previous => ({ ...previous, strategy: event.target.value as Strategy }))}>{strategies.map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}</select></label>
-      </div>
-      <p className="caption">Dados a partir de {new Date(Date.now() - inputs.lookback_days * 86400000).toLocaleDateString("pt-BR")} · dias corridos.</p>
-      {inputs.strategy === "manual" && <>
-        <h3 className="pf-step">Cotas por ativo</h3><p className="pf-hint">Os pesos serão calculados pelo valor de mercado das cotas informadas; o capital disponível continua sendo a base histórica e da simulação.</p>
-        <div className="controls-grid">{session.selection.map(ticker => <label key={ticker}>Cotas de {ticker}<input type="number" min={0} step={1} value={inputs.manual_shares[ticker] ?? 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>)}</div>
-      </>}
-      {inputs.strategy === "markowitz" && <>
-        <h3 className="pf-step">Diversificação</h3><p className="pf-hint">Controle quanto a otimização evita concentrar o capital.</p>
-        <div className="button-row">{[{ label: "Concentrada", gamma: 0 }, { label: "Equilibrada", gamma: 1 }, { label: "Diversificada", gamma: 2 }].map(preset => <button type="button" key={preset.label} onClick={() => setInputs(previous => ({ ...previous, gamma: preset.gamma }))}>{preset.label}</button>)}</div>
-        <label className="pf-gamma">Diversificação (regularização L2, de 0 a 3)<input type="number" min={0} max={3} step={.1} value={inputs.gamma} onChange={event => setInputs(previous => ({ ...previous, gamma: Number(event.target.value) }))} /></label>
-      </>}
-      {!manualValid && <Notice tone="warning">A alocação manual precisa ter ao menos uma cota positiva.</Notice>}
-      {!validInputs && <Notice tone="warning">Confira os limites de capital, histórico, cotas inteiras e diversificação.</Notice>}
-      <div className="actions">
-        <button type="button" className="primary pf-actions-primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => void runAnalysis()}>Carregar portfólio</button>
-        <button type="button" disabled={selectionBusy} onClick={() => void refreshQuotes()}>Atualizar cotações</button>
-        <button type="button" onClick={() => void clearPortfolio()} disabled={selectionBusy}>Limpar carteira</button>
-      </div>
-      {loadedSelection === selectionKey && <p className="pf-actions-note">Após carregar, mudanças nos parâmetros recalculam a análise; trocar os ativos exige carregar novamente.</p>}
+      <div className="task-panel pf-setup">
+        <div className="pf-setup-grid">
+          <div className="pf-group">
+            <h3 className="pf-step">1. Escolha os papéis</h3>
+            <p className="pf-hint">Selecione de 2 a 20 ações para compor a carteira.</p>
+            <TickerPicker value={session.selection} stocks={stocks} max={20} label="Ações da carteira" onChange={changeSelection} />
+            <p className="pf-count" role="status">{count} {count === 1 ? "ativo selecionado" : "ativos selecionados"} · mínimo de 2, máximo de 20</p>
+          </div>
+          <div className="pf-group">
+            <h3 className="pf-step">2. Defina os parâmetros</h3>
+            <div className="controls-grid">
+              <label>Período de análise<select value={windowChoice} onChange={event => { const value = event.target.value; setWindowChoice(value); setInputs(previous => ({ ...previous, lookback_days: value === "custom" ? customDays : Number(value) })); }}>
+                <option value="730">2 Anos (Padrão)</option><option value="365">1 Ano</option><option value="1095">3 Anos</option><option value="1825">5 Anos</option><option value="180">6 Meses</option><option value="custom">Personalizado (Dias)</option>
+              </select></label>
+              {windowChoice === "custom" && <label>Dias de lookback<input type="number" min={60} max={5000} step={10} value={customDays} onChange={event => { const days = Number(event.target.value); setCustomDays(days); setInputs(previous => ({ ...previous, lookback_days: days })); }} /></label>}
+              <label>Capital disponível (R$)<input type="number" min={100} max={1000000} step={100} value={inputs.capital} onChange={event => setInputs(previous => ({ ...previous, capital: Number(event.target.value) }))} /></label>
+              <label>Estratégia de alocação<select value={inputs.strategy} onChange={event => setInputs(previous => ({ ...previous, strategy: event.target.value as Strategy }))}>{strategies.map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}</select></label>
+            </div>
+            <p className="caption">Dados a partir de {new Date(Date.now() - inputs.lookback_days * 86400000).toLocaleDateString("pt-BR")} · dias corridos.</p>
+            {inputs.strategy === "manual" && <div className="pf-settings">
+              <h3 className="pf-step">Cotas por ativo</h3><p className="pf-hint">Os pesos serão calculados pelo valor de mercado das cotas informadas; o capital disponível continua sendo a base histórica e da simulação.</p>
+              <div className="controls-grid">{session.selection.map(ticker => <label key={ticker}>Cotas de {ticker}<input type="number" min={0} step={1} value={inputs.manual_shares[ticker] ?? 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>)}</div>
+            </div>}
+            {inputs.strategy === "markowitz" && <div className="pf-settings">
+              <h3 className="pf-step">Diversificação</h3><p className="pf-hint">Controle quanto a otimização evita concentrar o capital.</p>
+              <div className="button-row pf-presets">{[{ label: "Concentrada", gamma: 0 }, { label: "Equilibrada", gamma: 1 }, { label: "Diversificada", gamma: 2 }].map(preset => <button type="button" key={preset.label} aria-pressed={inputs.gamma === preset.gamma} className={inputs.gamma === preset.gamma ? "is-active" : undefined} onClick={() => setInputs(previous => ({ ...previous, gamma: preset.gamma }))}>{preset.label}</button>)}</div>
+              <label className="pf-gamma">Diversificação (regularização L2, de 0 a 3)<input type="number" min={0} max={3} step={.1} value={inputs.gamma} onChange={event => setInputs(previous => ({ ...previous, gamma: Number(event.target.value) }))} /></label>
+            </div>}
+          </div>
+        </div>
+        {!manualValid && <Notice tone="warning">A alocação manual precisa ter ao menos uma cota positiva.</Notice>}
+        {!validInputs && <Notice tone="warning">Confira os limites de capital, histórico, cotas inteiras e diversificação.</Notice>}
+        <div className="actions">
+          <button type="button" className="primary pf-actions-primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => void runAnalysis()}>Carregar portfólio</button>
+          <button type="button" disabled={selectionBusy} onClick={() => void refreshQuotes()}>Atualizar cotações</button>
+          <button type="button" onClick={() => void clearPortfolio()} disabled={selectionBusy}>Limpar carteira</button>
+        </div>
+        {loadedSelection === selectionKey && <p className="pf-actions-note">Após carregar, mudanças nos parâmetros recalculam a análise; trocar os ativos exige carregar novamente.</p>}
       </div>
     </Section>
-    {count < 2 && <EmptyState title={count === 0 ? "Monte seu portfólio" : "Adicione mais um ativo"} href="/">Selecione pelo menos duas ações para comparar risco, retorno e diversificação.</EmptyState>}
+    {count < 2 && <EmptyState icon="portfolio" title={count === 0 ? "Monte seu portfólio" : "Adicione mais um ativo"} href="/">Selecione pelo menos duas ações para comparar risco, retorno e diversificação.</EmptyState>}
     {busy && <Loading>Baixando cotações e calculando alocação, risco e retorno…</Loading>}
-    {activeResult && <>
+    {activeResult && <div className="pf-results">
       {activeResult.warnings.map((warning, index) => <Notice tone="warning" key={index}>{warning}</Notice>)}
       <ResultSummary result={activeResult} />
-      <Section title="Resumo de Desempenho">
-        <Metrics items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, status: metricSignal(activeResult.metric_status[key]), help: activeResult.metric_status[key] }))} />
-        {activeResult.benchmark_available && <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit }))} />}
-        {!activeResult.benchmark_available && <Notice>Métricas relativas ao IBOVESPA e análises complementares ficam indisponíveis. Atualize as cotações quando o benchmark responder.</Notice>}
-      </Section>
-      <Section title="Pesos do Portfólio (%)">
-        <WeightList weights={activeResult.weights} />
-        <ExportButton path={`/api/portfolio/${activeResult.id}/allocation.csv`}>Exportar alocação (CSV)</ExportButton>
-      </Section>
+      <div className="pf-overview">
+        <Section title="Resumo de Desempenho">
+          <div className="pf-kpis">
+            <Metrics items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, status: metricSignal(activeResult.metric_status[key]), help: activeResult.metric_status[key] }))} />
+          </div>
+          {activeResult.benchmark_available && <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit }))} />}
+          {!activeResult.benchmark_available && <Notice>Métricas relativas ao IBOVESPA e análises complementares ficam indisponíveis. Atualize as cotações quando o benchmark responder.</Notice>}
+        </Section>
+        <Section title="Pesos do Portfólio (%)">
+          <WeightList weights={activeResult.weights} />
+          <ExportButton path={`/api/portfolio/${activeResult.id}/allocation.csv`}>Exportar alocação (CSV)</ExportButton>
+        </Section>
+      </div>
+      <div className="pf-evidence">
       <Section title="Sugestão de Compra de Cotas">
         <p className="pf-section-lead">Estimativas usam o último fechamento bruto disponível por ativo (pode haver atraso); confirme o preço de execução. Retornos seguem usando preços ajustados. Compra por arredondamento para baixo, sem completar posições com o caixa.</p>
         <Table columns={[{ key: "ticker", label: "Ativo" }, { key: "price", label: "Preço Unitário", unit: "money" }, { key: "quote_date", label: "Data da Cotação" }, { key: "shares", label: "Cotas a Comprar", unit: "integer" }, { key: "effective_value", label: "Valor Efetivo", unit: "money" }, { key: "suggested_value", label: "Valor Sugerido", unit: "money" }, { key: "suggested_weight", label: "Peso Sugerido (%)", unit: "fraction" }, { key: "effective_weight", label: "Peso Efetivo (%)", unit: "fraction" }]} rows={activeResult.trade_suggestions} rowKey="ticker" />
@@ -270,8 +281,9 @@ export default function PortfolioPage() {
       {activeResult.charts.drawdown && <Section title="Análise de Drawdown"><Chart figure={activeResult.charts.drawdown} /><h3 className="pf-sub">Máximo Drawdown por Ativo Individual</h3><Table columns={[{ key: "ticker", label: "Ativo" }, { key: "max_drawdown", label: "Máximo Drawdown (%)", unit: "percent" }, { key: "date", label: "Data do Máximo Drawdown" }]} rows={activeResult.asset_drawdowns} rowKey="ticker" /></Section>}
       {activeResult.charts.rolling_beta && <Section title="Beta Móvel (60 dias) vs IBOVESPA"><Chart figure={activeResult.charts.rolling_beta} /></Section>}
       {activeResult.charts.rolling_sharpe && <Section title="Índice de Sharpe Móvel Anualizado (60 dias)"><Chart figure={activeResult.charts.rolling_sharpe} /></Section>}
+      </div>
       <p className="discreet-status">Fontes: {activeResult.source.adjusted_prices}; {activeResult.source.trade_quotes}; Selic: {activeResult.source.selic_source} ({(activeResult.source.selic_annual * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% a.a.).</p>
       <div className="next-step-card"><h3>Portfólio configurado</h3><p>Projete trajetórias com Monte Carlo.</p><Link className="button-link" href="/simulacao">Abrir Simulação</Link></div>
-    </>}
+    </div>}
   </>;
 }
