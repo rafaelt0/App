@@ -1,0 +1,33 @@
+.pf-step { margin: 24px 0 8px; font-size: 16px; font-weight: 650; color: var(--text-primary); }
+.pf-step:first-child { margin-top: 0; }
+.pf-hint { color: var(--text-muted); font-size: 14px; margin: 4px 0 12px; }
+.pf-count { display: inline-block; margin: 8px 0 0; font-size: 13px; color: var(--text-secondary); }
+.pf-gamma { max-width: 320px; }
+.pf-actions-note { color: var(--text-muted); font-size: 14px; margin: 0 0 20px; }
+.pf-summary { background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 16px; margin: 0 0 8px; }
+.pf-summary dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px 24px; margin: 0; }
+.pf-summary dt { font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.pf-summary dd { margin: 2px 0 0; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.pf-summary .caption { margin: 12px 0 0; }
+.pf-weights { list-style: none; margin: 8px 0 16px; padding: 0; display: grid; gap: 4px; background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 12px 16px; }
+.pf-weights li { display: grid; grid-template-columns: 88px minmax(0, 1fr) 72px; align-items: center; gap: 12px; min-height: 32px; }
+.pf-weight-ticker { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.pf-weight-track { height: 8px; border-radius: var(--radius-pill); background: var(--surface-muted); overflow: hidden; }
+.pf-weight-fill { display: block; height: 100%; background: var(--brand-primary); border-radius: var(--radius-pill); }
+.pf-weight-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.pf-caption { caption-side: top; text-align: left; padding: 12px; color: var(--text-muted); font-size: 13px; white-space: normal; min-width: 0; }
+.pf-monthly table { min-width: 960px; }
+.pf-monthly tbody th { position: sticky; left: 0; background: var(--surface-panel); color: var(--text-primary); font-size: 14px; border-right: 1px solid var(--border-default); }
+.pf-monthly thead th:first-child { position: sticky; left: 0; z-index: 1; border-right: 1px solid var(--border-default); }
+.pf-monthly tbody tr:hover th { background: var(--surface-muted); }
+.pf-monthly td:last-child, .pf-monthly thead th:last-child { border-left: 1px solid var(--border-default); font-weight: 650; }
+.pf-stress-check { display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 12px 0; font-size: 14px; }
+.pf-stress-check input { width: 20px; height: 20px; flex: none; }
+.pf-note { color: var(--text-secondary); font-size: 14px; max-width: 80ch; }
+.pf-sub { font-size: 16px; font-weight: 650; margin: 24px 0 8px; }
+.pf-section-lead { color: var(--text-secondary); max-width: 80ch; margin: 0 0 12px; }
+@media (max-width: 480px) {
+  .pf-weights { padding: 8px 12px; }
+  .pf-weights li { grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 8px; }
+  .pf-actions-primary { width: 100%; }
+}
