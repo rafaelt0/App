@@ -2,20 +2,21 @@
 .news-page { min-width: 0; }
 .news-prereq { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: stretch; }
 .news-prereq .empty-state-card { margin: 0; justify-content: center; }
-.news-prereq-guide { min-width: 0; padding: 24px; border: 1px solid var(--border-default); border-radius: var(--radius-xl); background: var(--surface-panel); }
-.news-prereq-guide h2 { margin: 0 0 12px; font-size: 18px; }
+.news-prereq-guide { min-width: 0; padding: 24px 0 0; border-top: 1px solid var(--border-default); }
+.news-prereq-guide h2 { margin: 0 0 12px; font-size: 16px; color: var(--text-secondary); }
 .news-prereq-guide dl { display: grid; gap: 16px; margin: 24px 0 0; }
 .news-prereq-guide dl > div { padding-top: 16px; border-top: 1px solid var(--border-default); }
 .news-prereq-guide dt { margin-bottom: 4px; color: var(--text-primary); font-weight: 600; }
 .news-prereq-guide dd { margin: 0; color: var(--text-muted); }
 @container workspace (min-width: 880px) {
   .news-prereq { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .news-prereq-guide { padding: 8px 0 8px 24px; border-top: 0; border-left: 1px solid var(--border-default); }
 }
 .news-page :where(p:not(.page-hero-subtitle)) { margin: 0 0 12px; }
 .news-page .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 .news-task { display: grid; gap: 16px; padding: 24px; margin: 0 0 24px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-panel); }
-.news-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.news-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding-top: 16px; border-top: 1px solid var(--border-default); }
 .news-task-actions > p { margin: 0; }
 .news-asof { color: var(--text-muted); font-size: 13px; }
 .news-engine { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: var(--radius-pill); background: var(--surface-muted); color: var(--text-secondary); font-size: 13px; font-weight: 600; }

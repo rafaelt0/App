@@ -12,8 +12,9 @@ wayfinding comes from icon, title, and the active navigation link.
 
 Keep the B3Lab name, flask-and-candlestick mark, Brazilian Portuguese copy, and
 current financial behavior. This is a data-dense dashboard, not a marketing
-page. Use system fonts so the app works offline. Do not add gradients, glow,
-blur, shadows, decorative texture, external fonts, or color-only status.
+page. Bundle IBM Plex Sans locally so typography works without external font
+requests. Do not add gradients, glow, blur, shadows, decorative texture,
+remote font services, or color-only status.
 
 The Next.js interface defaults to dark. Tokens in
 `frontend/app/globals.css` and the `CHART_*` constants in `utils/charts.py`
@@ -48,22 +49,52 @@ Measured contrast: muted text is 6.81:1 on panel; every accent is at least
 colors paired with a sign, label, or icon. Never use `--brand-primary` to mean
 "positive"; use `--brand-positive` / `CHART_POSITIVE`.
 
+### Indigo ramp
+
+The indigo ramp in `frontend/app/globals.css` runs from light `50` to dark
+`950`. The existing brand color is `--indigo-400`. Use semantic tokens in
+components so primary states and selected surfaces share the same shades.
+
+| Token | Value | Current role |
+|---|---|---|
+| `--indigo-50` | `#F1F2FF` | Lightest shade |
+| `--indigo-100` | `#E1E3FF` | Light shade |
+| `--indigo-200` | `#BEC3FF` | Light shade |
+| `--indigo-300` | `#A8AFFF` | `--brand-primary-hover` |
+| `--indigo-400` | `#8B93FF` | `--brand-primary` |
+| `--indigo-500` | `#7078E8` | `--brand-primary-active`, pressed primary actions |
+| `--indigo-600` | `#565FC8` | Dark shade |
+| `--indigo-700` | `#444CA3` | `--brand-primary-border`, decorative icon borders |
+| `--indigo-800` | `#343B78` | Dark shade |
+| `--indigo-900` | `#282E57` | Dark shade |
+| `--indigo-950` | `#252A41` | `--brand-primary-surface`, selected backgrounds and icon tiles |
+
+Primary buttons and links use `--text-on-primary` in their default, hover,
+and pressed states. Their text contrast is 6.99:1, 9.28:1, and 5.02:1,
+respectively. Indigo icons on the selected surface have 5.19:1 contrast.
+Keep input outlines and focus rings on `--brand-primary`. The darker ramp
+shades are fills and decorative borders; check contrast before using them
+for text or control outlines. Keep selection labels, borders, and
+`aria-current` or `aria-pressed` alongside the selected background.
+
 ## Typography
 
 | Role | Font | Size | Weight | Line height |
 |---|---|---:|---:|---:|
-| Page title | System sans | `clamp(26px–30px)` | 700 | 1.2 |
-| Section heading | System sans | 18–20px | 650 | 1.3 |
-| Body | System sans | 14–16px | 400 | 1.5 |
-| Labels | System sans | 13px | 500–600 | 1.4 |
-| Financial values | System sans with tabular numerals | 14–24px | 600–700 | 1.3 |
+| Page title | IBM Plex Sans | `clamp(26px–30px)` | 700 | 1.2 |
+| Section heading | IBM Plex Sans | 18–20px | 650 | 1.3 |
+| Body | IBM Plex Sans | 14–16px | 400 | 1.5 |
+| Labels | IBM Plex Sans | 13px | 500–600 | 1.4 |
+| Financial values | IBM Plex Sans with tabular numerals | 14–24px | 600–700 | 1.3 |
 | Chips and code | System monospace | 12px | 400–600 | 1.4 |
 
-All text uses the system sans stack (`--font-display`). Financial values use
-`font-variant-numeric: tabular-nums`. Monospace (`--font-mono`) is reserved for
-ticker chips, formulas, and code. Preserve existing Portuguese strings. New
-labels use sentence case; no all-caps eyebrows. Body copy stays at least 14px
-where the component permits it.
+Interface text uses locally bundled IBM Plex Sans with a system sans fallback
+(`--font-display`). The variable font in `frontend/app/fonts/` supports weights
+400–700 and Brazilian Portuguese characters. Plotly charts inherit the
+interface font. Financial values use `font-variant-numeric: tabular-nums`.
+Monospace (`--font-mono`) is reserved for ticker chips, formulas, and code.
+Preserve existing Portuguese strings. New labels use sentence case; no
+all-caps eyebrows. Body copy stays at least 14px where the component permits it.
 
 ## Spacing and layout
 
@@ -78,9 +109,11 @@ Keep the page sequence clear: page identity, task controls, key metrics, then
 evidence and next steps. Use cards only when they group one analytical task.
 
 The desktop navigation reserves 232px, or 72px when collapsed. A slim workspace
-bar names the current page above its header. Each page uses the same shell:
+bar names the current page above its header without adding a second divider.
+Each page uses the same shell:
 
-- Fundamentos pairs the empty selection with a short guide. Once an asset is
+- Fundamentos puts search and quick selections before source metadata and pairs
+  the empty selection with a short guide. Once an asset is
   selected, the task fills the available width. Loaded results lead with ticker
   summaries, followed by section navigation and evidence.
 - Portfólio puts asset selection beside parameters on wide screens, then groups
@@ -126,6 +159,10 @@ neutral primary text with tabular numerals; metric deltas use positive/danger
 colors and keep their arrow icon. Hover changes the border only; do not lift
 cards.
 
+Supporting guides and allocation context use the canvas with a single divider
+and 16px secondary headings. Primary tasks keep the panel surface and 20px
+headings. On narrow screens, the supporting divider moves above the content.
+
 ### Controls
 
 Buttons: 44px minimum height, 8px radius, muted surface with strong border;
@@ -134,6 +171,11 @@ indigo-filled with `--text-on-primary`. Inputs use the canvas surface with a
 strong border; focus turns it indigo. Tabs use an indigo 2px highlight. Keep
 visible labels, keyboard operation, and clear default, hover, focus, disabled,
 and error states.
+
+Quick-selection shortcuts use the canvas and default border. Their hover and
+focus states keep the indigo border or outline. Primary task actions have 24px
+horizontal padding. Active screener criteria use a subdued indigo border;
+their checkbox and textual state identify which filters are enabled.
 
 Disabled inputs and selects drop to 50% opacity with a not-allowed cursor, the
 same as disabled buttons. A page's primary task form sits in one `.task-panel`
@@ -146,6 +188,9 @@ chips, not a native multi-select. The checked chip takes the indigo border.
 Long result lists render 25 items at a time. A `Ver mais N … (M restantes)`
 button reveals the next 25. Row actions render above the list, never below it.
 Exports always cover the full result.
+
+Screener column options sit in a collapsed disclosure above the table. Its
+summary shows the selected count; opening it reveals the checkbox chips.
 
 Shared native buttons and form controls live in `frontend/components/ui.tsx`
 and inherit the global state rules. Use the same scope for base, hover, focus,
