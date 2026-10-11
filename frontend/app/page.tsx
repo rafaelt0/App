@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import "./home.css";
 import { useApp } from "../components/AppProvider";
 import type { SelectionUpdate } from "../components/AppProvider";
+import SelectionSummary from "./SelectionSummary";
 import HomeResults from "../components/HomeResults";
 import { Loading, Notice, PageHeader, TickerPicker } from "../components/ui";
 import { analyzeHome, quickSectors, quickTickers, refreshConsensus, refreshFundamentus, suggestions } from "../lib/home";
@@ -19,12 +20,15 @@ export default function HomePage() {
   const [error,setError] = useState<string|null>(null);
   const [notice,setNotice] = useState<string|null>(null);
   const [retryAction,setRetryAction] = useState<"analyze"|"consensus"|"source">("analyze");
+  const [editRequested,setEditRequested] = useState(false);
+  const panel = useRef<HTMLElement>(null);
   const generation = useRef(0);
   const sectorGeneration = useRef(0);
   const analyzedRevision = useRef<number|null>(null);
   const revision = useRef(session?.revision);
   revision.current = session?.revision;
   useEffect(() => {generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);},[session?.revision]);
+  useEffect(() => {if(editRequested)panel.current?.querySelector<HTMLInputElement>("input[type=search]")?.focus();},[editRequested]);
   useEffect(() => {
     const unavailable=new URLSearchParams(window.location.search).get("unavailable");
     if(unavailable)setNotice(`${unavailable} está fora da lista local B3. A seleção foi removida; escolha outro ativo para analisar.`);
@@ -35,7 +39,7 @@ export default function HomePage() {
   },[]);
 
   async function changeSelection(tickers:SelectionUpdate) {
-    generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);
+    generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);
     try {await setSelection(tickers);} catch(exc) {setError((exc as Error).message);}
   }
   async function changeSectors(next:string[]) {
@@ -58,6 +62,7 @@ export default function HomePage() {
     const rev=session.revision;
     const tickers=[...session.selection];
     setRetryAction(action);setBusy(true);setError(null);
+    if(action!=="consensus")setEditRequested(false);
     if(action==="analyze")analyzedRevision.current=rev;
     if(action!=="consensus")setResult(null);
     try {
@@ -88,7 +93,10 @@ export default function HomePage() {
   if(loading || !session) return <div className="home-page"><PageHeader title="Fundamentos" description="Análise quantitativa · B3" icon="home"/>{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
   const stockMap=new Map(stocks.map(stock => [stock.ticker,stock]));
   const ordered=[...(suggested?.tickers ?? []),...stocks.map(stock=>stock.ticker)].filter((ticker,index,array)=>array.indexOf(ticker)===index).map(ticker=>stockMap.get(ticker)).filter((stock):stock is typeof stocks[number]=>!!stock);
-  const sectorOptions=["Todos",...Array.from(new Set(stocks.map(stock=>stock.sector).filter(Boolean))).sort()];
+  const popularSectors=new Set(quickSectors.map(([,sector])=>sector));
+  const allSectors=Array.from(new Set(stocks.map(stock=>stock.sector).filter(Boolean))).sort();
+  const sectorOptions=["Todos",...allSectors.filter(sector=>popularSectors.has(sector)),...allSectors.filter(sector=>!popularSectors.has(sector))];
+  const mode:"edit"|"collapsed"=ready && !editRequested ? "collapsed":"edit";
   return <div className="home-page">
     <PageHeader title="Fundamentos" description="Explore fundamentos, compare empresas e aprofunde sua análise da B3." icon="home"/>
     {session.restored && <Notice>Seleção da carteira salva carregada. Revise os ativos e clique em Analisar para atualizar os fundamentos.</Notice>}
@@ -96,7 +104,8 @@ export default function HomePage() {
     {session.restored && !!session.restoration?.truncated_count && <Notice>A seleção salva tinha {session.restoration.original_count} ações. Carregamos as primeiras 20 ações válidas para manter a análise estável.</Notice>}
     {notice && <Notice tone="positive">{notice}</Notice>}
     <div className={`home-desk${!selection.length ? " is-empty" : ""}`}>
-      <section className="task-panel home-task" aria-labelledby="home-task-title">
+      <section ref={panel} className="task-panel home-task" {...(mode==="collapsed" ? {"aria-label":"Seleção analisada"}:{"aria-labelledby":"home-task-title"})}>
+        {mode==="collapsed" ? <SelectionSummary tickers={selection} onEdit={()=>setEditRequested(true)}/> : <>
         <h2 id="home-task-title" className="ui-section-heading">Selecione ativos para analisar</h2>
         <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
         <TickerPicker value={selection} onChange={changeSelection} stocks={ordered} max={20} label="Buscar ações"/>
@@ -111,6 +120,7 @@ export default function HomePage() {
           <div className="quick-start-grid">{quickTickers.map(([ticker,sector])=><button className="quick-start-button" key={ticker} onClick={()=>void changeSelection([ticker])}><strong>{ticker}</strong><span className="quick-start-sector">{sector}</span></button>)}</div>
         </div>}
         <div className="home-source" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
+        </>}
       </section>
       {!selection.length && <aside className="home-guide" aria-labelledby="home-guide-title">
         <h2 id="home-guide-title">Como funciona</h2>
@@ -134,8 +144,7 @@ export default function HomePage() {
               return <label key={sector}><input type="checkbox" checked={checked} onChange={()=>void changeSectors(sector==="Todos" ? []:checked ? sectors.filter(item=>item!==sector):[...sectors.filter(item=>item!=="Todos"),sector])} />{sector}</label>;
             })}</div>
           </fieldset>
-          <p>Nenhum setor ou Todos inclui toda a lista B3.</p>
-          {!selection.length && <><h3>Explorar · setores</h3><div className="actions">{quickSectors.map(([label,sector])=><button key={label} onClick={()=>void changeSectors([sector])}>{label}</button>)}</div></>}
+          <p>Nenhum setor ou Todos inclui toda a lista B3. Os setores mais buscados aparecem primeiro.</p>
           <button disabled={busy} onClick={()=>void run("source")}>Atualizar dados Fundamentus</button>
         </div>
         <div>
