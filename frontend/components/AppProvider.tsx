@@ -56,6 +56,7 @@ const navigation = [
 
 function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const currentPage = navigation.find(item => item.href === pathname);
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -92,13 +93,16 @@ function Shell({ children }: { children: ReactNode }) {
     <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></header>
     <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
       <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
-      <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} title={collapsed ? item.label : undefined} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>
+      <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} aria-label={item.label} title={collapsed ? item.label : undefined} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span>{pathname === item.href && <span className="nav-indicator"><Icon name="arrow-right" /></span>}</Link>)}</nav>
       <div className="sidebar-footer">
         <p className="sidebar-note"><strong>Análise quantitativa da B3</strong><span>Dados para pesquisa, não recomendações de investimento.</span></p>
         <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}</button>
       </div>
     </aside>
-    <main id="conteudo" className="main-content">{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></main>
+    <main id="conteudo" className="main-content">
+      <div className="workspace-bar"><div className="workspace-location"><span>B3Lab</span><span aria-hidden="true">/</span><span>{currentPage?.label ?? "Pesquisa de ações"}</span></div><span className="workspace-market">Mercado brasileiro <span>B3</span></span></div>
+      {children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer>
+    </main>
   </div>;
 }
 

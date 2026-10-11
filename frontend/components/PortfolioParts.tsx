@@ -30,12 +30,12 @@ export function MonthlyReturns({ rows }: { rows: PortfolioResult["monthly_return
   const keys = [...months.map((_, index) => `m${index + 1}`), "ytd"];
   return <div className="table-wrap pf-monthly" tabIndex={0} role="region" aria-label="Retornos mensais do portfólio, em pontos percentuais por mês">
     <table>
-      <caption className="pf-caption">Retorno mensal em %. Sinal + indica ganho; sinal − indica perda; “-” indica mês sem dados.</caption>
+      <caption className="pf-caption">Retorno mensal em %. Sinal + indica ganho; sinal − indica perda; “—” indica mês sem dados.</caption>
       <thead><tr><th scope="col">Ano</th>{[...months, "Acumulado no ano"].map(label => <th scope="col" key={label} className="numeric-cell">{label}</th>)}</tr></thead>
       <tbody>{rows.map(row => <tr key={row.year}><th scope="row">{row.year}</th>{keys.map(key => {
         const value = row[key];
         const tone = value == null ? "" : value > 0 ? "is-positive" : value < 0 ? "is-negative" : "is-neutral";
-        const text = value == null ? "-" : `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+        const text = value == null ? "—" : `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
         return <td key={key} className={`numeric-cell ${tone}`.trim()}>{text}</td>;
       })}</tr>)}</tbody>
     </table>

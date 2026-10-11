@@ -11,7 +11,7 @@ export type Metric = { label: string; value: number | string | null; unit?: Unit
 export type Column = { key: string; label: string; unit?: Unit; currency?: string; digits?: number };
 
 export function formatValue(value: unknown, unit: Unit = "number", digits = 2, currency = "BRL"): string {
-  if (value === null || value === undefined || (typeof value === "number" && !Number.isFinite(value))) return "-";
+  if (value === null || value === undefined || (typeof value === "number" && !Number.isFinite(value))) return "—";
   if (typeof value !== "number" || unit === "text") return String(value);
   const options: Intl.NumberFormatOptions = { minimumFractionDigits: unit === "integer" ? 0 : digits, maximumFractionDigits: unit === "integer" ? 0 : digits };
   if (unit === "money") { options.style = "currency"; options.currency = currency; }
@@ -32,7 +32,13 @@ const paths: Record<string, string> = {
   menu: "M3 6h18M3 12h18M3 18h18",
   "panel-close": "M4 5h16v14H4zM9 5v14m7-9-2 2 2 2",
   "panel-open": "M4 5h16v14H4zM9 5v14m5-9 2 2-2 2",
+  "arrow-right": "M5 12h14m-5-5 5 5-5 5",
+  search: "M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
+  info: "M12 11v6m0-10h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
+  alert: "M12 8v5m0 4h.01M10 3 2 18a2 2 0 0 0 2 3h16a2 2 0 0 0 2-3L14 3a2 2 0 0 0-4 0",
+  check: "M8 12l3 3 5-6M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
 };
+const noticeIcons: Record<Signal, string> = { positive: "check", negative: "alert", warning: "alert", neutral: "info", info: "info" };
 export function Icon({ name = "chart" }: { name?: string }) {
   if (Object.hasOwn(iconAssets, name)) return <span className="app-icon" aria-hidden="true" style={{ maskImage: `url("${iconAssets[name]}")` }} />;
   return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] ?? paths.chart} /></svg>;
@@ -54,10 +60,10 @@ export function Table<T extends object>({ columns, rows, onSelect, selectedKey, 
   })}</tbody></table></div>;
 }
 export function Notice({ children, tone = "info" }: { children: ReactNode; tone?: Signal }) {
-  return <div className={`notice is-${tone}`} role={tone === "negative" ? "alert" : undefined}>{children}</div>;
+  return <div className={`notice is-${tone}`} role={tone === "negative" ? "alert" : undefined}><span className="notice-icon"><Icon name={noticeIcons[tone]} /></span><div className="notice-content">{children}</div></div>;
 }
-export function EmptyState({ title, children, href, action }: { title: string; children: ReactNode; href?: string; action?: string }) {
-  return <section className="empty-state-card"><Icon name="chart" /><h2 className="empty-state-title">{title}</h2><div className="empty-state-message">{children}</div>{href && <Link className="button-link" href={href}>{action ?? "Configurar portfólio"}</Link>}</section>;
+export function EmptyState({ title, children, href, action, icon = "chart" }: { title: string; children: ReactNode; href?: string; action?: string; icon?: string }) {
+  return <section className="empty-state-card"><span className="empty-state-icon"><Icon name={icon} /></span><h2 className="empty-state-title">{title}</h2><div className="empty-state-message">{children}</div>{href && <Link className="button-link primary" href={href}>{action ?? "Configurar portfólio"}<Icon name="arrow-right" /></Link>}</section>;
 }
 export function Loading({ children }: { children?: ReactNode }) {
   return <div className="loading-container" role="status" aria-live="polite"><span className="loading-spinner" aria-hidden="true" /><p>{children ?? "Carregando dados para a análise."}</p></div>;
@@ -81,12 +87,12 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
   }
   const expanded = focused && options.length > 0 && value.length < max;
   return <div className="ticker-picker"><label htmlFor={id}>{label}</label><div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}>{ticker}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => change(value.filter(item => item !== ticker))}>×</button></span>)}</div>
-    <input id={id} role="combobox" type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} disabled={busy || value.length >= max} aria-autocomplete="list" aria-expanded={expanded} aria-controls={`${id}-options`} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={event => { setQuery(event.target.value); setActive(0); }} onKeyDown={event => {
+    <div className="ticker-search"><Icon name="search" /><input id={id} role="combobox" type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} disabled={busy || value.length >= max} aria-autocomplete="list" aria-expanded={expanded} aria-controls={`${id}-options`} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={event => { setQuery(event.target.value); setActive(0); }} onKeyDown={event => {
       if (event.key === "Escape") setFocused(false);
       if (event.key === "ArrowDown") { event.preventDefault(); setActive(index => Math.min(index + 1, options.length - 1)); }
       if (event.key === "ArrowUp") { event.preventDefault(); setActive(index => Math.max(index - 1, 0)); }
       if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); void change([...value, options[active].ticker]); }
-    }} />
+    }} /></div>
     {expanded && <ul className="ticker-options" id={`${id}-options`} role="listbox">{options.map((stock, index) => <li key={stock.ticker} id={`${id}-option-${index}`} role="option" aria-selected={active === index}><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => change([...value, stock.ticker])}><strong>{stock.ticker}</strong><span>{[stock.company, stock.sector].filter(Boolean).join(" · ") || "Setor não informado"}</span></button></li>)}</ul>}
     <p className="caption">{value.length}/{max} ativos selecionados.</p>{error && <Notice tone="negative">{error}</Notice>}
   </div>;
