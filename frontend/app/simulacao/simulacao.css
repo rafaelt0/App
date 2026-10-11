@@ -1,0 +1,58 @@
+/* Simulação page only. Uses shared tokens from globals.css; no shadows, gradients or glow. */
+.sim-allocation { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 8px 16px; margin: 12px 0 8px; padding: 0; list-style: none; }
+.sim-allocation li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-panel); }
+.sim-ticker { font-family: var(--font-mono); font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text-primary); }
+.sim-bar { height: 6px; border-radius: var(--radius-pill); background: var(--surface-raised); overflow: hidden; }
+.sim-bar span { display: block; height: 100%; background: var(--brand-primary); }
+.sim-weight { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; }
+.sim-mode { margin: 4px 0 0; color: var(--text-secondary); }
+
+.sim-form { display: block; padding: 0; }
+.sim-form .task-panel { margin-bottom: 16px; }
+.sim-step { margin: 0 0 8px; font-weight: 600; color: var(--text-primary); font-size: 15px; }
+.sim-presets { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+.sim-presets button { flex: 1 1 140px; flex-direction: column; gap: 2px; min-height: 56px; align-items: flex-start; text-align: left; }
+.sim-presets button small { font-weight: 400; font-size: 13px; color: var(--text-muted); }
+.sim-presets button[aria-pressed="true"] { border-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 14%, var(--surface-panel)); }
+.sim-presets button[aria-pressed="true"] small { color: var(--text-secondary); }
+.sim-form .controls-grid { margin: 0 0 8px; align-items: start; }
+.sim-form .controls-grid label { margin: 0; }
+.sim-hint { display: block; margin: 6px 0 0; color: var(--text-muted); font-size: 13px; font-weight: 400; }
+.sim-form .actions { margin: 20px 0 0; }
+.sim-form .actions button.primary { min-width: 200px; }
+.sim-form .actions .caption { margin: 0; }
+
+.sim-idle { display: flex; gap: 12px; align-items: flex-start; padding: 16px 20px; border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); color: var(--text-secondary); margin: 16px 0; }
+.sim-idle p { margin: 0; }
+
+.sim-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; margin: 8px 0 12px; }
+.sim-kpis .mcard-grid { display: contents; }
+.sim-kpis .mcard { padding: 20px; }
+.sim-kpis .mcard-value { font-size: 28px; }
+.sim-subhead { margin: 24px 0 8px; font-size: 15px; font-weight: 650; color: var(--text-secondary); }
+.sim-notes { margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.sim-notes div { padding: 12px 16px; border: 1px solid var(--border-default); border-left: 3px solid var(--brand-secondary); border-radius: var(--radius-md); background: var(--surface-panel); }
+.sim-notes dt { font-weight: 600; font-size: 14px; }
+.sim-notes dd { margin: 2px 0 0; color: var(--text-secondary); font-size: 14px; }
+.sim-prose { max-width: 78ch; color: var(--text-secondary); }
+.sim-prose.sim-lead { color: var(--text-primary); }
+
+.sim-inline-control { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px; margin: 0 0 8px; }
+.sim-inline-control label { margin: 0; flex: 0 1 240px; }
+.sim-inline-control .caption { flex: 1 1 280px; margin: 0; }
+.sim-chart-lead { margin: 0 0 8px; color: var(--text-secondary); max-width: 78ch; }
+.sim-section-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.sim-section-actions > * { min-width: 0; }
+
+.sim-synthesis ul { margin: 8px 0 16px; padding-left: 20px; display: grid; gap: 6px; }
+.sim-synthesis li::marker { color: var(--brand-primary); }
+.sim-synthesis .button-link { margin-top: 4px; }
+
+@media (max-width: 768px) {
+  .sim-kpis .mcard-value { font-size: 22px; }
+  .sim-form .actions button.primary { width: 100%; }
+  .sim-presets button { flex-basis: 100%; }
+}
+@media (max-width: 480px) {
+  .sim-allocation li { grid-template-columns: auto 1fr auto; padding: 8px; gap: 8px; }
+}
