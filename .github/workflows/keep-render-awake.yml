@@ -14,8 +14,8 @@ jobs:
           B3LAB_URL: ${{ vars.B3LAB_URL }}
         run: |
           if [ -z "$B3LAB_URL" ]; then
-            echo "Defina a variável de repositório B3LAB_URL com a URL pública do Render."
-            exit 1
+            echo "::warning::Defina a variável de repositório B3LAB_URL com a URL pública do Render."
+            exit 0
           fi
           # A primeira requisição pode acordar o serviço; o Render leva até ~1 min.
           curl --fail --silent --show-error --location --retry 3 --retry-delay 20 \
