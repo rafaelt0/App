@@ -51,6 +51,14 @@ O launcher usa um único worker Python. Os resultados de análise e o recurso Fi
 
 Para publicar atrás de um proxy HTTPS, mantenha a API privada e configure `B3LAB_ENV=production` e `B3LAB_ORIGIN` com a origem pública exata. A interface e os pedidos `/api` compartilham a mesma origem. O proxy precisa admitir a duração das análises, incluindo o carregamento inicial do modelo. Não há fila de execução nem promessa de implantação serverless.
 
+### Render
+
+O `render.yaml` cria um serviço web Docker no plano gratuito. O contêiner usa `PORT` e `RENDER_EXTERNAL_URL` do Render como porta e origem pública, e `B3LAB_HOST=0.0.0.0` expõe o Next.js. A API continua privada em `127.0.0.1`.
+
+O plano gratuito tem 512 MB, por isso a imagem é construída sem FinBERT e as notícias usam o fallback léxico. Use o argumento de build `WITH_FINBERT=1` em um plano com mais memória. O disco é efêmero: favoritos e seleções em SQLite se perdem a cada deploy ou reinício.
+
+O workflow `keep-render-awake.yml` acessa a URL da variável de repositório `B3LAB_URL` a cada 10 minutos para evitar a suspensão por inatividade.
+
 ## Configuração
 
 | Variável | Padrão | Uso |
@@ -61,6 +69,7 @@ Para publicar atrás de um proxy HTTPS, mantenha a API privada e configure `B3LA
 | `B3LAB_ORIGIN` | `http://localhost:3000` | Origem autorizada para mutações; o launcher adapta a porta |
 | `B3LAB_DB` | `b3_data.db` na raiz | Arquivo SQLite gravável e persistente |
 | `B3LAB_ENV` | Não definido | `production` exige cookie Secure e a origem configurada |
+| `B3LAB_HOST` | `127.0.0.1` | Endereço de escuta do Next.js no launcher |
 
 O launcher configura `B3LAB_API_URL` a partir de `B3LAB_API_PORT` quando não há endereço explícito. Portas personalizadas devem usar uma origem correspondente; `localhost` e `127.0.0.1` são origens distintas.
 

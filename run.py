@@ -28,7 +28,10 @@ def main():
     processes = []
     try:
         processes.append(subprocess.Popen([sys.executable, "-m", "uvicorn", "backend.app:app", "--host", "127.0.0.1", "--port", api_port, "--workers", "1"], cwd=ROOT, env=environment, start_new_session=True))
-        processes.append(subprocess.Popen(["npm", "run", "start" if args.production else "dev", "--", "--port", port], cwd=ROOT / "frontend", env=environment, start_new_session=True))
+        frontend_args = ["--port", port]
+        if host := os.environ.get("B3LAB_HOST"):
+            frontend_args += ["--hostname", host]
+        processes.append(subprocess.Popen(["npm", "run", "start" if args.production else "dev", "--", *frontend_args], cwd=ROOT / "frontend", env=environment, start_new_session=True))
         print(f"B3Lab em http://localhost:{port}. API privada em 127.0.0.1:{api_port}.", flush=True)
         while not stopping.wait(.25):
             failed = next((process for process in processes if process.poll() is not None), None)
