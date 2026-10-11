@@ -78,9 +78,11 @@ Keep the page sequence clear: page identity, task controls, key metrics, then
 evidence and next steps. Use cards only when they group one analytical task.
 
 The desktop navigation reserves 232px, or 72px when collapsed. A slim workspace
-bar names the current page above its header. Each page uses the same shell:
+bar names the current page above its header without adding a second divider.
+Each page uses the same shell:
 
-- Fundamentos pairs the empty selection with a short guide. Once an asset is
+- Fundamentos puts search and quick selections before source metadata and pairs
+  the empty selection with a short guide. Once an asset is
   selected, the task fills the available width. Loaded results lead with ticker
   summaries, followed by section navigation and evidence.
 - Portfólio puts asset selection beside parameters on wide screens, then groups
@@ -126,6 +128,10 @@ neutral primary text with tabular numerals; metric deltas use positive/danger
 colors and keep their arrow icon. Hover changes the border only; do not lift
 cards.
 
+Supporting guides and allocation context use the canvas with a single divider
+and 16px secondary headings. Primary tasks keep the panel surface and 20px
+headings. On narrow screens, the supporting divider moves above the content.
+
 ### Controls
 
 Buttons: 44px minimum height, 8px radius, muted surface with strong border;
@@ -134,6 +140,11 @@ indigo-filled with `--text-on-primary`. Inputs use the canvas surface with a
 strong border; focus turns it indigo. Tabs use an indigo 2px highlight. Keep
 visible labels, keyboard operation, and clear default, hover, focus, disabled,
 and error states.
+
+Quick-selection shortcuts use the canvas and default border. Their hover and
+focus states keep the indigo border or outline. Primary task actions have 24px
+horizontal padding. Active screener criteria use a subdued indigo border;
+their checkbox and textual state identify which filters are enabled.
 
 Disabled inputs and selects drop to 50% opacity with a not-allowed cursor, the
 same as disabled buttons. A page's primary task form sits in one `.task-panel`
@@ -146,6 +157,9 @@ chips, not a native multi-select. The checked chip takes the indigo border.
 Long result lists render 25 items at a time. A `Ver mais N … (M restantes)`
 button reveals the next 25. Row actions render above the list, never below it.
 Exports always cover the full result.
+
+Screener column options sit in a collapsed disclosure above the table. Its
+summary shows the selected count; opening it reveals the checkbox chips.
 
 Shared native buttons and form controls live in `frontend/components/ui.tsx`
 and inherit the global state rules. Use the same scope for base, hover, focus,

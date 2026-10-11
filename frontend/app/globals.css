@@ -90,21 +90,21 @@ code { font-family: var(--font-mono); background: var(--surface-muted); border-r
 .sidebar-note { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0 8px; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
 .sidebar-note strong { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 .main-content { min-width: 0; width: 100%; max-width: var(--content-max-width); margin-inline: auto; padding: 20px 32px 64px; }
-.workspace-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid var(--border-default); color: var(--text-muted); font-size: 12px; }
+.workspace-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; margin-bottom: 24px; color: var(--text-muted); font-size: 12px; }
 .workspace-location { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .workspace-location > span:first-child { color: var(--text-secondary); font-weight: 600; }
-.workspace-location > span:last-child { color: var(--text-secondary); }
+.workspace-location > span:last-child { color: var(--text-muted); }
 .workspace-market { display: inline-flex; align-items: center; gap: 12px; white-space: nowrap; }
 .workspace-market > span { border: 1px solid var(--border-default); border-radius: var(--radius-sm); padding: 2px 8px; color: var(--text-secondary); font-weight: 600; }
 .mobile-header, .mobile-disclaimer { display: none; }
 .skip-link { position: fixed; top: 8px; left: 8px; padding: 12px; background: var(--surface-raised); border: 1px solid var(--brand-primary); border-radius: var(--radius-md); transform: translateY(-150%); z-index: 100; }
 .skip-link:focus { transform: none; }
-.page-hero { display: flex; align-items: center; gap: 16px; margin: 0 0 32px; padding-bottom: 24px; border-bottom: 1px solid var(--border-default); }
+.page-hero { display: flex; align-items: flex-start; gap: 16px; margin: 0 0 32px; padding-bottom: 24px; border-bottom: 1px solid var(--border-default); }
 .page-hero-icon { display: flex; flex: 0 0 44px; width: 44px; height: 44px; align-items: center; justify-content: center; background: color-mix(in srgb, var(--brand-primary) 14%, var(--surface-panel)); border: 1px solid color-mix(in srgb, var(--brand-primary) 35%, var(--border-default)); border-radius: var(--radius-lg); color: var(--brand-primary); }
 .app-icon { display: inline-block; width: 24px; height: 24px; flex-shrink: 0; background: currentColor; mask-size: contain; mask-position: center; mask-repeat: no-repeat; }
 .page-hero-content { min-width: 0; flex: 1; }
 .page-hero-title { margin: 0; font-size: clamp(1.625rem, 2.4vw, 1.875rem); line-height: 1.2; letter-spacing: -.02em; color: var(--text-primary); }
-.page-hero-subtitle { max-width: 76ch; margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
+.page-hero-subtitle { max-width: 64ch; margin: 8px 0 0; font-size: 15px; line-height: 1.6; color: var(--text-secondary); }
 .ui-section-heading { margin: 32px 0 16px; font-size: clamp(1.125rem, 1.6vw, 1.25rem); font-weight: 650; }
 .analysis-section { min-width: 0; }
 .page-columns { display: grid; grid-template-columns: 224px minmax(0, 1fr); gap: 24px; align-items: start; }
@@ -113,7 +113,7 @@ code { font-family: var(--font-mono); background: var(--surface-muted); border-r
 .panel, form { background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 20px; margin: 8px 0 16px; }
 .panel > h2:first-child { margin-top: 0; }
 .panel p { font-size: 14px; }
-.controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 12px 0 20px; }
+.controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px 24px; margin: 12px 0 20px; }
 .controls-grid label { margin: 0; }
 .actions, .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0 20px; }
 .actions > *, .button-row > * { min-width: 0; }
@@ -121,8 +121,8 @@ code { font-family: var(--font-mono); background: var(--surface-muted); border-r
 .mcard-grid:has(.mcard-money) { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
 .mcard { min-width: 0; padding: 20px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-panel); }
 .mcard:hover { border-color: var(--border-strong); }
-.mcard-label { font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
-.mcard-value { font-size: 24px; line-height: 1.3; font-weight: 650; color: var(--text-primary); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.mcard-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
+.mcard-value { font-size: 24px; line-height: 1.3; font-weight: 700; letter-spacing: -.02em; color: var(--text-primary); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .mcard-money .mcard-value { white-space: nowrap; overflow-wrap: normal; }
 .metric-help { font-size: 13px; color: var(--text-muted); margin: 8px 0 0; }
 .is-positive, .signal-positive { color: var(--brand-positive); }
@@ -169,6 +169,7 @@ tbody tr:hover td, .selected-row td { background: var(--surface-muted); }
 @keyframes b3-spin { to { transform: rotate(360deg); } }
 .task-panel { min-width: 0; background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px; }
 .task-panel > .ui-section-heading:first-child { margin-top: 0; }
+.task-panel .actions > .primary { padding-inline: 24px; }
 .task-panel .ticker-picker input { min-height: 48px; }
 .home-source { color: var(--text-muted); font-size: 13px; margin: 16px 0; }
 details.home-tools { margin: 24px 0; padding: 12px 0; border: 0; border-top: 1px solid var(--border-default); border-radius: 0; background: transparent; }
@@ -261,6 +262,7 @@ hr { border: 0; border-top: 1px solid var(--border-default); margin: 24px 0; }
   .page-hero { gap: 12px; }
   .page-hero-icon { width: 40px; height: 40px; flex-basis: 40px; }
   .page-hero { margin-bottom: 24px; padding-bottom: 20px; }
+  .page-hero-subtitle { font-size: 14px; }
   .workspace-market { display: none; }
   .mcard-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   .home-tools-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
