@@ -20,6 +20,7 @@ export function formatValue(value: unknown, unit: Unit = "number", digits = 2, c
 }
 
 const iconAssets: Record<string, string> = {
+  home: "/icons/home.svg",
   portfolio: "/icons/portfolio.svg",
   simulation: "/icons/simulation.svg",
   news: "/icons/news.svg",
@@ -31,7 +32,6 @@ const paths: Record<string, string> = {
   menu: "M3 6h18M3 12h18M3 18h18",
 };
 export function Icon({ name = "chart" }: { name?: string }) {
-  if (name === "home") return <img src="/favicon.svg" alt="" aria-hidden="true" width="24" height="24" />;
   if (Object.hasOwn(iconAssets, name)) return <span className="app-icon" aria-hidden="true" style={{ maskImage: `url("${iconAssets[name]}")` }} />;
   return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] ?? paths.chart} /></svg>;
 }
