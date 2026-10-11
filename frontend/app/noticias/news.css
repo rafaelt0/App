@@ -1,18 +1,17 @@
 /* Estilos exclusivos da página Notícias; tokens vêm de globals.css. */
 .news-page { min-width: 0; }
-.news-prereq { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: stretch; }
+.news-prereq { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: stretch; }
 .news-prereq .empty-state-card { margin: 0; justify-content: center; }
-.news-prereq-guide { min-width: 0; padding: 32px; border: 1px solid var(--border-default); border-radius: var(--radius-xl); background: var(--surface-panel); }
+.news-prereq-guide { min-width: 0; padding: 24px; border: 1px solid var(--border-default); border-radius: var(--radius-xl); background: var(--surface-panel); }
 .news-prereq-guide h2 { margin: 0 0 12px; font-size: 18px; }
 .news-prereq-guide dl { display: grid; gap: 16px; margin: 24px 0 0; }
 .news-prereq-guide dl > div { padding-top: 16px; border-top: 1px solid var(--border-default); }
 .news-prereq-guide dt { margin-bottom: 4px; color: var(--text-primary); font-weight: 600; }
 .news-prereq-guide dd { margin: 0; color: var(--text-muted); }
-@media (max-width: 1023px) {
-  .news-prereq { grid-template-columns: minmax(0, 1fr); }
-  .news-prereq-guide { padding: 24px; }
+@container workspace (min-width: 880px) {
+  .news-prereq { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
-.news-page :where(p) { margin: 0 0 12px; }
+.news-page :where(p:not(.page-hero-subtitle)) { margin: 0 0 12px; }
 .news-page .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 .news-task { display: grid; gap: 16px; padding: 24px; margin: 0 0 24px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-panel); }
@@ -37,7 +36,7 @@
 .news-score-note, .news-help { color: var(--text-muted); font-size: 13px; line-height: 1.5; max-width: 80ch; }
 .news-tone-total { font-size: 15px; color: var(--text-secondary); }
 .news-tone-total strong { font-size: 18px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-@media (min-width: 1280px) {
+@container workspace (min-width: 960px) {
   .news-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 32px; }
 }
 

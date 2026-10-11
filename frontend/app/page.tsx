@@ -133,9 +133,9 @@ export default function HomePage() {
       {!selection.length && <aside className="home-guide" aria-labelledby="home-guide-title">
         <h2 id="home-guide-title">Como funciona</h2>
         <ol>
-          <li><strong>Escolha</strong> · Filtre por setor ou pesquise diretamente pelo ticker.</li>
-          <li><strong>Compare</strong> · Compare fundamentos, rentabilidade, crescimento e endividamento lado a lado.</li>
-          <li><strong>Aprofunde</strong> · Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
+          <li><strong>Escolha</strong> Filtre por setor ou pesquise diretamente pelo ticker.</li>
+          <li><strong>Compare</strong> Compare fundamentos, rentabilidade, crescimento e endividamento lado a lado.</li>
+          <li><strong>Aprofunde</strong> Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
         </ol>
         <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
       </aside>}

@@ -50,13 +50,15 @@
 .scr-table + .caption { margin: 8px 0 0; }
 .scr-more { margin-top: 12px; }
 
-@media (min-width: 640px) and (max-width: 1279px) {
+@container workspace (min-width: 600px) {
   .scr-criteria { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scr-criterion:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
-@media (min-width: 1280px) {
-  .scr-workspace { grid-template-columns: minmax(300px, 340px) minmax(0, 1fr); gap: 24px; }
+@container workspace (min-width: 960px) {
+  .scr-workspace { grid-template-columns: 320px minmax(0, 1fr); gap: 24px; }
   .scr-filters { margin: 0; }
+  .scr-criteria { grid-template-columns: minmax(0, 1fr); }
+  .scr-criterion:last-child:nth-child(odd) { grid-column: auto; }
 }
 @media (max-width: 480px) {
   .scr-pair { grid-template-columns: minmax(0, 1fr); }

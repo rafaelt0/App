@@ -1,6 +1,7 @@
 .pf-setup { padding: 24px; margin-bottom: 32px; }
-.pf-setup-grid { display: grid; gap: 8px 32px; min-width: 0; }
+.pf-setup-grid { display: grid; gap: 24px; min-width: 0; }
 .pf-group { min-width: 0; }
+.pf-group + .pf-group { padding-top: 24px; border-top: 1px solid var(--border-default); }
 .pf-step { margin: 24px 0 8px; font-size: 16px; font-weight: 650; color: var(--text-primary); }
 .pf-step:first-child { margin-top: 0; }
 .pf-hint { color: var(--text-muted); font-size: 14px; margin: 4px 0 12px; }
@@ -40,10 +41,11 @@
 .pf-note { color: var(--text-secondary); font-size: 14px; max-width: 80ch; }
 .pf-sub { font-size: 16px; font-weight: 650; margin: 24px 0 8px; }
 .pf-section-lead { color: var(--text-secondary); max-width: 80ch; margin: 0 0 12px; }
-@media (min-width: 1200px) {
+@container workspace (min-width: 880px) {
   .pf-setup-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .pf-group + .pf-group { padding: 0 0 0 24px; border-top: 0; border-left: 1px solid var(--border-default); }
 }
-@media (min-width: 1280px) {
+@container workspace (min-width: 960px) {
   .pf-overview { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
 }
 @media (max-width: 768px) {
