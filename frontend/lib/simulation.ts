@@ -57,3 +57,27 @@ export function periodLabel(period: { start: string | null; end: string | null }
   const date = (value: string) => value.split("-").reverse().join("/");
   return period.start && period.end ? `${date(period.start)} a ${date(period.end)}` : "datas não disponíveis";
 }
+
+/** Presentation-only chart polish for this page; data, series and statistics are untouched. */
+export function polishFigure(figure: PlotFigure, kind: "individual" | "fan" | "histogram"): PlotFigure {
+  const layout = figure.layout ?? {};
+  const axis = { gridcolor: "#646e88", zerolinecolor: "#646e88", linecolor: "#646e88", automargin: true };
+  const base = (axis_: unknown) => ({ ...axis, ...(axis_ as object) });
+  const data = figure.data.map(trace => {
+    if (kind === "histogram") return { ...trace, hovertemplate: "R$ %{x:,.0f}<br>%{y} simulações<extra></extra>" } as typeof trace;
+    if (kind === "fan") return { ...trace, hovertemplate: "%{fullData.name}: R$ %{y:,.0f}<br>%{x|%d/%m/%Y}<extra></extra>" } as typeof trace;
+    return { ...trace, hovertemplate: "%{fullData.name}: R$ %{y:,.0f}<br>%{x|%d/%m/%Y}<extra></extra>" } as typeof trace;
+  });
+  return {
+    data,
+    layout: {
+      ...layout,
+      xaxis: base(layout.xaxis),
+      yaxis: base({ ...layout.yaxis, tickprefix: kind === "histogram" ? "" : "R$ ", tickformat: ",.0f" }),
+      ...(kind === "histogram" ? { xaxis: base({ ...layout.xaxis, tickprefix: "R$ ", tickformat: ",.0f" }) } : {}),
+      legend: { ...layout.legend, orientation: "h", yanchor: "top", y: -0.22, x: 0 },
+      hovermode: kind === "fan" ? "x unified" : "closest",
+      title: { ...(typeof layout.title === "object" ? layout.title : { text: layout.title as string | undefined }), font: { size: 15 }, x: 0.01, xanchor: "left" },
+    },
+  };
+}

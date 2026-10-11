@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import "./simulacao.css";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
-import { EmptyState, ExportButton, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
+import { EmptyState, ExportButton, Icon, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
 import { api } from "../../lib/api";
 import {
-  displayedTrajectories, initialInputs, periodLabel, sameInputs, simulationPresets,
+  displayedTrajectories, initialInputs, periodLabel, polishFigure, sameInputs, simulationPresets,
   type CalibrationWindow, type SimulationInputs, type SimulationPortfolio, type SimulationResult,
 } from "../../lib/simulation";
 
@@ -106,6 +107,10 @@ export default function SimulationPage() {
   const total = rawWeights.reduce((sum, row) => sum + row.weight, 0);
   const allocation = visible?.allocation ?? rawWeights.map(row => ({ ticker: row.ticker, weight: row.weight / total }));
 
+  const fan = useMemo(() => visible ? polishFigure(visible.charts.fan, "fan") : null, [visible]);
+  const histogram = useMemo(() => visible ? polishFigure(visible.charts.histogram, "histogram") : null, [visible]);
+  const trajectoryMax = visible ? Math.min(50, visible.inputs.simulations) : 50;
+
   return <>
     <PageHeader title="Simulação de portfólio" description="Projete faixas de retorno e risco a partir dos pesos definidos na carteira." icon="simulation" />
     {sessionError && <Notice tone="negative">{sessionError}</Notice>}
@@ -116,78 +121,86 @@ export default function SimulationPage() {
       </EmptyState> : <>
       {restoredNotice && <Notice>Carteira salva restaurada. Confira os ativos e pesos antes de rodar a simulação.</Notice>}
       <Section title="Alocação usada na simulação">
-        <p>{portfolio?.mode}</p>
-        <Metrics items={allocation.map(row => ({ label: row.ticker, value: row.weight, unit: "fraction", digits: 1 }))} />
+        {portfolio?.mode && <p className="sim-mode">{portfolio.mode}</p>}
+        <ul className="sim-allocation" aria-label="Pesos da carteira na simulação">
+          {allocation.map(row => <li key={row.ticker}>
+            <span className="sim-ticker">{row.ticker}</span>
+            <span className="sim-bar" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(1, row.weight)) * 100}%` }} /></span>
+            <span className="sim-weight">{percent.format(row.weight)}</span>
+          </li>)}
+        </ul>
         <p className="discreet-status">Pesos normalizados a partir da carteira carregada; ativos com peso zero permanecem zerados.</p>
       </Section>
-      <form onSubmit={submit}>
-        <p>Escolha um ponto de partida; você pode ajustar os valores abaixo.</p>
-        <div className="actions">{simulationPresets.map(preset => <button key={preset.label} type="button" disabled={running} title={preset.description} onClick={() => setInputs(current => ({ ...current, simulations: preset.simulations, initial_capital: preset.initial_capital, years: preset.years }))}>{preset.label}</button>)}</div>
-        <label>Janela de calibração
-          <select value={inputs.calibration} onChange={event => setInputs(current => ({ ...current, calibration: (event.target.value === "portfolio" ? "portfolio" : Number(event.target.value)) as CalibrationWindow }))}>
-            <option value="portfolio">Histórico do Portfolio</option><option value="2">2 Anos</option><option value="3">3 Anos</option><option value="5">5 Anos</option>
-          </select>
-        </label>
-        <p className="discreet-status">Define o histórico usado para estimar retornos e risco; não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos.</p>
-        <div className="controls-grid">
-          <label>Número de Simulações<input type="number" required min={10} max={3000} step={1} value={inputs.simulations} onChange={event => setInputs(current => ({ ...current, simulations: event.target.valueAsNumber }))} /></label>
-          <label>Capital Inicial (R$)<input type="number" required min={100} step={1} value={inputs.initial_capital} onChange={event => setInputs(current => ({ ...current, initial_capital: event.target.valueAsNumber }))} /></label>
-          <label>Anos<input type="number" required min={1} max={10} step={1} value={inputs.years} onChange={event => setInputs(current => ({ ...current, years: event.target.valueAsNumber }))} /></label>
+      <form className="sim-form" onSubmit={submit} aria-busy={running}>
+        <div className="task-panel">
+          <h2 className="ui-section-heading">Parâmetros da simulação</h2>
+          <p className="sim-step">Ponto de partida</p>
+          <div className="sim-presets" role="group" aria-label="Pontos de partida">
+            {simulationPresets.map(preset => {
+              const active = inputs.simulations === preset.simulations && inputs.initial_capital === preset.initial_capital && inputs.years === preset.years;
+              return <button key={preset.label} type="button" disabled={running} aria-pressed={active} onClick={() => setInputs(current => ({ ...current, simulations: preset.simulations, initial_capital: preset.initial_capital, years: preset.years }))}>
+                {active ? `✓ ${preset.label} (selecionado)` : preset.label}<small>{preset.description}</small>
+              </button>;
+            })}
+          </div>
+          <div className="controls-grid">
+            <label>Número de simulações (trajetórias)
+              <input type="number" required min={10} max={3000} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-n" value={Number.isNaN(inputs.simulations) ? "" : inputs.simulations} onChange={event => setInputs(current => ({ ...current, simulations: event.target.valueAsNumber }))} />
+              <span className="sim-hint" id="sim-help-n">Entre 10 e 3.000.</span>
+            </label>
+            <label>Capital inicial (R$)
+              <input type="number" required min={100} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-c" value={Number.isNaN(inputs.initial_capital) ? "" : inputs.initial_capital} onChange={event => setInputs(current => ({ ...current, initial_capital: event.target.valueAsNumber }))} />
+              <span className="sim-hint" id="sim-help-c">Mínimo de R$ 100.</span>
+            </label>
+            <label>Horizonte (anos)
+              <input type="number" required min={1} max={10} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-y" value={Number.isNaN(inputs.years) ? "" : inputs.years} onChange={event => setInputs(current => ({ ...current, years: event.target.valueAsNumber }))} />
+              <span className="sim-hint" id="sim-help-y">Entre 1 e 10 anos.</span>
+            </label>
+            <label>Janela de calibração
+              <select disabled={running} aria-describedby="sim-help-w" value={String(inputs.calibration)} onChange={event => setInputs(current => ({ ...current, calibration: (event.target.value === "portfolio" ? "portfolio" : Number(event.target.value)) as CalibrationWindow }))}>
+                <option value="portfolio">Histórico do Portfolio</option><option value="2">2 Anos</option><option value="3">3 Anos</option><option value="5">5 Anos</option>
+              </select>
+              <span className="sim-hint" id="sim-help-w">Histórico usado para estimar retornos e risco.</span>
+            </label>
+          </div>
+          <p className="discreet-status">A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos. O horizonte é independente da janela: são 252 dias úteis por ano, com limite de 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p>
+          <div className="actions">
+            <button type="submit" className="primary" disabled={running}>{running ? "Rodando simulação…" : "Rodar Simulação"}</button>
+          </div>
         </div>
-        <p className="discreet-status">O horizonte é independente da janela de calibração. São 252 dias úteis por ano, com limite de 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p>
-        <button type="submit" className="primary" disabled={running}>Rodar Simulação</button>
       </form>
       {running && <Loading>Rodando simulações Monte Carlo multivariadas…</Loading>}
-      {!visible && !running && <Notice>Configure os parâmetros acima e clique em Rodar Simulação para ver os resultados.</Notice>}
+      {!visible && !running && <div className="sim-idle"><Icon name="chart" /><p>Configure os parâmetros acima e clique em Rodar Simulação para ver os resultados.</p></div>}
       {visible && <>
-        <Section title="Calibração histórica">
-          <p>{visible.calibration.count} retornos diários completos ({periodLabel(visible.calibration)}). Média log anual estimada: {percent.format(visible.calibration.annual_log_mean)} ±{number.format(visible.calibration.iid_standard_error * 100)} p.p. (1 erro-padrão IID; não mede a incerteza dos retornos futuros).</p>
-          {visible.calibration.sensitivity.length > 0 && <>
-            <h3>Sensibilidade à janela histórica (pesos fixos)</h3>
-            <Table columns={[{ key: "window", label: "Janela" }, { key: "count", label: "Retornos completos", unit: "integer" }, { key: "period", label: "Período" }, { key: "annual_log_mean", label: "Média log anual", unit: "fraction", digits: 1 }, { key: "error", label: "Erro-padrão IID (p.p.)", unit: "number", digits: 1 }]} rows={visible.calibration.sensitivity.map(row => ({ ...row, window: `${row.years} anos`, period: periodLabel(row), error: row.iid_standard_error * 100 }))} />
-            <p>Janelas aninhadas usam a mesma alocação e o mesmo endpoint. O erro-padrão pressupõe dias independentes; mudanças entre janelas podem indicar efeito de regimes de mercado.</p>
-          </>}
-          {visible.warnings.map(warning => <Notice key={warning} tone="warning">{warning}</Notice>)}
-        </Section>
+        {visible.warnings.map(warning => <Notice key={warning} tone="warning"><strong>Atenção: </strong>{warning}</Notice>)}
         <Section title="Estatísticas da Simulação Monte Carlo">
-          <Metrics items={[
-            { label: "CAGR do valor final médio", value: visible.stats.mean_implied_cagr, unit: "fraction", digits: 1, help: "Crescimento anual implícito no valor final médio; não é a média dos CAGRs das trajetórias." },
-            { label: "Probabilidade de Ganho", value: visible.stats.gain_probability, unit: "fraction", digits: 1, help: `Percentual de simulações acima do capital inicial sob o modelo normal. Erro Monte Carlo de até ±${number.format(visible.monte_carlo_error_pp)} p.p. (95% aproximado, pior caso); não inclui incerteza dos parâmetros.` },
-            { label: "Retorno final P5", value: visible.stats.p5_return, unit: "fraction", digits: 1, help: "Retorno no percentil 5 dos valores finais simulados; não é uma estimativa de VaR nem representa perda máxima." },
-          ]} />
-          <Metrics items={[
+          <div className="sim-kpis"><Metrics items={[
             { label: "Valor Esperado Final", value: visible.stats.mean_terminal, unit: "money" },
-            { label: "CAGR do valor final P75", value: visible.stats.p75_implied_cagr, unit: "fraction", digits: 1 },
+            { label: "CAGR do valor final médio (a.a.)", value: visible.stats.mean_implied_cagr, unit: "fraction", digits: 1, help: "Crescimento anual implícito no valor final médio; não é a média dos CAGRs das trajetórias." },
+            { label: "Probabilidade de Ganho", value: visible.stats.gain_probability, unit: "fraction", digits: 1, help: `Percentual de simulações acima do capital inicial sob o modelo normal. Erro Monte Carlo de até ±${number.format(visible.monte_carlo_error_pp)} p.p. (95% aproximado, pior caso); não inclui incerteza dos parâmetros.` },
+          ]} /></div>
+          <h3 className="sim-subhead">Cauda inferior e extremos</h3>
+          <Metrics items={[
+            { label: "Retorno final P5", value: visible.stats.p5_return, unit: "fraction", digits: 1, help: "Retorno no percentil 5 dos valores finais simulados; não é uma estimativa de VaR nem representa perda máxima." },
             { label: "Valor final P5", value: visible.stats.p5_terminal, unit: "money" },
             { label: "Média dos 5% menores valores", value: visible.stats.lower_tail_mean, unit: "money" },
             { label: "Menor valor simulado", value: visible.stats.minimum, unit: "money" },
+            { label: "CAGR do valor final P75 (a.a.)", value: visible.stats.p75_implied_cagr, unit: "fraction", digits: 1 },
             { label: "Maior valor simulado", value: visible.stats.maximum, unit: "money" },
           ]} />
-          <Notice>Valor final P5: percentil 5 dos valores finais simulados; não é uma medida VaR de perda nem representa perda máxima.</Notice>
-          <Notice>Média dos 5% menores valores: média dos resultados finais menores ou iguais ao P5 (inclui empates) na cauda inferior simulada.</Notice>
+          <dl className="sim-notes">
+            <div><dt>Valor final P5</dt><dd>Percentil 5 dos valores finais simulados; não é uma medida VaR de perda nem representa perda máxima.</dd></div>
+            <div><dt>Média dos 5% menores valores</dt><dd>Média dos resultados finais menores ou iguais ao P5 (inclui empates) na cauda inferior simulada.</dd></div>
+          </dl>
         </Section>
-        <Section title="Comparação de modelos">
-          <Table columns={[{ key: "model", label: "Modelo" }, { key: "p5", label: "Valor final P5", unit: "money" }, { key: "p95", label: "Valor final P95", unit: "money" }, { key: "gain_probability", label: "Ganho sobre o capital inicial", unit: "fraction", digits: 1 }]} rows={visible.comparison} />
-          <p>O modelo normal usa retornos logarítmicos diários correlacionados. A reamostragem sorteia dias históricos inteiros (preserva choques simultâneos entre ativos), mas não cria crises ausentes da amostra nem preserva sequências de volatilidade. A diferença entre modelos indica sensibilidade às hipóteses, não incerteza coberta pelas faixas.</p>
+        <Section title="Faixas de percentis">
+          <p className="sim-chart-lead">Evolução do valor do portfólio em reais (R$): a faixa mais escura cobre de P25 a P75 e a mais clara, de P5 a P95. A linha tracejada marca o capital inicial.</p>
+          {fan && <Chart figure={fan} />}
+          <div className="sim-section-actions"><ExportButton path={`/api/simulation/${visible.id}/summary.csv`}>Resumo (CSV)</ExportButton><ExportButton path={`/api/simulation/${visible.id}/percentiles.csv`}>Percentis por Data (CSV)</ExportButton></div>
         </Section>
-        <Section title="Trajetórias Individuais das Simulações">
-          <label>Número de trajetórias exibidas<input type="number" min={5} max={Math.min(50, visible.inputs.simulations)} step={5} value={displayDraft} onChange={event => {
-            setDisplayDraft(event.target.value);
-            const count = event.target.valueAsNumber;
-            if (Number.isInteger(count) && count >= 5 && count <= Math.min(50, visible.inputs.simulations)) setDisplayCount(count);
-          }} onBlur={() => {
-            const count = Number(displayDraft);
-            const bounded = Number.isFinite(count) ? Math.max(5, Math.min(Math.min(50, visible.inputs.simulations), Math.trunc(count))) : displayCount;
-            setDisplayCount(bounded);
-            setDisplayDraft(String(bounded));
-          }} /></label>
-          <p className="discreet-status">Este controle só muda a exibição das primeiras trajetórias; não roda novamente a simulação nem altera estatísticas ou percentis.</p>
-          {individual && <Chart figure={individual} />}
-        </Section>
-        <Section title="Faixas de percentis"><Chart figure={visible.charts.fan} />
-          <div className="actions"><ExportButton path={`/api/simulation/${visible.id}/summary.csv`}>Resumo (CSV)</ExportButton><ExportButton path={`/api/simulation/${visible.id}/percentiles.csv`}>Percentis por Data (CSV)</ExportButton></div>
-        </Section>
-        <Section title="Distribuição do Valor Final do Portfólio"><Chart figure={visible.charts.histogram} />
+        <Section title="Distribuição do Valor Final do Portfólio">
+          <p className="sim-chart-lead">Frequência dos valores finais simulados, em reais (R$), com Q1, mediana e Q3 marcados.</p>
+          {histogram && <Chart figure={histogram} />}
           <Metrics items={[
             { label: "Mínimo", value: visible.distribution.minimum, unit: "money" }, { label: "Q1 (25%)", value: visible.distribution.q1, unit: "money" },
             { label: "Mediana (50%)", value: visible.distribution.median, unit: "money" }, { label: "Q3 (75%)", value: visible.distribution.q3, unit: "money" },
@@ -195,16 +208,52 @@ export default function SimulationPage() {
             { label: "Desvio Padrão", value: visible.distribution.standard_deviation, unit: "money", help: "Desvio padrão amostral dos valores finais (ddof=1)." },
           ]} />
         </Section>
+        <Section title="Trajetórias Individuais das Simulações">
+          <div className="sim-inline-control">
+            <label>Número de trajetórias exibidas
+              <input type="number" min={5} max={trajectoryMax} step={5} inputMode="numeric" aria-describedby="sim-help-display" value={displayDraft} onChange={event => {
+                setDisplayDraft(event.target.value);
+                const count = event.target.valueAsNumber;
+                if (Number.isInteger(count) && count >= 5 && count <= trajectoryMax) setDisplayCount(count);
+              }} onBlur={() => {
+                const count = Number(displayDraft);
+                const bounded = Number.isFinite(count) ? Math.max(5, Math.min(trajectoryMax, Math.trunc(count))) : displayCount;
+                setDisplayCount(bounded);
+                setDisplayDraft(String(bounded));
+              }} />
+            </label>
+            <p className="caption" id="sim-help-display">De 5 a {trajectoryMax}. Só muda a exibição das primeiras trajetórias; não roda novamente a simulação nem altera estatísticas ou percentis.</p>
+          </div>
+          {individual && <Chart figure={polishFigure(individual, "individual")} />}
+        </Section>
+        <Section title="Calibração histórica">
+          <p className="sim-prose sim-lead">{visible.calibration.count} retornos diários completos ({periodLabel(visible.calibration)}). Média log anual estimada: {percent.format(visible.calibration.annual_log_mean)} ±{number.format(visible.calibration.iid_standard_error * 100)} p.p. (1 erro-padrão IID; não mede a incerteza dos retornos futuros).</p>
+          {visible.calibration.sensitivity.length > 0 && <>
+            <h3 className="sim-subhead">Sensibilidade à janela histórica (pesos fixos)</h3>
+            <Table columns={[{ key: "window", label: "Janela" }, { key: "count", label: "Retornos completos", unit: "integer" }, { key: "period", label: "Período" }, { key: "annual_log_mean", label: "Média log anual", unit: "fraction", digits: 1 }, { key: "error", label: "Erro-padrão IID (p.p.)", unit: "number", digits: 1 }]} rows={visible.calibration.sensitivity.map(row => ({ ...row, window: `${row.years} anos`, period: periodLabel(row), error: row.iid_standard_error * 100 }))} />
+            <p className="discreet-status sim-prose">Janelas aninhadas usam a mesma alocação e o mesmo endpoint. O erro-padrão pressupõe dias independentes; mudanças entre janelas podem indicar efeito de regimes de mercado.</p>
+          </>}
+        </Section>
+        <Section title="Comparação de modelos">
+          <Table columns={[{ key: "model", label: "Modelo" }, { key: "p5", label: "Valor final P5", unit: "money" }, { key: "p95", label: "Valor final P95", unit: "money" }, { key: "gain_probability", label: "Ganho sobre o capital inicial", unit: "fraction", digits: 1 }]} rows={visible.comparison} />
+          <p className="discreet-status sim-prose">O modelo normal usa retornos logarítmicos diários correlacionados. A reamostragem sorteia dias históricos inteiros (preserva choques simultâneos entre ativos), mas não cria crises ausentes da amostra nem preserva sequências de volatilidade. A diferença entre modelos indica sensibilidade às hipóteses, não incerteza coberta pelas faixas.</p>
+        </Section>
         <Section title="Síntese do Analista">
-          <h3>Projeção {visible.inputs.years} ano(s) — {visible.inputs.simulations} simulações</h3>
-          <ul>
-            <li>{percent.format(visible.stats.gain_probability)} dos cenários do modelo normal terminaram acima do capital inicial.</li>
-            <li>CAGR implícito no valor final médio: {percent.format(visible.stats.mean_implied_cagr)} a.a. ao longo de {visible.inputs.years} ano(s).</li>
-            <li>Retorno final P5: {percent.format(visible.stats.p5_return)}.</li>
-            <li>Amplitude entre P5 e P95: {percent.format(visible.spread_fraction)} do capital inicial.</li>
-          </ul>
-          <p>Modelo normal de retornos logarítmicos multivariados ({visible.calibration.count} observações, {periodLabel(visible.calibration)}); pesos rebalanceados diariamente em ambos os modelos. Não inclui taxas nem impostos. Resultados são cenários, não previsões nem recomendação de investimento.</p>
-          <p>Complemente a leitura da projeção com as notícias das empresas.</p><Link href="/noticias">Abrir Notícias</Link>
+          <div className="analyst-synthesis-card sim-synthesis">
+            <h3>Projeção {visible.inputs.years} ano(s) — {visible.inputs.simulations} simulações</h3>
+            <ul>
+              <li>{percent.format(visible.stats.gain_probability)} dos cenários do modelo normal terminaram acima do capital inicial.</li>
+              <li>CAGR implícito no valor final médio: {percent.format(visible.stats.mean_implied_cagr)} a.a. ao longo de {visible.inputs.years} ano(s).</li>
+              <li>Retorno final P5: {percent.format(visible.stats.p5_return)}.</li>
+              <li>Amplitude entre P5 e P95: {percent.format(visible.spread_fraction)} do capital inicial.</li>
+            </ul>
+            <p className="sim-prose">Modelo normal de retornos logarítmicos multivariados ({visible.calibration.count} observações, {periodLabel(visible.calibration)}); pesos rebalanceados diariamente em ambos os modelos. Não inclui taxas nem impostos. Resultados são cenários, não previsões nem recomendação de investimento.</p>
+          </div>
+          <div className="next-step-card">
+            <h3>Próximo passo</h3>
+            <p>Complemente a leitura da projeção com as notícias das empresas.</p>
+            <Link className="button-link" href="/noticias">Abrir Notícias</Link>
+          </div>
         </Section>
       </>}
     </>}
