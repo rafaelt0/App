@@ -57,11 +57,21 @@ const navigation = [
 function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const closeMenu = () => {
     setOpen(false);
     if (navRef.current?.contains(document.activeElement) && window.matchMedia("(max-width: 1023px)").matches) menuRef.current?.focus();
+  };
+  useEffect(() => {
+    setCollapsed(localStorage.getItem("b3lab-sidebar") === "collapsed");
+  }, []);
+  const toggleCollapsed = () => {
+    setCollapsed(value => {
+      localStorage.setItem("b3lab-sidebar", value ? "expanded" : "collapsed");
+      return !value;
+    });
   };
   useEffect(() => {
     setOpen(false);
@@ -77,12 +87,13 @@ function Shell({ children }: { children: ReactNode }) {
     document.addEventListener("keydown", onEscape);
     return () => document.removeEventListener("keydown", onEscape);
   }, [open]);
-  return <div className="app-shell">
+  return <div className={`app-shell${collapsed ? " is-collapsed" : ""}`}>
     <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
     <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></header>
     <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
       <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
-      <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>
+      <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}</button>
+      <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} title={collapsed ? item.label : undefined} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>
       <p className="sidebar-note">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</p>
     </aside>
     <main id="conteudo" className="main-content">{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></main>
