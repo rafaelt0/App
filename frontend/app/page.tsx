@@ -93,7 +93,9 @@ export default function HomePage() {
   if(loading || !session) return <div className="home-page"><PageHeader title="Fundamentos" description="Análise quantitativa · B3" icon="home"/>{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
   const stockMap=new Map(stocks.map(stock => [stock.ticker,stock]));
   const ordered=[...(suggested?.tickers ?? []),...stocks.map(stock=>stock.ticker)].filter((ticker,index,array)=>array.indexOf(ticker)===index).map(ticker=>stockMap.get(ticker)).filter((stock):stock is typeof stocks[number]=>!!stock);
-  const sectorOptions=["Todos",...Array.from(new Set(stocks.map(stock=>stock.sector).filter(Boolean))).sort()];
+  const popularSectors=new Set(quickSectors.map(([,sector])=>sector));
+  const allSectors=Array.from(new Set(stocks.map(stock=>stock.sector).filter(Boolean))).sort();
+  const sectorOptions=["Todos",...allSectors.filter(sector=>popularSectors.has(sector)),...allSectors.filter(sector=>!popularSectors.has(sector))];
   const mode:"edit"|"collapsed"=ready && !editRequested ? "collapsed":"edit";
   return <div className="home-page">
     <PageHeader title="Fundamentos" description="Explore fundamentos, compare empresas e aprofunde sua análise da B3." icon="home"/>
@@ -142,8 +144,7 @@ export default function HomePage() {
               return <label key={sector}><input type="checkbox" checked={checked} onChange={()=>void changeSectors(sector==="Todos" ? []:checked ? sectors.filter(item=>item!==sector):[...sectors.filter(item=>item!=="Todos"),sector])} />{sector}</label>;
             })}</div>
           </fieldset>
-          <p>Nenhum setor ou Todos inclui toda a lista B3.</p>
-          {!selection.length && <><h3>Explorar · setores</h3><div className="actions">{quickSectors.map(([label,sector])=><button key={label} onClick={()=>void changeSectors([sector])}>{label}</button>)}</div></>}
+          <p>Nenhum setor ou Todos inclui toda a lista B3. Os setores mais buscados aparecem primeiro.</p>
           <button disabled={busy} onClick={()=>void run("source")}>Atualizar dados Fundamentus</button>
         </div>
         <div>
