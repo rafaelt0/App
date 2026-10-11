@@ -14,6 +14,7 @@ import {
 
 const percent = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+const yearsLabel = (years: number) => `${number.format(years)} ${years === 1 ? "ano" : "anos"}`;
 
 export default function SimulationPage() {
   const { session, loading, error: sessionError, refreshSession } = useApp();
@@ -200,8 +201,8 @@ export default function SimulationPage() {
         {visible.warnings.map(warning => <Notice key={warning} tone="warning"><strong>Atenção: </strong>{warning}</Notice>)}
         <Section title="Estatísticas da Simulação Monte Carlo">
           <dl className="sim-run">
-            <div><dt>Horizonte</dt><dd>{visible.inputs.years} ano(s)</dd></div>
-            <div><dt>Trajetórias</dt><dd>{visible.inputs.simulations}</dd></div>
+            <div><dt>Horizonte</dt><dd>{yearsLabel(visible.inputs.years)}</dd></div>
+            <div><dt>Trajetórias</dt><dd>{number.format(visible.inputs.simulations)}</dd></div>
             <div><dt>Capital inicial</dt><dd>{formatValue(visible.inputs.initial_capital, "money")}</dd></div>
             <div><dt>Janela de calibração</dt><dd>{visible.inputs.calibration === "portfolio" ? "Histórico do Portfólio" : `${visible.inputs.calibration} anos`}</dd></div>
           </dl>
@@ -271,10 +272,10 @@ export default function SimulationPage() {
         </Section>
         <Section title="Síntese do Analista">
           <div className="analyst-synthesis-card sim-synthesis">
-            <h3>Projeção {visible.inputs.years} ano(s) — {visible.inputs.simulations} simulações</h3>
+            <h3>Projeção {yearsLabel(visible.inputs.years)} — {number.format(visible.inputs.simulations)} simulações</h3>
             <ul>
               <li>{percent.format(visible.stats.gain_probability)} dos cenários do modelo normal terminaram acima do capital inicial.</li>
-              <li>CAGR implícito no valor final médio: {percent.format(visible.stats.mean_implied_cagr)} a.a. ao longo de {visible.inputs.years} ano(s).</li>
+              <li>CAGR implícito no valor final médio: {percent.format(visible.stats.mean_implied_cagr)} a.a. ao longo de {yearsLabel(visible.inputs.years)}.</li>
               <li>Retorno final P5: {percent.format(visible.stats.p5_return)}.</li>
               <li>Amplitude entre P5 e P95: {percent.format(visible.spread_fraction)} do capital inicial.</li>
             </ul>

@@ -189,7 +189,6 @@ export default function PortfolioPage() {
             <h3 className="pf-step">1. Escolha os papéis</h3>
             <p className="pf-hint">Selecione de 2 a 20 ações para compor a carteira.</p>
             <TickerPicker value={session.selection} stocks={stocks} max={20} label="Ações da carteira" onChange={changeSelection} />
-            <p className="pf-count" role="status">{count} {count === 1 ? "ativo selecionado" : "ativos selecionados"} · mínimo de 2, máximo de 20</p>
           </div>
           <div className="pf-group">
             <h3 className="pf-step">2. Defina os parâmetros</h3>
@@ -199,7 +198,7 @@ export default function PortfolioPage() {
               </select></label>
               {windowChoice === "custom" && <label>Dias de lookback<input type="number" min={60} max={5000} step={10} value={customDays} onChange={event => { const days = Number(event.target.value); setCustomDays(days); setInputs(previous => ({ ...previous, lookback_days: days })); }} /></label>}
               <label>Capital disponível (R$)<input type="number" min={100} max={1000000} step={100} value={inputs.capital} onChange={event => setInputs(previous => ({ ...previous, capital: Number(event.target.value) }))} /></label>
-              <label>Estratégia de alocação<select value={inputs.strategy} onChange={event => setInputs(previous => ({ ...previous, strategy: event.target.value as Strategy }))}>{strategies.map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}</select></label>
+              <label className="pf-wide">Estratégia de alocação<select value={inputs.strategy} onChange={event => setInputs(previous => ({ ...previous, strategy: event.target.value as Strategy }))}>{strategies.map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}</select></label>
             </div>
             <p className="caption">Dados a partir de {new Date(Date.now() - inputs.lookback_days * 86400000).toLocaleDateString("pt-BR")} · dias corridos.</p>
             {inputs.strategy === "manual" && <div className="pf-settings">
@@ -218,12 +217,12 @@ export default function PortfolioPage() {
         <div className="actions">
           <button type="button" className="primary pf-actions-primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => void runAnalysis()}>Carregar portfólio</button>
           <button type="button" disabled={selectionBusy} onClick={() => void refreshQuotes()}>Atualizar cotações</button>
-          <button type="button" onClick={() => void clearPortfolio()} disabled={selectionBusy}>Limpar carteira</button>
+          <button type="button" onClick={() => void clearPortfolio()} disabled={selectionBusy || (count === 0 && !session.portfolio_ready)}>Limpar carteira</button>
         </div>
         {loadedSelection === selectionKey && <p className="pf-actions-note">Após carregar, mudanças nos parâmetros recalculam a análise; trocar os ativos exige carregar novamente.</p>}
       </div>
     </Section>
-    {count < 2 && <EmptyState icon="portfolio" title={count === 0 ? "Monte seu portfólio" : "Adicione mais um ativo"} href="/">Selecione pelo menos duas ações para comparar risco, retorno e diversificação.</EmptyState>}
+    {count < 2 && <EmptyState icon="portfolio" title={count === 0 ? "Monte seu portfólio" : "Adicione mais um ativo"}>Selecione pelo menos duas ações para comparar risco, retorno e diversificação.</EmptyState>}
     {busy && <Loading>Baixando cotações e calculando alocação, risco e retorno…</Loading>}
     {activeResult && <div className="pf-results">
       {activeResult.warnings.map((warning, index) => <Notice tone="warning" key={index}>{warning}</Notice>)}

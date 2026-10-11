@@ -29,7 +29,8 @@ export default function Chart({ figure, title }: { figure: PlotFigure; title?: s
         paper_bgcolor: "#161a22",
         plot_bgcolor: "#161a22",
         font: { ...figure.layout?.font, family: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: "#f3f5f9" },
-        margin: { l: 48, r: 20, t: title ? 32 : 40, b: 80, ...figure.layout?.margin },
+        margin: { l: 48, r: 20, b: 80, ...figure.layout?.margin, t: title ? 32 : figure.layout?.margin?.t ?? 40 },
+        ...(title ? { title: { text: "" } } : {}),
       };
       await plotly.react(element, figure.data.map(trace => ({ ...trace })), layout, {
         responsive: true, displaylogo: false, scrollZoom: false,
