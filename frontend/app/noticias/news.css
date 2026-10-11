@@ -1,7 +1,7 @@
 /* Estilos exclusivos da página Notícias; tokens vêm de globals.css. */
 .news-page { min-width: 0; }
 .news-prereq { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: stretch; }
-.news-prereq .empty-state-card { margin: 0; justify-content: center; }
+.news-prereq .empty-state-card { margin: 0; justify-content: center; border-top: 0; }
 .news-prereq-guide { min-width: 0; padding: 24px 0 0; border-top: 1px solid var(--border-default); }
 .news-prereq-guide h2 { margin: 0 0 12px; font-size: 16px; color: var(--text-secondary); }
 .news-prereq-guide dl { display: grid; gap: 16px; margin: 24px 0 0; }
