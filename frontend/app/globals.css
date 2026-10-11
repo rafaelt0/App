@@ -296,7 +296,6 @@ hr { border: 0; border-top: 1px solid var(--border-default); margin: 24px 0; }
 @media (max-width: 480px) {
   .controls-grid { grid-template-columns: minmax(0, 1fr); }
   .mcard-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .identity-metrics > .mcard-grid { grid-template-columns: minmax(0, 1fr); }
   .mcard-money { grid-column: 1 / -1; }
   .mcard { padding: 12px 0; }
   .mcard-value { font-size: 22px; }

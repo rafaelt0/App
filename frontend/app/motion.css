@@ -47,7 +47,7 @@ details[open] > summary::before { transform: translateY(-3px) rotate(45deg); }
   button:active:not(:disabled), .button-link:active { transform: scale(.98); }
   input, select, textarea, fieldset, .checkbox-group label,
   .mcard, .home-summary-card, .news-item, .news-article-card,
-  .home-jump a, .scr-state, tbody td {
+  .scr-state, tbody td {
     transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
   }
   summary::before { transition: transform 220ms var(--motion-ease-out); }

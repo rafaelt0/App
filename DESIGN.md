@@ -119,7 +119,10 @@ Each page uses the same shell:
 - Fundamentos puts search and quick selections before source metadata and pairs
   the empty selection with compact ticker rows. Instructions live in a collapsed
   disclosure after sectors and favorites. The task uses the available width. Loaded results lead with ticker
-  summaries, followed by section navigation and evidence.
+  summary cards: sector and subsector, quote, P/L, ROE, Dividend Yield, the
+  sector synthesis, and a star favorite toggle. One tab set follows with Visão
+  geral (market data and indicators), Saúde financeira, Comparação when more
+  than one ticker is analyzed, Preço-alvo, and Síntese.
 - Portfólio puts asset selection beside parameters on wide screens, then groups
   headline metrics with the allocation before the historical evidence.
 - Simulação puts parameters before the allocation in reading order and beside
@@ -175,6 +178,16 @@ indigo-filled with `--text-on-primary`. Inputs use the canvas surface with a
 strong border; focus turns it indigo. Tabs use an indigo 2px highlight. Keep
 visible labels, keyboard operation, and clear default, hover, focus, disabled,
 and error states.
+
+Tabs follow the ARIA tabs pattern: `role="tablist"`, `tab`, and `tabpanel`,
+`aria-selected`, and a roving tabindex. Left and Right move between tabs and
+wrap; Home and End jump to the ends. The selected tab uses indigo text, weight
+600, and the 2px bottom rule. Tabs wrap onto a second row on narrow screens
+instead of scrolling sideways. One typed list decides which tabs are available.
+
+Icon-only toggles, such as the favorite star, keep a 44px target, an
+`aria-label`, and `aria-pressed`. Their state changes shape, outline or filled,
+not only color.
 
 Quick-selection shortcuts use compact ticker rows with a bottom rule. Their hover and
 focus states keep the indigo border or outline. Primary task actions have 24px
