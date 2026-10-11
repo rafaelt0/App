@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import AppProvider from "../components/AppProvider";
 import "./globals.css";
+import "./motion.css";
 
 const ibmPlexSans = localFont({
   src: "./fonts/ibm-plex-sans-latin.woff2",

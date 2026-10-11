@@ -11,8 +11,8 @@ interface ArticleBase {
   intensity: string; raw_text_length: number;
 }
 export type NewsArticle = ArticleBase & (
-  {is_finbert: true; engine: "FinBERT-PT-BR"; scores: {label: string; score: number}[]; evidence_count: null; pos_terms: string[]; neg_terms: string[]} |
-  {is_finbert: false; engine: "PLN Léxico (fallback)"; scores: []; evidence_count: number; pos_terms: string[]; neg_terms: string[]}
+  {is_jev: true; engine: "Jev"; scores: {label: string; score: number}[]; evidence_count: null; pos_terms: string[]; neg_terms: string[]} |
+  {is_jev: false; engine: "PLN Léxico (fallback)"; scores: []; evidence_count: number; pos_terms: string[]; neg_terms: string[]}
 );
 export interface NewsTone {
   ticker: string; state: string; count: number; positive: number; neutral: number; negative: number;

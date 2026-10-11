@@ -1,0 +1,102 @@
+:root {
+  --motion-ease-out: cubic-bezier(.22, 1, .36, 1);
+  --motion-duration: 480ms;
+  --motion-stagger: 40ms;
+}
+
+@keyframes b3-enter {
+  from { opacity: .65; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes b3-fade {
+  from { opacity: .65; }
+  to { opacity: 1; }
+}
+@keyframes b3-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes b3-marker-enter {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes b3-nav-enter {
+  from { opacity: .5; transform: translateX(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+summary { list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 12px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-1px) rotate(-45deg);
+}
+details[open] > summary::before { transform: translateY(-3px) rotate(45deg); }
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  button, .button-link {
+    transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast), transform 180ms var(--motion-ease-out);
+  }
+  button:active:not(:disabled), .button-link:active { transform: scale(.98); }
+  input, select, textarea, fieldset, .checkbox-group label,
+  .mcard, .home-summary-card, .news-item, .news-article-card,
+  .home-jump a, .scr-state, tbody td {
+    transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+  }
+  summary::before { transition: transform 220ms var(--motion-ease-out); }
+  .button-link > svg { transition: transform 220ms var(--motion-ease-out); }
+  .button-link:hover > svg, .button-link:focus-visible > svg { transform: translateX(3px); }
+
+  .page-hero-icon, .page-hero-title, .page-hero-subtitle {
+    animation: b3-enter var(--motion-duration) var(--motion-ease-out) both;
+  }
+  .page-hero-title { animation-delay: 40ms; }
+  .page-hero-subtitle { animation-delay: 80ms; }
+  .task-panel, .home-guide, .empty-state-card, .sim-prereq,
+  .news-prereq-guide, .news-task {
+    animation: b3-enter var(--motion-duration) var(--motion-ease-out) 80ms both;
+  }
+  .home-guide, .news-prereq-guide { animation-delay: 140ms; }
+
+  .notice, .loading-container, .ticker-options, .ticker-chip,
+  .analysis-section, .home-results-bar, .next-step-card, .sim-idle {
+    animation: b3-fade 320ms var(--motion-ease-out) both;
+  }
+  .mcard-grid > *, .home-summary > *, .news-list > li {
+    --motion-order: 0;
+    animation: b3-fade var(--motion-duration) var(--motion-ease-out) both;
+    animation-delay: calc(var(--motion-order) * var(--motion-stagger));
+  }
+  :is(.mcard-grid, .home-summary, .news-list) > :nth-child(2) { --motion-order: 1; }
+  :is(.mcard-grid, .home-summary, .news-list) > :nth-child(3) { --motion-order: 2; }
+  :is(.mcard-grid, .home-summary, .news-list) > :nth-child(4) { --motion-order: 3; }
+  :is(.mcard-grid, .home-summary, .news-list) > :nth-child(n + 5) { --motion-order: 4; }
+
+  .plotly-chart .svg-container { animation: b3-fade 400ms var(--motion-ease-out) both; }
+  .pf-weight-fill, .sim-bar > span, .analyst-synthesis-meter > span, .news-model-fill {
+    transform-origin: left center;
+    animation: b3-grow 640ms var(--motion-ease-out) both;
+  }
+  details[open] > :not(summary) { animation: b3-fade 240ms var(--motion-ease-out) both; }
+  .nav-indicator { animation: b3-nav-enter 280ms var(--motion-ease-out) both; }
+  .sidebar nav a[aria-current="page"]::before {
+    transform-origin: center;
+    animation: b3-marker-enter 280ms var(--motion-ease-out) both;
+  }
+  @media (max-width: 1023px) {
+    .sidebar.is-open nav a {
+      animation: b3-nav-enter 280ms var(--motion-ease-out) both;
+    }
+    .sidebar.is-open nav a:nth-child(2) { animation-delay: 30ms; }
+    .sidebar.is-open nav a:nth-child(3) { animation-delay: 60ms; }
+    .sidebar.is-open nav a:nth-child(4) { animation-delay: 90ms; }
+    .sidebar.is-open nav a:nth-child(5) { animation-delay: 120ms; }
+  }
+}

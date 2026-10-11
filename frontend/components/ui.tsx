@@ -80,6 +80,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
     return stocks.filter(stock => !value.includes(stock.ticker) && `${stock.ticker} ${stock.company} ${stock.sector}`.toLocaleLowerCase("pt-BR").includes(needle)).slice(0, 40);
   }, [query, stocks, value]);
   async function change(next: string[]) {
+    if (busy) return;
     setBusy(true); setError(null);
     try { await onChange(next); setQuery(""); setActive(0); }
     catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
@@ -87,7 +88,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
   }
   const expanded = focused && options.length > 0 && value.length < max;
   return <div className="ticker-picker"><label htmlFor={id}>{label}</label><div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}>{ticker}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => change(value.filter(item => item !== ticker))}>×</button></span>)}</div>
-    <div className="ticker-search"><Icon name="search" /><input id={id} role="combobox" type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} disabled={busy || value.length >= max} aria-autocomplete="list" aria-expanded={expanded} aria-controls={`${id}-options`} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={event => { setQuery(event.target.value); setActive(0); }} onKeyDown={event => {
+    <div className="ticker-search"><Icon name="search" /><input id={id} role="combobox" type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} disabled={value.length >= max} aria-busy={busy} aria-autocomplete="list" aria-expanded={expanded} aria-controls={`${id}-options`} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={event => { setQuery(event.target.value); setActive(0); }} onKeyDown={event => {
       if (event.key === "Escape") setFocused(false);
       if (event.key === "ArrowDown") { event.preventDefault(); setActive(index => Math.min(index + 1, options.length - 1)); }
       if (event.key === "ArrowUp") { event.preventDefault(); setActive(index => Math.max(index - 1, 0)); }

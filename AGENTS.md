@@ -69,7 +69,7 @@ B3Lab uses Next.js and React for its five-page interface and a Python 3.11 FastA
 - Do not classify unknown stock sectors.
 - Do not present an anonymous session as a durable user account or invent identity recovery.
 - Do not fabricate market data or neutral sentiment when a source fails. Identify real fallbacks and missing data.
-- Do not run multiple Python workers with process-local analysis artifacts and FinBERT state.
+- Do not run multiple Python workers with process-local analysis artifacts.
 
 ## Commands
 
