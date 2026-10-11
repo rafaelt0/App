@@ -86,9 +86,10 @@ export default function ScreenerPage() {
   return <>
     <PageHeader title="Screener de ações" description="Explore ações listadas na B3 com critérios claros e ajustáveis. Dados da Fundamentus; consulte a coleta exibida abaixo." icon="filter"/>
     {notice && <Notice tone="positive">{notice}</Notice>}
+    <div className="scr-workspace">
     <section className="task-panel scr-filters" aria-labelledby="scr-filters-title">
       <h2 className="ui-section-heading" id="scr-filters-title"><Icon name="filter"/>Critérios de seleção</h2>
-      <div className="controls-grid scr-top">
+      <div className="scr-setup">
         <label>Ponto de partida<select value={controls.preset} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config?.presets.map(item=><option key={item.name}>{item.name}</option>)}</select></label>
         <label>Ordenar resultados<select value={sort.field} disabled={!config} onChange={event=>{const value=config?.sorts.find(option=>option.field===event.target.value);if(value)setSort(value);}}>{config?.sorts.map(option=><option key={option.field} value={option.field}>{option.label}</option>)}</select></label>
       </div>
@@ -120,7 +121,7 @@ export default function ScreenerPage() {
           <label>Liquidez média 2 meses mínima<input type="range" min={0} max={100000000} step={100000} value={Number.isNaN(controls.liq2m_min) ? 0:controls.liq2m_min} disabled={!controls.liq2m_enabled} onChange={event=>edit("liq2m_min",event.target.valueAsNumber)}/><output className="scr-output">{liquidity}</output></label>
         </fieldset>
       </div>
-      <div className="actions">
+      <div className="actions scr-filters-actions">
         <button disabled={actionBusy} onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button>
         <button disabled={actionBusy} onClick={()=>void sourceRefresh()}>{actionBusy ? "Atualizando…":"Atualizar dados Fundamentus"}</button>
         <span className="caption">Os resultados são atualizados automaticamente ao alterar os critérios.</span>
@@ -131,14 +132,16 @@ export default function ScreenerPage() {
       {error && <Notice tone="negative"><strong>Não foi possível exibir os resultados.</strong> {error}{!plInvalid && <button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button>}</Notice>}
       {result && <Section title="Resultados">
         <Metrics items={[{label:"Ações correspondentes",value:result.matched_count,unit:"integer",help:`de ${result.total_count} ativos analisados`},{label:"DY médio",value:result.metrics.mean_dy,unit:"percent",digits:2},{label:"ROE médio",value:result.metrics.mean_roe,unit:"percent",digits:2}]}/>
-        <div className="scr-summary">
-          <p className="scr-chips-label">Critérios ativos:</p>
-          {result.active_filters.length ? <ul className="scr-chips" aria-label="Critérios ativos">{result.active_filters.map(filter=><li key={filter}>{filter}</li>)}</ul>:<span className="caption">Nenhum critério ativo; todos os ativos são exibidos.</span>}
-          <p className="caption">{result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")} · há ${result.age_minutes} min`:"Horário da coleta indisponível; a idade deste dado não pode ser confirmada."}</p>
+        <div className="scr-context">
+          <div className="scr-context-filters">
+            <p className="scr-chips-label">Critérios ativos:</p>
+            {result.active_filters.length ? <ul className="scr-chips" aria-label="Critérios ativos">{result.active_filters.map(filter=><li key={filter}>{filter}</li>)}</ul>:<span className="caption">Nenhum critério ativo; todos os ativos são exibidos.</span>}
+          </div>
+          <p className="caption scr-collected">{result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")} · há ${result.age_minutes} min`:"Horário da coleta indisponível; a idade deste dado não pode ser confirmada."}</p>
         </div>
-        {!result.matched_count ? <div className="empty-state-card"><Icon name="filter"/><h3 className="empty-state-title">Nenhuma ação encontrada</h3><div className="empty-state-message">Reduza os limites ou desative critérios. Dados ausentes não são considerados aprovação.</div><button onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button></div>:<>
+        {!result.matched_count ? <div className="empty-state-card"><span className="empty-state-icon"><Icon name="filter"/></span><h3 className="empty-state-title">Nenhuma ação encontrada</h3><div className="empty-state-message">Reduza os limites ou desative critérios. Dados ausentes não são considerados aprovação.</div><button className="primary" onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button></div>:<>
           <fieldset className="checkbox-group scr-columns"><legend>Colunas exibidas ({columnCount} de {result.available_columns.length})</legend><div className="checkbox-group-options">{result.available_columns.map(column=><label key={column.key}><input type="checkbox" checked={visible?.includes(column.key) ?? false} onChange={event=>setVisible(current=>{const next=new Set(current ?? []);if(event.target.checked)next.add(column.key);else next.delete(column.key);return result.available_columns.map(item=>item.key).filter(key=>next.has(key));})}/>{column.label}</label>)}</div></fieldset>
-          <div className="scr-selection" role="region" aria-label="Ação selecionada" aria-live="polite">
+          <div className="scr-selection" data-selected={selectedCurrent ? "true":"false"} role="region" aria-label="Ação selecionada" aria-live="polite">
             {selectedCurrent ? <>
               <strong>Ação selecionada: {selectedCurrent}</strong>
               <div className="actions"><button className="primary" disabled={actionBusy} onClick={()=>void handoff()}>Ver preço-alvo</button><button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favoritado":"☆ Favoritar"}</button><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
@@ -152,9 +155,10 @@ export default function ScreenerPage() {
             <Table columns={[{key:"ticker",label:"Papel"},...result.available_columns.filter(column=>visible?.includes(column.key))]} rows={result.rows.slice(0,limit)} rowKey="ticker" selectedKey={selectedCurrent ?? undefined} onSelect={row=>setSelected(String(row.ticker))}/>
           </div>
           <p className="caption" role="status">Exibindo {Math.min(limit,result.rows.length)} de {result.rows.length} ações.</p>
-          {result.rows.length>limit && <button onClick={()=>setLimit(previous=>previous+25)}>Ver mais {Math.min(25,result.rows.length-limit)} ações ({result.rows.length-limit} restantes)</button>}
+          {result.rows.length>limit && <button className="scr-more" onClick={()=>setLimit(previous=>previous+25)}>Ver mais {Math.min(25,result.rows.length-limit)} ações ({result.rows.length-limit} restantes)</button>}
         </>}
       </Section>}
+    </div>
     </div>
     <hr/><p className="caption">Fonte: Fundamentus (fundamentus.com.br). Dados com atraso. Esta triagem não é recomendação de investimento; verifique os indicadores e faça sua própria análise.</p>
   </>;
