@@ -24,6 +24,13 @@
 .home-page .home-guide li strong { display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 600; }
 .home-page .home-guide > p { margin: auto 0 0; padding-top: 20px; border-top: 1px solid var(--border-default); font-size: 13px; color: var(--text-muted); }
 
+.home-page .home-selection-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.home-page .home-selection-list { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-width: 0; margin: 0; font-size: 14px; }
+.home-page .home-selection-label { color: var(--text-muted); }
+.home-page .home-selection-tickers { font-family: var(--font-mono); font-size: 14px; color: var(--text-primary); overflow-wrap: anywhere; }
+.home-page .home-selection-more { color: var(--brand-primary); font-weight: 600; }
+.home-page .home-selection-count { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
 .home-page details.home-tools { margin: 24px 0 0; padding: 12px 0 0; border: 0; border-top: 1px solid var(--border-default); border-radius: 0; background: transparent; }
 .home-page .home-tools-grid { gap: 16px; }
 .home-page .home-tools-grid > div { padding: 16px 0; border: 0; }
