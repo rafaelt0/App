@@ -12,8 +12,9 @@ wayfinding comes from icon, title, and the active navigation link.
 
 Keep the B3Lab name, flask-and-candlestick mark, Brazilian Portuguese copy, and
 current financial behavior. This is a data-dense dashboard, not a marketing
-page. Use system fonts so the app works offline. Do not add gradients, glow,
-blur, shadows, decorative texture, external fonts, or color-only status.
+page. Bundle IBM Plex Sans locally so typography works without external font
+requests. Do not add gradients, glow, blur, shadows, decorative texture,
+remote font services, or color-only status.
 
 The Next.js interface defaults to dark. Tokens in
 `frontend/app/globals.css` and the `CHART_*` constants in `utils/charts.py`
@@ -52,18 +53,20 @@ colors paired with a sign, label, or icon. Never use `--brand-primary` to mean
 
 | Role | Font | Size | Weight | Line height |
 |---|---|---:|---:|---:|
-| Page title | System sans | `clamp(26px–30px)` | 700 | 1.2 |
-| Section heading | System sans | 18–20px | 650 | 1.3 |
-| Body | System sans | 14–16px | 400 | 1.5 |
-| Labels | System sans | 13px | 500–600 | 1.4 |
-| Financial values | System sans with tabular numerals | 14–24px | 600–700 | 1.3 |
+| Page title | IBM Plex Sans | `clamp(26px–30px)` | 700 | 1.2 |
+| Section heading | IBM Plex Sans | 18–20px | 650 | 1.3 |
+| Body | IBM Plex Sans | 14–16px | 400 | 1.5 |
+| Labels | IBM Plex Sans | 13px | 500–600 | 1.4 |
+| Financial values | IBM Plex Sans with tabular numerals | 14–24px | 600–700 | 1.3 |
 | Chips and code | System monospace | 12px | 400–600 | 1.4 |
 
-All text uses the system sans stack (`--font-display`). Financial values use
-`font-variant-numeric: tabular-nums`. Monospace (`--font-mono`) is reserved for
-ticker chips, formulas, and code. Preserve existing Portuguese strings. New
-labels use sentence case; no all-caps eyebrows. Body copy stays at least 14px
-where the component permits it.
+Interface text uses locally bundled IBM Plex Sans with a system sans fallback
+(`--font-display`). The variable font in `frontend/app/fonts/` supports weights
+400–700 and Brazilian Portuguese characters. Plotly charts inherit the
+interface font. Financial values use `font-variant-numeric: tabular-nums`.
+Monospace (`--font-mono`) is reserved for ticker chips, formulas, and code.
+Preserve existing Portuguese strings. New labels use sentence case; no
+all-caps eyebrows. Body copy stays at least 14px where the component permits it.
 
 ## Spacing and layout
 
