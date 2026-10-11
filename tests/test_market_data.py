@@ -12,9 +12,9 @@ def test_listed_stock_universe_has_required_schema_and_unique_tickers():
     frame = get_listed_stocks()
 
     assert {"Ticker", "Setor", "Empresa", "RazaoSocial"}.issubset(frame.columns)
-    assert len(frame) == 335
-    assert frame["Empresa"].str.strip().ne("").sum() == 335
-    assert frame["RazaoSocial"].str.strip().ne("").sum() == 334
+    assert len(frame) == 332
+    assert frame["Empresa"].str.strip().ne("").sum() == 332
+    assert frame["RazaoSocial"].str.strip().ne("").sum() == 332
     assert frame["Ticker"].is_unique
     assert frame["Ticker"].notna().all()
     assert (frame["Ticker"] == frame["Ticker"].str.upper()).all()
