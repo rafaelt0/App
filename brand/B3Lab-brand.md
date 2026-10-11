@@ -50,16 +50,27 @@ shadows, and color-only status indicators.
 
 All pages share the indigo accent; wayfinding comes from icon, title, and the active navigation link.
 
+The indigo ramp uses `--indigo-50` through `--indigo-950`, with the original
+`#8b93ff` at `--indigo-400`. Primary actions use `--brand-primary`,
+`--brand-primary-hover`, and `--brand-primary-active`. Selected backgrounds
+use `--brand-primary-surface`; decorative icon borders use
+`--brand-primary-border`. The [indigo ramp reference](../DESIGN.md#indigo-ramp)
+lists every shade and its contrast constraints.
+
 ## Typography
 
 | Role | Font | Weight | Size |
 |------|------|--------|------|
-| Page headings | System sans stack | 700 | clamp(26–30px) |
-| Section headings | System sans stack | 650 | 18–20px |
-| Body | System sans stack | 400 | 14–16px |
-| Financial values | System sans stack with tabular numerals | 600–700 | 14–24px |
+| Page headings | IBM Plex Sans | 700 | clamp(26–30px) |
+| Section headings | IBM Plex Sans | 650 | 18–20px |
+| Body | IBM Plex Sans | 400 | 14–16px |
+| Financial values | IBM Plex Sans with tabular numerals | 600–700 | 14–24px |
 | Chips / code | System monospace stack | 400–600 | 12px |
-| Labels | System sans stack | 500–600 | 13px, sentence case |
+| Labels | IBM Plex Sans | 500–600 | 13px, sentence case |
+
+IBM Plex Sans is bundled in `frontend/app/fonts/` and served locally through
+`next/font/local`. Charts inherit the interface font. System sans remains the
+fallback, and ticker chips, formulas, and code keep the system monospace stack.
 
 ## Icons (page set)
 

@@ -11,14 +11,29 @@
   --border-default: #2b313d;
   --border-strong: #5e687e;
   --chart-grid: #646e88;
-  --brand-primary: #8b93ff;
+  --indigo-50: #f1f2ff;
+  --indigo-100: #e1e3ff;
+  --indigo-200: #bec3ff;
+  --indigo-300: #a8afff;
+  --indigo-400: #8b93ff;
+  --indigo-500: #7078e8;
+  --indigo-600: #565fc8;
+  --indigo-700: #444ca3;
+  --indigo-800: #343b78;
+  --indigo-900: #282e57;
+  --indigo-950: #252a41;
+  --brand-primary: var(--indigo-400);
+  --brand-primary-hover: var(--indigo-300);
+  --brand-primary-active: var(--indigo-500);
+  --brand-primary-surface: var(--indigo-950);
+  --brand-primary-border: var(--indigo-700);
   --brand-secondary: #4cc9f0;
   --brand-accent: #f5b544;
   --brand-danger: #f2757a;
   --brand-info: #e879c6;
   --brand-positive: #3ecf8e;
   --text-on-primary: #0e1015;
-  --font-display: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-ibm-plex-sans), system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -46,7 +61,8 @@ button:hover:not(:disabled), .button-link:hover { background: var(--surface-rais
 button:disabled { opacity: .5; cursor: not-allowed; }
 input:disabled, select:disabled, textarea:disabled { opacity: .5; cursor: not-allowed; }
 button.primary, .button-link.primary { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--text-on-primary); }
-button.primary:hover:not(:disabled), .button-link.primary:hover { background: color-mix(in srgb, var(--brand-primary) 85%, #fff); }
+button.primary:hover:not(:disabled), .button-link.primary:hover { background: var(--brand-primary-hover); border-color: var(--brand-primary-hover); }
+button.primary:active:not(:disabled), .button-link.primary:active { background: var(--brand-primary-active); border-color: var(--brand-primary-active); }
 button svg { width: 18px; height: 18px; flex: 0 0 18px; }
 label { display: block; color: var(--text-secondary); font-weight: 600; font-size: 13px; margin: 16px 0 8px; }
 input:not([type="checkbox"]):not([type="radio"]), select, textarea { display: block; width: 100%; min-width: 0; min-height: 44px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface-canvas); color: var(--text-primary); }
@@ -60,7 +76,7 @@ fieldset { min-width: 0; border: 1px solid var(--border-default); border-radius:
 legend { color: var(--text-secondary); font-weight: 600; padding: 0 6px; }
 .checkbox-group-options { display: flex; flex-wrap: wrap; gap: 8px; }
 .checkbox-group label, .checkbox-group label:has(> input[type="checkbox"]) { display: inline-flex; align-items: center; min-height: 44px; margin: 0; padding: 0 12px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-muted); color: var(--text-primary); font-weight: 500; font-size: 13px; cursor: pointer; }
-.checkbox-group label:has(input:checked) { border-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 14%, var(--surface-panel)); }
+.checkbox-group label:has(input:checked) { border-color: var(--brand-primary); background: var(--brand-primary-surface); }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; box-shadow: none; }
 code { font-family: var(--font-mono); background: var(--surface-muted); border-radius: var(--radius-sm); padding: 1px 6px; }
 .app-shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; align-items: start; }
@@ -84,7 +100,7 @@ code { font-family: var(--font-mono); background: var(--surface-muted); border-r
 .nav-indicator { display: flex; margin-left: auto; color: var(--brand-primary); }
 .nav-indicator svg { width: 16px; height: 16px; }
 .sidebar nav a:hover { background: var(--surface-muted); color: var(--text-primary); text-decoration: none; }
-.sidebar nav a[aria-current="page"] { background: color-mix(in srgb, var(--brand-primary) 14%, var(--sidebar-bg)); color: var(--text-primary); font-weight: 600; }
+.sidebar nav a[aria-current="page"] { background: var(--brand-primary-surface); color: var(--text-primary); font-weight: 600; }
 .sidebar nav a[aria-current="page"]::before { content: ""; position: absolute; left: -16px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--brand-primary); }
 .sidebar nav a[aria-current="page"] .app-icon { color: var(--brand-primary); }
 .sidebar-note { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0 8px; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
@@ -100,7 +116,7 @@ code { font-family: var(--font-mono); background: var(--surface-muted); border-r
 .skip-link { position: fixed; top: 8px; left: 8px; padding: 12px; background: var(--surface-raised); border: 1px solid var(--brand-primary); border-radius: var(--radius-md); transform: translateY(-150%); z-index: 100; }
 .skip-link:focus { transform: none; }
 .page-hero { display: flex; align-items: flex-start; gap: 16px; margin: 0 0 32px; padding-bottom: 24px; border-bottom: 1px solid var(--border-default); }
-.page-hero-icon { display: flex; flex: 0 0 44px; width: 44px; height: 44px; align-items: center; justify-content: center; background: color-mix(in srgb, var(--brand-primary) 14%, var(--surface-panel)); border: 1px solid color-mix(in srgb, var(--brand-primary) 35%, var(--border-default)); border-radius: var(--radius-lg); color: var(--brand-primary); }
+.page-hero-icon { display: flex; flex: 0 0 44px; width: 44px; height: 44px; align-items: center; justify-content: center; background: var(--brand-primary-surface); border: 1px solid var(--brand-primary-border); border-radius: var(--radius-lg); color: var(--brand-primary); }
 .app-icon { display: inline-block; width: 24px; height: 24px; flex-shrink: 0; background: currentColor; mask-size: contain; mask-position: center; mask-repeat: no-repeat; }
 .page-hero-content { min-width: 0; flex: 1; }
 .page-hero-title { margin: 0; font-size: clamp(1.625rem, 2.4vw, 1.875rem); line-height: 1.2; letter-spacing: -.02em; color: var(--text-primary); }

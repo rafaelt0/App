@@ -12,8 +12,9 @@ wayfinding comes from icon, title, and the active navigation link.
 
 Keep the B3Lab name, flask-and-candlestick mark, Brazilian Portuguese copy, and
 current financial behavior. This is a data-dense dashboard, not a marketing
-page. Use system fonts so the app works offline. Do not add gradients, glow,
-blur, shadows, decorative texture, external fonts, or color-only status.
+page. Bundle IBM Plex Sans locally so typography works without external font
+requests. Do not add gradients, glow, blur, shadows, decorative texture,
+remote font services, or color-only status.
 
 The Next.js interface defaults to dark. Tokens in
 `frontend/app/globals.css` and the `CHART_*` constants in `utils/charts.py`
@@ -48,22 +49,52 @@ Measured contrast: muted text is 6.81:1 on panel; every accent is at least
 colors paired with a sign, label, or icon. Never use `--brand-primary` to mean
 "positive"; use `--brand-positive` / `CHART_POSITIVE`.
 
+### Indigo ramp
+
+The indigo ramp in `frontend/app/globals.css` runs from light `50` to dark
+`950`. The existing brand color is `--indigo-400`. Use semantic tokens in
+components so primary states and selected surfaces share the same shades.
+
+| Token | Value | Current role |
+|---|---|---|
+| `--indigo-50` | `#F1F2FF` | Lightest shade |
+| `--indigo-100` | `#E1E3FF` | Light shade |
+| `--indigo-200` | `#BEC3FF` | Light shade |
+| `--indigo-300` | `#A8AFFF` | `--brand-primary-hover` |
+| `--indigo-400` | `#8B93FF` | `--brand-primary` |
+| `--indigo-500` | `#7078E8` | `--brand-primary-active`, pressed primary actions |
+| `--indigo-600` | `#565FC8` | Dark shade |
+| `--indigo-700` | `#444CA3` | `--brand-primary-border`, decorative icon borders |
+| `--indigo-800` | `#343B78` | Dark shade |
+| `--indigo-900` | `#282E57` | Dark shade |
+| `--indigo-950` | `#252A41` | `--brand-primary-surface`, selected backgrounds and icon tiles |
+
+Primary buttons and links use `--text-on-primary` in their default, hover,
+and pressed states. Their text contrast is 6.99:1, 9.28:1, and 5.02:1,
+respectively. Indigo icons on the selected surface have 5.19:1 contrast.
+Keep input outlines and focus rings on `--brand-primary`. The darker ramp
+shades are fills and decorative borders; check contrast before using them
+for text or control outlines. Keep selection labels, borders, and
+`aria-current` or `aria-pressed` alongside the selected background.
+
 ## Typography
 
 | Role | Font | Size | Weight | Line height |
 |---|---|---:|---:|---:|
-| Page title | System sans | `clamp(26px–30px)` | 700 | 1.2 |
-| Section heading | System sans | 18–20px | 650 | 1.3 |
-| Body | System sans | 14–16px | 400 | 1.5 |
-| Labels | System sans | 13px | 500–600 | 1.4 |
-| Financial values | System sans with tabular numerals | 14–24px | 600–700 | 1.3 |
+| Page title | IBM Plex Sans | `clamp(26px–30px)` | 700 | 1.2 |
+| Section heading | IBM Plex Sans | 18–20px | 650 | 1.3 |
+| Body | IBM Plex Sans | 14–16px | 400 | 1.5 |
+| Labels | IBM Plex Sans | 13px | 500–600 | 1.4 |
+| Financial values | IBM Plex Sans with tabular numerals | 14–24px | 600–700 | 1.3 |
 | Chips and code | System monospace | 12px | 400–600 | 1.4 |
 
-All text uses the system sans stack (`--font-display`). Financial values use
-`font-variant-numeric: tabular-nums`. Monospace (`--font-mono`) is reserved for
-ticker chips, formulas, and code. Preserve existing Portuguese strings. New
-labels use sentence case; no all-caps eyebrows. Body copy stays at least 14px
-where the component permits it.
+Interface text uses locally bundled IBM Plex Sans with a system sans fallback
+(`--font-display`). The variable font in `frontend/app/fonts/` supports weights
+400–700 and Brazilian Portuguese characters. Plotly charts inherit the
+interface font. Financial values use `font-variant-numeric: tabular-nums`.
+Monospace (`--font-mono`) is reserved for ticker chips, formulas, and code.
+Preserve existing Portuguese strings. New labels use sentence case; no
+all-caps eyebrows. Body copy stays at least 14px where the component permits it.
 
 ## Spacing and layout
 
