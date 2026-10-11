@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import "./simulacao.css";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
-import { EmptyState, ExportButton, Icon, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
+import { ExportButton, formatValue, Icon, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
 import { api } from "../../lib/api";
 import {
   displayedTrajectories, initialInputs, periodLabel, polishFigure, sameInputs, simulationPresets,
@@ -111,69 +111,100 @@ export default function SimulationPage() {
   const histogram = useMemo(() => visible ? polishFigure(visible.charts.histogram, "histogram") : null, [visible]);
   const trajectoryMax = visible ? Math.min(50, visible.inputs.simulations) : 50;
 
+  const prerequisite = restoreFailed
+    ? { title: "Não foi possível restaurar a carteira", message: "A carteira salva foi encontrada, mas seu histórico não pôde ser carregado. Abra Portfólio e carregue a análise novamente." }
+    : session?.selection.length
+      ? { title: "Atualize o portfólio", message: "A seleção atual não possui histórico analisado. Volte para Portfólio e clique em Carregar portfólio antes de rodar a simulação." }
+      : { title: "Portfólio não configurado", message: "Configure seu portfólio na página Portfólio e carregue a análise para liberar a Simulação Monte Carlo." };
+
   return <>
     <PageHeader title="Simulação de portfólio" description="Projete faixas de retorno e risco a partir dos pesos definidos na carteira." icon="simulation" />
     {sessionError && <Notice tone="negative">{sessionError}</Notice>}
     {error && <Notice tone="negative">{error}</Notice>}
     {loading || preparing ? <Loading>Restaurando contexto da carteira…</Loading> : !ready ?
-      <EmptyState title={restoreFailed ? "Não foi possível restaurar a carteira" : session?.selection.length ? "Atualize o portfólio" : "Portfólio não configurado"} href="/portfolio" action="Ir para Portfolio">
-        {restoreFailed ? "A carteira salva foi encontrada, mas seu histórico não pôde ser carregado. Abra Portfolio e carregue a análise novamente." : session?.selection.length ? "A seleção atual não possui histórico analisado. Volte para Portfolio e clique em Carregar portfólio antes de rodar a simulação." : "Configure seu portfólio na página Portfolio e carregue a análise para liberar a Simulação Monte Carlo."}
-      </EmptyState> : <>
-      {restoredNotice && <Notice>Carteira salva restaurada. Confira os ativos e pesos antes de rodar a simulação.</Notice>}
-      <Section title="Alocação usada na simulação">
-        {portfolio?.mode && <p className="sim-mode">{portfolio.mode}</p>}
-        <ul className="sim-allocation" aria-label="Pesos da carteira na simulação">
-          {allocation.map(row => <li key={row.ticker}>
-            <span className="sim-ticker">{row.ticker}</span>
-            <span className="sim-bar" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(1, row.weight)) * 100}%` }} /></span>
-            <span className="sim-weight">{percent.format(row.weight)}</span>
-          </li>)}
-        </ul>
-        <p className="discreet-status">Pesos normalizados a partir da carteira carregada; ativos com peso zero permanecem zerados.</p>
-      </Section>
-      <form className="sim-form" onSubmit={submit} aria-busy={running}>
-        <div className="task-panel">
-          <h2 className="ui-section-heading">Parâmetros da simulação</h2>
-          <p className="sim-step">Ponto de partida</p>
-          <div className="sim-presets" role="group" aria-label="Pontos de partida">
-            {simulationPresets.map(preset => {
-              const active = inputs.simulations === preset.simulations && inputs.initial_capital === preset.initial_capital && inputs.years === preset.years;
-              return <button key={preset.label} type="button" disabled={running} aria-pressed={active} onClick={() => setInputs(current => ({ ...current, simulations: preset.simulations, initial_capital: preset.initial_capital, years: preset.years }))}>
-                {active ? `✓ ${preset.label} (selecionado)` : preset.label}<small>{preset.description}</small>
-              </button>;
-            })}
-          </div>
-          <div className="controls-grid">
-            <label>Número de simulações (trajetórias)
-              <input type="number" required min={10} max={3000} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-n" value={Number.isNaN(inputs.simulations) ? "" : inputs.simulations} onChange={event => setInputs(current => ({ ...current, simulations: event.target.valueAsNumber }))} />
-              <span className="sim-hint" id="sim-help-n">Entre 10 e 3.000.</span>
-            </label>
-            <label>Capital inicial (R$)
-              <input type="number" required min={100} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-c" value={Number.isNaN(inputs.initial_capital) ? "" : inputs.initial_capital} onChange={event => setInputs(current => ({ ...current, initial_capital: event.target.valueAsNumber }))} />
-              <span className="sim-hint" id="sim-help-c">Mínimo de R$ 100.</span>
-            </label>
-            <label>Horizonte (anos)
-              <input type="number" required min={1} max={10} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-y" value={Number.isNaN(inputs.years) ? "" : inputs.years} onChange={event => setInputs(current => ({ ...current, years: event.target.valueAsNumber }))} />
-              <span className="sim-hint" id="sim-help-y">Entre 1 e 10 anos.</span>
-            </label>
-            <label>Janela de calibração
-              <select disabled={running} aria-describedby="sim-help-w" value={String(inputs.calibration)} onChange={event => setInputs(current => ({ ...current, calibration: (event.target.value === "portfolio" ? "portfolio" : Number(event.target.value)) as CalibrationWindow }))}>
-                <option value="portfolio">Histórico do Portfolio</option><option value="2">2 Anos</option><option value="3">3 Anos</option><option value="5">5 Anos</option>
-              </select>
-              <span className="sim-hint" id="sim-help-w">Histórico usado para estimar retornos e risco.</span>
-            </label>
-          </div>
-          <p className="discreet-status">A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos. O horizonte é independente da janela: são 252 dias úteis por ano, com limite de 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p>
-          <div className="actions">
-            <button type="submit" className="primary" disabled={running}>{running ? "Rodando simulação…" : "Rodar Simulação"}</button>
-          </div>
+      <section className="sim-prereq" aria-labelledby="sim-prereq-title">
+        <div className="sim-prereq-main">
+          <span className="sim-prereq-icon"><Icon name="simulation" /></span>
+          <h2 id="sim-prereq-title" className="sim-prereq-title">{prerequisite.title}</h2>
+          <p className="sim-prereq-message">{prerequisite.message}</p>
+          <Link className="button-link sim-prereq-link" href="/portfolio">Ir para Portfólio</Link>
         </div>
-      </form>
+        <div className="sim-prereq-outputs">
+          <h3>O que a simulação calcula</h3>
+          <ul>
+            <li>Faixas de percentis do valor do portfólio ao longo do horizonte escolhido.</li>
+            <li>Distribuição dos valores finais, com quartis, média e desvio padrão.</li>
+            <li>Probabilidade de ganho e estatísticas da cauda inferior.</li>
+            <li>Calibração histórica e comparação entre o modelo normal e a reamostragem.</li>
+          </ul>
+          <p>Os cenários dependem do histórico da carteira e das premissas do modelo.</p>
+        </div>
+      </section> : <>
+      {restoredNotice && <Notice>Carteira salva restaurada. Confira os ativos e pesos antes de rodar a simulação.</Notice>}
+      <div className="sim-workbench">
+        <form className="sim-form" onSubmit={submit} aria-busy={running}>
+          <div className="task-panel sim-task">
+            <h2 className="ui-section-heading">Parâmetros da simulação</h2>
+            <p className="sim-step">Ponto de partida</p>
+            <div className="sim-presets" role="group" aria-label="Pontos de partida">
+              {simulationPresets.map(preset => {
+                const active = inputs.simulations === preset.simulations && inputs.initial_capital === preset.initial_capital && inputs.years === preset.years;
+                return <button key={preset.label} type="button" disabled={running} aria-pressed={active} onClick={() => setInputs(current => ({ ...current, simulations: preset.simulations, initial_capital: preset.initial_capital, years: preset.years }))}>
+                  {active ? `✓ ${preset.label} (selecionado)` : preset.label}<small>{preset.description}</small>
+                </button>;
+              })}
+            </div>
+            <div className="controls-grid">
+              <label>Número de simulações (trajetórias)
+                <input type="number" required min={10} max={3000} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-n" value={Number.isNaN(inputs.simulations) ? "" : inputs.simulations} onChange={event => setInputs(current => ({ ...current, simulations: event.target.valueAsNumber }))} />
+                <span className="sim-hint" id="sim-help-n">Entre 10 e 3.000.</span>
+              </label>
+              <label>Capital inicial (R$)
+                <input type="number" required min={100} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-c" value={Number.isNaN(inputs.initial_capital) ? "" : inputs.initial_capital} onChange={event => setInputs(current => ({ ...current, initial_capital: event.target.valueAsNumber }))} />
+                <span className="sim-hint" id="sim-help-c">Mínimo de R$ 100.</span>
+              </label>
+              <label>Horizonte (anos)
+                <input type="number" required min={1} max={10} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-y" value={Number.isNaN(inputs.years) ? "" : inputs.years} onChange={event => setInputs(current => ({ ...current, years: event.target.valueAsNumber }))} />
+                <span className="sim-hint" id="sim-help-y">Entre 1 e 10 anos.</span>
+              </label>
+              <label>Janela de calibração
+                <select disabled={running} aria-describedby="sim-help-w" value={String(inputs.calibration)} onChange={event => setInputs(current => ({ ...current, calibration: (event.target.value === "portfolio" ? "portfolio" : Number(event.target.value)) as CalibrationWindow }))}>
+                  <option value="portfolio">Histórico do Portfólio</option><option value="2">2 Anos</option><option value="3">3 Anos</option><option value="5">5 Anos</option>
+                </select>
+                <span className="sim-hint" id="sim-help-w">Histórico usado para estimar retornos e risco.</span>
+              </label>
+            </div>
+            <p className="discreet-status">A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos. O horizonte é independente da janela: são 252 dias úteis por ano, com limite de 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p>
+            <div className="actions">
+              <button type="submit" className="primary" disabled={running}>{running ? "Rodando simulação…" : "Rodar Simulação"}</button>
+            </div>
+          </div>
+        </form>
+        <aside className="sim-context" aria-label="Alocação usada na simulação">
+          <Section title="Alocação usada na simulação">
+            {portfolio?.mode && <p className="sim-mode">{portfolio.mode}</p>}
+            <ul className="sim-allocation" aria-label="Pesos da carteira na simulação">
+              {allocation.map(row => <li key={row.ticker}>
+                <span className="sim-ticker">{row.ticker}</span>
+                <span className="sim-bar" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(1, row.weight)) * 100}%` }} /></span>
+                <span className="sim-weight">{percent.format(row.weight)}</span>
+              </li>)}
+            </ul>
+            <p className="discreet-status">Pesos normalizados a partir da carteira carregada; ativos com peso zero permanecem zerados.</p>
+          </Section>
+        </aside>
+      </div>
       {running && <Loading>Rodando simulações Monte Carlo multivariadas…</Loading>}
       {!visible && !running && <div className="sim-idle"><Icon name="chart" /><p>Configure os parâmetros acima e clique em Rodar Simulação para ver os resultados.</p></div>}
-      {visible && <>
+      {visible && <div className="sim-results">
         {visible.warnings.map(warning => <Notice key={warning} tone="warning"><strong>Atenção: </strong>{warning}</Notice>)}
         <Section title="Estatísticas da Simulação Monte Carlo">
+          <dl className="sim-run">
+            <div><dt>Horizonte</dt><dd>{visible.inputs.years} ano(s)</dd></div>
+            <div><dt>Trajetórias</dt><dd>{visible.inputs.simulations}</dd></div>
+            <div><dt>Capital inicial</dt><dd>{formatValue(visible.inputs.initial_capital, "money")}</dd></div>
+            <div><dt>Janela de calibração</dt><dd>{visible.inputs.calibration === "portfolio" ? "Histórico do Portfólio" : `${visible.inputs.calibration} anos`}</dd></div>
+          </dl>
           <div className="sim-kpis"><Metrics items={[
             { label: "Valor Esperado Final", value: visible.stats.mean_terminal, unit: "money" },
             { label: "CAGR do valor final médio (a.a.)", value: visible.stats.mean_implied_cagr, unit: "fraction", digits: 1, help: "Crescimento anual implícito no valor final médio; não é a média dos CAGRs das trajetórias." },
@@ -255,7 +286,7 @@ export default function SimulationPage() {
             <Link className="button-link" href="/noticias">Abrir Notícias</Link>
           </div>
         </Section>
-      </>}
+      </div>}
     </>}
   </>;
 }
