@@ -225,10 +225,15 @@ analyses. CSV exports come from the owned Python result, not visible table cells
 
 ## Motion and interaction
 
-Limit interaction feedback to 150ms color, border, background, and opacity
-changes. Do not animate layout or add decorative movement. Focus shows a 2px
-indigo outline. Under `prefers-reduced-motion: reduce`, disable nonessential
-transitions and animations.
+Shared motion lives in `frontend/app/motion.css`. Page identity and task panels
+enter with an 8px translation over 480ms, with short staggered delays. Results
+fade in, allocation meters draw from the left, and disclosure arrows rotate
+when opened. Keep financial values at their actual values throughout; never
+count them up or animate chart series. Keep card hover stationary and animate
+only its border. Controls use 150ms color feedback and a small press response.
+Do not animate layout or add looping decorative movement. Focus shows a 2px
+indigo outline. Under `prefers-reduced-motion: reduce`, show everything in its
+final state and disable transitions, animations, and smooth scrolling.
 
 ## Surface treatment
 
