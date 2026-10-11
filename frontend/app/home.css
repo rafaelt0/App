@@ -39,17 +39,21 @@
 .home-page .home-results-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .home-page .home-results-actions > .notice { margin: 0; flex-basis: 100%; }
 
-.home-page .home-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 24px; margin: 0 0 24px; padding: 0; list-style: none; }
+.home-page .home-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 192px), 1fr)); gap: 0 24px; margin: 0 0 24px; padding: 0; list-style: none; }
 .home-page .home-summary-card { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 16px 0; border: 0; border-top: 1px solid var(--border-default); }
 .home-page .home-summary-card:hover { border-color: var(--border-strong); }
-.home-page .home-summary-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.home-page .home-summary-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -8px 0 -4px; }
 .home-page .home-summary-ticker { font-family: var(--font-mono); font-size: 16px; color: var(--text-primary); }
-.home-page .home-summary-head button { padding-inline: 12px; font-size: 13px; }
+.home-page .home-favorite-toggle { flex: 0 0 44px; width: 44px; padding: 0; border-color: transparent; color: var(--text-secondary); }
+.home-page .home-favorite-toggle svg { width: 20px; height: 20px; flex-basis: 20px; }
+.home-page .home-favorite-toggle[aria-pressed="true"] { color: var(--brand-primary); }
 .home-page .home-summary-company, .home-page .home-summary-sector { margin: 0; overflow-wrap: anywhere; }
 .home-page .home-summary-company { font-size: 14px; color: var(--text-primary); }
 .home-page .home-summary-sector { font-size: 13px; color: var(--text-muted); }
-.home-page .home-summary-facts { display: grid; gap: 8px; margin: 4px 0 0; padding-top: 12px; border-top: 1px solid var(--border-default); }
-.home-page .home-summary-facts > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.home-page .home-summary-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 4px 0 0; padding-top: 12px; border-top: 1px solid var(--border-default); }
+.home-page .home-summary-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.home-page .home-summary-indicator { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; min-width: 0; }
+.home-page .home-summary-indicator dt { overflow-wrap: anywhere; }
 .home-page .home-summary-facts dt { font-size: 13px; color: var(--text-muted); }
 .home-page .home-summary-facts dd { margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 

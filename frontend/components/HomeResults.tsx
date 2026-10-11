@@ -74,12 +74,14 @@ const resultTabs: ResultTab[] = [
 ];
 
 const tabKeys = ["ArrowLeft","ArrowRight","Home","End"];
+const summaryIndicatorKeys = ["pl","roe","dy"];
 
 export default function HomeResults({ ready, selection, watchlist, busy, onFavorite, onRefreshConsensus }: Props) {
   const [comparison,setComparison] = useState("pl");
   const [selectedTab,setSelectedTab] = useState(resultTabs[0].id);
   const single=selection.length===1;
   const companies=ready.companies;
+  const summaryIndicators=ready.comparison_indicators.filter(item=>summaryIndicatorKeys.includes(item.key));
   const tabs=resultTabs.filter(tab=>tab.available(ready,single));
   const activeTab=tabs.find(tab=>tab.id===selectedTab) ?? tabs[0];
   function moveFocus(event:KeyboardEvent<HTMLButtonElement>, index:number) {
@@ -96,12 +98,13 @@ export default function HomeResults({ ready, selection, watchlist, busy, onFavor
         <div className="home-results-actions"><ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>Exportar CSV bruto</ExportButton></div>
       </div>
       <ul className="home-summary" aria-label="Resumo dos ativos analisados">{companies.map(company=>{const saved=watchlist.includes(company.ticker);return <li className="home-summary-card" key={company.ticker}>
-        <div className="home-summary-head"><strong className="home-summary-ticker">{company.ticker}</strong><button aria-pressed={saved} aria-label={`Favoritar ${company.ticker}`} onClick={()=>onFavorite(company.ticker)}>{saved ? "★ Favoritado":"☆ Favoritar"}</button></div>
+        <div className="home-summary-head"><strong className="home-summary-ticker">{company.ticker}</strong><button type="button" className="home-favorite-toggle" aria-pressed={saved} aria-label={`Favoritar ${company.ticker}`} title={saved ? `${company.ticker} está nos favoritos`:`Adicionar ${company.ticker} aos favoritos`} onClick={()=>onFavorite(company.ticker)}><svg width="20" height="20" viewBox="0 0 24 24" fill={saved ? "currentColor":"none"} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></button></div>
         <p className="home-summary-company">{company.identity.company ?? "Empresa não informada"}</p>
-        <p className="home-summary-sector">{company.identity.sector ?? "Setor indisponível"}</p>
+        <p className="home-summary-sector">{[company.identity.sector ?? "Setor indisponível",company.identity.subsector].filter(Boolean).join(" · ")}</p>
         <dl className="home-summary-facts">
-          <div><dt>Cotação</dt><dd>{formatValue(company.market.price,"money",2,company.market.currency)}</dd></div>
-          <div><dt>Síntese setorial</dt><dd>{company.synthesis.categorias_validas ? `${company.synthesis.favorable_categories}/${company.synthesis.categorias_validas} áreas favoráveis`:"Sem áreas avaliadas"}</dd></div>
+          <div className="home-summary-row"><dt>Cotação</dt><dd>{formatValue(company.market.price,"money",2,company.market.currency)}</dd></div>
+          {summaryIndicators.map(item=><div className="home-summary-indicator" key={item.key}><dt>{item.label}</dt><dd>{formatValue(company.indicators[item.key],item.unit,2)}</dd></div>)}
+          <div className="home-summary-row"><dt>Síntese setorial</dt><dd>{company.synthesis.categorias_validas ? `${company.synthesis.favorable_categories}/${company.synthesis.categorias_validas} áreas favoráveis`:"Sem áreas avaliadas"}</dd></div>
         </dl>
       </li>;})}</ul>
       <div className="home-tabs" role="tablist" aria-label="Seções da análise">{tabs.map((tab,index)=>{const selected=tab.id===activeTab.id;return <button type="button" role="tab" key={tab.id} id={`home-tab-${tab.id}`} aria-controls={`home-panel-${tab.id}`} aria-selected={selected} tabIndex={selected ? 0:-1} onClick={()=>setSelectedTab(tab.id)} onKeyDown={event=>moveFocus(event,index)}>{tab.label}</button>;})}</div>
