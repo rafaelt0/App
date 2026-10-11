@@ -9,15 +9,15 @@
 .scr-setup label { margin: 0; }
 .scr-preset-note { margin: 12px 0 0; max-width: 72ch; }
 
-.scr-criteria { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 24px 0 0; }
-.scr-criterion { min-width: 0; margin: 0; padding: 12px 0 16px; border: 0; border-top: 1px solid var(--border-default); }
+.scr-criteria { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 16px 0 0; }
+.scr-criterion { min-width: 0; margin: 0; padding: 8px 0; border: 0; border-top: 1px solid var(--border-default); }
 .scr-criterion[data-active="true"] { border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--border-default)); }
 .scr-criterion legend { padding: 0 8px 0 0; color: var(--text-primary); font-size: 15px; font-weight: 500; }
 .scr-state { margin-left: 8px; color: var(--brand-primary); font-size: 12px; font-weight: 600; }
 .scr-state::before { content: "· "; }
 .scr-criterion label { margin: 0; }
 .scr-criterion > label { margin-top: 12px; }
-.scr-criterion > label:has(> input[type="checkbox"]) { min-height: 44px; margin: 8px 0 0; }
+.scr-criterion > label:has(> input[type="checkbox"]) { min-height: 44px; margin: 0; }
 .scr-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .scr-criterion input[type="range"] { min-height: 44px; padding: 0; accent-color: var(--brand-primary); }
 .scr-output { display: block; margin-top: 4px; color: var(--text-primary); font-size: 14px; font-variant-numeric: tabular-nums; }
