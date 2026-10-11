@@ -19,6 +19,8 @@ V=.cursor/skills/verify-b3lab/scripts/b3lab-verify   # run from the repo root
 
 Prerequisites (README quickstart): `.venv` with `pip install -r requirements-dev.txt`, `npm --prefix frontend ci`, `/usr/bin/chromium`, network access to Yahoo Finance, Fundamentus, BCB, and Google News.
 
+In a **git worktree** (for example, `~/.t3/worktrees/App/<id>`), `frontend/node_modules` is per checkout, so run `npm --prefix frontend ci` there once (~1 min); `up` refuses without it. Python needs no per-worktree venv: the helper uses the first interpreter that can `import fastapi, uvicorn`, checking this checkout's `.venv`, then the main checkout's `.venv` (found via `git rev-parse --git-common-dir`), then `python3.11`. A bare system `python3.11` usually lacks the requirements.
+
 ```bash
 $V up                    # dev mode: python run.py with isolated env; ~10 s
 export B3LAB_VERIFY_RUN=<id printed by up>
@@ -33,7 +35,7 @@ export B3LAB_VERIFY_RUN=<id printed by up>
 
 Options: `--run <id>` names the run; `--production` runs `npm --prefix frontend run build` then `run.py --production`.
 
-**Isolation limits.** Next allows only **one `next dev` per checkout** (`frontend/.next/dev/lock`). If the user already runs `python run.py` / `npm run dev`, `up` refuses. Do **not** stop their server: use `$V up --production` (separate `.next` output, coexists with their dev server) or ask. `--production` rebuilds `frontend/.next`, so never use it while the user or another verification run serves `run.py --production` from this checkout. Run one verification instance per checkout at a time. `http_cache.sqlite` (repo root, requests-cache) and the Hugging Face FinBERT cache are shared with the user's instance; both are caches, not user state.
+**Isolation limits.** Next allows only **one `next dev` per checkout** (`frontend/.next/dev/lock`). If the user already runs `python run.py` / `npm run dev`, `up` refuses. Do **not** stop their server: use `$V up --production` (separate `.next` output, coexists with their dev server) or ask. `--production` rebuilds `frontend/.next`, so never use it while the user or another verification run serves `run.py --production` from this checkout. Run one verification instance per checkout at a time. Runs from *different* checkouts or worktrees coexist, because `up` skips port triples that are already taken. Other runs, or B3Lab dev servers on 3100+/8100+ that you did not start, are not yours: never `down` or kill them. `http_cache.sqlite` (repo root, requests-cache) and the Hugging Face FinBERT cache are shared with the user's instance; both are caches, not user state.
 
 ## Doctor
 
@@ -47,7 +49,9 @@ Read-only. Checks: launcher alive; web and API ports owned by **this run's** pro
 
 ## Drive
 
-Browser commands take the user's visible names: button text or `aria-label`, link text, and `<label>` text for inputs and selects. They use real CDP mouse and keyboard events, and they fail loudly with the candidate names when nothing matches, the target is disabled, or the target is covered.
+Browser commands take the user's visible names: button text or `aria-label`, link text, and `<label>` text for inputs and selects. A label's name excludes nested controls and the hint text the input points to with `aria-describedby`, so `Horizonte (anos)` matches even though the label also shows `Entre 1 e 10 anos.`. The commands use real CDP mouse and keyboard events, and they fail loudly with the candidate names when nothing matches, the target is disabled, or the target is covered. When a name fails, copy the right one from that candidate list. Labels change with redesigns, so the error output is the source of truth, then update the feature file.
+
+`fill` selects all and types over it in one edit. That keeps controlled number inputs, which re-render `0` when emptied, from becoming `010`. `wait-text` matches against `document.body.innerText` with whitespace collapsed. That has two consequences. Label/value lists read as one line, so `wait-text "Registro Alocação salva"` works. And `<select>` option labels count as visible text, so never wait on a string that is also an option label.
 
 ```bash
 $V browser open /portfolio                         # path relative to the run URL
@@ -57,7 +61,7 @@ $V browser press Enter                              # Enter|Escape|Tab|ArrowDown
 $V browser click VALE3 --role option --contains     # roles: button (default) link option checkbox summary any; --nth N
 $V browser click "Carregar portfólio"
 $V browser select "Estratégia de alocação" "Otimização Hierarchical Risk Parity (HRP)"   # by option text or value; several for multi-selects
-$V browser set "Liquidez média 2 meses mínima (R$)" 5000000   # range sliders only
+$V browser set "Liquidez média 2 meses mínima" 5000000       # range sliders only
 $V browser click "Exportar alocação (CSV)" --download          # waits for the file in <evidence>/downloads/
 $V browser text main                                # visible text of <main>
 $V browser snapshot <evidence>/<feature>/NN-step.aria.txt

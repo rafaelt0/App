@@ -30,7 +30,7 @@ shoot() {
 b viewport 1440 900 >/dev/null
 for entry in /:fundamentos /portfolio:portfolio /simulacao:simulacao /noticias:noticias /screener:screener; do
   b open "${entry%%:*}" >/dev/null
-  b wait-text "Análise quantitativa da B3." >/dev/null
+  b wait-text "Dados para pesquisa, não recomendações de investimento." >/dev/null
   b wait-idle >/dev/null
   shoot empty "${entry##*:}"
 done
@@ -64,7 +64,7 @@ b wait-idle >/dev/null
 shoot loaded noticias
 
 b click "Screener" --role link >/dev/null
-b wait-text "ativos correspondem aos filtros" --timeout 180 >/dev/null
+b wait-text "Ações correspondentes" --timeout 180 >/dev/null
 b wait-idle >/dev/null
 shoot loaded screener
 

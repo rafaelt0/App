@@ -65,10 +65,12 @@ async function evaluate(expression) {
 const helpers = String.raw`
 const norm = s => (s ?? "").replace(/\s+/g, " ").trim();
 const visible = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
-const labelText = label => { const copy = label.cloneNode(true); copy.querySelectorAll("input,select,textarea,output,ul,button").forEach(n => n.remove()); return norm(copy.textContent); };
+// Name excludes nested controls and the control's aria-describedby hints (description, not name).
+const labelText = (label, el) => { const copy = label.cloneNode(true); const described = (el?.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean);
+  copy.querySelectorAll("input,select,textarea,output,ul,button").forEach(n => n.remove()); described.forEach(id => copy.querySelector("[id=\"" + id + "\"]")?.remove()); return norm(copy.textContent); };
 const nameOf = el => {
   if (el.getAttribute("aria-label")) return norm(el.getAttribute("aria-label"));
-  if (el.matches("input,select,textarea")) { const label = el.labels?.[0]; return label ? labelText(label) : ""; }
+  if (el.matches("input,select,textarea")) { const label = el.labels?.[0]; return label ? labelText(label, el) : ""; }
   return norm(el.innerText);
 };
 const selectors = { button: "button,[role=button]", link: "a[href]", option: "[role=option] button,[role=option]", checkbox: "input[type=checkbox]", summary: "summary", any: "button,[role=button],a[href],[role=option],summary,input,select,textarea" };
@@ -167,9 +169,12 @@ try {
       if (target.disabled) fail(`control ${JSON.stringify(label)} is disabled`);
       await page("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "a", code: "KeyA", windowsVirtualKeyCode: 65, modifiers: 2, commands: ["selectAll"] });
       await page("Input.dispatchKeyEvent", { type: "keyUp", key: "a", code: "KeyA", windowsVirtualKeyCode: 65, modifiers: 2 });
-      await page("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
-      await page("Input.dispatchKeyEvent", { type: "keyUp", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
+      // Replace the selection in one edit: controlled inputs such as Number(value) re-render "0" if cleared first.
       if (value) await page("Input.insertText", { text: value });
+      else {
+        await page("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
+        await page("Input.dispatchKeyEvent", { type: "keyUp", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
+      }
       const now = await evaluate("document.activeElement?.value ?? ''");
       console.log(`filled ${JSON.stringify(label)} -> ${JSON.stringify(now)}`);
       break;

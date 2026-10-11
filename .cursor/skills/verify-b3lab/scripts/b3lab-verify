@@ -22,7 +22,14 @@ descends_from() { # descends_from <pid> <ancestor>
   return 1
 }
 proc_env() { tr '\0' '\n' < "/proc/$1/environ" 2>/dev/null | grep "^$2=" | cut -d= -f2- || true; }
-python_bin() { [[ -x "$ROOT/.venv/bin/python" ]] && echo "$ROOT/.venv/bin/python" || command -v python3.11 || die "Python 3.11 not found; create .venv per README"; }
+python_bin() { # this checkout's .venv, then the main checkout's .venv (git worktrees), then python3.11; must import the API deps
+  local main candidate
+  main=$(dirname "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$ROOT/.git")")
+  for candidate in "$ROOT/.venv/bin/python" "$main/.venv/bin/python" "$(command -v python3.11 || true)"; do
+    [[ -x "$candidate" ]] && "$candidate" -c "import fastapi, uvicorn" 2>/dev/null && { echo "$candidate"; return; }
+  done
+  die "no Python with requirements installed; create .venv per README (pip install -r requirements-dev.txt)"
+}
 
 load() {
   local run=${B3LAB_VERIFY_RUN:-}

@@ -40,8 +40,12 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 ## Features
 
-- [Portfólio](./portfolio.md) covers selection, optimization strategies, results, CSV export, the persisted portfolio, and stress history. **Proven end to end when this skill was created.**
+- [Portfólio](./portfolio.md) covers selection, optimization strategies, results, CSV export, the persisted portfolio, and stress history.
 - [Fundamentos](./fundamentos.md) covers ticker and sector selection, Analisar, fundamentals, consensus, favorites, and CSV export.
 - [Screener](./screener.md) covers presets, criteria, sorting, columns, row selection, the handoff to Fundamentos, favorites, and CSV export.
 - [Simulação](./simulacao.md) covers Monte Carlo runs on the loaded portfolio, presets, display-only trajectories, and two CSV exports.
 - [Notícias](./noticias.md) covers news for the loaded portfolio, the FinBERT or lexical engine, filters, pagination, and refresh.
+
+## Last full drive
+
+On 2026-10-10, after the page rebrand, every recipe was driven against `2dc50f5` in run `skillproof` with live providers. The pass covered the main steps of all five features: Portfólio load/export/DB/HRP/manual/stale/clear; Simulação run/display/both CSVs; Notícias analyze (FinBERT)/filter; Screener preset/criteria/select/favorite/export/columns/handoff; Fundamentos analyze/export/favorite/sector/unfavorite. These steps were not driven: `pf-window`, `pf-stress`, `pf-refresh`, `news-refresh`, `news-paging`, `scr-more`, `home-consensus`, `home-source`, `sim-restore`, and the `/?unavailable=<T>` deep link. After any UI change, re-drive a recipe before trusting its labels.

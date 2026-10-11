@@ -24,9 +24,9 @@ Preconditions:
 - Google News reachable. The FinBERT model is downloaded from Hugging Face on first use; later runs use the HF cache.
 
 - **Gate.** With a selection but no load, run `$V browser click "Notícias" --role link` and `$V browser wait-text "Atualize o portfólio"`.
-- **Analyze.** After a Portfólio load, run `$V browser click "Notícias" --role link` and `$V browser wait-text "Tom da amostra disponível" --timeout 600`. The text shows `Carteira: PETR4 …% · VALE3 …%`, `Nota do tom da carteira (/100)`, and an engine badge. Capture to `$EV/noticias/`.
-- **Filter.** Run `$V browser select "Filtrar por sentimento" Otimista`. The line `X de Y notícias após filtros` changes, while `Nota do tom da carteira: …` stays identical.
-- **Paging.** If more than 15 articles match, run `$V browser click "Ver mais" --contains`. The visible count grows by up to 15.
+- **Analyze.** After a Portfólio load, run `$V browser click "Notícias" --role link` and `$V browser wait-text "Tom da amostra disponível" --timeout 600`. The `Carteira e pesos` list shows `PETR4 49,8%` / `VALE3 50,2%` (Portfólio weights at 1 decimal), with `Amostra em <timestamp>`, an engine badge, `Nota do tom da carteira (/100)`, and `Feeds indisponíveis: nenhum.` (or the failed tickers). Capture to `$EV/noticias/`.
+- **Filter.** Run `$V browser select "Filtrar por sentimento" Otimistas` and `$V browser wait-idle`. The line `Mostrando X de Y notícias após filtros` changes (e.g. `15 de 20` → `1 de 1`), while `Nota do tom da carteira: N/100` stays identical.
+- **Paging.** If more than 15 articles match, run `$V browser click "Ver mais" --contains`. The visible count grows by up to 15, and once all are shown, `Todas as N notícias carregadas.` appears.
 - **Refresh.** Run `$V browser click "Atualizar notícias"`, then `$V browser wait-text "Buscando feeds" --timeout 30` and `$V browser wait-text "Buscando feeds" --gone --timeout 600`. A new `Amostra em <timestamp>` shows.
 
 ## Gotchas
