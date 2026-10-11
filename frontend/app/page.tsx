@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import "./home.css";
 import { useApp } from "../components/AppProvider";
 import type { SelectionUpdate } from "../components/AppProvider";
 import Chart from "../components/Chart";
@@ -84,7 +85,7 @@ export default function HomePage() {
   async function favorite(ticker:string) {
     try {await toggleFavorite(ticker);} catch(exc) {setError((exc as Error).message);}
   }
-  if(loading || !session) return <><PageHeader title="Fundamentos" description="Análise quantitativa · B3" icon="home"/>{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading/>}</>;
+  if(loading || !session) return <div className="home-page"><PageHeader title="Fundamentos" description="Análise quantitativa · B3" icon="home"/>{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
   const selection=session.selection;
   const ready=result && result.revision===session.revision && JSON.stringify(result.requested_tickers)===JSON.stringify(selection) ? result:null;
   const stockMap=new Map(stocks.map(stock => [stock.ticker,stock]));
@@ -94,7 +95,7 @@ export default function HomePage() {
   const single=selection.length===1;
   const choice=ready?.comparison_indicators.find(item=>item.key===comparison);
   const chartCompanies=companies.filter(company=>company.indicators_available);
-  return <>
+  return <div className="home-page">
     <PageHeader title="Fundamentos" description="Explore fundamentos, compare empresas e aprofunde sua análise da B3." icon="home"/>
     {session.restored && <Notice>Seleção da carteira salva carregada. Revise os ativos e clique em Analisar para atualizar os fundamentos.</Notice>}
     {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ação(ões) da carteira salva não estão na lista B3 e foram removidas da seleção.</Notice>}
@@ -102,16 +103,17 @@ export default function HomePage() {
     {notice && <Notice tone="positive">{notice}</Notice>}
     <section className="task-panel">
       <h2 className="ui-section-heading">Selecione ativos para analisar</h2>
+      <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
       <TickerPicker value={selection} onChange={changeSelection} stocks={ordered} max={20}/>
-      {!!selection.length && <><div className="actions"><button className="primary" disabled={busy || sectorBusy} onClick={()=>void run()}>Analisar</button><button onClick={()=>void changeSelection([])}>Limpar</button></div>{!ready && !busy && <Notice>Clique em Analisar para buscar os indicadores das ações selecionadas.</Notice>}</>}
-      <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
-      <div className="home-source" role="status"><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"} · Lista local B3 · Fundamentus · ordenação por liquidez</div>
+      {!!selection.length && <><div className="actions"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button><button disabled={busy} onClick={()=>void changeSelection([])}>Limpar seleção</button></div>{!ready && !busy && <Notice>Clique em Analisar para buscar os indicadores das ações selecionadas.</Notice>}</>}
+      <p className="caption">A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
+      <div className="home-source" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
       {sectorBusy && <Loading>Ordenando ações por liquidez…</Loading>}
-      {!selection.length && <>
+      {!selection.length && <div className="home-quick">
         <p>Pesquise pelo ticker ou nome da empresa ou use a seleção rápida abaixo.</p>
         <h3>Seleção rápida · ações líquidas</h3>
         <div className="quick-start-grid">{quickTickers.map(([ticker,sector])=><button className="quick-start-button" key={ticker} onClick={()=>void changeSelection([ticker])}><strong>{ticker}</strong><span className="quick-start-sector">{sector}</span></button>)}</div>
-      </>}
+      </div>}
     </section>
     <details className="home-tools">
       <summary>Setores e favoritos</summary>
@@ -125,10 +127,10 @@ export default function HomePage() {
         </div>
         <div>
           <h3>Favoritos</h3>
-          {!session.watchlist.length && <p>Nenhum favorito ainda.</p>}
-          {session.watchlist.map(ticker=><div className="actions" key={ticker}>
+          {!session.watchlist.length && <p>Nenhum favorito ainda. Depois de analisar, use Favoritar para guardar ativos aqui.</p>}
+          {session.watchlist.map(ticker=><div className="home-favorite-row" key={ticker}>
             {stockMap.has(ticker) ? <button disabled={selection.length>=20 && !selection.includes(ticker)} onClick={()=>void changeSelection(current=>Array.from(new Set([...current,ticker])))}>{ticker}</button>:<span>{ticker} · fora da lista B3</span>}
-            <button aria-label={`Remover ${ticker} dos favoritos`} onClick={()=>void favorite(ticker)}>Remover</button>
+            <button aria-label={`Remover ${ticker} dos favoritos`} onClick={()=>void favorite(ticker)}>Remover favorito</button>
           </div>)}
         </div>
       </div>
@@ -145,29 +147,30 @@ export default function HomePage() {
     {error && <Notice tone="negative">{error}<button disabled={busy} onClick={()=>void (selection.length ? run(retryAction) : suggestions(sectors).then(setSuggested).catch(exc=>setError(exc.message)))}>Tentar novamente</button></Notice>}
     {ready && <>
       {!!ready.missing_tickers.length && <Notice tone="warning">Dados Fundamentus indisponíveis para {ready.missing_tickers.join(", ")}. Os dados disponíveis foram preservados e os caches da fonte invalidados.</Notice>}
-      <ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>Exportar dados fundamentalistas (CSV bruto)</ExportButton>
-      <Section title="Setor">
+      <div className="home-results-bar"><div><h2>Resultado da análise</h2><p className="caption">{companies.length} {companies.length===1 ? "ativo analisado":"ativos analisados"}: {ready.requested_tickers.join(", ")}</p></div><div className="home-results-actions"><ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>Exportar CSV bruto</ExportButton></div></div>
+      <nav aria-label="Seções da análise"><ul className="home-jump">{[["home-setor","Setor"],["home-mercado","Mercado"],["home-indicadores","Indicadores"],["home-saude","Saúde financeira"],...(single ? []:[["home-grafico","Comparação"]]),["home-consenso","Preço-alvo"],["home-sintese","Síntese"]].map(([id,label])=><li key={id}><a href={`#${id}`}>{label}</a></li>)}</ul></nav>
+      <div id="home-setor" className="home-anchor"><Section title="Setor">
         {single ? companies.map(company=>company.available ? <div className="identity-metrics" key={company.ticker}><Metrics items={[{label:"Empresa",value:company.identity.company},{label:"Setor",value:company.identity.sector},{label:"Subsetor",value:company.identity.subsector}]}/></div>:<Notice key={company.ticker}>Sem dados de setor para {company.ticker}.</Notice>):<Table columns={identityColumns} rows={companies.map(company=>({ticker:company.ticker,...company.identity}))} rowKey="ticker"/>}
-      </Section>
-      <Section title="Informações de Mercado">
+      </Section></div>
+      <div id="home-mercado" className="home-anchor"><Section title="Informações de Mercado">
         {single ? companies.map(company=>company.available ? <div key={company.ticker}><Metrics items={marketColumns.filter(column=>column.unit).map(column=>({label:column.label,value:company.market[column.key as keyof typeof company.market] ?? 0,unit:column.unit,digits:column.digits}))}/><p>Última cotação registrada: {company.market.last_quote_date ?? "—"} para {company.ticker}</p></div>:<Notice key={company.ticker}>Sem dados de mercado para {company.ticker}.</Notice>):<Table columns={marketColumns} rows={companies.map(company=>({ticker:company.ticker,...company.market}))} rowKey="ticker"/>}
-      </Section>
-      <Section title="Indicadores Financeiros">
-        <div className="actions">{companies.map(company=><button key={company.ticker} onClick={()=>void favorite(company.ticker)}>{session.watchlist.includes(company.ticker) ? "★ Favoritado":"☆ Favoritar"} · {company.ticker}</button>)}</div>
-        {single ? companies.map(company=>company.indicators_available ? <div key={company.ticker}>{Object.entries(company.metric_groups).map(([group,metrics])=><div key={group}><h3>{group}</h3><Metrics items={metrics.map(metric=>({...metric,value:metric.value ?? (metric.label==="EV/EBITDA" ? null:0)}))}/><div className="actions">{metrics.filter(metric=>metric.classification).map(metric=><span key={metric.label} className={`signal-${metric.status}`}>{metric.label}: {metric.classification}</span>)}</div></div>)}</div>:<Notice key={company.ticker}>Sem indicadores para {company.ticker}.</Notice>):<><p>Rentabilidade, margens e crescimento em % · múltiplos em × · dados ausentes: —.</p><Table columns={[{key:"ticker",label:"Ticker"},...ready.comparison_indicators.map(item=>({key:item.key,label:item.label,unit:item.unit,digits:2} as Column))]} rows={companies.map(company=>({ticker:company.ticker,...company.indicators}))} rowKey="ticker"/></>}
-      </Section>
-      <Section title="Saúde Financeira"><p>Endividamento e liquidez da empresa. Dívida/PL acima de 3× e liquidez abaixo de 1× são sinais de alerta.</p>{companies.map(company=><div key={company.ticker}><h3>{company.ticker}</h3>{company.health.metrics.length ? <><Metrics items={company.health.metrics}/>{company.health.diagnostics.map(diag=><Notice key={diag.text} tone={diag.status}>{diag.text}</Notice>)}</>:<Notice>Dados de endividamento não disponíveis via Fundamentus para este ticker.</Notice>}</div>)}</Section>
-      {!single && <Section title="Comparação Gráfica de Múltiplos"><label>Indicador comparativo<select value={comparison} onChange={event=>setComparison(event.target.value)}>{ready.comparison_indicators.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}</select></label><Chart figure={{data:[{type:"bar",x:chartCompanies.map(company=>company.ticker),y:chartCompanies.map(company=>company.indicators[comparison]),text:chartCompanies.map(company=>{const value=company.indicators[comparison];return value===null ? "N/D":!company.indicator_available[comparison] ? "N/A":`${value.toFixed(2)}${choice?.unit==="percent" ? "%":""}`;}),textposition:"outside",cliponaxis:false,marker:{color:"#8b93ff"}}],layout:{height:350,title:{text:`Comparativo de ${choice?.label}`},yaxis:{title:{text:choice?.unit==="percent" ? `${choice.label} (%)`:choice?.label}}}}}/></Section>}
-      <Section title="Preço-alvo e consenso"><button disabled={busy} onClick={()=>void run("consensus")}>Atualizar consensos</button><Table columns={consensusColumns} rows={ready.consensus.rows} rowKey="ticker"/>{ready.consensus.failed_tickers.length ? <Notice tone="warning">Consenso indisponível para: {ready.consensus.failed_tickers.join(", ")}.</Notice>:!ready.consensus.has_targets && <Notice>O Yahoo Finance não informa preços-alvo para as ações selecionadas.</Notice>}<p>Fonte: Yahoo Finance. Potencial calculado sobre o alvo médio; opiniões e recomendações são agregadas pela fonte e não constituem recomendação de investimento.</p></Section>
-      <Section title="Síntese do Analista">{companies.map(company=><article className="analyst-synthesis-card" key={company.ticker}>
+      </Section></div>
+      <div id="home-indicadores" className="home-anchor"><Section title="Indicadores Financeiros">
+        <div className="actions home-favorites-row">{companies.map(company=>{const saved=session.watchlist.includes(company.ticker);return <button key={company.ticker} aria-pressed={saved} onClick={()=>void favorite(company.ticker)}>{saved ? "★ Favoritado":"☆ Favoritar"} · {company.ticker}</button>;})}</div>
+        {single ? companies.map(company=>company.indicators_available ? <div key={company.ticker}>{Object.entries(company.metric_groups).map(([group,metrics])=><div className="home-group" key={group}><h3>{group}</h3><Metrics items={metrics.map(metric=>({...metric,value:metric.value ?? (metric.label==="EV/EBITDA" ? null:0)}))}/><div className="actions">{metrics.filter(metric=>metric.classification).map(metric=><span key={metric.label} className={`home-signal signal-${metric.status}`}>{metric.label}: {metric.classification}</span>)}</div></div>)}</div>:<Notice key={company.ticker}>Sem indicadores para {company.ticker}.</Notice>):<><p>Rentabilidade, margens e crescimento em % · múltiplos em × · dados ausentes: —.</p><Table columns={[{key:"ticker",label:"Ticker"},...ready.comparison_indicators.map(item=>({key:item.key,label:item.label,unit:item.unit,digits:2} as Column))]} rows={companies.map(company=>({ticker:company.ticker,...company.indicators}))} rowKey="ticker"/></>}
+      </Section></div>
+      <div id="home-saude" className="home-anchor"><Section title="Saúde Financeira"><p>Endividamento e liquidez da empresa. Dívida/PL acima de 3× e liquidez abaixo de 1× são sinais de alerta.</p>{companies.map(company=><div className="home-company-block" key={company.ticker}><h3>{company.ticker}{company.identity.company ? <> · {company.identity.company}</>:null}</h3>{company.health.metrics.length ? <><Metrics items={company.health.metrics}/>{company.health.diagnostics.map(diag=><Notice key={diag.text} tone={diag.status}>{diag.text}</Notice>)}</>:<Notice>Dados de endividamento não disponíveis via Fundamentus para este ticker.</Notice>}</div>)}</Section></div>
+      {!single && <div id="home-grafico" className="home-anchor"><Section title="Comparação Gráfica de Múltiplos"><label>Indicador comparativo<select value={comparison} onChange={event=>setComparison(event.target.value)}>{ready.comparison_indicators.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}</select></label><Chart figure={{data:[{type:"bar",x:chartCompanies.map(company=>company.ticker),y:chartCompanies.map(company=>company.indicators[comparison]),text:chartCompanies.map(company=>{const value=company.indicators[comparison];return value===null ? "N/D":!company.indicator_available[comparison] ? "N/A":`${value.toFixed(2)}${choice?.unit==="percent" ? "%":""}`;}),textposition:"outside",cliponaxis:false,marker:{color:"#8b93ff"}}],layout:{height:350,title:{text:`Comparativo de ${choice?.label}`},yaxis:{title:{text:choice?.unit==="percent" ? `${choice.label} (%)`:choice?.label}}}}}/></Section></div>}
+      <div id="home-consenso" className="home-anchor"><Section title="Preço-alvo e consenso"><button disabled={busy} onClick={()=>void run("consensus")}>Atualizar consensos</button><Table columns={consensusColumns} rows={ready.consensus.rows} rowKey="ticker"/>{ready.consensus.failed_tickers.length ? <Notice tone="warning">Consenso indisponível para: {ready.consensus.failed_tickers.join(", ")}.</Notice>:!ready.consensus.has_targets && <Notice>O Yahoo Finance não informa preços-alvo para as ações selecionadas.</Notice>}<p>Fonte: Yahoo Finance. Potencial calculado sobre o alvo médio; opiniões e recomendações são agregadas pela fonte e não constituem recomendação de investimento.</p></Section></div>
+      <div id="home-sintese" className="home-anchor"><Section title="Síntese do Analista">{companies.map(company=><article className="analyst-synthesis-card" key={company.ticker}>
         <h3>{company.ticker} · {company.identity.company ?? "—"}</h3><span className="analyst-synthesis-sector">{company.synthesis.sector ?? "Setor indisponível"}</span>
         <p>{company.synthesis.favorable_categories}/{company.synthesis.categorias_validas} áreas favoráveis · {company.synthesis.indicadores_validos} indicadores elegíveis</p>
         {company.synthesis.categorias_validas<2 && <Notice>Dados insuficientes para uma conclusão setorial: são necessárias pelo menos duas áreas com indicadores e no mínimo três observações.</Notice>}
-        <div className="mcard-grid">{Object.entries(company.synthesis.categorias).map(([name,category])=><div className={`analyst-category ${category.veredicto==="Favorável" ? "is-positive":category.veredicto==="Desfavorável" ? "is-negative":"is-neutral"}`} key={name}><h4>{name==="Yield" ? "Dividendos":name}</h4><span className="analyst-category-status">{category.veredicto}</span><div className="analyst-synthesis-meter"><span style={{width:`${category.percentil}%`}}/></div><p>Percentil {category.percentil.toFixed(1)} · {category.indicadores_validos} indicadores</p></div>)}</div>
+        <div className="mcard-grid">{Object.entries(company.synthesis.categorias).map(([name,category])=><div className={`analyst-category ${category.veredicto==="Favorável" ? "is-positive":category.veredicto==="Desfavorável" ? "is-negative":"is-neutral"}`} key={name}><h4>{name==="Yield" ? "Dividendos":name}</h4><span className="analyst-category-status">{category.veredicto}</span><div className="analyst-synthesis-meter" role="meter" aria-label={`Percentil de ${name==="Yield" ? "Dividendos":name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={category.percentil}><span style={{width:`${category.percentil}%`}}/></div><p>Percentil {category.percentil.toFixed(1)} · {category.indicadores_validos} indicadores</p></div>)}</div>
         {["Favorável","Neutro","Desfavorável"].map(verdict=>{const details=company.synthesis.details.filter(detail=>detail.verdict===verdict);return details.length ? <details className="analyst-synthesis-details" key={verdict}><summary>{verdict} · {details.length} indicadores</summary><Table columns={[{key:"label",label:"Indicador"},{key:"value",label:"Valor"},{key:"unit",label:"Unidade"},{key:"median",label:"Mediana do setor"},{key:"mean",label:"Média do setor"},{key:"percentile",label:"Percentil",unit:"number",digits:1},{key:"observations",label:"Observações",unit:"integer"}]} rows={details.map(detail=>({...detail,unit:detail.unit==="percent" ? "%":"×"}))} rowKey="label"/><p>Percentil é a proporção de observações estritamente superadas; inclui o próprio ticker. Empates não contam como superados.</p></details>:null;})}
         <p>Fonte: Fundamentus · comparação setorial. Áreas e percentis não constituem recomendação de investimento.</p>
-      </article>)}</Section>
-      <div className="next-step-card"><div className="next-step-eyebrow">Próximo passo</div><h2>Analise sua carteira</h2><p>Monte e otimize a carteira com {selection.slice(0,3).join(", ")}{selection.length>3 ? "…":""}.</p><Link href="/portfolio">Abrir Portfolio</Link></div>
+      </article>)}</Section></div>
+      <div className="next-step-card"><div className="next-step-eyebrow">Próximo passo</div><h2>Analise sua carteira</h2><p>Monte e otimize a carteira com {selection.slice(0,3).join(", ")}{selection.length>3 ? "…":""}.</p><Link href="/portfolio">Abrir Portfólio</Link></div>
     </>}
-  </>;
+  </div>;
 }
