@@ -77,6 +77,21 @@ scroll inside their own container.
 Keep the page sequence clear: page identity, task controls, key metrics, then
 evidence and next steps. Use cards only when they group one analytical task.
 
+The desktop navigation reserves 232px, or 72px when collapsed. A slim workspace
+bar names the current page above its header. Each page uses the same shell:
+
+- Fundamentos pairs the empty selection with a short guide. Once an asset is
+  selected, the task fills the available width. Loaded results lead with ticker
+  summaries, followed by section navigation and evidence.
+- Portfólio puts asset selection beside parameters on wide screens, then groups
+  headline metrics with the allocation before the historical evidence.
+- Simulação puts parameters before the allocation in reading order and beside
+  it on wide screens. Results begin with the submitted run and statistics.
+- Notícias groups the loaded portfolio and update action above the sample
+  summary, filters, articles, and source evidence.
+- Screener puts filters beside results on wide screens. Both stay in the
+  document's vertical scroll; table containers own horizontal scrolling only.
+
 ## Radii
 
 | Token | Value | Use |
@@ -106,7 +121,7 @@ underline or uppercase.
 
 ### Metrics and cards
 
-Panel surface, 1px default border, 12px radius, 16px padding. Values are
+Panel surface, 1px default border, 12px radius, 20px padding. Values are
 neutral primary text with tabular numerals; metric deltas use positive/danger
 colors and keep their arrow icon. Hover changes the border only; do not lift
 cards.
@@ -139,8 +154,8 @@ and disabled states; do not depend on framework-generated wrapper markup.
 ### Alerts and empty states
 
 Alerts tint the panel with the semantic color (info cyan, success green, warning
-amber, error coral) and color the icon. Empty states are centered panels with a
-muted icon, a title, a message, and a recovery action. Loading feedback keeps
+amber, error coral) and color the icon. Empty states are centered panels with an
+indigo icon tile, a title, a message, and a primary recovery action. Loading feedback keeps
 `role="status"` and `aria-live="polite"`.
 
 ### Diagnostics, next step, and loading

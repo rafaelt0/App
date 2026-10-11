@@ -1,15 +1,29 @@
+.pf-setup { padding: 24px; margin-bottom: 32px; }
+.pf-setup-grid { display: grid; gap: 8px 32px; min-width: 0; }
+.pf-group { min-width: 0; }
 .pf-step { margin: 24px 0 8px; font-size: 16px; font-weight: 650; color: var(--text-primary); }
 .pf-step:first-child { margin-top: 0; }
 .pf-hint { color: var(--text-muted); font-size: 14px; margin: 4px 0 12px; }
 .pf-count { display: inline-block; margin: 8px 0 0; font-size: 13px; color: var(--text-secondary); }
+.pf-settings { margin: 16px 0 0; padding: 16px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-canvas); }
+.pf-settings .controls-grid { margin-bottom: 0; }
+.pf-presets button.is-active { border-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 14%, var(--surface-muted)); }
 .pf-gamma { max-width: 320px; }
-.pf-actions-note { color: var(--text-muted); font-size: 14px; margin: 0 0 20px; }
-.pf-summary { background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 16px; margin: 0 0 8px; }
-.pf-summary dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px 24px; margin: 0; }
+.pf-setup .actions { margin: 24px 0 0; padding-top: 20px; border-top: 1px solid var(--border-default); }
+.pf-actions-primary { min-width: 200px; }
+.pf-actions-note { color: var(--text-muted); font-size: 14px; margin: 12px 0 0; }
+.pf-results { display: grid; gap: 8px; min-width: 0; }
+.pf-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 32px; align-items: start; min-width: 0; }
+.pf-overview > .analysis-section { min-width: 0; }
+.pf-kpis .mcard-value { font-size: 26px; }
+.pf-kpis .mcard:first-child .mcard-value { font-size: 30px; }
+.pf-evidence { display: grid; gap: 0; min-width: 0; }
+.pf-summary { background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 16px 20px; margin: 16px 0 0; }
+.pf-summary dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 16px 32px; margin: 0; }
 .pf-summary dt { font-size: 13px; font-weight: 500; color: var(--text-muted); }
 .pf-summary dd { margin: 2px 0 0; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .pf-summary .caption { margin: 12px 0 0; }
-.pf-weights { list-style: none; margin: 8px 0 16px; padding: 0; display: grid; gap: 4px; background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 12px 16px; }
+.pf-weights { list-style: none; margin: 8px 0 16px; padding: 12px 16px; display: grid; gap: 4px; background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
 .pf-weights li { display: grid; grid-template-columns: 88px minmax(0, 1fr) 72px; align-items: center; gap: 12px; min-height: 32px; }
 .pf-weight-ticker { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
 .pf-weight-track { height: 8px; border-radius: var(--radius-pill); background: var(--surface-muted); overflow: hidden; }
@@ -26,8 +40,21 @@
 .pf-note { color: var(--text-secondary); font-size: 14px; max-width: 80ch; }
 .pf-sub { font-size: 16px; font-weight: 650; margin: 24px 0 8px; }
 .pf-section-lead { color: var(--text-secondary); max-width: 80ch; margin: 0 0 12px; }
+@media (min-width: 1200px) {
+  .pf-setup-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (min-width: 1280px) {
+  .pf-overview { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+}
+@media (max-width: 768px) {
+  .pf-setup { padding: 20px; }
+  .pf-kpis .mcard:first-child .mcard-value { font-size: 26px; }
+}
 @media (max-width: 480px) {
+  .pf-setup { padding: 16px; }
+  .pf-settings { padding: 12px; }
   .pf-weights { padding: 8px 12px; }
   .pf-weights li { grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 8px; }
-  .pf-actions-primary { width: 100%; }
+  .pf-setup .actions > * { flex: 1 1 100%; width: 100%; }
+  .pf-actions-primary { min-width: 0; }
 }
