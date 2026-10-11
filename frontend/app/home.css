@@ -53,10 +53,18 @@
 .home-page .home-summary-facts dt { font-size: 13px; color: var(--text-muted); }
 .home-page .home-summary-facts dd { margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
-.home-page .home-sections { display: grid; gap: 40px; min-width: 0; }
-.home-page .home-anchor { min-width: 0; scroll-margin-top: 24px; }
-.home-page .home-anchor .ui-section-heading { margin: 0 0 16px; font-size: 20px; }
-.home-page .home-anchor .analysis-section > p { font-size: 14px; color: var(--text-secondary); }
+.home-page .home-tabs { display: flex; gap: 4px; margin: 0 0 24px; overflow-x: auto; border-bottom: 1px solid var(--border-default); scrollbar-width: thin; }
+.home-page .home-tabs [role="tab"] { flex: 0 0 auto; min-height: 44px; padding: 10px 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 500; white-space: nowrap; }
+.home-page .home-tabs [role="tab"]:hover { background: transparent; border-color: var(--border-strong); color: var(--text-primary); }
+.home-page .home-tabs [role="tab"][aria-selected="true"] { border-color: var(--brand-primary); color: var(--brand-primary); font-weight: 600; }
+.home-page .home-tabs [role="tab"]:focus-visible { outline-offset: -2px; }
+.home-page .home-tab-panel { min-width: 0; }
+.home-page .home-tab-panel:focus-visible { outline-offset: 4px; }
+.home-page .home-tab-panel > p, .home-page .home-panel-section > p { font-size: 14px; color: var(--text-secondary); }
+.home-page .home-tab-panel > .actions { margin: 0 0 4px; }
+.home-page .home-tab-panel > label:first-child { margin-top: 0; }
+.home-page .home-panel-section > h3 { margin: 0 0 12px; font-size: 18px; font-weight: 500; }
+.home-page .home-panel-section + .home-panel-section { margin-top: 32px; }
 .home-page .table-scroll { margin: 0 0 16px; }
 
 .home-page .table-scroll th:first-child, .home-page .table-scroll td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface-panel); border-right: 1px solid var(--border-default); font-weight: 600; }
@@ -65,7 +73,7 @@
 .home-page .table-scroll th { white-space: normal; vertical-align: bottom; min-width: 96px; }
 .home-page .table-scroll td { font-size: 14px; }
 
-.home-page .home-group h3 { margin: 24px 0 8px; font-size: 16px; color: var(--text-secondary); }
+.home-page .home-group h4 { margin: 24px 0 8px; font-size: 16px; color: var(--text-secondary); }
 .home-page .home-group .actions { margin: 4px 0 8px; }
 .home-page .home-signal { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 0; border: 0; border-radius: 0; font-size: 13px; font-weight: 500; margin-right: 12px; }
 .home-page .home-signal::before { content: "●"; font-size: 10px; }
