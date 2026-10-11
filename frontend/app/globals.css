@@ -191,6 +191,10 @@ details.home-tools { margin: 24px 0; padding: 12px 0; border: 0; border-top: 1px
 .home-tools-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .home-tools-grid > * { min-width: 0; }
 .home-tools-grid h3 { margin-top: 8px; }
+.sector-picker { margin: 8px 0 12px; padding: 12px; }
+.sector-picker-options { max-height: 232px; overflow-y: auto; padding: 2px; }
+.sector-picker-options label:has(> input[type="checkbox"]) { min-height: 36px; }
+.sector-picker-options input[type="checkbox"] { width: 16px; height: 16px; margin-right: 8px; }
 .quick-start-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .quick-start-button { width: 100%; min-width: 0; flex-direction: column; align-items: flex-start; text-align: left; padding: 12px; gap: 4px; }
 .quick-start-sector { color: var(--text-muted); font-size: 13px; font-weight: 400; overflow-wrap: anywhere; }

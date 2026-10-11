@@ -144,7 +144,13 @@ export default function HomePage() {
       <div className="home-tools-grid">
         <div>
           <h3>Setores</h3>
-          <label>Escolha um ou mais setores<select multiple value={sectors} onChange={event=>void changeSectors(Array.from(event.target.selectedOptions,option=>option.value))}>{sectorOptions.map(sector=><option key={sector}>{sector}</option>)}</select></label>
+          <fieldset className="checkbox-group sector-picker">
+            <legend>Escolha um ou mais setores</legend>
+            <div className="checkbox-group-options sector-picker-options">{sectorOptions.map(sector=>{
+              const checked=sector==="Todos" ? !sectors.length || sectors.includes("Todos"):sectors.includes(sector);
+              return <label key={sector}><input type="checkbox" checked={checked} onChange={()=>void changeSectors(sector==="Todos" ? []:checked ? sectors.filter(item=>item!==sector):[...sectors.filter(item=>item!=="Todos"),sector])} />{sector}</label>;
+            })}</div>
+          </fieldset>
           <p>Nenhum setor ou Todos inclui toda a lista B3.</p>
           {!selection.length && <><h3>Explorar · setores</h3><div className="actions">{quickSectors.map(([label,sector])=><button key={label} onClick={()=>void changeSectors([sector])}>{label}</button>)}</div></>}
           <button disabled={busy} onClick={()=>void run("source")}>Atualizar dados Fundamentus</button>
