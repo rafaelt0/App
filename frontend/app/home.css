@@ -57,6 +57,7 @@
 .home-page .home-jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .home-page .home-jump a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; border: 1px solid var(--border-default); border-radius: var(--radius-pill); background: var(--surface-muted); color: var(--text-secondary); font-size: 14px; font-weight: 500; }
 .home-page .home-jump a:hover { border-color: var(--brand-primary); color: var(--text-primary); text-decoration: none; }
+.home-page .home-jump a[aria-current="location"] { border-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 14%, var(--surface-panel)); color: var(--text-primary); font-weight: 600; }
 .home-page .home-anchor { min-width: 0; scroll-margin-top: 24px; }
 .home-page .home-anchor .ui-section-heading { margin: 0 0 16px; font-size: 20px; }
 .home-page .home-anchor .analysis-section > p { font-size: 14px; color: var(--text-secondary); }
@@ -79,6 +80,7 @@
 .home-page .home-company-block { padding-top: 8px; }
 .home-page .home-company-block + .home-company-block { margin-top: 24px; border-top: 1px solid var(--border-default); }
 .home-page .home-company-block h3 { margin-top: 16px; font-size: 17px; }
+.home-page .home-company-block .mcard-grid { grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); }
 .home-page .mcard-value.is-positive::before, .home-page .mcard-value.is-negative::before { font-size: 14px; margin-right: 6px; }
 .home-page .mcard-value.is-positive::before { content: "✓"; }
 .home-page .mcard-value.is-negative::before { content: "✕"; }

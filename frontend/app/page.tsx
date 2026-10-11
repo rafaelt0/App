@@ -21,6 +21,7 @@ export default function HomePage() {
   const [notice,setNotice] = useState<string|null>(null);
   const [comparison,setComparison] = useState("pl");
   const [retryAction,setRetryAction] = useState<"analyze"|"consensus"|"source">("analyze");
+  const [activeSection,setActiveSection] = useState<string|null>(null);
   const generation = useRef(0);
   const sectorGeneration = useRef(0);
   const analyzedRevision = useRef<number|null>(null);
@@ -85,17 +86,26 @@ export default function HomePage() {
   async function favorite(ticker:string) {
     try {await toggleFavorite(ticker);} catch(exc) {setError((exc as Error).message);}
   }
+  const selection=session?.selection ?? [];
+  const ready=session && result && result.revision===session.revision && JSON.stringify(result.requested_tickers)===JSON.stringify(selection) ? result:null;
+  const single=selection.length===1;
+  const sectionLinks=[["home-setor","Setor"],["home-mercado","Mercado"],["home-indicadores","Indicadores"],["home-saude","Saúde financeira"],...(single ? []:[["home-grafico","Comparação"]]),["home-consenso","Preço-alvo"],["home-sintese","Síntese"]];
+  const sectionIds=sectionLinks.map(([id])=>id).join(" ");
+  useEffect(() => {
+    if(!ready || loading) return;
+    const ids=sectionIds.split(" ");
+    const visible=new Set<string>();
+    const observer=new IntersectionObserver(entries => {entries.forEach(entry => {if(entry.isIntersecting)visible.add(entry.target.id);else visible.delete(entry.target.id);});setActiveSection(ids.find(id=>visible.has(id)) ?? null);},{rootMargin:"0px 0px -60% 0px"});
+    ids.map(id=>document.getElementById(id)).forEach(element => {if(element)observer.observe(element);});
+    return () => observer.disconnect();
+  },[ready?.id,sectionIds,loading]);
   if(loading || !session) return <div className="home-page"><PageHeader title="Fundamentos" description="Análise quantitativa · B3" icon="home"/>{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
-  const selection=session.selection;
-  const ready=result && result.revision===session.revision && JSON.stringify(result.requested_tickers)===JSON.stringify(selection) ? result:null;
   const stockMap=new Map(stocks.map(stock => [stock.ticker,stock]));
   const ordered=[...(suggested?.tickers ?? []),...stocks.map(stock=>stock.ticker)].filter((ticker,index,array)=>array.indexOf(ticker)===index).map(ticker=>stockMap.get(ticker)).filter((stock):stock is typeof stocks[number]=>!!stock);
   const sectorOptions=["Todos",...Array.from(new Set(stocks.map(stock=>stock.sector).filter(Boolean))).sort()];
   const companies=ready?.companies ?? [];
-  const single=selection.length===1;
   const choice=ready?.comparison_indicators.find(item=>item.key===comparison);
   const chartCompanies=companies.filter(company=>company.indicators_available);
-  const sectionLinks=[["home-setor","Setor"],["home-mercado","Mercado"],["home-indicadores","Indicadores"],["home-saude","Saúde financeira"],...(single ? []:[["home-grafico","Comparação"]]),["home-consenso","Preço-alvo"],["home-sintese","Síntese"]];
   return <div className="home-page">
     <PageHeader title="Fundamentos" description="Explore fundamentos, compare empresas e aprofunde sua análise da B3." icon="home"/>
     {session.restored && <Notice>Seleção da carteira salva carregada. Revise os ativos e clique em Analisar para atualizar os fundamentos.</Notice>}
@@ -159,7 +169,7 @@ export default function HomePage() {
         <div className="home-results-actions"><ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>Exportar CSV bruto</ExportButton></div>
       </div>
       <ul className="home-summary" aria-label="Resumo dos ativos analisados">{companies.map(company=>{const saved=session.watchlist.includes(company.ticker);return <li className="home-summary-card" key={company.ticker}>
-        <div className="home-summary-head"><strong className="home-summary-ticker">{company.ticker}</strong><button aria-pressed={saved} onClick={()=>void favorite(company.ticker)}>{saved ? "★ Favoritado":"☆ Favoritar"} · {company.ticker}</button></div>
+        <div className="home-summary-head"><strong className="home-summary-ticker">{company.ticker}</strong><button aria-pressed={saved} aria-label={`Favoritar ${company.ticker}`} onClick={()=>void favorite(company.ticker)}>{saved ? "★ Favoritado":"☆ Favoritar"}</button></div>
         <p className="home-summary-company">{company.identity.company ?? "Empresa não informada"}</p>
         <p className="home-summary-sector">{company.identity.sector ?? "Setor indisponível"}</p>
         <dl className="home-summary-facts">
@@ -168,7 +178,7 @@ export default function HomePage() {
         </dl>
       </li>;})}</ul>
       <div className="home-results-body">
-        <nav className="home-jump-nav" aria-label="Seções da análise"><ul className="home-jump">{sectionLinks.map(([id,label])=><li key={id}><a href={`#${id}`}>{label}</a></li>)}</ul></nav>
+        <nav className="home-jump-nav" aria-label="Seções da análise"><ul className="home-jump">{sectionLinks.map(([id,label])=><li key={id}><a href={`#${id}`} aria-current={activeSection===id ? "location":undefined}>{label}</a></li>)}</ul></nav>
         <div className="home-sections">
           <div id="home-setor" className="home-anchor"><Section title="Setor">
             {single ? companies.map(company=>company.available ? <div className="identity-metrics" key={company.ticker}><Metrics items={[{label:"Empresa",value:company.identity.company},{label:"Setor",value:company.identity.sector},{label:"Subsetor",value:company.identity.subsector}]}/></div>:<Notice key={company.ticker}>Sem dados de setor para {company.ticker}.</Notice>):<Table columns={identityColumns} rows={companies.map(company=>({ticker:company.ticker,...company.identity}))} rowKey="ticker"/>}
