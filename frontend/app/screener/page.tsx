@@ -107,8 +107,8 @@ export default function ScreenerPage() {
     <section className="task-panel scr-filters" aria-labelledby="scr-filters-title">
       <h2 className="ui-section-heading" id="scr-filters-title"><Icon name="filter"/>Critérios de seleção</h2>
       <div className="scr-setup">
-        <label>Ponto de partida<select value={controls.preset} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config?.presets.map(item=><option key={item.name}>{item.name}</option>)}</select></label>
-        <label>Ordenar resultados<select value={sort.field} disabled={!config} onChange={event=>{const value=config?.sorts.find(option=>option.field===event.target.value);if(value)setSort(value);}}>{config?.sorts.map(option=><option key={option.field} value={option.field}>{option.label}</option>)}</select></label>
+        <label>Ponto de partida<select value={config ? controls.preset:""} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config ? config.presets.map(item=><option key={item.name}>{item.name}</option>):<option value="">Carregando…</option>}</select></label>
+        <label>Ordenar resultados<select value={config ? sort.field:""} disabled={!config} onChange={event=>{const value=config?.sorts.find(option=>option.field===event.target.value);if(value)setSort(value);}}>{config ? config.sorts.map(option=><option key={option.field} value={option.field}>{option.label}</option>):<option value="">Carregando…</option>}</select></label>
       </div>
       {preset?.description && <p className="caption scr-preset-note">{preset.description}</p>}
       <div className="scr-criteria">
