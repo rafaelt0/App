@@ -57,7 +57,7 @@
 .home-page .home-summary-facts dt { font-size: 13px; color: var(--text-muted); }
 .home-page .home-summary-facts dd { margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
-.home-page .home-tabs { display: flex; gap: 4px; margin: 0 0 24px; overflow-x: auto; border-bottom: 1px solid var(--border-default); scrollbar-width: thin; }
+.home-page .home-tabs { display: flex; flex-wrap: wrap; gap: 0 4px; margin: 0 0 24px; border-bottom: 1px solid var(--border-default); }
 .home-page .home-tabs [role="tab"] { flex: 0 0 auto; min-height: 44px; padding: 10px 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 500; white-space: nowrap; }
 .home-page .home-tabs [role="tab"]:hover { background: transparent; border-color: var(--border-strong); color: var(--text-primary); }
 .home-page .home-tabs [role="tab"][aria-selected="true"] { border-color: var(--brand-primary); color: var(--brand-primary); font-weight: 600; }
