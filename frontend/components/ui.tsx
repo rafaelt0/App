@@ -13,7 +13,7 @@ export type Column = { key: string; label: string; unit?: Unit; currency?: strin
 export function formatValue(value: unknown, unit: Unit = "number", digits = 2, currency = "BRL"): string {
   if (value === null || value === undefined || (typeof value === "number" && !Number.isFinite(value))) return "—";
   if (typeof value !== "number" || unit === "text") return String(value);
-  const options: Intl.NumberFormatOptions = { minimumFractionDigits: unit === "integer" ? 0 : digits, maximumFractionDigits: unit === "integer" ? 0 : digits };
+  const options: Intl.NumberFormatOptions = { signDisplay: "negative", minimumFractionDigits: unit === "integer" ? 0 : digits, maximumFractionDigits: unit === "integer" ? 0 : digits };
   if (unit === "money") { options.style = "currency"; options.currency = currency; }
   if (unit === "fraction") options.style = "percent";
   return new Intl.NumberFormat("pt-BR", options).format(value) + (unit === "percent" ? "%" : unit === "multiple" ? "×" : "");
@@ -94,7 +94,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
       if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); void change([...value, options[active].ticker]); }
     }} /></div>
     {expanded && <ul className="ticker-options" id={`${id}-options`} role="listbox">{options.map((stock, index) => <li key={stock.ticker} id={`${id}-option-${index}`} role="option" aria-selected={active === index}><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => change([...value, stock.ticker])}><strong>{stock.ticker}</strong><span>{[stock.company, stock.sector].filter(Boolean).join(" · ") || "Setor não informado"}</span></button></li>)}</ul>}
-    <p className="caption">{value.length}/{max} ativos selecionados.</p>{error && <Notice tone="negative">{error}</Notice>}
+    <p className="caption" role="status">{value.length}/{max} ativos selecionados.</p>{error && <Notice tone="negative">{error}</Notice>}
   </div>;
 }
 export function ExportButton({ path, children }: { path: string; children: ReactNode }) {
