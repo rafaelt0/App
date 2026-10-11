@@ -66,7 +66,7 @@ export function EmptyState({ title, children, href, action, icon = "chart" }: { 
   return <section className="empty-state-card"><span className="empty-state-icon"><Icon name={icon} /></span><h2 className="empty-state-title">{title}</h2><div className="empty-state-message">{children}</div>{href && <Link className="button-link primary" href={href}>{action ?? "Configurar portfólio"}<Icon name="arrow-right" /></Link>}</section>;
 }
 export function Loading({ children }: { children?: ReactNode }) {
-  return <div className="loading-container" role="status" aria-live="polite"><span className="loading-spinner" aria-hidden="true" /><p>{children ?? "Carregando dados para a análise."}</p></div>;
+  return <div className="loading-container" role="status" aria-live="polite"><span className="loading-spinner" aria-hidden="true" /><p>{children ?? "Carregando dados para a análise."}</p><span className="loading-track" aria-hidden="true" /></div>;
 }
 export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escolha ações para analisar" }: { value: string[]; onChange: (tickers: string[]) => void | Promise<void>; stocks: Stock[]; max?: number; label?: string }) {
   const id = useId();
