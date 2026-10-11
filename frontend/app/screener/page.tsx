@@ -6,8 +6,8 @@ import "./screener.css";
 import { useApp } from "../../components/AppProvider";
 import { ExportButton, Icon, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
 import { refreshFundamentus } from "../../lib/home";
-import { applyPreset, canonicalCriteria, criterionDefs, defaults, editControl, queryScreener, screenerConfig } from "../../lib/screener";
-import type { Config, Controls, CriterionKey, Result, Sort } from "../../lib/screener";
+import { activeCriteria, applyPreset, canonicalCriteria, criterionDefs, defaults, editControl, queryScreener, screenerConfig } from "../../lib/screener";
+import type { Config, Controls, CriterionDef, CriterionKey, Result, Sort } from "../../lib/screener";
 
 export default function ScreenerPage() {
   const {session,stocks,loading,error:appError,setSelection,toggleFavorite,refreshSession} = useApp();
@@ -24,6 +24,7 @@ export default function ScreenerPage() {
   const [error,setError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
   const [reload,setReload]=useState(0);
+  const barRef=useRef<HTMLDivElement>(null);
   const generation=useRef(0);
   const orderedTickers=useRef("");
   const revision=useRef(session?.revision);
@@ -76,6 +77,7 @@ export default function ScreenerPage() {
     setActionBusy(true);setError(null);
     try{await toggleFavorite(selected);}catch(exc){setError((exc as Error).message);}finally{setActionBusy(false);}
   }
+  function removeCriterion(key:CriterionDef["enabled"]) {edit(key,false);barRef.current?.focus();}
   function edit<K extends keyof Controls>(key:K,value:Controls[K]) {setControls(current=>editControl(current,key,value));}
   if(loading || !session)return <><PageHeader title="Screener de ações" description="Explore ações da B3 com critérios claros e ajustáveis." icon="filter"/>{appError ? <Notice tone="negative">{appError}<button onClick={()=>void refreshSession()}>Tentar novamente</button></Notice>:<Loading/>}</>;
   const selectedCurrent=selected && result?.rows.some(row=>row.ticker===selected) ? selected:null;
@@ -96,6 +98,7 @@ export default function ScreenerPage() {
     dy:<label>Dividend yield mínimo (%)<input type="number" inputMode="decimal" min={0} max={30} step={.5} value={Number.isNaN(controls.dy_min) ? "":controls.dy_min} onChange={event=>edit("dy_min",event.target.valueAsNumber)}/></label>,
     liq2m:<label>Liquidez média 2 meses mínima<input type="range" min={0} max={100000000} step={100000} value={Number.isNaN(controls.liq2m_min) ? 0:controls.liq2m_min} onChange={event=>edit("liq2m_min",event.target.valueAsNumber)}/><output className="scr-output">{liquidity}</output></label>,
   };
+  const chips=activeCriteria(controls);
   const columnCount=visible?.length ?? 0;
   return <>
     <PageHeader title="Screener de ações" description="Explore ações listadas na B3 com critérios claros e ajustáveis. Dados da Fundamentus; consulte a coleta exibida abaixo." icon="filter"/>
@@ -124,16 +127,17 @@ export default function ScreenerPage() {
       </div>
     </section>
     <div className="scr-results" aria-busy={busy || actionBusy}>
+      <div className="scr-active" tabIndex={-1} ref={barRef}>
+        <p className="scr-chips-label" id="scr-active-label">Critérios ativos</p>
+        {chips.length ? <ul className="scr-chips" aria-labelledby="scr-active-label">{chips.map(chip=><li key={chip.key}><span>{chip.label}</span><button type="button" aria-label={`Remover critério ${chip.label}`} onClick={()=>removeCriterion(chip.enabled)}><span aria-hidden="true">×</span></button></li>)}</ul>:<span className="caption">Nenhum critério ativo; todos os ativos são exibidos.</span>}
+        <p className="scr-count" role="status">{result && !busy ? <><strong>{result.matched_count}</strong> de {result.total_count} ações correspondem</>:error ? "Resultado indisponível":"Atualizando resultado…"}</p>
+      </div>
       {(busy || actionBusy || !config) && !error && <Loading>{actionBusy ? "Atualizando dados da Fundamentus…":"Carregando dados da B3…"}</Loading>}
       {error && <Notice tone="negative"><strong>Não foi possível exibir os resultados.</strong> {error}{!plInvalid && <button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button>}</Notice>}
       {result && <Section title="Resultados">
         <Metrics items={[{label:"Ações correspondentes",value:result.matched_count,unit:"integer",help:`de ${result.total_count} ativos analisados`},{label:"DY médio",value:result.metrics.mean_dy,unit:"percent",digits:2},{label:"ROE médio",value:result.metrics.mean_roe,unit:"percent",digits:2}]}/>
         <div className="scr-context">
-          <div className="scr-context-filters">
-            <p className="scr-chips-label">Critérios ativos:</p>
-            {result.active_filters.length ? <ul className="scr-chips" aria-label="Critérios ativos">{result.active_filters.map(filter=><li key={filter}>{filter}</li>)}</ul>:<span className="caption">Nenhum critério ativo; todos os ativos são exibidos.</span>}
-          </div>
-          <p className="caption scr-collected">{result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")} · há ${result.age_minutes} min`:"Horário da coleta indisponível; a idade deste dado não pode ser confirmada."}</p>
+          <p className="caption">{result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")} · há ${result.age_minutes} min`:"Horário da coleta indisponível; a idade deste dado não pode ser confirmada."}</p>
         </div>
         {!result.matched_count ? <div className="empty-state-card"><span className="empty-state-icon"><Icon name="filter"/></span><h3 className="empty-state-title">Nenhuma ação encontrada</h3><div className="empty-state-message">Reduza os limites ou desative critérios. Dados ausentes não são considerados aprovação.</div><button className="primary" onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button></div>:<>
           <details className="scr-columns"><summary>Colunas exibidas ({columnCount} de {result.available_columns.length})</summary><fieldset className="checkbox-group"><legend>Indicadores na tabela</legend><div className="checkbox-group-options">{result.available_columns.map(column=><label key={column.key}><input type="checkbox" checked={visible?.includes(column.key) ?? false} onChange={event=>setVisible(current=>{const next=new Set(current ?? []);if(event.target.checked)next.add(column.key);else next.delete(column.key);return result.available_columns.map(item=>item.key).filter(key=>next.has(key));})}/>{column.label}</label>)}</div></fieldset></details>
