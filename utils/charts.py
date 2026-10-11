@@ -34,7 +34,6 @@ def apply_plotly_theme(fig: go.Figure) -> go.Figure:
         plot_bgcolor=CHART_SURFACE,
         colorway=CHART_COLORWAY,
         font=dict(
-            family='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
             color=CHART_TEXT,
         ),
         xaxis=dict(
@@ -42,7 +41,6 @@ def apply_plotly_theme(fig: go.Figure) -> go.Figure:
             linecolor=CHART_BORDER,
             zerolinecolor=CHART_GRID,
             tickfont=dict(
-                family='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
                 color=CHART_MUTED,
             ),
         ),
@@ -51,7 +49,6 @@ def apply_plotly_theme(fig: go.Figure) -> go.Figure:
             linecolor=CHART_BORDER,
             zerolinecolor=CHART_GRID,
             tickfont=dict(
-                family='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
                 color=CHART_MUTED,
             ),
         ),
