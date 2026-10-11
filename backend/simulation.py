@@ -179,6 +179,7 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
             line_dash="solid" if key == "median" else "dash", line_color=color,
             annotation_text=text, annotation_position=position, annotation_yshift=shift)
     _themed(histogram, "Distribuição dos valores finais (modelo normal)", "Valor final do portfólio (R$)", "Frequência")
+    histogram.update_layout(margin={"t": 120}, title={"y": .97, "yanchor": "top"})
     summary_values = [
         ("Valor Esperado Final", f"R$ {stats['mean_terminal']:,.2f}"),
         ("Probabilidade de Ganho", f"{stats['gain_probability'] * 100:.1f}%"),
