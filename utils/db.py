@@ -1,17 +1,17 @@
-"""SQLite-backed cache, watchlist and portfolio for B3 Explorer.
+"""SQLite cache and anonymous-owner watchlist and allocation storage.
 
-Watchlist and portfolio are keyed by a random Streamlit-session identity
-(see utils/identity.py); they are not recoverable after that session ends.
+Owner identity is resolved by backend.state, never from a caller's URL or body.
 """
 import sqlite3
 import json
 import time
 import os
 import logging
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
-_DB = os.path.join(os.path.dirname(__file__), '..', 'b3_data.db')
+_DB = os.environ.get("B3LAB_DB", os.path.join(os.path.dirname(__file__), '..', 'b3_data.db'))
 
 
 def _migrate_legacy_watchlist(conn):
@@ -39,34 +39,39 @@ def _migrate_legacy_watchlist(conn):
         conn.execute("DROP TABLE watchlist_legacy")
 
 
+@contextmanager
 def _conn():
     conn = sqlite3.connect(_DB, check_same_thread=False, timeout=10)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS cache (
-            key  TEXT PRIMARY KEY,
-            data TEXT NOT NULL,
-            ts   REAL NOT NULL
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS watchlist (
-            uid       TEXT NOT NULL,
-            ticker    TEXT NOT NULL,
-            added_at  REAL NOT NULL,
-            PRIMARY KEY (uid, ticker)
-        )
-    """)
-    _migrate_legacy_watchlist(conn)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS portfolio (
-            uid        TEXT PRIMARY KEY,
-            tickers    TEXT NOT NULL,
-            weights    TEXT,
-            updated_at REAL NOT NULL
-        )
-    """)
-    conn.commit()
-    return conn
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS cache (
+                key TEXT PRIMARY KEY,
+                data TEXT NOT NULL,
+                ts REAL NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS watchlist (
+                uid TEXT NOT NULL,
+                ticker TEXT NOT NULL,
+                added_at REAL NOT NULL,
+                PRIMARY KEY (uid, ticker)
+            )
+        """)
+        _migrate_legacy_watchlist(conn)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS portfolio (
+                uid TEXT PRIMARY KEY,
+                tickers TEXT NOT NULL,
+                weights TEXT,
+                updated_at REAL NOT NULL
+            )
+        """)
+        conn.commit()
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 # ── Cache ──────────────────────────────────────────────────────────────────────
@@ -129,8 +134,10 @@ def wl_add(uid: str, ticker: str):
                 "INSERT OR IGNORE INTO watchlist VALUES (?, ?, ?)",
                 (uid, ticker.upper(), time.time()),
             )
+        return True
     except Exception:
         logger.warning("wl_add failed for uid=%s ticker=%s", uid, ticker, exc_info=True)
+        return False
 
 
 def wl_remove(uid: str, ticker: str):
@@ -140,8 +147,10 @@ def wl_remove(uid: str, ticker: str):
                 "DELETE FROM watchlist WHERE uid = ? AND ticker = ?",
                 (uid, ticker.upper()),
             )
+        return True
     except Exception:
         logger.warning("wl_remove failed for uid=%s ticker=%s", uid, ticker, exc_info=True)
+        return False
 
 
 def wl_has(uid: str, ticker: str) -> bool:
@@ -192,7 +201,7 @@ def portfolio_get(uid: str) -> tuple[list[str], dict]:
 
 
 def portfolio_save(uid: str, tickers: list[str], weights: dict | None = None):
-    """Persist this visitor's current ticker selection and manual weights."""
+    """Persist the allocation and report whether the transaction committed."""
     try:
         with _conn() as c:
             c.execute(
@@ -204,13 +213,17 @@ def portfolio_save(uid: str, tickers: list[str], weights: dict | None = None):
                     time.time(),
                 ),
             )
+        return True
     except Exception:
         logger.warning("portfolio_save failed for uid=%s", uid, exc_info=True)
+        return False
 
 
 def portfolio_clear(uid: str):
     try:
         with _conn() as c:
             c.execute("DELETE FROM portfolio WHERE uid = ?", (uid,))
+        return True
     except Exception:
         logger.warning("portfolio_clear failed for uid=%s", uid, exc_info=True)
+        return False

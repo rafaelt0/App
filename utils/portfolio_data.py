@@ -1,4 +1,4 @@
-"""Cached data-fetching helpers for pages/1_Portfolio.py."""
+"""Cached financial sources and portfolio calculation helpers."""
 
 import datetime
 import logging
@@ -7,7 +7,7 @@ import time
 
 import numpy as np
 import pandas as pd
-import streamlit as st
+from utils.cache import cache_data
 import yfinance as yf
 from bcb import sgs
 from pypfopt import expected_returns, risk_models
@@ -111,7 +111,7 @@ def bound_efficient_return(
 
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_data(ttl=3600)
 def get_selic_rate():
     taxa_selic = sgs.get(432, last=1)
     val = float(taxa_selic.iloc[-1, 0]) / 100
@@ -121,12 +121,12 @@ def get_selic_rate():
     return daily_val
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_data(ttl=3600)
 def get_portfolio_prices(tickers_yf, start_date):
     return _download_close(tickers_yf, start_date)
 
 
-@st.cache_data(ttl=900, show_spinner=False)
+@cache_data(ttl=900)
 def get_portfolio_trade_prices(tickers_yf):
     """Fetch recent unadjusted closes for share-count estimates, not returns."""
     if not tickers_yf:
@@ -138,7 +138,7 @@ def get_portfolio_trade_prices(tickers_yf):
     return prices
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_data(ttl=3600)
 def get_benchmark_prices(start_date):
     return _download_close("^BVSP", start_date).squeeze()
 

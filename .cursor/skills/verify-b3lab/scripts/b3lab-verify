@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# verify-b3lab lifecycle helper: isolated B3Lab instance + headless Chromium.
+# Usage: b3lab-verify <up|doctor|browser|db|logs|down|list> ...  (see SKILL.md)
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+ROOT=$(cd "$SCRIPT_DIR/../../../.." && pwd)
+VERIFY_HOME=${B3LAB_VERIFY_HOME:-/tmp/b3lab-verify}
+RUNS="$VERIFY_HOME/runs"
+EVIDENCE="$VERIFY_HOME/evidence"
+
+die() { echo "b3lab-verify: $*" >&2; exit 1; }
+listening() { ss -ltnH "sport = :$1" | grep -q .; }
+listener_pid() { ss -ltnpH "sport = :$1" | grep -o 'pid=[0-9]*' | head -n1 | cut -d= -f2; }
+alive() { [[ -n "${1:-}" ]] && kill -0 "$1" 2>/dev/null; }
+descends_from() { # descends_from <pid> <ancestor>
+  local pid=$1
+  while [[ -n "$pid" && "$pid" != 0 && "$pid" != 1 ]]; do
+    [[ "$pid" == "$2" ]] && return 0
+    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+  done
+  return 1
+}
+proc_env() { tr '\0' '\n' < "/proc/$1/environ" 2>/dev/null | grep "^$2=" | cut -d= -f2- || true; }
+python_bin() { [[ -x "$ROOT/.venv/bin/python" ]] && echo "$ROOT/.venv/bin/python" || command -v python3.11 || die "Python 3.11 not found; create .venv per README"; }
+
+load() {
+  local run=${B3LAB_VERIFY_RUN:-}
+  [[ -n "$run" ]] || die "B3LAB_VERIFY_RUN is not set. Use the id printed by 'up' (or 'list')."
+  [[ -f "$RUNS/$run/state.env" ]] || die "no state for run '$run' under $RUNS"
+  # shellcheck disable=SC1090
+  source "$RUNS/$run/state.env"
+}
+
+stop_tree() { # stop_tree <label> <pid> <pgid-or-empty>
+  local label=$1 pid=$2 pgid=${3:-}
+  if alive "$pid"; then kill -TERM "$pid" 2>/dev/null || true; fi
+  for _ in $(seq 1 60); do alive "$pid" || break; sleep 0.25; done
+  if alive "$pid"; then kill -KILL "$pid" 2>/dev/null || true; fi
+  if [[ -n "$pgid" ]] && pgrep -g "$pgid" >/dev/null 2>&1; then
+    kill -TERM -- "-$pgid" 2>/dev/null || true
+    for _ in $(seq 1 40); do pgrep -g "$pgid" >/dev/null 2>&1 || break; sleep 0.25; done
+    pgrep -g "$pgid" >/dev/null 2>&1 && kill -KILL -- "-$pgid" 2>/dev/null || true
+  fi
+  echo "stopped $label"
+}
+
+cmd_up() {
+  local mode=dev run_id=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --production) mode=production ;;
+      --run) run_id=$2; shift ;;
+      *) die "unknown up option $1" ;;
+    esac
+    shift
+  done
+  run_id=${run_id:-$(date +%Y%m%d-%H%M%S)-$$}
+  local run_dir="$RUNS/$run_id" evidence_dir="$EVIDENCE/$run_id"
+  [[ -e "$run_dir" ]] && die "run $run_id already exists"
+  [[ -d "$ROOT/frontend/node_modules/next" ]] || die "frontend deps missing: npm --prefix frontend ci"
+  if [[ $mode == dev && -f "$ROOT/frontend/.next/dev/lock" ]]; then
+    local lock_pid
+    lock_pid=$(grep -o '"pid":[0-9]*' "$ROOT/frontend/.next/dev/lock" | cut -d: -f2 || true)
+    if alive "$lock_pid"; then
+      die "another 'next dev' (pid $lock_pid) owns this checkout; Next allows one dev server per directory. Do not stop it. Use 'up --production' or ask the user."
+    fi
+  fi
+  local port=""
+  for candidate in $(seq 3100 3199); do
+    if ! listening "$candidate" && ! listening $((candidate + 5000)) && ! listening $((candidate + 6200)); then port=$candidate; break; fi
+  done
+  [[ -n "$port" ]] || die "no free port triple in 3100-3199 / 8100-8199 / 9300-9399"
+  local api_port=$((port + 5000)) cdp_port=$((port + 6200)) url="http://127.0.0.1:$port"
+  local py; py=$(python_bin)
+  mkdir -p "$run_dir/chrome-profile" "$evidence_dir/downloads"
+
+  if [[ $mode == production ]]; then
+    echo "building Next production bundle (log: $run_dir/build.log)"
+    NEXT_TELEMETRY_DISABLED=1 npm --prefix "$ROOT/frontend" run build > "$run_dir/build.log" 2>&1 || die "next build failed; see $run_dir/build.log"
+  fi
+  local flags=(); [[ $mode == production ]] && flags=(--production)
+  (cd "$ROOT" && exec env -u B3LAB_API_URL -u B3LAB_ENV \
+      B3LAB_PORT="$port" B3LAB_API_PORT="$api_port" B3LAB_ORIGIN="$url" B3LAB_DB="$run_dir/b3lab.db" NEXT_TELEMETRY_DISABLED=1 \
+      setsid "$py" run.py "${flags[@]}" > "$run_dir/app.log" 2>&1 < /dev/null) &
+  local app_pid=$!
+  chromium --headless=new --remote-debugging-port="$cdp_port" --remote-allow-origins="*" --user-data-dir="$run_dir/chrome-profile" \
+    --window-size=1440,1000 --no-first-run --no-default-browser-check --disable-gpu --disable-dev-shm-usage --lang=pt-BR about:blank \
+    > "$run_dir/chrome.log" 2>&1 < /dev/null &
+  local chrome_pid=$!
+  cat > "$run_dir/state.env" <<EOF
+RUN_ID=$run_id
+MODE=$mode
+URL=$url
+PORT=$port
+API_PORT=$api_port
+CDP_PORT=$cdp_port
+APP_PID=$app_pid
+CHROME_PID=$chrome_pid
+DB=$run_dir/b3lab.db
+RUN_DIR=$run_dir
+EVIDENCE_DIR=$evidence_dir
+GIT_REV=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
+GIT_DIRTY=$(git -C "$ROOT" status --porcelain 2>/dev/null | wc -l)
+EOF
+  echo "starting run $run_id ($mode) at $url, API 127.0.0.1:$api_port, CDP $cdp_port"
+  local ready=0
+  for _ in $(seq 1 240); do
+    alive "$app_pid" || { tail -n 40 "$run_dir/app.log" >&2; die "run.py exited during startup; run 'B3LAB_VERIFY_RUN=$run_id $0 down'"; }
+    if curl -fsS -m 2 "http://127.0.0.1:$api_port/health" >/dev/null 2>&1 && curl -fsS -m 30 -o /dev/null "$url/" 2>/dev/null \
+       && curl -fsS -m 2 "http://127.0.0.1:$cdp_port/json/version" >/dev/null 2>&1; then ready=1; break; fi
+    sleep 0.5
+  done
+  [[ $ready == 1 ]] || { tail -n 40 "$run_dir/app.log" >&2; die "not ready after 120 s; run 'B3LAB_VERIFY_RUN=$run_id $0 down'"; }
+  local api_pid web_pid
+  api_pid=$(listener_pid "$api_port"); web_pid=$(listener_pid "$port")
+  echo "API_PGID=$(ps -o pgid= -p "$api_pid" | tr -d ' ')" >> "$run_dir/state.env"
+  echo "WEB_PGID=$(ps -o pgid= -p "$web_pid" | tr -d ' ')" >> "$run_dir/state.env"
+  echo "ready. evidence dir: $evidence_dir"
+  echo "export B3LAB_VERIFY_RUN=$run_id"
+}
+
+cmd_doctor() {
+  load
+  local bad=0
+  check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; bad=1; fi; }
+  echo "run $RUN_ID ($MODE) at $URL; checkout $GIT_REV with $GIT_DIRTY changed path(s) at launch, now $(git -C "$ROOT" status --porcelain 2>/dev/null | wc -l)"
+  check "launcher run.py alive (pid $APP_PID)" "alive $APP_PID && tr '\0' ' ' < /proc/$APP_PID/cmdline | grep -q run.py"
+  check "web port $PORT owned by this run" "descends_from \"\$(listener_pid $PORT)\" $APP_PID"
+  check "API port $API_PORT owned by this run" "descends_from \"\$(listener_pid $API_PORT)\" $APP_PID"
+  check "API /health" "curl -fsS -m 5 http://127.0.0.1:$API_PORT/health | grep '\"ok\"' >/dev/null"
+  check "frontend serves B3Lab title" "curl -fsS -m 60 $URL/ | grep '<title>B3Lab' >/dev/null"
+  local api_pid; api_pid=$(listener_pid "$API_PORT")
+  check "API uses scratch DB $DB" "[[ \"\$(proc_env $api_pid B3LAB_DB)\" == '$DB' ]]"
+  check "API origin is $URL" "[[ \"\$(proc_env $api_pid B3LAB_ORIGIN)\" == '$URL' ]]"
+  check "Chromium alive with CDP on $CDP_PORT" "alive $CHROME_PID && curl -fsS -m 5 http://127.0.0.1:$CDP_PORT/json/version >/dev/null"
+  check "evidence dir exists $EVIDENCE_DIR" "[[ -d '$EVIDENCE_DIR' ]]"
+  [[ $bad == 0 ]] && echo "doctor: healthy" || { echo "doctor: NOT healthy; check '$0 logs' then 'down' and 'up' again"; return 1; }
+}
+
+cmd_browser() {
+  load
+  CDP_PORT=$CDP_PORT B3LAB_URL=$URL DOWNLOAD_DIR="$EVIDENCE_DIR/downloads" exec node "$SCRIPT_DIR/cdp.mjs" "$@"
+}
+
+cmd_db() {
+  load
+  [[ $# -eq 1 ]] || die "db needs one SQL query"
+  "$(python_bin)" - "$DB" "$1" <<'PY'
+import sqlite3, sys
+connection = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+cursor = connection.execute(sys.argv[2])
+print("\t".join(column[0] for column in cursor.description or []))
+for row in cursor:
+    print("\t".join("" if value is None else str(value) for value in row))
+PY
+}
+
+cmd_logs() {
+  load
+  tail -n "${1:-60}" "$RUN_DIR/app.log"
+}
+
+cmd_down() {
+  load
+  stop_tree chromium "$CHROME_PID" ""
+  stop_tree "run.py launcher" "$APP_PID" ""
+  stop_tree "API process group" "" "${API_PGID:-}"
+  stop_tree "Next process group" "" "${WEB_PGID:-}"
+  for port in "$PORT" "$API_PORT" "$CDP_PORT"; do listening "$port" && echo "warning: port $port still listening (pid $(listener_pid "$port")); not killing an unowned process" >&2; done
+  [[ -s "$RUN_DIR/app.log" ]] && cp "$RUN_DIR/app.log" "$EVIDENCE_DIR/app.log"
+  rm -rf "$RUN_DIR"
+  echo "removed scratch $RUN_DIR"
+  echo "evidence kept in $EVIDENCE_DIR:"
+  find "$EVIDENCE_DIR" -type f -printf '  %P (%s bytes)\n' | sort
+}
+
+cmd_list() {
+  shopt -s nullglob
+  for state in "$RUNS"/*/state.env; do
+    ( source "$state"; printf '%s\t%s\t%s\tlauncher %s\n' "$RUN_ID" "$MODE" "$URL" "$(alive "$APP_PID" && echo alive || echo dead)" )
+  done
+}
+
+case ${1:-} in
+  up) shift; cmd_up "$@" ;;
+  doctor) shift; cmd_doctor ;;
+  browser) shift; cmd_browser "$@" ;;
+  db) shift; cmd_db "$@" ;;
+  logs) shift; cmd_logs "$@" ;;
+  down) shift; cmd_down ;;
+  list) cmd_list ;;
+  *) echo "usage: $0 up [--production] [--run ID] | doctor | browser <cmd> ... | db <SELECT> | logs [N] | down | list" >&2; exit 2 ;;
+esac

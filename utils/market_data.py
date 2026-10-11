@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 
 import pandas as pd
-import streamlit as st
+from utils.cache import cache_data
 import yfinance as yf
 from utils.formatting import normalize_numeric_text
 
@@ -57,7 +57,7 @@ def _normalize_listed_stocks(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.drop_duplicates(subset=["Ticker"]).reset_index(drop=True)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_data(ttl=3600)
 def get_listed_stocks() -> pd.DataFrame:
     """Load the shared local B3 universe once per hour."""
     frame = pd.read_csv(Path(__file__).resolve().parent.parent / "acoes-listadas-b3.csv")
@@ -80,7 +80,7 @@ def compute_target_upside(current_price, target_price):
     return (target / current - 1) * 100
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_data(ttl=3600)
 def get_market_target_data(ticker_b3):
     """Fetch Yahoo Finance's target-price and recommendation data for a B3 ticker."""
     try:
@@ -104,13 +104,13 @@ def get_market_target_data(ticker_b3):
         return {"_error": str(exc)}
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_data(ttl=3600)
 def get_full_market_data():
     """Fetch an hourly Fundamentus snapshot and retain its successful fetch time."""
     import fundamentus.resultado as fzr
 
     # The installed Fundamentus scraper wraps requests in a non-expiring HTTP
-    # cache. Evict its result URL whenever Streamlit's one-hour cache misses.
+    # cache. Evict its result URL whenever the hourly application cache misses.
     with FUNDAMENTUS_REQUEST_LOCK:
         _clear_fundamentus_http_cache()
         frame = fzr.get_resultado_raw()
@@ -118,7 +118,7 @@ def get_full_market_data():
     return frame
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@cache_data(ttl=86400)
 def get_sorted_tickers_by_liquidity(tickers_list):
     try:
         df = get_full_market_data()

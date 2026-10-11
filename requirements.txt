@@ -1,5 +1,4 @@
 fundamentus==0.2.0
-ipython==8.15.0
 matplotlib==3.7.2
 numpy==1.24.3
 pandas==2.3.1
@@ -8,14 +7,14 @@ scikit_learn==1.3.0
 QuantStats==0.0.62
 scipy==1.12.0
 seaborn==0.13.2
-streamlit==1.36.0
 yfinance==0.2.65
 PyPortfolioOpt==1.5.5
-kaleido==0.2.1
 lxml==5.2.2
 beautifulsoup4==4.12.3
 requests==2.32.3
 python-bcb==0.4.0
 torch==2.4.1
 transformers==4.44.2
+fastapi==0.142.2
+uvicorn==0.54.0
 

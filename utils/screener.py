@@ -1,4 +1,4 @@
-"""Pure screener presets and filtering, separate from Streamlit rendering."""
+"""Framework-independent screener presets, filtering, and export normalization."""
 
 import pandas as pd
 

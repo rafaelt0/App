@@ -1,118 +1,179 @@
-# B3Lab dark research desk
+# B3Lab fintech desk
 
 ## Atmosphere and identity
 
-B3Lab is a dark-first workspace for researching Brazilian equities. A blue-green
-charcoal canvas, quieter panel layers, serif page titles, and precise numeric
-typography keep long analysis sessions readable. Teal remains the primary B3Lab
-signal. Blue, amber, coral, and violet retain their existing semantic roles.
+B3Lab is a dark-first workspace for researching Brazilian equities. Cool neutral
+dark grays, a single vivid indigo brand accent, sans-serif typography, and
+precise tabular numerals keep long analysis sessions calm and readable. The
+brand color marks primary actions, active state, and section identity only.
+Financial semantics use their own colors: green for gains, coral red for
+losses, and amber for warnings. Every page shares the same indigo accent;
+wayfinding comes from icon, title, and the active navigation link.
 
 Keep the B3Lab name, flask-and-candlestick mark, Brazilian Portuguese copy, and
 current financial behavior. This is a data-dense dashboard, not a marketing
 page. Use system fonts so the app works offline. Do not add gradients, glow,
-blur, decorative texture, external fonts, or color-only status.
+blur, shadows, decorative texture, external fonts, or color-only status.
 
-The Streamlit theme defaults to dark. CSS tokens and Python chart constants
-must use the same palette. The light paper design is no longer the default.
+The Next.js interface defaults to dark. Tokens in
+`frontend/app/globals.css` and the `CHART_*` constants in `utils/charts.py`
+use the same palette. Verify their rendered colors on the live surface.
 
 ## Color tokens
 
 | Role | Token | Value | Use |
 |---|---|---|---|
-| Canvas | `--surface-canvas` | `#0C1518` | Main application background |
-| Sidebar | `--sidebar-bg` | `#111E22` | Navigation rail |
-| Panel | `--surface-panel` | `#142126` | Cards, controls, and chart surfaces |
-| Grouped surface | `--surface-muted` | `#1C2B30` | Selected rows and grouped controls |
-| Raised surface | `--surface-raised` | `#22343A` | Menus and selected component states |
-| Primary text | `--text-primary` | `#EEF4F2` | Headings, body copy, and values |
-| Supporting text | `--text-secondary` | `#C4D1CF` | Labels and supporting copy |
-| Muted text | `--text-muted` | `#9CAFAE` | Captions and metadata |
-| Default border | `--border-default` | `#33464A` | Cards, tables, and separators |
-| Strong border | `--border-strong` | `#52686D` | Inputs and control outlines |
-| Chart grid | `--chart-grid` | `#63787C` | Plot grid and axes |
-| Primary / positive | `--brand-primary` | `#76D5C5` | Primary actions and positive signals |
-| Supporting data | `--brand-secondary` | `#91B9E7` | Links and supporting series |
-| Warning / return | `--brand-accent` | `#E7BD69` | Caution and return semantics |
-| Negative / risk | `--brand-danger` | `#EF969D` | Loss, risk, and errors |
-| Guidance | `--brand-info` | `#B7A3E2` | Informational and exploratory states |
-| Text on primary | `--text-on-primary` | `#10201F` | Text on teal-filled actions |
+| Canvas | `--surface-canvas` | `#0E1015` | Main application background, inputs |
+| Sidebar | `--sidebar-bg` | `#12151C` | Navigation rail |
+| Panel | `--surface-panel` | `#161A22` | Cards, charts, tables, forms |
+| Grouped surface | `--surface-muted` | `#1D222C` | Buttons, table headers, hover rows, chips |
+| Raised surface | `--surface-raised` | `#252B37` | Menus, tooltips, button hover |
+| Primary text | `--text-primary` | `#F3F5F9` | Headings, body copy, and values |
+| Supporting text | `--text-secondary` | `#C5CAD6` | Labels and supporting copy |
+| Muted text | `--text-muted` | `#9AA2B4` | Captions and metadata |
+| Default border | `--border-default` | `#2B313D` | Cards, tables, and separators |
+| Strong border | `--border-strong` | `#5E687E` | Inputs and control outlines |
+| Chart grid | `--chart-grid` | `#646E88` | Plot grid and axes |
+| Brand | `--brand-primary` | `#8B93FF` | Primary actions, active state, focus, first series |
+| Supporting data | `--brand-secondary` | `#4CC9F0` | Benchmarks, info alerts, neutral sentiment |
+| Warning / return | `--brand-accent` | `#F5B544` | Caution and return semantics |
+| Negative / risk | `--brand-danger` | `#F2757A` | Loss, risk, and errors |
+| Guidance | `--brand-info` | `#E879C6` | Categorical and exploratory emphasis |
+| Positive | `--brand-positive` | `#3ECF8E` | Gains, favorable and healthy states |
+| Text on primary | `--text-on-primary` | `#0E1015` | Text on indigo-filled actions |
 
-Text meets WCAG AA contrast on canvas, panel, and grouped surfaces. The measured
-muted-text contrast is 7.18:1 on panels. The measured chart-grid contrast is
-3.54:1 against chart panels. Keep status colors paired with a sign, label, or
-icon. Update `utils/charts.py` and `.streamlit/config.toml` whenever these
-values change.
+Measured contrast: muted text is 6.81:1 on panel; every accent is at least
+5.1:1 on the raised surface; the chart grid is 3.43:1 on panel;
+`--border-strong` is 3.12:1 on panel; text on primary is 6.99:1. Keep status
+colors paired with a sign, label, or icon. Never use `--brand-primary` to mean
+"positive"; use `--brand-positive` / `CHART_POSITIVE`.
 
 ## Typography
 
 | Role | Font | Size | Weight | Line height |
 |---|---|---:|---:|---:|
-| Page title | Georgia with system serif fallback | 28–32px | 600–700 | 1.2 |
-| Section heading | System UI | 18–22px | 600–700 | 1.3 |
-| Body | System UI | 14–16px | 400 | 1.5 |
-| Labels | System UI | 12–14px | 500–600 | 1.4 |
-| Financial values | System monospace with tabular figures | 14–24px | 500–700 | 1.3 |
+| Page title | System sans | `clamp(26px–30px)` | 700 | 1.2 |
+| Section heading | System sans | 18–20px | 650 | 1.3 |
+| Body | System sans | 14–16px | 400 | 1.5 |
+| Labels | System sans | 13px | 500–600 | 1.4 |
+| Financial values | System sans with tabular numerals | 14–24px | 600–700 | 1.3 |
+| Chips and code | System monospace | 12px | 400–600 | 1.4 |
 
-Preserve existing Portuguese strings. New labels use sentence case. Body copy
-stays at least 14px where the component permits it.
+All text uses the system sans stack (`--font-display`). Financial values use
+`font-variant-numeric: tabular-nums`. Monospace (`--font-mono`) is reserved for
+ticker chips, formulas, and code. Preserve existing Portuguese strings. New
+labels use sentence case; no all-caps eyebrows. Body copy stays at least 14px
+where the component permits it.
 
 ## Spacing and layout
 
 Use a 4px base unit: 4, 8, 12, 16, 24, 32, and 40px. Keep desktop content
-within 1360px. The document owns vertical scrolling. Keep the sidebar automatic
-and collapsed when Streamlit chooses that state on narrow screens. At tablet
-widths, an expanded sidebar reserves its own column instead of obscuring the
-page. At 375px, cards and columns reflow without horizontal page scrolling.
-Wide tables may scroll inside their own container.
+within 1360px. The document owns vertical scrolling. Navigation is collapsed
+behind an explicit Menu control on narrow screens. At desktop widths, the
+sidebar reserves its own column instead of obscuring the page. At 375px,
+cards and columns reflow without horizontal page scrolling. Wide tables may
+scroll inside their own container.
 
 Keep the page sequence clear: page identity, task controls, key metrics, then
 evidence and next steps. Use cards only when they group one analytical task.
+
+## Radii
+
+| Token | Value | Use |
+|---|---:|---|
+| `--radius-sm` | 6px | Chips, tags, code |
+| `--radius-md` | 8px | Buttons, inputs, menus, nav links |
+| `--radius-lg` | 12px | Cards, metrics, charts, tables, alerts |
+| `--radius-xl` | 16px | Large containers: onboarding, empty state, analyst synthesis |
+| `--radius-pill` | 999px | Badges, meters, progress tracks |
 
 ## Components
 
 ### Page header
 
-Use one page-level heading, its existing icon, a short description, and a
-semantic page accent. Keep the title and icon accent on the neutral dark
-surface. Decorative SVGs remain hidden from assistive technology. The active
-navigation link uses a muted surface and `aria-current`.
+One page-level heading with its icon in a 44px indigo-tinted tile, a short
+subtitle, and a bottom border. Title uses primary text. Decorative SVGs remain
+hidden from assistive technology. The active navigation link uses a 3px indigo
+left border, an indigo-tinted background, and `aria-current`.
+
+Keep the icon visible at every viewport width. At widths up to 768px, use a
+40px tile and keep the header flex layout so long titles and subtitles wrap.
+
+### Section headings
+
+Sans, 18–20px, weight 650, primary text, with the icon in the brand color. No
+underline or uppercase.
 
 ### Metrics and cards
 
-Use a panel surface, thin border, and 8px radius. Use tabular numbers. Positive,
-negative, and warning states retain their labels or signs as well as their
-colors. Hover changes border or surface only. Do not lift cards.
+Panel surface, 1px default border, 12px radius, 16px padding. Values are
+neutral primary text with tabular numerals; metric deltas use positive/danger
+colors and keep their arrow icon. Hover changes the border only; do not lift
+cards.
 
 ### Controls
 
-Keep visible labels, minimum 44px targets where Streamlit permits them, and
-clear default, hover, focus, disabled, and error states. Inputs use a recessed
-dark surface. Focus uses a visible teal outline. Keep keyboard operation and
-associated labels.
+Buttons: 44px minimum height, 8px radius, muted surface with strong border;
+hover raises the surface and turns the border indigo. Primary buttons are
+indigo-filled with `--text-on-primary`. Inputs use the canvas surface with a
+strong border; focus turns it indigo. Tabs use an indigo 2px highlight. Keep
+visible labels, keyboard operation, and clear default, hover, focus, disabled,
+and error states.
+
+Disabled inputs and selects drop to 50% opacity with a not-allowed cursor, the
+same as disabled buttons. A page's primary task form sits in one `.task-panel`
+(panel surface, 12px radius, 24px padding). The order inside it is the
+selection first, then parameters in a `.controls-grid`, then one `.actions`
+row that leads with the primary button. Multi-choice options with up to about
+15 entries, such as table columns, use a `.checkbox-group` of 44px checkbox
+chips, not a native multi-select. The checked chip takes the indigo border.
+
+Long result lists render 25 items at a time. A `Ver mais N … (M restantes)`
+button reveals the next 25. Row actions render above the list, never below it.
+Exports always cover the full result.
+
+Shared native buttons and form controls live in `frontend/components/ui.tsx`
+and inherit the global state rules. Use the same scope for base, hover, focus,
+and disabled states; do not depend on framework-generated wrapper markup.
 
 ### Alerts and empty states
 
-Use a semantic icon and sentence-case message. Keep recovery actions beside the
-relevant state. Loading feedback keeps `role="status"` and `aria-live="polite"`.
+Alerts tint the panel with the semantic color (info cyan, success green, warning
+amber, error coral) and color the icon. Empty states are centered panels with a
+muted icon, a title, a message, and a recovery action. Loading feedback keeps
+`role="status"` and `aria-live="polite"`.
+
+### Diagnostics, next step, and loading
+
+Financial diagnostics pair their semantic color with a textual assessment.
+Next-step cards use a 3px indigo left border. Loading uses an indigo spinner
+with an actual operation label and an accessible status region.
+
+React consumes calculated financial states from the Python API. Keep fixed
+colors in stylesheet tokens. Page icons reuse the SVG assets in
+`frontend/public/icons`; the flask-and-candlestick mark keeps its geometry.
 
 ### Charts and tables
 
-Use the dark panel for Plotly and Matplotlib backgrounds. Keep readable axes,
+Plotly charts sit on a bordered panel with 12px radius. Keep readable axes,
 visible grid lines, semantic series colors, tooltips, and the existing table
-alternative where available. Data must be readable before any animation.
+alternative where available. Tables use muted headers, row borders, and a muted
+hover row. Data must be readable before any animation.
+
+Chart toolbar actions stay local. Do not expose cloud sharing of session
+analyses. CSV exports come from the owned Python result, not visible table cells.
 
 ## Motion and interaction
 
-Limit interaction feedback to 150ms color, border, and opacity changes. Do not
-animate layout or add decorative movement. Keep focus visible. Under
-`prefers-reduced-motion: reduce`, disable nonessential transitions and
-animations.
+Limit interaction feedback to 150ms color, border, background, and opacity
+changes. Do not animate layout or add decorative movement. Focus shows a 2px
+indigo outline. Under `prefers-reduced-motion: reduce`, disable nonessential
+transitions and animations.
 
 ## Surface treatment
 
-Create depth with three adjacent dark surface values and clear borders. Do not
-use shadows, gradients, glow, blur, or texture. Use 4px radii for controls, 8px
-for cards, and 12px only for larger containers.
+Create depth with adjacent neutral dark surface values and clear borders. Do
+not use shadows, gradients, glow, blur, or texture.
 
 ## Accessibility and responsive checks
 
@@ -120,7 +181,7 @@ for cards, and 12px only for larger containers.
   3:1 where the contrast criterion applies.
 - Every interactive control has visible keyboard focus.
 - Status never relies on color alone.
-- Primary controls use a 44px target where Streamlit allows it.
+- Primary controls use a minimum 44px target.
 - Check 375, 768, 1024, and 1440px widths.
 - Honor `prefers-reduced-motion`.
 - Keep chart grid lines distinct from the panel surface.

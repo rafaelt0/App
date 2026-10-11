@@ -1,8 +1,5 @@
-from unittest.mock import patch
-
 import pandas as pd
 import pytest
-from streamlit.testing.v1 import AppTest
 
 from utils.screener import PRESET_FILTERS, filter_stocks, prepare_export
 
@@ -84,117 +81,15 @@ def test_new_presets_apply_only_their_stated_thresholds():
     ) == ["GROWTH"]
 
 
-def test_sorting_does_not_change_which_stocks_match(stocks):
-    criteria = PRESET_FILTERS["Renda atual"]
-    matched = filter_stocks(stocks, criteria)
-    ascending = matched.sort_values("liq2m").index
-    descending = matched.sort_values("liq2m", ascending=False).index
-    assert set(ascending) == set(descending) == set(matched.index)
-
-
 def test_export_uses_percentage_points_and_keeps_every_row(stocks):
     exported = prepare_export(
         stocks,
         {"dy": "Div. Yield (%)", "roe": "ROE (%)", "pl": "P/L"},
     )
 
-    assert len(exported) == len(stocks)
+    assert list(exported.index) == ["AAA3", "BBB3", "CCC3", "DDD3", "EEE3"]
     assert exported.loc["AAA3", "Div. Yield (%)"] == 6.0
     assert exported.loc["AAA3", "ROE (%)"] == 15.0
     assert exported.index.name == "Papel"
 
 
-def test_screener_migrates_stale_session_filters_to_explorar_b3():
-    raw = pd.DataFrame(
-        {"P/L": [10.0], "ROE": [0.15], "Div.Yield": [0.06], "Liq.2meses": [2_000_000]},
-        index=["AAA3"],
-    )
-    app = AppTest.from_file("pages/5_Screener.py")
-    app.session_state["_screener_filter_version"] = 1
-    app.session_state["preset_select"] = "Greenblatt — Magic Formula"
-    app.session_state["liq2m_min"] = 100_000_000
-    app.session_state["screener_visible_columns"] = ["cotacao", "pl"]
-    with patch("utils.market_data.get_full_market_data", return_value=raw):
-        app.run()
-
-    assert not app.exception
-    assert app.selectbox(key="preset_select").value == "Explorar B3"
-    assert any("1 de 1 ativos" in item.value for item in app.caption)
-
-
-def test_screener_migrates_old_freeform_liquidity_values():
-    raw = pd.DataFrame(
-        {"P/L": [10.0], "ROE": [0.15], "Div.Yield": [0.06], "Liq.2meses": [2_000_000]},
-        index=["AAA3"],
-    )
-    app = AppTest.from_file("pages/5_Screener.py")
-    app.session_state["_screener_filter_version"] = 2
-    app.session_state["preset_select"] = "Explorar B3"
-    app.session_state["liq2m_min"] = 1_234_567
-    with patch("utils.market_data.get_full_market_data", return_value=raw):
-        app.run().run()
-
-    assert not app.exception
-    assert app.select_slider(key="liq2m_min").value == 1_000_000
-
-
-def test_screener_preset_change_and_manual_edit_update_ui_state():
-    raw = pd.DataFrame(
-        {
-            "Cotação": [12.5, 15.0, 17.0],
-            "P/L": [10.0, 0.0, 16.0],
-            "P/VP": [1.2, 0.8, 1.0],
-            "Div.Yield": [0.06, 0.07, 0.04],
-            "ROE": [0.15, 0.12, 0.12],
-            "ROIC": [0.1, 0.11, 0.1],
-            "Cresc. Rec.5a": [0.15, 0.12, 0.20],
-            "EV/EBITDA": [5.0, 6.0, 7.0],
-            "Patrim. Líq": [100_000.0, 200_000.0, 300_000.0],
-            "Dív.Líq/ Patrim.": [0.4, 0.2, 0.3],
-            "Liq.2meses": [2_000_000, 3_000_000, 4_000_000],
-        },
-        index=["AAA3", "BBB3", "CCC3"],
-    )
-    raw.attrs["fetched_at"] = "2026-09-24T12:00:00+00:00"
-    with patch("utils.market_data.get_full_market_data", return_value=raw):
-        app = AppTest.from_file("pages/5_Screener.py").run()
-        assert not app.exception
-        assert any("3 de 3 ativos" in item.value for item in app.caption)
-        assert any("Liquidez 2m ≥ R$ 1.000.000" in item.value for item in app.caption)
-        assert [metric.value for metric in app.metric] == ["3", "5,67%", "13,00%"]
-        assert "P/L" in app.dataframe[0].value.columns
-        liquidity = app.select_slider(key="liq2m_min")
-        assert liquidity.value == 1_000_000
-        assert liquidity.options[10:12] == ["1 milhão", "1,1 milhões"]
-        assert liquidity.options[20] == "2 milhões"
-
-        liquidity.set_value(3_000_000).run()
-        assert app.selectbox(key="preset_select").value == "Personalizado"
-        assert any("2 de 3 ativos" in item.value for item in app.caption)
-        assert any("Liquidez 2m ≥ R$ 3.000.000" in item.value for item in app.caption)
-
-        app.selectbox(key="preset_select").select("Renda atual").run()
-        assert app.select_slider(key="liq2m_min").value == 1_000_000
-        assert app.selectbox(key="preset_select").value == "Renda atual"
-        assert any("DY ≥ 5%" in item.value and "ROE ≥ 10%" in item.value for item in app.caption)
-
-        app.number_input(key="dy_min").set_value(5.5).run()
-        assert any("DY ≥ 5,5%" in item.value for item in app.caption)
-
-        app.number_input(key="roe_min").set_value(20).run()
-        assert app.selectbox(key="preset_select").value == "Personalizado"
-
-        app.selectbox(key="preset_select").select("Qualidade rentável").run()
-        assert app.number_input(key="roe_min").value == 18
-        assert app.number_input(key="pl_max").value == 20
-        assert app.select_slider(key="liq2m_min").value == 2_000_000
-
-        app.selectbox(key="preset_select").select("Alta liquidez").run()
-        assert app.select_slider(key="liq2m_min").value == 10_000_000
-        assert not app.checkbox(key="filter_pl_enabled").value
-        assert not app.checkbox(key="filter_roe_enabled").value
-
-        app.selectbox(key="preset_select").select("Crescimento com lucro").run()
-        assert app.number_input(key="c5y_min").value == 10
-        assert app.checkbox(key="filter_c5y_enabled").value
-        assert any("Cresc. Rec. 5a ≥ 10%" in item.value for item in app.caption)

@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# tour <label>: full-page screenshots + layout audit of all five routes at 1440/1024/768/375,
+# first in the empty state, then with a loaded PETR4/VALE3/ITUB4 portfolio.
+# Requires a fresh run (empty selection): B3LAB_VERIFY_RUN set by `b3lab-verify up`.
+set -euo pipefail
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+V="$SCRIPT_DIR/b3lab-verify"
+label=${1:?usage: tour <label>}
+state_file="${B3LAB_VERIFY_HOME:-/tmp/b3lab-verify}/runs/${B3LAB_VERIFY_RUN:?B3LAB_VERIFY_RUN is not set}/state.env"
+# shellcheck disable=SC1090
+source "$state_file"
+out="$EVIDENCE_DIR/tour-$label"
+mkdir -p "$out"
+: > "$out/audit.jsonl"
+widths=(1440 1024 768 375)
+b() { "$V" browser "$@"; }
+
+shoot() {
+  local state=$1 page=$2
+  for width in "${widths[@]}"; do
+    b viewport "$width" 900 >/dev/null
+    sleep 0.6
+    b screenshot --full "$out/$state-$page-$width.png" >/dev/null
+    printf '{"state":"%s","page":"%s","width":%s,"audit":%s}\n' "$state" "$page" "$width" "$(b audit)" >> "$out/audit.jsonl"
+  done
+  b viewport 1440 900 >/dev/null
+  echo "captured $state/$page"
+}
+
+b viewport 1440 900 >/dev/null
+for entry in /:fundamentos /portfolio:portfolio /simulacao:simulacao /noticias:noticias /screener:screener; do
+  b open "${entry%%:*}" >/dev/null
+  b wait-text "Análise quantitativa da B3." >/dev/null
+  b wait-idle >/dev/null
+  shoot empty "${entry##*:}"
+done
+
+b open /portfolio >/dev/null
+b wait-text "Montagem da carteira" >/dev/null
+for ticker in PETR4 VALE3 ITUB4; do b fill "Ações da carteira" "$ticker" >/dev/null; b press Enter >/dev/null; done
+b wait-text "3/20 ativos selecionados" >/dev/null
+b click "Carregar portfólio" >/dev/null
+b wait-text "Pesos do Portfólio (%)" --timeout 300 >/dev/null
+b wait-idle >/dev/null
+shoot loaded portfolio
+
+b click "Fundamentos" --role link >/dev/null
+b wait-text "Selecione ativos para analisar" >/dev/null
+b click "Analisar" >/dev/null
+b wait-text "Preço-alvo e consenso" --timeout 300 >/dev/null
+b wait-idle >/dev/null
+shoot loaded fundamentos
+
+b click "Simulação" --role link >/dev/null
+b wait-text "Alocação usada na simulação" --timeout 120 >/dev/null
+b click "Rodar Simulação" >/dev/null
+b wait-text "Estatísticas da Simulação Monte Carlo" --timeout 300 >/dev/null
+b wait-idle >/dev/null
+shoot loaded simulacao
+
+b click "Notícias" --role link >/dev/null
+b wait-text "Tom da amostra disponível" --timeout 600 >/dev/null
+b wait-idle >/dev/null
+shoot loaded noticias
+
+b click "Screener" --role link >/dev/null
+b wait-text "ativos correspondem aos filtros" --timeout 180 >/dev/null
+b wait-idle >/dev/null
+shoot loaded screener
+
+node -e '
+const rows = require("fs").readFileSync(process.argv[1], "utf8").trim().split("\n").map(JSON.parse);
+console.log("state\tpage\twidth\toverflowX\tsmallTargets\tdocHeight\tsmallTargetNames");
+for (const r of rows) console.log([r.state, r.page, r.width, r.audit.pageOverflowX, r.audit.smallTargets, r.audit.docHeight, r.audit.smallTargetNames.join(" | ")].join("\t"));
+' "$out/audit.jsonl" | tee "$out/summary.tsv"
+echo "tour written to $out"

@@ -1,10 +1,7 @@
-"""Session-cached Monte Carlo path generation for Streamlit reruns."""
-
-import hashlib
+"""Deterministic Monte Carlo calculations independent of the web framework."""
 
 import numpy as np
 import pandas as pd
-import streamlit as st
 
 
 def _normalized_weights(weights):
@@ -43,11 +40,6 @@ def simulate_portfolio(
     mu, covariance, weights, days, simulations, initial_value, start_date, chunk_size=64
 ):
     """Simulate daily-rebalanced portfolio paths with deterministic local randomness."""
-    inputs = (mu, covariance, weights, days, simulations, initial_value, start_date, chunk_size)
-    fingerprint = hashlib.sha256(repr(inputs).encode()).hexdigest()
-    cached = st.session_state.get("_simulation_result")
-    if cached and cached[0] == fingerprint:
-        return cached[1]
 
     mu = np.asarray(mu, dtype=float)
     covariance = np.asarray(covariance, dtype=float)
@@ -68,7 +60,6 @@ def simulate_portfolio(
     result = pd.DataFrame(
         np.vstack([np.full(simulations, initial_value), portfolio_values]), index=dates
     )
-    st.session_state["_simulation_result"] = (fingerprint, result)
     return result
 
 
@@ -84,11 +75,6 @@ def bootstrap_terminal_values(returns, weights, days, simulations, initial_value
     if days < 1 or simulations < 1 or chunk_size < 1 or not np.isfinite(initial_value) or initial_value <= 0:
         raise ValueError("Days, simulations, chunk size and initial value must be positive.")
 
-    inputs = (returns.shape, tuple(weights), days, simulations, initial_value, chunk_size)
-    fingerprint = hashlib.sha256(repr(inputs).encode() + returns.tobytes()).hexdigest()
-    cached = st.session_state.get("_bootstrap_terminal_result")
-    if cached and cached[0] == fingerprint:
-        return cached[1]
 
     rng = np.random.default_rng(43)
     final_values = np.empty(simulations, dtype=float)
@@ -99,5 +85,4 @@ def bootstrap_terminal_values(returns, weights, days, simulations, initial_value
         daily_returns = returns[indices] @ weights
         final_values[first:first + count] = initial_value * np.prod(1 + daily_returns, axis=0)
 
-    st.session_state["_bootstrap_terminal_result"] = (fingerprint, final_values)
     return final_values

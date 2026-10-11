@@ -1,9 +1,9 @@
-# B3Lab — Brand Guide
+# B3Lab brand guide
 
 ## Identity
 
 **Name:** B3Lab  
-**Tagline:** Análise Quantitativa · B3  
+**Tagline:** Análise quantitativa · B3  
 **Concept:** A research laboratory for the Brazilian equity market (B3). The flask icon with candlestick bars captures "scientific analysis of financial data."
 
 `../DESIGN.md` defines the application’s surface tokens, typography, components,
@@ -13,93 +13,98 @@ and responsive behavior; this guide preserves the B3Lab identity and assets.
 
 | File | Use |
 |------|-----|
-| `logo.svg` | Sidebar header (300×72px); teal flask mark and light wordmark |
-| `favicon.svg` | Browser tab / `st.set_page_config(page_icon=...)` |
-| `icons/*.svg` | Page navigation icons (24×24, currentColor) |
+| `frontend/public/logo.svg` | Sidebar header; indigo flask, green/coral candles, light wordmark |
+| `frontend/public/favicon.svg` | Browser tab and Home identity mark |
+| `frontend/public/icons/*.svg` | Page icons, 24px, currentColor |
 
 ## Color System
 
-The dark-first interface uses blue-green charcoal surfaces and light text.
-Teal, blue, amber, coral, and violet remain reserved for hierarchy and
-financial semantics.
+The dark-first interface uses cool neutral dark surfaces and light text. A
+single indigo accent marks brand, primary actions, and active state; green,
+coral, and amber are reserved for financial semantics.
 
 | Token | Hex | Use |
 |-------|-----|-----|
-| `--brand-primary` | `#76d5c5` | Primary action, active state, positive signal |
-| `--brand-secondary` | `#91b9e7` | Supporting data, links, secondary emphasis |
-| `--brand-accent` | `#e7bd69` | Warnings, yield, return metrics |
-| `--brand-danger` | `#ef969d` | Negative signal, errors, risk |
-| `--brand-info` | `#b7a3e2` | Secondary guidance and exploratory emphasis |
-| `--surface-canvas` | `#0c1518` | Main application background |
-| `--surface-panel` | `#142126` | Cards, controls, and chart surfaces |
-| `--surface-muted` | `#1c2b30` | Grouped and selected surfaces |
-| `--border-default` | `#33464a` | Borders and dividers |
-| `--text-primary` | `#eef4f2` | Primary text |
-| `--text-secondary` | `#c4d1cf` | Supporting copy and labels |
-| `--text-muted` | `#9cafae` | Captions and metadata |
-| `--chart-grid` | `#63787c` | Visible chart grid and axes |
+| `--brand-primary` | `#8b93ff` | Primary action, active state, focus, first series |
+| `--brand-positive` | `#3ecf8e` | Gains, favorable and healthy states |
+| `--brand-secondary` | `#4cc9f0` | Supporting data, benchmarks, info |
+| `--brand-accent` | `#f5b544` | Warnings, yield, return metrics |
+| `--brand-danger` | `#f2757a` | Negative signal, errors, risk |
+| `--brand-info` | `#e879c6` | Categorical and exploratory emphasis |
+| `--surface-canvas` | `#0e1015` | Main application background |
+| `--sidebar-bg` | `#12151c` | Navigation rail |
+| `--surface-panel` | `#161a22` | Cards, controls, and chart surfaces |
+| `--surface-muted` | `#1d222c` | Grouped and selected surfaces |
+| `--surface-raised` | `#252b37` | Menus, tooltips, hover |
+| `--border-default` | `#2b313d` | Borders and dividers |
+| `--border-strong` | `#5e687e` | Input and control outlines |
+| `--text-primary` | `#f3f5f9` | Primary text |
+| `--text-secondary` | `#c5cad6` | Supporting copy and labels |
+| `--text-muted` | `#9aa2b4` | Captions and metadata |
+| `--chart-grid` | `#646e88` | Visible chart grid and axes |
+| `--text-on-primary` | `#0e1015` | Text on indigo-filled actions |
 
 Color communicates hierarchy and state, never decoration alone. Surface depth
 comes from adjacent dark neutrals and visible borders. Avoid gradients, glow,
 shadows, and color-only status indicators.
 
-Page headers reuse these accents for wayfinding: teal for Home, blue for Portfolio,
-violet for Simulation, amber for News, coral for Valuation, and blue-violet for
-Screener. Color stays on the title, icon, and divider; surfaces remain neutral.
+All pages share the indigo accent; wayfinding comes from icon, title, and the active navigation link.
 
 ## Typography
 
 | Role | Font | Weight | Size |
 |------|------|--------|------|
-| Page headings | Georgia with system serif fallback | 600–700 | 28–32px |
-| Section headings | System UI stack | 600–700 | 18–22px |
-| Body | System UI stack | 400 | 14–16px |
-| Code / metrics | System monospace stack with tabular numerals | 400–700 | 12–24px |
-| Labels | System UI stack | 500–600 | 12–14px, sentence case |
+| Page headings | System sans stack | 700 | clamp(26–30px) |
+| Section headings | System sans stack | 650 | 18–20px |
+| Body | System sans stack | 400 | 14–16px |
+| Financial values | System sans stack with tabular numerals | 600–700 | 14–24px |
+| Chips / code | System monospace stack | 400–600 | 12px |
+| Labels | System sans stack | 500–600 | 13px, sentence case |
 
 ## Icons (page set)
 
 | Page | File | Icon concept |
 |------|------|-------------|
-| Portfólio | `icons/portfolio.svg` | Briefcase + bar chart |
-| Simulação | `icons/simulation.svg` | Normal distribution bell curve |
-| Notícias | `icons/news.svg` | Document / newspaper |
-| Valuation | `icons/valuation.svg` | Price tag + dollar |
-| Screener | `icons/screener.svg` | Funnel + search circle |
+| Portfólio | `frontend/public/icons/portfolio.svg` | Briefcase and bar chart |
+| Simulação | `frontend/public/icons/simulation.svg` | Normal distribution bell curve |
+| Notícias | `frontend/public/icons/news.svg` | Newspaper |
+| Valuation | `frontend/public/icons/valuation.svg` | Price tag and dollar |
+| Screener | `frontend/public/icons/screener.svg` | Funnel and search circle |
 
 Icons are decorative unless they carry meaning not already present in adjacent
 text. Decorative inline SVGs use `aria-hidden="true"` and
 `focusable="false"`; interactive controls still need an accessible label.
 
-## Shared UI Helpers
+## Shared React components
 
-| Helper | Purpose |
-|--------|---------|
-| `svg_icon` | Safe inline decorative icon wrapper |
-| `render_page_header` | Consistent page title, description, and existing B3Lab icon |
-| `section_header` | Consistent semantic section heading |
-| `empty_state_card` | Actionable empty and error state |
-| `loading_overlay` | Explicit, live loading feedback |
+| Component | Purpose |
+|---|---|
+| `Icon` | Decorative SVG assets and shared glyphs |
+| `PageHeader` | Page title, description, visible identity icon |
+| `Section` | Semantic section heading |
+| `EmptyState` | Actionable empty and error state |
+| `Loading` | Actual operation label and accessible status |
+| `Metrics`, `Table` | Neutral values, explicit units, semantic assessments |
 
-## Integration — Streamlit
+## Next.js integration
 
-```python
-st.set_page_config(
-    page_title="B3Lab",
-    page_icon="favicon.svg",
-    layout="wide",
-    initial_sidebar_state="auto",
-)
+`frontend/app/layout.tsx` owns metadata, language, and the shared application
+shell. `frontend/components/ui.tsx` owns the presentation components.
+Page icons retain their existing SVG geometry and inherit the brand color.
+Financial classifications come from the Python API.
 
-# Sidebar logo
-with st.sidebar:
-    st.image("logo.svg", use_column_width=True)
+```tsx
+<PageHeader
+  title="Otimização de portfólio"
+  description="Monte uma carteira e compare risco e retorno."
+  icon="portfolio"
+/>
 ```
 
 ## Dos and Don'ts
 
-- **Do** reserve bright teal for primary actions, active states, and positive signals
-- **Do** keep gold/red semantic: returns and warnings / negative and risk states
+- **Do** use indigo for primary actions and active state, never gains.
+- **Do** use green for gains, amber for warnings, and coral for losses and risk.
 - **Do** preserve visible focus, responsive touch targets, and reduced-motion support
 - **Do** use sentence case for new labels while preserving existing PT-BR copy
 - **Don't** use gradients, glow, all-caps eyebrows, or decorative card noise

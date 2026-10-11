@@ -1,6 +1,6 @@
 import pandas as pd
 
-from utils.charts import CHART_ACCENT, CHART_DANGER, CHART_MUTED, CHART_PRIMARY
+from utils.charts import CHART_ACCENT, CHART_DANGER, CHART_MUTED, CHART_POSITIVE
 from utils.home_data import build_analyst_synthesis, compute_sector_ranking
 
 
@@ -101,7 +101,7 @@ def test_build_analyst_synthesis_marks_three_favorable_categories_attractive():
     synthesis = build_analyst_synthesis(peers_raw, "AAA1", "Bancos", _b3_data())
 
     assert synthesis["veredicto"] == "ATRATIVO"
-    assert synthesis["cor_veredicto"] == CHART_PRIMARY
+    assert synthesis["cor_veredicto"] == CHART_POSITIVE
     assert synthesis["categorias_validas"] == 3
     assert all(
         category["veredicto"] == "Favorável"

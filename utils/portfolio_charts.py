@@ -1,10 +1,10 @@
-"""Matplotlib/Plotly chart builders for pages/1_Portfolio.py."""
+"""Plotly frontier figures and their cached numerical calculations."""
 
 import logging
 
 import numpy as np
 import plotly.graph_objects as go
-import streamlit as st
+from utils.cache import cache_data
 from pypfopt.efficient_frontier import EfficientFrontier
 
 from utils.charts import (
@@ -42,14 +42,9 @@ def apply_matplotlib_theme(fig):
     return fig
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_data(ttl=3600)
 def _compute_frontier_data(mu_tuple, S_tuple, weights_tuple, rf, num_portfolios=5000):
-    """Numeric core of the efficient-frontier chart — cached because it's
-    expensive (5,000 simulated portfolios + 25 quadratic programs) and its
-    inputs (mu/S/weights/rf) are identical across unrelated widget reruns.
-    Takes plain tuples instead of pandas/dict objects so Streamlit hashes
-    the cache key cheaply and deterministically.
-    """
+    """Cache the 5,000 random portfolios and 25 frontier solves by their inputs."""
     mu = np.array(mu_tuple)
     S = np.array(S_tuple)
 

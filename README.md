@@ -1,120 +1,114 @@
-# B3 Explorer — Plataforma Quantitativa de Análise de Ações
+# B3Lab
 
-## 📈 Descrição
+B3Lab analisa ações brasileiras com uma interface React em Next.js e uma API Python em FastAPI. Os cálculos financeiros continuam em Python. A interface usa o sistema visual fintech-neutral definido em `DESIGN.md`.
 
-O **B3 Explorer** é uma aplicação web interativa desenvolvida com **Streamlit** para análise quantitativa de ações listadas na B3 (Bolsa de Valores do Brasil). A plataforma reúne, em um único fluxo de trabalho, análise fundamentalista, consenso de preços-alvo de analistas, otimização de portfólio, simulação Monte Carlo, monitoramento de notícias com análise de sentimento e um screener de mercado.
+## Funcionalidades
 
-O projeto integra dados históricos do Yahoo Finance (`yfinance`), indicadores fundamentalistas do Fundamentus e a taxa Selic do Banco Central (`python-bcb`), oferecendo uma ferramenta completa de apoio à decisão de investimento.
-As cinco páginas compartilham cabeçalho, navegação e componentes de análise, com adaptação para telas menores.
+- **Fundamentos.** Seleção por empresa e setor, indicadores do Fundamentus, endividamento, comparação setorial, favoritos e consenso de preços-alvo do Yahoo Finance. A seleção exige a ação **Analisar** antes de buscar os detalhes.
+- **Portfólio.** Mínima volatilidade, Markowitz com regularização L2, HRP e cotas manuais. Inclui alocação, estimativa de compra por cotas, fronteira eficiente, desempenho histórico, retornos mensais, Sharpe, Sortino, drawdown, beta, alpha, VaR diário, concentração, regime recente e crises históricas. A ação **Carregar portfólio** libera as análises seguintes.
+- **Simulação.** De 10 a 3.000 trajetórias, com até 10 anos de horizonte. Compara o modelo normal multivariado com a reamostragem conjunta dos dias históricos. Mostra trajetórias, percentis, distribuição final, sensibilidade da calibração e média da cauda inferior. P5 não é VaR nem perda máxima. Alterar o número de trajetórias exibidas não executa novamente os modelos.
+- **Notícias.** Feeds brasileiros dos últimos sete dias, até dez notícias por ativo, deduplicação, classificação com FinBERT-PT-BR e fallback léxico identificado. Filtros e paginação não alteram a nota ponderada da amostra completa. A nota mede tom textual, não retorno esperado.
+- **Screener.** Sete pontos de partida, critérios opcionais, ordenação, escolha de colunas, favoritos e envio de ativos para a análise fundamentalista. Os dados vêm do Fundamentus.
 
-🔗 **Acesse a aplicação:** https://b3explorer.streamlit.app/
+As cinco exportações disponíveis são CSV de fundamentos, alocação, resumo da simulação, percentis por data e resultados completos do screener. Não há geração de relatório HTML.
 
----
+## Executar localmente
 
-## ⚙️ Funcionalidades
-
-A aplicação é organizada como um **fluxo de análise em 5 etapas**:
-
-### 1. Análise Fundamentalista *(página inicial)*
-* Panorama de todo o mercado com dados atualizados do Fundamentus (a cada hora).
-* Cartões de preço, indicadores por setor e ranking setorial de ativos.
-* Painel de endividamento e watchlist personalizada (favoritos por sessão).
-* Síntese do Analista compara valuation, rentabilidade e dividend yield com pares do mesmo setor, atribui um voto por categoria e informa quando a cobertura é insuficiente.
-* Painel de preços-alvo do Yahoo Finance: cotação, faixa de consenso, potencial implícito e recomendação agregada.
-
-### 2. Portfolio — Análise & Otimização
-* Importação de preços históricos ajustados via `yfinance`.
-* Otimização de alocação por **Mínima Volatilidade**, **Markowitz** (fronteira eficiente) e **Hierarchical Risk Parity (HRP)**, além de alocação manual por cotas.
-* Métricas institucionais de risco/retorno: Sharpe, Sortino, VaR, CVaR e Drawdown.
-* Visualização do valor do portfólio vs. benchmark (IBOVESPA), beta móvel, Sharpe móvel e drawdown.
-* Taxa livre de risco baseada na Selic real.
-
-### 3. Simulação Monte Carlo
-* Projeção de 10 a 3.000 trajetórias (padrão: 2.000) com retornos logarítmicos normais e rebalanceamento diário.
-* Comparação dos percentis finais com reamostragem conjunta dos retornos históricos; nenhum modelo prevê crises não observadas.
-* Gráfico interativo estilo *fan chart* com faixas de percentis, não intervalos de confiança.
-* Estatísticas resumo: valor final médio, percentil 5, média da cauda inferior e extremos simulados.
-
-### 4. Notícias & Sentimento
-* Monitoramento de notícias em tempo real das ações da carteira (RSS).
-* Análise de sentimento com o modelo de deep learning **FinBERT-PT-BR** (classificação otimista / neutro / pessimista).
-* Agregação do impacto qualitativo sobre o portfólio.
-
-### 5. Screener B3
-* Filtragem de todas as ações listadas na B3 por indicadores fundamentalistas.
-* Ordenação e busca de candidatos de investimento.
-* Dados atualizados a cada hora via Fundamentus.
-
-### Exportação
-* Geração e download de relatório completo em HTML usando `quantstats`.
-
----
-
-## 🛠 Tecnologias e Bibliotecas
-
-* [Streamlit](https://streamlit.io/) — Framework para apps web interativos em Python.
-* [yfinance](https://github.com/ranaroussi/yfinance) — Dados financeiros históricos.
-* [Fundamentus](https://pypi.org/project/fundamentus/) — Indicadores fundamentalistas da B3.
-* [python-bcb](https://github.com/wilsonfreitas/python-bcb) — Séries do Banco Central (Selic).
-* [PyPortfolioOpt](https://pyportfolioopt.readthedocs.io/) — Otimização de portfólio (Markowitz, HRP).
-* [QuantStats](https://github.com/ranaroussi/quantstats) — Análise estatística e relatórios financeiros.
-* [Transformers](https://huggingface.co/docs/transformers) + [PyTorch](https://pytorch.org/) — Modelo FinBERT-PT-BR para análise de sentimento.
-* [Plotly](https://plotly.com/python/) — Visualizações interativas.
-* [Matplotlib](https://matplotlib.org/) e [Seaborn](https://seaborn.pydata.org/) — Gráficos estáticos.
-* [Pandas](https://pandas.pydata.org/) e [NumPy](https://numpy.org/) — Manipulação e análise de dados.
-* [scikit-learn](https://scikit-learn.org/) e [SciPy](https://scipy.org/) — Suporte numérico e estatístico.
-* **SQLite** — Cache de dados compartilhado; portfólio e watchlist usam identidade aleatória apenas na sessão atual.
-
----
-
-## 🚀 Executando localmente
+Use Python 3.11 e Node.js 26. A instalação JavaScript usa o `package-lock.json` versionado.
 
 ```bash
-# 1. Clonar o repositório
-git clone https://github.com/rafaelt0/app.git
-cd app
-
-# 2. (Opcional) criar um ambiente virtual
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-
-# 3. Instalar as dependências
-pip install -r requirements.txt
-
-# 4. Iniciar a aplicação
-streamlit run Main_Page.py
-```
-
-A aplicação abre em `http://localhost:8501`. Portfólio e watchlist são associados à sessão atual; podem não sobreviver ao recarregamento ou ao encerramento da sessão.
-
-### Testes
-
-```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest
+npm --prefix frontend ci
+python run.py
 ```
 
----
+Abra http://localhost:3000. O comando inicia o Next.js e a API privada em http://127.0.0.1:8000. Ao encerrar o comando, os dois processos terminam.
 
-## 📁 Estrutura do Projeto
+A lista de ações é local. Fundamentus, Yahoo Finance, Banco Central, Google News e a primeira obtenção do modelo FinBERT precisam de acesso à rede. A indisponibilidade de uma fonte aparece na interface. O fallback léxico não se apresenta como FinBERT.
 
-```
-.
-├── Main_Page.py              # Análise fundamentalista e preços-alvo de mercado
-├── pages/
-│   ├── 1_Portfolio.py        # Análise & otimização de portfólio
-│   ├── 2_Simulação.py        # Simulação Monte Carlo
-│   ├── 3_Notícias.py         # Notícias & análise de sentimento (FinBERT)
-│   └── 5_Screener.py         # Screener de ações da B3
-├── utils/                    # Módulos de dados, mercado, gráficos e UI
-├── tests/                    # Testes com pytest
-├── .streamlit/config.toml    # Tema e configurações do Streamlit
-├── requirements.txt
-└── requirements-dev.txt
+Para executar os processos separadamente, use dois terminais na raiz do projeto.
+
+```bash
+python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
----
+```bash
+npm --prefix frontend run dev
+```
 
-## 📞 Contato
+## Executar o build de produção
 
-Desenvolvido por **Rafael Eiki Teruya** — [rafael_teruya@usp.br](mailto:rafael_teruya@usp.br)
+Com as dependências instaladas, execute os comandos na raiz.
+
+```bash
+npm --prefix frontend run build
+python run.py --production
+```
+
+O launcher usa um único worker Python. Os resultados de análise e o recurso FinBERT pertencem a esse processo. Adicionar workers sem compartilhar o estado quebra essa arquitetura.
+
+Para publicar atrás de um proxy HTTPS, mantenha a API privada e configure `B3LAB_ENV=production` e `B3LAB_ORIGIN` com a origem pública exata. A interface e os pedidos `/api` compartilham a mesma origem. O proxy precisa admitir a duração das análises, incluindo o carregamento inicial do modelo. Não há fila de execução nem promessa de implantação serverless.
+
+## Configuração
+
+| Variável | Padrão | Uso |
+|---|---|---|
+| `B3LAB_PORT` | `3000` | Porta do Next.js no launcher |
+| `B3LAB_API_PORT` | `8000` | Porta da API no launcher |
+| `B3LAB_API_URL` | `http://127.0.0.1:8000` | Endereço privado usado pelo proxy Next.js |
+| `B3LAB_ORIGIN` | `http://localhost:3000` | Origem autorizada para mutações; o launcher adapta a porta |
+| `B3LAB_DB` | `b3_data.db` na raiz | Arquivo SQLite gravável e persistente |
+| `B3LAB_ENV` | Não definido | `production` exige cookie Secure e a origem configurada |
+
+O launcher configura `B3LAB_API_URL` a partir de `B3LAB_API_PORT` quando não há endereço explícito. Portas personalizadas devem usar uma origem correspondente; `localhost` e `127.0.0.1` são origens distintas.
+
+Mutações exigem a origem autorizada e o cabeçalho `X-B3Lab-Request: 1`. A API não aceita um identificador de usuário em URL ou corpo como autorização.
+
+## Sessões e persistência
+
+A API emite um cookie anônimo HttpOnly e SameSite=Lax, sem `Max-Age`. Em produção, o cookie também é Secure. A sessão pode ser compartilhada por abas e recarregamentos do mesmo navegador. Não é uma conta, e perder o cookie impede recuperar os registros anônimos. A restauração de sessões pelo navegador pode manter cookies de sessão.
+
+O SQLite guarda favoritos e a última seleção com pesos. O registro do token expira após 30 dias de inatividade. Registros antigos da identidade Streamlit não são atribuídos a um novo visitante, e o banco existente não é apagado pela migração.
+
+Resultados pesados são temporários. O processo mantém até 32 contextos ativos e descarta contextos ociosos após duas horas ou sob pressão de capacidade. Uma solicitação em andamento protege seu contexto contra descarte. Após perda de resultados, a carteira salva pode ser restaurada; mudar a seleção exige uma nova análise.
+
+A API admite duas análises pesadas simultâneas. Uma terceira recebe uma resposta explícita de indisponibilidade. Simulação e notícias usam a carteira atual da sessão, não pesos enviados livremente pelo navegador.
+
+## Verificar alterações
+
+```bash
+PYTHONPATH=. pytest
+npm --prefix frontend run typecheck
+npm --prefix frontend run build
+```
+
+Os testes Python isolam o banco e as fontes de rede. Com a aplicação em execução, o smoke abaixo usa fontes reais e uma sessão independente.
+
+```bash
+python scripts/smoke_api.py --url http://localhost:3000
+```
+
+Ele executa portfólio, ambos os modelos de simulação, screener e fundamentos. Verifica os cinco CSVs, unidades numéricas, ordenação, acesso por outra sessão e rejeição de resultados desatualizados. Uma falha de fonte é uma falha do smoke, não um conjunto fictício de dados.
+
+A verificação visual cobre as cinco rotas nas larguras 375, 768, 1024 e 1440, além de teclado, foco, ícones visíveis, controles de 44px, tabelas com rolagem interna e movimento reduzido.
+
+## Estrutura
+
+```text
+backend/                  API, sessão e serviços por domínio
+frontend/app/             Cinco páginas React e proxy de API
+frontend/components/      Navegação, estado e componentes compartilhados
+frontend/public/          Marca e ícones SVG
+utils/                    Fontes, cálculos financeiros, cache e SQLite
+scripts/smoke_api.py       Verificação HTTP com fontes reais
+run.py                    Launcher dos dois processos
+requirements*.txt         Dependências Python
+```
+
+O frontend não refaz cálculos financeiros. As unidades distinguem frações, pontos percentuais, múltiplos e valores monetários. Gráficos usam resultados calculados em Python e renderização Plotly no navegador. A barra de ferramentas permite operações locais, sem envio de gráficos para a nuvem.
+
+## Contato
+
+Desenvolvido por Rafael Eiki Teruya. [rafael_teruya@usp.br](mailto:rafael_teruya@usp.br).

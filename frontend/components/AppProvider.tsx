@@ -1,0 +1,136 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { api } from "../lib/api";
+import { Icon, Loading, Notice } from "./ui";
+
+export type Stock = { ticker: string; company: string; sector: string };
+export type Session = {
+  selection: string[];
+  revision: number;
+  watchlist: string[];
+  portfolio_ready: boolean;
+  simulation_ready: boolean;
+  portfolio_id?: string | null;
+  restored: boolean;
+  restoration?: { original_count: number; invalid_count: number; truncated_count: number } | null;
+};
+export type SelectionUpdate = string[] | ((current: readonly string[]) => string[]);
+type AppContext = {
+  session: Session | null;
+  stocks: Stock[];
+  loading: boolean;
+  error: string | null;
+  setSelection: (tickers: SelectionUpdate) => Promise<void>;
+  refreshSession: () => Promise<void>;
+  toggleFavorite: (ticker: string) => Promise<void>;
+};
+const Context = createContext<AppContext | null>(null);
+let bootstrap: Promise<{ session: Session; stocks: Stock[] }> | null = null;
+
+function initialize() {
+  if (!bootstrap) {
+    bootstrap = api<Session>("/api/session").then(async session => {
+      const universe = await api<{ stocks: Stock[] }>("/api/universe");
+      return { session, stocks: universe.stocks };
+    }).catch(error => { bootstrap = null; throw error; });
+  }
+  return bootstrap;
+}
+
+export function useApp() {
+  const context = useContext(Context);
+  if (!context) throw new Error("B3Lab AppProvider is missing");
+  return context;
+}
+
+const navigation = [
+  { href: "/", label: "Fundamentos", icon: "home" },
+  { href: "/portfolio", label: "Portfólio", icon: "portfolio" },
+  { href: "/simulacao", label: "Simulação", icon: "simulation" },
+  { href: "/noticias", label: "Notícias", icon: "news" },
+  { href: "/screener", label: "Screener", icon: "filter" },
+];
+
+function Shell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const closeMenu = () => {
+    setOpen(false);
+    if (navRef.current?.contains(document.activeElement) && window.matchMedia("(max-width: 1023px)").matches) menuRef.current?.focus();
+  };
+  useEffect(() => {
+    setOpen(false);
+    if (navRef.current?.contains(document.activeElement) && window.matchMedia("(max-width: 1023px)").matches) menuRef.current?.focus();
+  }, [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      if (navRef.current?.contains(event.target as Node)) menuRef.current?.focus();
+    };
+    document.addEventListener("keydown", onEscape);
+    return () => document.removeEventListener("keydown", onEscape);
+  }, [open]);
+  return <div className="app-shell">
+    <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
+    <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></header>
+    <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
+      <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
+      <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>
+      <p className="sidebar-note">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</p>
+    </aside>
+    <main id="conteudo" className="main-content">{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></main>
+  </div>;
+}
+
+export default function AppProvider({ children }: { children: ReactNode }) {
+  const [current, setCurrent] = useState<Session | null>(null);
+  const [stocks, setStocks] = useState<Stock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const sessionRef = useRef<Session | null>(null);
+  const queue = useRef(Promise.resolve());
+  const enqueue = useCallback((operation: () => Promise<void>) => {
+    const next = queue.current.then(operation);
+    queue.current = next.catch(() => {});
+    return next;
+  }, []);
+  const accept = useCallback((value: Session) => { sessionRef.current = value; setCurrent(value); }, []);
+  useEffect(() => {
+    let active = true;
+    initialize().then(value => {
+      if (active) { accept(value.session); setStocks(value.stocks); setLoading(false); }
+    }).catch(reason => { if (active) { setError(reason instanceof Error ? reason.message : String(reason)); setLoading(false); } });
+    return () => { active = false; };
+  }, [accept]);
+  const refreshSession = useCallback(() => enqueue(async () => {
+    accept(await api<Session>("/api/session"));
+  }), [accept, enqueue]);
+  const setSelection = useCallback((update: SelectionUpdate) => enqueue(async () => {
+    const state = sessionRef.current;
+    if (!state) throw new Error("A sessão ainda não foi carregada.");
+    const tickers = typeof update === "function" ? update(state.selection) : update;
+    accept(await api<Session>("/api/session/selection", { tickers, revision: state.revision }, "PUT"));
+  }), [accept, enqueue]);
+  const toggleFavorite = useCallback((ticker: string) => enqueue(async () => {
+    const state = sessionRef.current;
+    if (!state) throw new Error("A sessão ainda não foi carregada.");
+    const result = await api<{ watchlist: string[] }>(`/api/watchlist/${encodeURIComponent(ticker)}`, undefined, state.watchlist.includes(ticker) ? "DELETE" : "PUT");
+    accept({ ...state, watchlist: result.watchlist });
+  }), [accept, enqueue]);
+  async function retry() {
+    setLoading(true); setError(null); bootstrap = null;
+    try { const value = await initialize(); accept(value.session); setStocks(value.stocks); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setLoading(false); }
+  }
+  return <Context value={{ session: current, stocks, loading, error, setSelection, refreshSession, toggleFavorite }}>
+    <Shell>{loading ? <Loading>Carregando a sessão e a lista de ativos.</Loading> : error ? <Notice tone="negative">{error}<button onClick={retry}>Tentar novamente</button></Notice> : children}</Shell>
+  </Context>;
+}

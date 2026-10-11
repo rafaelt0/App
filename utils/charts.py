@@ -3,20 +3,21 @@ from typing import Final
 import plotly.graph_objects as go
 
 
-CHART_PRIMARY: Final = "#76d5c5"
-CHART_SECONDARY: Final = "#91b9e7"
-CHART_ACCENT: Final = "#e7bd69"
-CHART_DANGER: Final = "#ef969d"
-CHART_INFO: Final = "#b7a3e2"
-CHART_TEXT: Final = "#eef4f2"
-CHART_MUTED: Final = "#9cafae"
-CHART_GRID: Final = "#63787c"
-CHART_BORDER: Final = "#33464a"
-CHART_SURFACE: Final = "#142126"
-CHART_SECONDARY_FILL: Final = "rgba(145, 185, 231, 0.14)"
-CHART_SECONDARY_FILL_STRONG: Final = "rgba(145, 185, 231, 0.24)"
-CHART_DANGER_FILL: Final = "rgba(239, 150, 157, 0.16)"
-CHART_INFO_FILL: Final = "rgba(183, 163, 226, 0.12)"
+CHART_PRIMARY: Final = "#8b93ff"
+CHART_SECONDARY: Final = "#4cc9f0"
+CHART_ACCENT: Final = "#f5b544"
+CHART_DANGER: Final = "#f2757a"
+CHART_INFO: Final = "#e879c6"
+CHART_POSITIVE: Final = "#3ecf8e"
+CHART_TEXT: Final = "#f3f5f9"
+CHART_MUTED: Final = "#9aa2b4"
+CHART_GRID: Final = "#646e88"
+CHART_BORDER: Final = "#2b313d"
+CHART_SURFACE: Final = "#161a22"
+CHART_SECONDARY_FILL: Final = "rgba(76, 201, 240, 0.14)"
+CHART_SECONDARY_FILL_STRONG: Final = "rgba(76, 201, 240, 0.24)"
+CHART_DANGER_FILL: Final = "rgba(242, 117, 122, 0.16)"
+CHART_INFO_FILL: Final = "rgba(232, 121, 198, 0.12)"
 CHART_COLORWAY: Final = (
     CHART_PRIMARY,
     CHART_SECONDARY,
@@ -33,7 +34,7 @@ def apply_plotly_theme(fig: go.Figure) -> go.Figure:
         plot_bgcolor=CHART_SURFACE,
         colorway=CHART_COLORWAY,
         font=dict(
-            family='-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            family='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
             color=CHART_TEXT,
         ),
         xaxis=dict(
@@ -41,7 +42,7 @@ def apply_plotly_theme(fig: go.Figure) -> go.Figure:
             linecolor=CHART_BORDER,
             zerolinecolor=CHART_GRID,
             tickfont=dict(
-                family='"SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace',
+                family='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
                 color=CHART_MUTED,
             ),
         ),
@@ -50,7 +51,7 @@ def apply_plotly_theme(fig: go.Figure) -> go.Figure:
             linecolor=CHART_BORDER,
             zerolinecolor=CHART_GRID,
             tickfont=dict(
-                family='"SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace',
+                family='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
                 color=CHART_MUTED,
             ),
         ),

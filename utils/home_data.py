@@ -1,4 +1,4 @@
-"""Cached data-fetching + sector-comparison helpers shared by Main_Page.py."""
+"""Fundamentus sources and sector-relative fundamental calculations."""
 
 import logging
 import time
@@ -6,11 +6,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 import fundamentus
 import pandas as pd
-import streamlit as st
-import yfinance as yf
+from utils.cache import cache_data
 
 from utils import db as _db
-from utils.charts import CHART_ACCENT, CHART_DANGER, CHART_MUTED, CHART_PRIMARY
+from utils.charts import CHART_ACCENT, CHART_DANGER, CHART_MUTED, CHART_POSITIVE
 from utils.market_data import (
     FUNDAMENTUS_REQUEST_LOCK,
     clean_numeric_column,
@@ -160,7 +159,7 @@ def build_analyst_synthesis(
     if categories_valid < 2:
         verdict, color = "DADOS INSUFICIENTES", CHART_MUTED
     elif positive_categories >= 2 and positive_categories > negative_categories:
-        verdict, color = "ATRATIVO", CHART_PRIMARY
+        verdict, color = "ATRATIVO", CHART_POSITIVE
     elif negative_categories >= 2 and negative_categories > positive_categories:
         verdict, color = "FRACO", CHART_DANGER
     else:
@@ -179,7 +178,7 @@ def build_analyst_synthesis(
     }
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_data(ttl=3600)
 def get_fundamentus_data(tickers):
     """Busca dados fundamentalistas com SQLite cache (4h) + retry automático."""
     cache_key = f"fund_{'_'.join(sorted(tickers))}"
@@ -221,173 +220,17 @@ def get_fundamentus_data(tickers):
 
 
 def clear_fundamentus_cache() -> int:
-    """Clear both Streamlit and persistent Fundamentus caches."""
+    """Clear process and persistent Fundamentus caches."""
     get_fundamentus_data.clear()
     get_full_market_data.clear()
     get_sector_peers.clear()
     return _db.cache_clear_prefix("fund_")
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_yfinance_data(tickers_yf, start, interval):
-    """Busca cotações do Yahoo Finance com retry automático."""
-    import datetime
 
-    today = datetime.date.today()
-    for attempt in range(3):
-        try:
-            return yf.download(
-                tickers_yf,
-                start=start,
-                end=today,
-                interval=interval,
-                auto_adjust=True,
-            )["Close"]
-        except OSError:
-            if attempt < 2:
-                time.sleep(1)
-                continue
-            raise
-
-
-@st.cache_data(ttl=14400, show_spinner=False)
-def get_hist_fundamentals(ticker_sa: str):
-    """Fetch annual income statement + balance sheet from yfinance (4h cache)."""
-    t_yf = yf.Ticker(ticker_sa)
-    out = {}
-    try:
-        fin = t_yf.financials
-        if fin is not None and not fin.empty:
-            out["fin"] = fin.to_json()
-    except Exception:
-        logger.debug("get_hist_fundamentals financials fetch failed for %s", ticker_sa, exc_info=True)
-    try:
-        bs = t_yf.balance_sheet
-        if bs is not None and not bs.empty:
-            out["bs"] = bs.to_json()
-    except Exception:
-        logger.debug("get_hist_fundamentals balance_sheet fetch failed for %s", ticker_sa, exc_info=True)
-    return out
-
-
-def _hist_parse(json_str):
-    """Parse a yfinance JSON financials/balance-sheet string into a year-indexed DataFrame."""
-    df_p = pd.read_json(json_str)
-    try:
-        df_p.columns = pd.to_datetime(df_p.columns.astype("int64"), unit="ms").year
-    except Exception:
-        logger.debug("_hist_parse ms-epoch column parse failed, trying fallback", exc_info=True)
-        try:
-            df_p.columns = pd.to_datetime(df_p.columns).year
-        except Exception:
-            logger.debug("_hist_parse fallback column parse failed", exc_info=True)
-    return df_p
-
-
-def _hist_row(df_p, *keys):
-    """Return the first matching row from df_p by trying each key in order."""
-    for k in keys:
-        if k in df_p.index:
-            return df_p.loc[k]
-    return None
-
-
-def build_hist_df(tkr: str):
-    """Returns a DataFrame indexed by year with Receita, Lucro, Margens, ROE."""
-    raw = get_hist_fundamentals(tkr + ".SA")
-    if not raw:
-        return None
-
-    fin_df = bs_df = None
-    if "fin" in raw:
-        try:
-            fin_df = _hist_parse(raw["fin"])
-        except Exception:
-            logger.debug("build_hist_df fin parse failed for %s", tkr, exc_info=True)
-    if "bs" in raw:
-        try:
-            bs_df = _hist_parse(raw["bs"])
-        except Exception:
-            logger.debug("build_hist_df bs parse failed for %s", tkr, exc_info=True)
-
-    records = {}
-
-    if fin_df is not None:
-        rev = _hist_row(fin_df, "Total Revenue", "Revenue")
-        ni = _hist_row(
-            fin_df,
-            "Net Income",
-            "Net Income Common Stockholders",
-            "Net Income Applicable To Common Shares",
-            "Net Income Including Noncontrolling Interests",
-        )
-        eb = _hist_row(fin_df, "EBIT", "Operating Income", "Ebit")
-
-        for y in sorted(fin_df.columns.tolist()):
-            y = int(y)
-            rec = records.setdefault(y, {})
-            r_v = (
-                float(rev[y])
-                if (rev is not None and y in rev.index and pd.notna(rev[y]))
-                else None
-            )
-            n_v = (
-                float(ni[y])
-                if (ni is not None and y in ni.index and pd.notna(ni[y]))
-                else None
-            )
-            e_v = (
-                float(eb[y])
-                if (eb is not None and y in eb.index and pd.notna(eb[y]))
-                else None
-            )
-            if r_v is not None:
-                rec["Receita"] = r_v
-            if n_v is not None:
-                rec["Lucro Líquido"] = n_v
-            if r_v and n_v is not None and abs(r_v) > 0:
-                rec["Margem Líquida (%)"] = n_v / r_v * 100
-            if r_v and e_v is not None and abs(r_v) > 0:
-                rec["Margem EBIT (%)"] = e_v / r_v * 100
-
-    if bs_df is not None and fin_df is not None:
-        eq = _hist_row(
-            bs_df,
-            "Stockholders Equity",
-            "Common Stock Equity",
-            "Total Stockholder Equity",
-            "Total Equity Gross Minority Interest",
-        )
-        ni = _hist_row(
-            fin_df,
-            "Net Income",
-            "Net Income Common Stockholders",
-            "Net Income Applicable To Common Shares",
-            "Net Income Including Noncontrolling Interests",
-        )
-        if eq is not None and ni is not None:
-            for y in sorted(bs_df.columns.tolist()):
-                y = int(y)
-                e_v = float(eq[y]) if y in eq.index and pd.notna(eq[y]) else None
-                n_v = float(ni[y]) if y in ni.index and pd.notna(ni[y]) else None
-                if e_v and n_v is not None and abs(e_v) > 0:
-                    records.setdefault(y, {})["ROE (%)"] = n_v / e_v * 100
-
-    if not records:
-        return None
-    df_h = pd.DataFrame(records).T.sort_index()
-    df_h.index.name = "Ano"
-    return df_h
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_sector_peers(_setores):
-    """Busca todos os tickers listados no fundamentus e mapeia colunas para identificadores internos.
-
-    O argumento ``_setores`` é recebido (como tupla) apenas para que o Streamlit inclua o setor
-    na chave de cache; os dados retornados cobrem toda a B3 para permitir filtragem posterior
-    por setor individual sem chamadas extras à API.
-    """
+@cache_data(ttl=3600)
+def get_sector_peers():
+    """Fetch the whole-market snapshot; ranking applies sector membership."""
     try:
         raw = get_full_market_data()
         df2 = pd.DataFrame(index=raw.index)

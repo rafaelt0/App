@@ -1,0 +1,3 @@
+[Design direction recorded] toward a less-flat B3Lab research workflow. You need: ledger 4/4 done; report exists at `.omo/evidence/b3lab-ui-redesign/audit/design-direction.md`, citations rechecked, and no product/test file was changed by this task. Now: None. Next: None.
+
+Recommended: **Layered Research Desk**—tonal paper layers and analytical grouping, not shadow/glow elevation. The report also documents the alternate direction, trade-offs, and three current CSS conflicts.

@@ -1,6 +1,4 @@
-"""Pure formatting/lookup helpers shared by the Streamlit pages — no st.* calls,
-so these are safe to unit-test without a Streamlit runtime.
-"""
+"""Framework-independent numerical parsing and financial lookup helpers."""
 
 import pandas as pd
 

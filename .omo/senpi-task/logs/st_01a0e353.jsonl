@@ -1,0 +1,4 @@
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"running","residency_state":"resident"}}
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"error","residency_state":"resident"}}
+{"type":"task_start_failed","payload":{"error_message":"The task child cannot serve this model: its provider is not present in the child profile.","failure_kind":"model_unavailable","failure_reason":"model_not_in_child_profile"}}
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"error","residency_state":"disposed"}}

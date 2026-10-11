@@ -9,8 +9,10 @@ __pycache__/
 venv/
 env/
 
-# Streamlit
+# Local secrets
 .streamlit/secrets.toml
+.env
+.env.*
 
 # SQLite runtime database
 *.db
@@ -41,3 +43,8 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Next.js runtime artifacts
+node_modules/
+.next/
+*.tsbuildinfo
