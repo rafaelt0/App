@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import "./screener.css";
 import { useApp } from "../../components/AppProvider";
-import { ExportButton, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
+import { ExportButton, Icon, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
 import { refreshFundamentus } from "../../lib/home";
 import { applyPreset, canonicalCriteria, defaults, editControl, queryScreener, screenerConfig } from "../../lib/screener";
 import type { Config, Controls, Result, Sort } from "../../lib/screener";
@@ -77,42 +78,84 @@ export default function ScreenerPage() {
   function edit<K extends keyof Controls>(key:K,value:Controls[K]) {setControls(current=>editControl(current,key,value));}
   if(loading || !session)return <><PageHeader title="Screener de ações" description="Explore ações da B3 com critérios claros e ajustáveis." icon="filter"/>{appError ? <Notice tone="negative">{appError}<button onClick={()=>void refreshSession()}>Tentar novamente</button></Notice>:<Loading/>}</>;
   const selectedCurrent=selected && result?.rows.some(row=>row.ticker===selected) ? selected:null;
+  const preset=config?.presets.find(item=>item.name===controls.preset);
+  const plInvalid=controls.pl_enabled && controls.pl_min>controls.pl_max;
+  const criterionState=(enabled:boolean)=><span className="scr-state">{enabled ? "Ativo":"Inativo"}</span>;
+  const liquidity=controls.liq2m_min.toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+  const columnCount=visible?.length ?? 0;
   return <>
     <PageHeader title="Screener de ações" description="Explore ações listadas na B3 com critérios claros e ajustáveis. Dados da Fundamentus; consulte a coleta exibida abaixo." icon="filter"/>
     {notice && <Notice tone="positive">{notice}</Notice>}
-    <div className="page-columns"><aside className="panel">
-      <label>Ponto de partida<select value={controls.preset} onChange={event=>{const preset=config?.presets.find(item=>item.name===event.target.value);if(preset)setControls(current=>applyPreset(current,preset.name,preset.criteria));}}>{config?.presets.map(preset=><option key={preset.name}>{preset.name}</option>)}</select></label>
-      <p>{config?.presets.find(preset=>preset.name===controls.preset)?.description}</p>
-      <button onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button>
-      <h2>Personalize critérios</h2>
-      <fieldset><legend>Valuation</legend><label><input type="checkbox" checked={controls.pl_enabled} onChange={event=>edit("pl_enabled",event.target.checked)}/>Aplicar faixa de P/L</label>
-        <label>P/L mínimo<input type="number" min={-50} max={200} step={.5} value={controls.pl_min} disabled={!controls.pl_enabled} onChange={event=>edit("pl_min",event.target.valueAsNumber)}/></label>
-        <label>P/L máximo<input type="number" min={-50} max={200} step={.5} value={controls.pl_max} disabled={!controls.pl_enabled} onChange={event=>edit("pl_max",event.target.valueAsNumber)}/></label>
-        {controls.pl_enabled && controls.pl_min_exclusive && <p>Mínimo exclusivo: P/L &gt; {controls.pl_min}. Editar o mínimo torna a comparação inclusiva.</p>}
-      </fieldset>
-      <fieldset><legend>Qualidade</legend><label><input type="checkbox" checked={controls.roe_enabled} onChange={event=>edit("roe_enabled",event.target.checked)}/>Aplicar ROE mínimo</label><label>ROE mínimo (%)<input type="number" min={0} max={80} step={1} value={controls.roe_min} disabled={!controls.roe_enabled} onChange={event=>edit("roe_min",event.target.valueAsNumber)}/></label></fieldset>
-      <fieldset><legend>Crescimento</legend><label><input type="checkbox" checked={controls.c5y_enabled} onChange={event=>edit("c5y_enabled",event.target.checked)}/>Aplicar crescimento da receita (5 anos)</label><label>Crescimento mínimo (%)<input type="number" min={0} max={100} step={1} value={controls.c5y_min} disabled={!controls.c5y_enabled} onChange={event=>edit("c5y_min",event.target.valueAsNumber)}/></label></fieldset>
-      <fieldset><legend>Dividendos</legend><label><input type="checkbox" checked={controls.dy_enabled} onChange={event=>edit("dy_enabled",event.target.checked)}/>Aplicar dividend yield mínimo</label><label>Dividend yield mínimo (%)<input type="number" min={0} max={30} step={.5} value={controls.dy_min} disabled={!controls.dy_enabled} onChange={event=>edit("dy_min",event.target.valueAsNumber)}/></label></fieldset>
-      <fieldset><legend>Liquidez</legend><label><input type="checkbox" checked={controls.liq2m_enabled} onChange={event=>edit("liq2m_enabled",event.target.checked)}/>Aplicar liquidez mínima</label><label>Liquidez média 2 meses mínima (R$)<input type="range" min={0} max={100000000} step={100000} value={controls.liq2m_min} disabled={!controls.liq2m_enabled} onChange={event=>edit("liq2m_min",event.target.valueAsNumber)}/><output>{(controls.liq2m_min/1000000).toLocaleString("pt-BR")} {controls.liq2m_min===1000000 ? "milhão":"milhões"}</output></label></fieldset>
-      <label>Ordenar resultados<select value={sort.field} onChange={event=>{const value=config?.sorts.find(option=>option.field===event.target.value);if(value)setSort(value);}}>{config?.sorts.map(option=><option key={option.field} value={option.field}>{option.label}</option>)}</select></label>
-      <button disabled={actionBusy} onClick={()=>void sourceRefresh()}>Atualizar dados Fundamentus</button>
-    </aside><div>
-      {(busy || actionBusy || !config) && !error && <Loading>Carregando dados da B3…</Loading>}
-      {error && <Notice tone="negative">{error}<button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button></Notice>}
+    <section className="task-panel scr-filters" aria-labelledby="scr-filters-title">
+      <h2 className="ui-section-heading" id="scr-filters-title"><Icon name="filter"/>Critérios de seleção</h2>
+      <div className="controls-grid scr-top">
+        <label>Ponto de partida<select value={controls.preset} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config?.presets.map(item=><option key={item.name}>{item.name}</option>)}</select></label>
+        <label>Ordenar resultados<select value={sort.field} disabled={!config} onChange={event=>{const value=config?.sorts.find(option=>option.field===event.target.value);if(value)setSort(value);}}>{config?.sorts.map(option=><option key={option.field} value={option.field}>{option.label}</option>)}</select></label>
+      </div>
+      {preset?.description && <p className="caption scr-preset-note">{preset.description}</p>}
+      <div className="scr-criteria">
+        <fieldset className="scr-criterion" data-active={controls.pl_enabled}><legend>Valuation</legend>{criterionState(controls.pl_enabled)}
+          <label><input type="checkbox" checked={controls.pl_enabled} onChange={event=>edit("pl_enabled",event.target.checked)}/>Aplicar faixa de P/L</label>
+          <div className="scr-pair">
+            <label>P/L mínimo (×)<input type="number" inputMode="decimal" min={-50} max={200} step={.5} value={Number.isNaN(controls.pl_min) ? "":controls.pl_min} disabled={!controls.pl_enabled} aria-invalid={plInvalid} aria-describedby={plInvalid ? "scr-pl-error":undefined} onChange={event=>edit("pl_min",event.target.valueAsNumber)}/></label>
+            <label>P/L máximo (×)<input type="number" inputMode="decimal" min={-50} max={200} step={.5} value={Number.isNaN(controls.pl_max) ? "":controls.pl_max} disabled={!controls.pl_enabled} aria-invalid={plInvalid} aria-describedby={plInvalid ? "scr-pl-error":undefined} onChange={event=>edit("pl_max",event.target.valueAsNumber)}/></label>
+          </div>
+          {plInvalid && <p className="scr-field-error" id="scr-pl-error">⚠ O mínimo não pode ser maior que o máximo.</p>}
+          {controls.pl_enabled && controls.pl_min_exclusive && <p className="caption">Mínimo exclusivo: P/L &gt; {controls.pl_min}. Editar o mínimo torna a comparação inclusiva.</p>}
+        </fieldset>
+        <fieldset className="scr-criterion" data-active={controls.roe_enabled}><legend>Qualidade</legend>{criterionState(controls.roe_enabled)}
+          <label><input type="checkbox" checked={controls.roe_enabled} onChange={event=>edit("roe_enabled",event.target.checked)}/>Aplicar ROE mínimo</label>
+          <label>ROE mínimo (%)<input type="number" inputMode="decimal" min={0} max={80} step={1} value={Number.isNaN(controls.roe_min) ? "":controls.roe_min} disabled={!controls.roe_enabled} onChange={event=>edit("roe_min",event.target.valueAsNumber)}/></label>
+        </fieldset>
+        <fieldset className="scr-criterion" data-active={controls.c5y_enabled}><legend>Crescimento</legend>{criterionState(controls.c5y_enabled)}
+          <label><input type="checkbox" checked={controls.c5y_enabled} onChange={event=>edit("c5y_enabled",event.target.checked)}/>Aplicar crescimento da receita (5 anos)</label>
+          <label>Crescimento mínimo (%)<input type="number" inputMode="decimal" min={0} max={100} step={1} value={Number.isNaN(controls.c5y_min) ? "":controls.c5y_min} disabled={!controls.c5y_enabled} onChange={event=>edit("c5y_min",event.target.valueAsNumber)}/></label>
+        </fieldset>
+        <fieldset className="scr-criterion" data-active={controls.dy_enabled}><legend>Dividendos</legend>{criterionState(controls.dy_enabled)}
+          <label><input type="checkbox" checked={controls.dy_enabled} onChange={event=>edit("dy_enabled",event.target.checked)}/>Aplicar dividend yield mínimo</label>
+          <label>Dividend yield mínimo (%)<input type="number" inputMode="decimal" min={0} max={30} step={.5} value={Number.isNaN(controls.dy_min) ? "":controls.dy_min} disabled={!controls.dy_enabled} onChange={event=>edit("dy_min",event.target.valueAsNumber)}/></label>
+        </fieldset>
+        <fieldset className="scr-criterion" data-active={controls.liq2m_enabled}><legend>Liquidez</legend>{criterionState(controls.liq2m_enabled)}
+          <label><input type="checkbox" checked={controls.liq2m_enabled} onChange={event=>edit("liq2m_enabled",event.target.checked)}/>Aplicar liquidez mínima</label>
+          <label>Liquidez média 2 meses mínima<input type="range" min={0} max={100000000} step={100000} value={Number.isNaN(controls.liq2m_min) ? 0:controls.liq2m_min} disabled={!controls.liq2m_enabled} onChange={event=>edit("liq2m_min",event.target.valueAsNumber)}/><output className="scr-output">{liquidity}</output></label>
+        </fieldset>
+      </div>
+      <div className="actions">
+        <button disabled={actionBusy} onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button>
+        <button disabled={actionBusy} onClick={()=>void sourceRefresh()}>{actionBusy ? "Atualizando…":"Atualizar dados Fundamentus"}</button>
+        <span className="caption">Os resultados são atualizados automaticamente ao alterar os critérios.</span>
+      </div>
+    </section>
+    <div className="scr-results" aria-busy={busy || actionBusy}>
+      {(busy || actionBusy || !config) && !error && <Loading>{actionBusy ? "Atualizando dados da Fundamentus…":"Carregando dados da B3…"}</Loading>}
+      {error && <Notice tone="negative"><strong>Não foi possível exibir os resultados.</strong> {error}{!plInvalid && <button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button>}</Notice>}
       {result && <Section title="Resultados">
-        <p>{result.matched_count} de {result.total_count} ativos correspondem aos filtros · {result.active_filters.join(" · ") || "sem critérios ativos"}</p>
-        <p>{result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")} · há ${result.age_minutes} min`:"Horário da coleta indisponível; a idade deste dado não pode ser confirmada."}</p>
-        <Metrics items={[{label:"Ações correspondentes",value:result.matched_count,unit:"integer"},{label:"DY médio",value:result.metrics.mean_dy,unit:"percent",digits:2},{label:"ROE médio",value:result.metrics.mean_roe,unit:"percent",digits:2}]}/>
-        {!result.matched_count ? <Notice tone="warning">Nenhuma ação encontrada. Reduza os limites ou desative critérios; dados ausentes não são considerados aprovação.</Notice>:<>
-          <fieldset className="checkbox-group"><legend>Colunas exibidas</legend><div className="checkbox-group-options">{result.available_columns.map(column=><label key={column.key}><input type="checkbox" checked={visible?.includes(column.key) ?? false} onChange={event=>setVisible(current=>{const next=new Set(current ?? []);if(event.target.checked)next.add(column.key);else next.delete(column.key);return result.available_columns.map(item=>item.key).filter(key=>next.has(key));})}/>{column.label}</label>)}</div></fieldset>
-          <p>Selecione uma linha para abrir a análise de preço-alvo ou gerenciar favoritos. As colunas exibidas não alteram a seleção nem o CSV.</p>
-          {selectedCurrent && <div className="panel"><strong>Ação selecionada: {selectedCurrent}</strong><div className="actions"><button disabled={actionBusy} onClick={()=>void handoff()}>Ver preço-alvo</button><button disabled={actionBusy} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favoritado":"☆ Favoritar"}</button></div><p>Abrir Home substitui a seleção; clique em Analisar para buscar fundamentos e consenso.</p></div>}
-          <Table columns={[{key:"ticker",label:"Papel"},...result.available_columns.filter(column=>visible?.includes(column.key))]} rows={result.rows.slice(0,limit)} rowKey="ticker" selectedKey={selectedCurrent ?? undefined} onSelect={row=>setSelected(String(row.ticker))}/>
-          {result.rows.length>limit ? <button onClick={()=>setLimit(previous=>previous+25)}>Ver mais {Math.min(25,result.rows.length-limit)} ações ({result.rows.length-limit} restantes)</button>:result.rows.length>25 ? <p className="caption">Todas as {result.rows.length} ações exibidas.</p>:null}
-          <ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados como CSV</ExportButton>
+        <Metrics items={[{label:"Ações correspondentes",value:result.matched_count,unit:"integer",help:`de ${result.total_count} ativos analisados`},{label:"DY médio",value:result.metrics.mean_dy,unit:"percent",digits:2},{label:"ROE médio",value:result.metrics.mean_roe,unit:"percent",digits:2}]}/>
+        <div className="scr-summary">
+          <p className="scr-chips-label">Critérios ativos:</p>
+          {result.active_filters.length ? <ul className="scr-chips" aria-label="Critérios ativos">{result.active_filters.map(filter=><li key={filter}>{filter}</li>)}</ul>:<span className="caption">Nenhum critério ativo; todos os ativos são exibidos.</span>}
+          <p className="caption">{result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")} · há ${result.age_minutes} min`:"Horário da coleta indisponível; a idade deste dado não pode ser confirmada."}</p>
+        </div>
+        {!result.matched_count ? <div className="empty-state-card"><Icon name="filter"/><h3 className="empty-state-title">Nenhuma ação encontrada</h3><div className="empty-state-message">Reduza os limites ou desative critérios. Dados ausentes não são considerados aprovação.</div><button onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button></div>:<>
+          <fieldset className="checkbox-group scr-columns"><legend>Colunas exibidas ({columnCount} de {result.available_columns.length})</legend><div className="checkbox-group-options">{result.available_columns.map(column=><label key={column.key}><input type="checkbox" checked={visible?.includes(column.key) ?? false} onChange={event=>setVisible(current=>{const next=new Set(current ?? []);if(event.target.checked)next.add(column.key);else next.delete(column.key);return result.available_columns.map(item=>item.key).filter(key=>next.has(key));})}/>{column.label}</label>)}</div></fieldset>
+          <div className="scr-selection" role="region" aria-label="Ação selecionada" aria-live="polite">
+            {selectedCurrent ? <>
+              <strong>Ação selecionada: {selectedCurrent}</strong>
+              <div className="actions"><button className="primary" disabled={actionBusy} onClick={()=>void handoff()}>Ver preço-alvo</button><button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favoritado":"☆ Favoritar"}</button><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
+              <p className="caption">Abrir Home substitui a seleção; clique em Analisar para buscar fundamentos e consenso.</p>
+            </>:<>
+              <p className="caption">Selecione uma linha para abrir a análise de preço-alvo ou gerenciar favoritos. As colunas exibidas não alteram a seleção nem o CSV.</p>
+              <div className="actions"><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
+            </>}
+          </div>
+          <div className="scr-table">
+            <Table columns={[{key:"ticker",label:"Papel"},...result.available_columns.filter(column=>visible?.includes(column.key))]} rows={result.rows.slice(0,limit)} rowKey="ticker" selectedKey={selectedCurrent ?? undefined} onSelect={row=>setSelected(String(row.ticker))}/>
+          </div>
+          <p className="caption" role="status">Exibindo {Math.min(limit,result.rows.length)} de {result.rows.length} ações.</p>
+          {result.rows.length>limit && <button onClick={()=>setLimit(previous=>previous+25)}>Ver mais {Math.min(25,result.rows.length-limit)} ações ({result.rows.length-limit} restantes)</button>}
         </>}
       </Section>}
-    </div></div>
-    <hr/><p>Fonte: Fundamentus (fundamentus.com.br). Dados com atraso. Esta triagem não é recomendação de investimento; verifique os indicadores e faça sua própria análise.</p>
+    </div>
+    <hr/><p className="caption">Fonte: Fundamentus (fundamentus.com.br). Dados com atraso. Esta triagem não é recomendação de investimento; verifique os indicadores e faça sua própria análise.</p>
   </>;
 }
