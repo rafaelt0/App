@@ -49,6 +49,34 @@ Measured contrast: muted text is 6.81:1 on panel; every accent is at least
 colors paired with a sign, label, or icon. Never use `--brand-primary` to mean
 "positive"; use `--brand-positive` / `CHART_POSITIVE`.
 
+### Indigo ramp
+
+The indigo ramp in `frontend/app/globals.css` runs from light `50` to dark
+`950`. The existing brand color is `--indigo-400`. Use semantic tokens in
+components so primary states and selected surfaces share the same shades.
+
+| Token | Value | Current role |
+|---|---|---|
+| `--indigo-50` | `#F1F2FF` | Lightest shade |
+| `--indigo-100` | `#E1E3FF` | Light shade |
+| `--indigo-200` | `#BEC3FF` | Light shade |
+| `--indigo-300` | `#A8AFFF` | `--brand-primary-hover` |
+| `--indigo-400` | `#8B93FF` | `--brand-primary` |
+| `--indigo-500` | `#7078E8` | `--brand-primary-active`, pressed primary actions |
+| `--indigo-600` | `#565FC8` | Dark shade |
+| `--indigo-700` | `#444CA3` | `--brand-primary-border`, decorative icon borders |
+| `--indigo-800` | `#343B78` | Dark shade |
+| `--indigo-900` | `#282E57` | Dark shade |
+| `--indigo-950` | `#252A41` | `--brand-primary-surface`, selected backgrounds and icon tiles |
+
+Primary buttons and links use `--text-on-primary` in their default, hover,
+and pressed states. Their text contrast is 6.99:1, 9.28:1, and 5.02:1,
+respectively. Indigo icons on the selected surface have 5.19:1 contrast.
+Keep input outlines and focus rings on `--brand-primary`. The darker ramp
+shades are fills and decorative borders; check contrast before using them
+for text or control outlines. Keep selection labels, borders, and
+`aria-current` or `aria-pressed` alongside the selected background.
+
 ## Typography
 
 | Role | Font | Size | Weight | Line height |

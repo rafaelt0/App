@@ -50,6 +50,13 @@ shadows, and color-only status indicators.
 
 All pages share the indigo accent; wayfinding comes from icon, title, and the active navigation link.
 
+The indigo ramp uses `--indigo-50` through `--indigo-950`, with the original
+`#8b93ff` at `--indigo-400`. Primary actions use `--brand-primary`,
+`--brand-primary-hover`, and `--brand-primary-active`. Selected backgrounds
+use `--brand-primary-surface`; decorative icon borders use
+`--brand-primary-border`. The [indigo ramp reference](../DESIGN.md#indigo-ramp)
+lists every shade and its contrast constraints.
+
 ## Typography
 
 | Role | Font | Weight | Size |
