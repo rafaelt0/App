@@ -30,6 +30,8 @@ const iconAssets: Record<string, string> = {
 const paths: Record<string, string> = {
   chart: "M3 20V4m0 16h18M6 16V9m6 7V5m6 11v-6",
   menu: "M3 6h18M3 12h18M3 18h18",
+  "panel-close": "M4 5h16v14H4zM9 5v14m7-9-2 2 2 2",
+  "panel-open": "M4 5h16v14H4zM9 5v14m5-9 2 2-2 2",
 };
 export function Icon({ name = "chart" }: { name?: string }) {
   if (Object.hasOwn(iconAssets, name)) return <span className="app-icon" aria-hidden="true" style={{ maskImage: `url("${iconAssets[name]}")` }} />;
