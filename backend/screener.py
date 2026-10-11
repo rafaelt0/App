@@ -27,10 +27,11 @@ DEFAULT_COLUMNS = ["cotacao", "pl", "pvp", "dy", "roe", "roic", "evebitda", "liq
 DESCRIPTIONS = {
     "Explorar B3": "Liquidez média em 2 meses de pelo menos R$ 1 milhão.",
     "Lucro a preço moderado": "P/L > 0 e ≤ 15, ROE ≥ 12% e liquidez ≥ R$ 1 milhão.",
-    "Renda atual": "Dividend yield ≥ 5%, ROE ≥ 10% e liquidez ≥ R$ 1 milhão. DY passado não garante dividendos futuros.",
-    "Qualidade rentável": "ROE ≥ 18%, 0 < P/L ≤ 20 e liquidez ≥ R$ 2 milhões.",
-    "Alta liquidez": "Liquidez média em 2 meses ≥ R$ 10 milhões; sem outros critérios.",
-    "Crescimento com lucro": "Receita em 5 anos ≥ 10%, ROE ≥ 12% e liquidez ≥ R$ 1 milhão.",
+    "Dividendos sustentáveis": "DY ≥ 6%, 0 < P/L ≤ 15, ROE ≥ 10% e liquidez ≥ R$ 1 milhão. O teto de P/L e o ROE evitam yield inflado por queda de preço ou lucro fraco; DY passado não garante dividendos futuros.",
+    "Valor descontado": "0 < P/L ≤ 8, ROE ≥ 12% e liquidez ≥ R$ 2 milhões. Empresas cíclicas costumam aparecer com P/L baixo no pico do ciclo; confira a sustentabilidade do lucro.",
+    "Qualidade rentável": "ROE ≥ 18%, 0 < P/L ≤ 20 e liquidez ≥ R$ 2 milhões. ROE alto pode refletir alavancagem.",
+    "Crescimento a preço razoável": "Receita em 5 anos ≥ 10%, ROE ≥ 15%, 0 < P/L ≤ 20 e liquidez ≥ R$ 2 milhões. Mede crescimento de receita, não de lucro.",
+    "Grandes e líquidas": "Liquidez média em 2 meses ≥ R$ 20 milhões, ROE ≥ 10% e 0 < P/L ≤ 25: papéis de grande negociação com lucro positivo.",
     "Personalizado": "Escolha explicitamente quais critérios aplicar.",
 }
 SORTS = [{"field": "liq2m", "direction": "desc", "label": "Liquidez 2m"},

@@ -12,10 +12,20 @@ PRESET_FILTERS = {
         "roe_min": 0.12,
         "liq2m_min": 1_000_000,
     },
-    "Renda atual": {
-        "dy_min": 0.05,
+    "Dividendos sustentáveis": {
+        "dy_min": 0.06,
+        "pl_min": 0,
+        "pl_min_exclusive": True,
+        "pl_max": 15,
         "roe_min": 0.10,
         "liq2m_min": 1_000_000,
+    },
+    "Valor descontado": {
+        "pl_min": 0,
+        "pl_min_exclusive": True,
+        "pl_max": 8,
+        "roe_min": 0.12,
+        "liq2m_min": 2_000_000,
     },
     "Qualidade rentável": {
         "pl_min": 0,
@@ -24,11 +34,20 @@ PRESET_FILTERS = {
         "roe_min": 0.18,
         "liq2m_min": 2_000_000,
     },
-    "Alta liquidez": {"liq2m_min": 10_000_000},
-    "Crescimento com lucro": {
+    "Crescimento a preço razoável": {
         "c5y_min": 0.10,
-        "roe_min": 0.12,
-        "liq2m_min": 1_000_000,
+        "pl_min": 0,
+        "pl_min_exclusive": True,
+        "pl_max": 20,
+        "roe_min": 0.15,
+        "liq2m_min": 2_000_000,
+    },
+    "Grandes e líquidas": {
+        "pl_min": 0,
+        "pl_min_exclusive": True,
+        "pl_max": 25,
+        "roe_min": 0.10,
+        "liq2m_min": 20_000_000,
     },
     "Personalizado": {},
 }
