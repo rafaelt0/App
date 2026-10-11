@@ -15,7 +15,7 @@ This directory is the maintained source for verifying B3Lab's user-facing behavi
 - The session is shared across pages. The selection made on one page is the selection on every page, and the server bumps `revision` on each change. Plan recipes in order: Portfólio must be loaded before Simulação and Notícias have anything to show.
 - Navigate the way a user does: `$V browser click "<Nav label>" --role link`. Use `browser open /route` only for the first page of a recipe or a deliberate deep link.
 - Address controls by visible label or button text, exactly as written here. They are Brazilian Portuguese, with accents.
-- After every action, `wait-text` for the resulting state instead of sleeping. Analyses take 1–10 s with warm caches. The first FinBERT load or a cold Yahoo fetch can take minutes, so pass `--timeout`.
+- After every action, `wait-text` for the resulting state instead of sleeping. Analyses take 1–10 s with warm caches. A cold Yahoo fetch can take minutes, so pass `--timeout`.
 - Reset between independent recipes with `Limpar carteira` on Portfólio, which deletes the saved portfolio and the selection. Or use a fresh run.
 
 ## Proof and skip reporting
@@ -44,4 +44,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Fundamentos](./fundamentos.md) covers ticker and sector selection, Analisar, fundamentals, consensus, favorites, and CSV export.
 - [Screener](./screener.md) covers presets, criteria, sorting, columns, row selection, the handoff to Fundamentos, favorites, and CSV export.
 - [Simulação](./simulacao.md) covers Monte Carlo runs on the loaded portfolio, presets, display-only trajectories, and two CSV exports.
-- [Notícias](./noticias.md) covers news for the loaded portfolio, the FinBERT or lexical engine, filters, pagination, and refresh.
+- [Notícias](./noticias.md) covers news for the loaded portfolio, the Jev or lexical engine, filters, pagination, and refresh.

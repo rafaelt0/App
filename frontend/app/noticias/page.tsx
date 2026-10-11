@@ -38,9 +38,9 @@ function Article({article}: {article: NewsArticle}) {
       <p className="news-item-meta">{article.provider || "Fonte não informada"} · {article.pub_time} · {article.engine} · Analisado: {article.text_source}</p>
       {article.summary && !article.summary.startsWith(article.title) && <p className="news-item-summary">{article.summary}</p>}
       <details className="news-model-details">
-        <summary>Detalhes do algoritmo PLN ({article.is_finbert ? "FinBERT-PT-BR" : "Léxico"} · score {decimal.format(article.score)})</summary>
-        {article.is_finbert ? <>
-          <p className="news-model-heading">Scores independentes (sigmoid) — FinBERT-PT-BR</p>
+        <summary>Detalhes do algoritmo PLN ({article.is_jev ? "Jev" : "Léxico"} · score {decimal.format(article.score)})</summary>
+        {article.is_jev ? <>
+          <p className="news-model-heading">Probabilidades — Jev</p>
           {([ ["POSITIVE", "Otimista", "positive"], ["NEGATIVE", "Pessimista", "negative"], ["NEUTRAL", "Neutro", "neutral"] ] as const).map(([label, name, state]) => {
             const score = article.scores.find(item => item.label === label)?.score ?? 0;
             return <div className="news-model-row" key={label}>
@@ -135,10 +135,10 @@ export default function NewsPage() {
         <div className="news-task-actions">
           <button className="primary" onClick={() => void execute(true)} disabled={busy}>{busy ? "Atualizando…" : "Atualizar notícias"}</button>
           {snapshot && <p className="news-asof">Amostra em {new Date(snapshot.as_of).toLocaleString("pt-BR")}</p>}
-          {snapshot && <p className={`news-engine ${snapshot.model.available ? "" : snapshot.articles.length ? "is-fallback" : "is-none"}`}>{snapshot.model.available ? "FinBERT-PT-BR disponível" : snapshot.articles.length ? "PLN Léxico (fallback)" : "Sem notícias classificadas"}</p>}
+          {snapshot && <p className={`news-engine ${snapshot.model.available ? "" : snapshot.articles.length ? "is-fallback" : "is-none"}`}>{snapshot.model.available ? "Jev disponível" : snapshot.articles.length ? "PLN Léxico (fallback)" : "Sem notícias classificadas"}</p>}
         </div>
       </section>}
-      {busy && <Loading>Buscando feeds e textos; classificando com FinBERT-PT-BR ou léxico quando indisponível…</Loading>}
+      {busy && <Loading>Buscando feeds e textos; classificando com Jev ou léxico quando indisponível…</Loading>}
       {snapshot && <>
         <div className="news-feed-status">{snapshot.feeds.map(feed => !feed.ok ? <Notice key={feed.ticker} tone="warning">Feed de notícias indisponível para {feed.ticker}; nenhum item foi usado na análise.</Notice> : !feed.recent_count ? <Notice key={feed.ticker}>Nenhuma notícia recente (últimos 7 dias) encontrada para {feed.ticker}.</Notice> : null)}</div>
         <Section title="Tom da amostra disponível">
@@ -171,7 +171,7 @@ export default function NewsPage() {
             <label>Filtrar por ativo<select value={filters.ticker} onChange={event => changeFilter("ticker", event.target.value)}><option value="Todos">Todos os ativos</option>{snapshot.tickers.map(ticker => <option key={ticker} value={ticker}>{ticker} ({snapshot.articles.filter(article => article.tickers.includes(ticker)).length} notícias)</option>)}</select></label>
             <label>Ordenar por<select value={filters.sort} onChange={event => changeFilter("sort", event.target.value)}>{sortModes.map(sort => <option key={sort}>{sort}</option>)}</select></label>
             <label>Filtrar por sentimento<select value={filters.sentiment} onChange={event => changeFilter("sentiment", event.target.value)}><option>Todos</option><option value="Otimista">Otimistas</option><option value="Neutro">Neutras</option><option value="Pessimista">Pessimistas</option></select></label>
-            <label>Filtrar por intensidade<select value={filters.intensity} onChange={event => changeFilter("intensity", event.target.value)}><option>Todos</option>{intensityLevels.filter(level => level !== "Evidência limitada" || snapshot.articles.some(article => !article.is_finbert)).map(level => <option key={level}>{level}</option>)}</select></label>
+            <label>Filtrar por intensidade<select value={filters.intensity} onChange={event => changeFilter("intensity", event.target.value)}><option>Todos</option>{intensityLevels.filter(level => level !== "Evidência limitada" || snapshot.articles.some(article => !article.is_jev)).map(level => <option key={level}>{level}</option>)}</select></label>
             <p className="news-help news-filters-note">Faixas de intensidade se baseiam no score, não em materialidade. No léxico, menos de dois termos implica evidência limitada.</p>
           </div>
           <div className="news-results" role="status" aria-live="polite">
@@ -191,7 +191,7 @@ export default function NewsPage() {
           <Table columns={[{key: "ticker", label: "Ativo"}, {key: "state", label: "Estado do feed"}, {key: "count", label: "Artigos", unit: "integer"}, {key: "positive", label: "+", unit: "integer"}, {key: "neutral", label: "0", unit: "integer"}, {key: "negative", label: "−", unit: "integer"}, {key: "signed_mean", label: "Média (−1 a +1)"}, {key: "covered_share", label: "% do peso coberto", unit: "fraction"}, {key: "signed_contribution", label: "Contribuição (pontos vs. 50)"}]}
             rows={snapshot.summary.tone.map(row => ({...row, signed_mean: row.mean === null ? null : signed.format(row.mean), signed_contribution: row.contribution === null ? null : signed.format(row.contribution)}))} rowKey="ticker" />
           <details><summary>Como é calculada a nota e a cobertura?</summary>
-            <p>Cada notícia recebe score entre −1 e +1. FinBERT usa sigmoid POSITIVE − NEGATIVE: scores independentes, não calibrados, que não somam 100%. O léxico usa (termos positivos − negativos) / total de termos encontrados; sem termos, score 0. As duas rotas não são medidas diretamente comparáveis.</p>
+            <p>Cada notícia recebe score entre −1 e +1. Jev usa probabilidade POSITIVE − NEGATIVE, com as três probabilidades somando 100%. O léxico usa (termos positivos − negativos) / total de termos encontrados; sem termos, score 0. As duas rotas não são medidas diretamente comparáveis.</p>
             <p>Para cada ativo calculamos a média simples das notícias, incluindo artigos compartilhados. Score coberto = Σ(peso × média do ativo) / Σ(pesos dos ativos com notícias). Cada peso entra uma vez, independentemente do número de notícias. Contribuição = 50 × peso/peso coberto × média; nota = int(50 + soma das contribuições), de 0 a 100. Ativos sem notícias são excluídos, não tratados como neutros; sem peso coberto não há nota.</p>
             <p>Cobertura = peso dos ativos com notícias / peso total, não confiança. Contagens e notas usam os dez artigos únicos mais recentes por ativo nos últimos sete dias UTC, sem datas futuras, antes dos filtros e paginação. Google e acesso aos publicadores podem limitar os resultados. Importância é triagem por palavras-chave.</p>
             <p>Atualizar notícias limpa os caches compartilhados de RSS e extração para todos os visitantes e libera nova tentativa de carregar o modelo; preserva o modelo já carregado e o cache de sentimento de uma hora, inclusive fallback de falhas individuais. Sem modelo, novas tentativas ocorrem após cinco minutos ou atualização explícita.</p>

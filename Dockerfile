@@ -18,16 +18,8 @@ COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
 COPY --from=frontend /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
-# FinBERT (torch + transformers) excede os 512 MB do plano gratuito do Render.
-# Sem ele, as notícias usam o fallback léxico identificado na interface.
-ARG WITH_FINBERT=0
 COPY requirements.txt ./
-RUN if [ "$WITH_FINBERT" = "1" ]; then \
-        pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt; \
-    else \
-        grep -Ev '^(torch|transformers)==' requirements.txt > requirements-deploy.txt && \
-        pip install -r requirements-deploy.txt; \
-    fi
+RUN pip install -r requirements.txt
 
 COPY . .
 COPY --from=frontend /app/frontend/.next ./frontend/.next

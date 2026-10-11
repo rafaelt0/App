@@ -1,6 +1,5 @@
 import datetime as dt
-import sys
-from types import SimpleNamespace
+import requests
 
 import pandas as pd
 import pytest
@@ -36,7 +35,7 @@ def isolated_caches(monkeypatch):
     caches = (news._fetch_brazilian_news, news.get_brazilian_news, news._cached_article_text, news._cached_sentiment)
     for cached in caches:
         cached.clear()
-    monkeypatch.setattr(news, "_model", None)
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     yield
     for cached in caches:
         cached.clear()
@@ -59,7 +58,6 @@ def test_shared_story_classified_once_and_weighted_per_asset(client, monkeypatch
         extracted.append(url)
         return ""
     monkeypatch.setattr(news, "_cached_article_text", extract)
-    monkeypatch.setattr(news, "load_finbert_pipeline", lambda ctx: None)
     response = client.post("/api/news/analyze", json={"revision": 0})
     assert response.status_code == 200
     data = response.json()
@@ -82,7 +80,7 @@ def test_feed_failure_empty_and_no_model_work_are_distinct(client, monkeypatch):
     monkeypatch.setattr(news, "get_brazilian_news", lambda ticker: {"ok": ticker != "PETR4", "items": []})
     def forbidden(*args):
         pytest.fail("Empty sample must not initialize model or extract publisher content")
-    monkeypatch.setattr(news, "load_finbert_pipeline", forbidden)
+    monkeypatch.setattr(news.requests, "post", forbidden)
     monkeypatch.setattr(news, "_cached_article_text", forbidden)
     data = client.post("/api/news/analyze", json={"revision": 0}).json()
     assert data["summary"]["score100"] is None
@@ -120,7 +118,6 @@ def test_cached_rss_rolling_cutoff_and_per_asset_ten_before_shared_merge(context
     context.portfolio.weights = {"PETR4": 1}
     monkeypatch.setattr(news, "get_brazilian_news", lambda ticker: {"ok": True, "items": entries})
     monkeypatch.setattr(news, "_cached_article_text", lambda url: "")
-    monkeypatch.setattr(news, "load_finbert_pipeline", lambda ctx: None)
     data = news.analyze_portfolio(context, context.portfolio)
     assert {article["link"] for article in data["articles"]} == {f"https://publisher.example/{index}" for index in range(10)}
     assert data["summary"]["counts"] == {"positive": 10, "neutral": 0, "negative": 0}
@@ -130,7 +127,6 @@ def test_zero_weight_stories_do_not_fabricate_neutral_portfolio_note(context, mo
     context.portfolio.weights = {"PETR4": 0, "VALE3": .5, "WEGE3": .5}
     monkeypatch.setattr(news, "get_brazilian_news", lambda ticker: {"ok": True, "items": [story("lucro", "https://publisher.example/one")] if ticker == "PETR4" else []})
     monkeypatch.setattr(news, "_cached_article_text", lambda url: "")
-    monkeypatch.setattr(news, "load_finbert_pipeline", lambda ctx: None)
     data = news.analyze_portfolio(context, context.portfolio)
     assert data["summary"]["counts"]["positive"] == 1
     assert data["summary"]["raw_score"] is None and data["summary"]["score100"] is None
@@ -139,64 +135,85 @@ def test_zero_weight_stories_do_not_fabricate_neutral_portfolio_note(context, mo
     assert data["articles"][0]["scores"] == []
 
 
-class Tokenizer:
-    def encode(self, text, add_special_tokens, truncation, max_length):
-        assert not add_special_tokens and truncation and max_length == 510
-        return text.split()[:max_length]
-    def decode(self, tokens, skip_special_tokens):
-        assert skip_special_tokens
-        return " ".join(tokens)
+def jev_response(positive=.399, negative=.2, neutral=.401):
+    response = requests.Response()
+    response.status_code = 200
+    import json
+    response._content = json.dumps({"answers": {"sentiment": {
+        "type": "choice", "probabilities": {
+            "POSITIVE": positive, "NEGATIVE": negative, "NEUTRAL": neutral,
+        },
+    }}}).encode()
+    return response
 
 
-class Classifier:
-    tokenizer = Tokenizer()
-    def __call__(self, texts):
-        assert len(texts[0].split()) == 510
-        return [[{"label": "POSITIVE", "score": .399}, {"label": "NEGATIVE", "score": .2}, {"label": "NEUTRAL", "score": .8}]]
-
-
-def test_finbert_independent_evidence_threshold_before_rounding_and_token_limit():
-    result = news.analise_sentimento_finbert("palavra " * 700, "", Classifier())
-    assert result["is_finbert"] is True
-    assert result["raw_text_length"] == 510
+def test_jev_request_threshold_before_rounding_and_cache(context, monkeypatch):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "server-secret")
+    calls = []
+    def post(url, **kwargs):
+        calls.append(kwargs)
+        assert url == "https://api.typesafe.ai/v1/systemone"
+        assert kwargs["headers"] == {"Authorization": "Bearer server-secret"}
+        assert kwargs["json"]["model"] == "jev-latest"
+        assert kwargs["json"]["state"] == {"article": "Lucro cresce Resumo"}
+        assert kwargs["json"]["questions"]["sentiment"]["type"] == "choice"
+        assert kwargs["timeout"] == (5, 20)
+        assert kwargs["allow_redirects"] is False
+        return jev_response()
+    monkeypatch.setattr(news.requests, "post", post)
+    result = news.analyze_sentiment("Lucro cresce", "Resumo", context)
+    assert result["is_jev"] is True
+    assert result["raw_text_length"] == 3
     assert result["score"] == .20
-    assert result["sentiment"] == "Neutro"  # .199 is below .20 despite rounded score.
-    assert sum(row["score"] for row in result["scores"]) == pytest.approx(1.399)
-    assert "evidence_count" not in result
+    assert result["sentiment"] == "Neutro"
+    assert sum(row["score"] for row in result["scores"]) == pytest.approx(1)
+    assert news.analyze_sentiment("Lucro cresce", "Resumo", context) == result
+    assert len(calls) == 1
 
 
-def test_inference_error_keeps_lexical_negation_repetition_and_provenance():
-    class FailedClassifier:
-        tokenizer = Tokenizer()
-        def __call__(self, texts):
-            raise RuntimeError("inference unavailable")
-    result = news.analise_sentimento_finbert("não lucro. lucro lucro", "", FailedClassifier())
-    assert result["is_finbert"] is False
+@pytest.mark.parametrize("status", [401, 429, 500, 529, None])
+def test_api_failure_backoff_and_recovery(context, monkeypatch, status):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "server-secret")
+    calls = []
+    def post(*args, **kwargs):
+        calls.append(1)
+        if len(calls) > 1:
+            return jev_response(.8, .1, .1)
+        if status is None:
+            raise requests.Timeout("unavailable")
+        response = requests.Response()
+        response.status_code = status
+        return response
+    monkeypatch.setattr(news.requests, "post", post)
+    result = news.analyze_sentiment("não lucro. lucro lucro", "", context)
+    assert result["is_jev"] is False
     assert result["engine"] == "PLN Léxico (fallback)"
     assert result["pos_terms"] == ["lucro", "lucro"]
     assert len(result["neg_terms"]) == 1
     assert result["score"] == .33
     assert result["evidence_count"] == 3
     assert result["scores"] == []
+    assert news.analyze_sentiment("não lucro. lucro lucro", "", context) == result
+    assert len(calls) == 1
+    context.model_retry_at = 0
+    assert news.analyze_sentiment("não lucro. lucro lucro", "", context)["is_jev"] is True
+    assert len(calls) == 2
 
 
-def test_failed_model_load_backoff_and_successful_pipeline_reuse(context, monkeypatch):
-    attempts = []
-    class Unavailable:
-        @staticmethod
-        def from_pretrained(name):
-            attempts.append(name)
-            raise OSError("offline model artifacts")
-    monkeypatch.setitem(sys.modules, "transformers", SimpleNamespace(AutoTokenizer=Unavailable, BertForSequenceClassification=Unavailable, pipeline=lambda *args, **kwargs: None))
-    assert news.load_finbert_pipeline(context) is None
-    assert news.load_finbert_pipeline(context) is None
-    assert attempts == [news.MODEL_NAME]
-    context.model_retry_at = 0  # Explicit refresh resets the failed-load backoff.
-    assert news.load_finbert_pipeline(context) is None
-    assert attempts == [news.MODEL_NAME, news.MODEL_NAME]
-    loaded = object()
-    monkeypatch.setattr(news, "_model", loaded)
-    assert news.load_finbert_pipeline(context) is loaded
+@pytest.mark.parametrize("probabilities", [(.8, .8, .3), (-.1, .5, .6), (float("nan"), .1, .9), (True, 0, 0)])
+def test_invalid_jev_probabilities_use_identified_fallback(context, monkeypatch, probabilities):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "server-secret")
+    monkeypatch.setattr(news.requests, "post", lambda *a, **kw: jev_response(*probabilities))
+    result = news.analyze_sentiment("lucro", "", context)
+    assert result["engine"] == "PLN Léxico (fallback)"
+    assert result["scores"] == []
+
+
+def test_missing_key_never_calls_api(context, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("Missing credentials must not call Jev")
+    monkeypatch.setattr(news.requests, "post", forbidden)
+    assert news.analyze_sentiment("lucro", "", context)["engine"] == "PLN Léxico (fallback)"
 
 
 def test_real_feed_wrapper_distinguishes_parse_failure_and_empty(monkeypatch):
@@ -220,7 +237,6 @@ def test_rss_vs_extracted_body_provenance_and_importance_remain_independent(cont
     context.portfolio.weights = {"PETR4": 1}
     monkeypatch.setattr(news, "get_brazilian_news", lambda ticker: {"ok": True, "items": [entry]})
     monkeypatch.setattr(news, "_cached_article_text", lambda url: "lucro lucro")
-    monkeypatch.setattr(news, "load_finbert_pipeline", lambda ctx: None)
     article = news.analyze_portfolio(context, context.portfolio)["articles"][0]
     assert article["importance_rank"] == 1
     assert article["sentiment"] == "Otimista"
@@ -228,7 +244,7 @@ def test_rss_vs_extracted_body_provenance_and_importance_remain_independent(cont
     assert article["text_source"] == "Texto do artigo"
 
 
-def test_refresh_refetches_rss_and_text_but_preserves_cached_inference_fallback(client, context, monkeypatch):
+def test_refresh_refetches_rss_and_text_and_retries_failed_inference(client, context, monkeypatch):
     context.selection = ["PETR4"]
     context.portfolio.tickers = ["PETR4"]
     context.portfolio.weights = {"PETR4": 1}
@@ -251,28 +267,26 @@ def test_refresh_refetches_rss_and_text_but_preserves_cached_inference_fallback(
     def extract(url):
         extracted.append(url)
         return ""
-    class RecoveringModel:
-        tokenizer = Tokenizer()
-        calls = 0
-        def __call__(self, texts):
-            self.calls += 1
-            if self.calls == 1:
-                raise RuntimeError("transient inference failure")
-            return [[{"label": "POSITIVE", "score": .2}, {"label": "NEGATIVE", "score": .8}, {"label": "NEUTRAL", "score": .3}]]
-    model = RecoveringModel()
+    calls = []
+    def post(*args, **kwargs):
+        calls.append(kwargs["json"]["state"]["article"])
+        if len(calls) == 1:
+            raise requests.Timeout("transient failure")
+        return jev_response(.1, .8, .1)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "server-secret")
     monkeypatch.setattr(news.urllib.request, "urlopen", urlopen)
     monkeypatch.setattr(news, "extract_article_text", extract)
-    monkeypatch.setattr(news, "load_finbert_pipeline", lambda ctx: model)
+    monkeypatch.setattr(news.requests, "post", post)
     initial = client.post("/api/news/analyze", json={"revision": 0}).json()
-    assert initial["articles"][0]["is_finbert"] is False
+    assert initial["articles"][0]["is_jev"] is False
     news_items.append(story("prejuizo prejuizo", "https://publisher.example/two"))
     context.model_retry_at = 12345
     refreshed = client.post("/api/news/refresh", json={"revision": 0}).json()
     assert len(fetched) == 2
     assert extracted.count("https://publisher.example/one") == 2
-    assert model.calls == 2  # First article's inference fallback remains cached for an hour.
+    assert len(calls) == 3  # Failed judgments are retried after refresh.
     engines = {article["title"]: article["engine"] for article in refreshed["articles"]}
-    assert engines == {"lucro lucro": "PLN Léxico (fallback)", "prejuizo prejuizo": "FinBERT-PT-BR"}
-    assert refreshed["summary"]["counts"] == {"positive": 1, "neutral": 0, "negative": 1}
-    assert refreshed["model"]["engines_used"] == ["FinBERT-PT-BR", "PLN Léxico (fallback)"]
+    assert engines == {"lucro lucro": "Jev", "prejuizo prejuizo": "Jev"}
+    assert refreshed["summary"]["counts"] == {"positive": 0, "neutral": 0, "negative": 2}
+    assert refreshed["model"]["engines_used"] == ["Jev"]
     assert context.model_retry_at == 0
