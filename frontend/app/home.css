@@ -78,9 +78,14 @@
 .home-page .home-signal.signal-negative::before { content: "✕"; }
 .home-page .home-signal.signal-warning::before { content: "!"; font-weight: 700; font-size: 12px; }
 .home-page .home-signal.signal-neutral::before { content: "■"; }
-.home-page .home-company-block { padding-top: 8px; }
-.home-page .home-company-block + .home-company-block { margin-top: 24px; border-top: 1px solid var(--border-default); }
-.home-page .home-company-block h3 { margin-top: 16px; font-size: 17px; }
+.home-page .home-company-block { padding-top: 4px; }
+.home-page .home-company-block + .home-company-block { margin-top: 12px; border-top: 1px solid var(--border-default); }
+.home-page .home-company-block h3 { margin: 10px 0 0; font-size: 15px; }
+.home-page .home-company-block .mcard-grid { margin: 0 0 4px; }
+.home-page .home-company-block .mcard { padding: 8px 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 12px; }
+.home-page .home-company-block .mcard-label { margin-bottom: 0; }
+.home-page .home-company-block .mcard-value { font-size: 20px; line-height: 1.2; }
+.home-page .home-company-block .metric-help { flex-basis: 100%; margin: 4px 0 0; }
 .home-page .home-company-block .mcard-grid { grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); }
 .home-page .mcard-value.is-positive::before, .home-page .mcard-value.is-negative::before { font-size: 14px; margin-right: 6px; }
 .home-page .mcard-value.is-positive::before { content: "✓"; }
