@@ -32,8 +32,8 @@ coral, and amber are reserved for financial semantics.
 | `--brand-danger` | `#f2757a` | Negative signal, errors, risk |
 | `--brand-info` | `#e879c6` | Categorical and exploratory emphasis |
 | `--surface-canvas` | `#0e1015` | Main application background |
-| `--sidebar-bg` | `#12151c` | Navigation rail |
-| `--surface-panel` | `#161a22` | Cards, controls, and chart surfaces |
+| `--sidebar-bg` | `#12151c` | Mobile header and menu |
+| `--surface-panel` | `#161a22` | Table headers and supporting surfaces |
 | `--surface-muted` | `#1d222c` | Grouped and selected surfaces |
 | `--surface-raised` | `#252b37` | Menus, tooltips, hover |
 | `--border-default` | `#2b313d` | Borders and dividers |
@@ -44,8 +44,9 @@ coral, and amber are reserved for financial semantics.
 | `--chart-grid` | `#646e88` | Visible chart grid and axes |
 | `--text-on-primary` | `#0e1015` | Text on indigo-filled actions |
 
-Color communicates hierarchy and state, never decoration alone. Surface depth
-comes from adjacent dark neutrals and visible borders. Avoid gradients, glow,
+Color communicates hierarchy and state, never decoration alone. Analytical content sits
+on the canvas, grouped by fine rules and whitespace. Filled surfaces identify
+controls and interaction states. Avoid gradients, glow,
 shadows, and color-only status indicators.
 
 All pages share the indigo accent; wayfinding comes from icon, title, and the active navigation link.
@@ -61,10 +62,10 @@ lists every shade and its contrast constraints.
 
 | Role | Font | Weight | Size |
 |------|------|--------|------|
-| Page headings | IBM Plex Sans | 700 | clamp(26–30px) |
-| Section headings | IBM Plex Sans | 650 | 18–20px |
+| Page headings | IBM Plex Sans | 500 | clamp(26–32px) |
+| Section headings | IBM Plex Sans | 500 | 18–20px |
 | Body | IBM Plex Sans | 400 | 14–16px |
-| Financial values | IBM Plex Sans with tabular numerals | 600–700 | 14–24px |
+| Financial values | IBM Plex Sans with tabular numerals | 500–650 | 14–30px |
 | Chips / code | System monospace stack | 400–600 | 12px |
 | Labels | IBM Plex Sans | 500–600 | 13px, sentence case |
 

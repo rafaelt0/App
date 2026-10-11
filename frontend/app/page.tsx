@@ -112,7 +112,7 @@ export default function HomePage() {
     {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ação(ões) da carteira salva não estão na lista B3 e foram removidas da seleção.</Notice>}
     {session.restored && !!session.restoration?.truncated_count && <Notice>A seleção salva tinha {session.restoration.original_count} ações. Carregamos as primeiras 20 ações válidas para manter a análise estável.</Notice>}
     {notice && <Notice tone="positive">{notice}</Notice>}
-    <div className={`home-desk${!selection.length ? " is-empty" : ""}`}>
+    <div className="home-desk">
       <section className="task-panel home-task" aria-labelledby="home-task-title">
         <h2 id="home-task-title" className="ui-section-heading">Selecione ativos para analisar</h2>
         <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
@@ -129,15 +129,6 @@ export default function HomePage() {
         </div>}
         <div className="home-source" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
       </section>
-      {!selection.length && <aside className="home-guide" aria-labelledby="home-guide-title">
-        <h2 id="home-guide-title">Como funciona</h2>
-        <ol>
-          <li><strong>Escolha</strong>Filtre por setor ou pesquise diretamente pelo ticker.</li>
-          <li><strong>Compare</strong>Compare fundamentos, rentabilidade, crescimento e endividamento lado a lado.</li>
-          <li><strong>Aprofunde</strong>Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
-        </ol>
-        <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
-      </aside>}
     </div>
     <details className="home-tools">
       <summary>Setores e favoritos</summary>
@@ -159,6 +150,15 @@ export default function HomePage() {
         </div>
       </div>
     </details>
+    {!selection.length && <details className="home-guide">
+      <summary>Como funciona a análise</summary>
+      <ol>
+        <li><strong>Escolha</strong>Filtre por setor ou pesquise diretamente pelo ticker.</li>
+        <li><strong>Compare</strong>Compare fundamentos, rentabilidade, crescimento e endividamento lado a lado.</li>
+        <li><strong>Aprofunde</strong>Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
+      </ol>
+      <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
+    </details>}
     {busy && <Loading>Buscando indicadores, comparação setorial e consensos dos ativos selecionados…</Loading>}
     {error && <Notice tone="negative">{error}<button disabled={busy} onClick={()=>void (selection.length ? run(retryAction) : suggestions(sectors).then(setSuggested).catch(exc=>setError(exc.message)))}>Tentar novamente</button></Notice>}
     {ready && <>
