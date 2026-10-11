@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import AppProvider from "../components/AppProvider";
 import "./globals.css";
+import "./motion.css";
 
 export const metadata: Metadata = {
   title: "B3Lab | Análise quantitativa de ações",
