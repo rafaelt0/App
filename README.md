@@ -7,7 +7,7 @@ B3Lab analisa ações brasileiras com uma interface React em Next.js e uma API P
 - **Fundamentos.** Seleção por empresa e setor, indicadores do Fundamentus, endividamento, comparação setorial, favoritos e consenso de preços-alvo do Yahoo Finance. A seleção exige a ação **Analisar** antes de buscar os detalhes.
 - **Portfólio.** Mínima volatilidade, Markowitz com regularização L2, HRP e cotas manuais. Inclui alocação, estimativa de compra por cotas, fronteira eficiente, desempenho histórico, retornos mensais, Sharpe, Sortino, drawdown, beta, alpha, VaR diário, concentração, regime recente e crises históricas. A ação **Carregar portfólio** libera as análises seguintes.
 - **Simulação.** De 10 a 3.000 trajetórias, com até 10 anos de horizonte. Compara o modelo normal multivariado com a reamostragem conjunta dos dias históricos. Mostra trajetórias, percentis, distribuição final, sensibilidade da calibração e média da cauda inferior. P5 não é VaR nem perda máxima. Alterar o número de trajetórias exibidas não executa novamente os modelos.
-- **Notícias.** Feeds brasileiros dos últimos sete dias, até dez notícias por ativo, deduplicação, classificação com FinBERT-PT-BR e fallback léxico identificado. Filtros e paginação não alteram a nota ponderada da amostra completa. A nota mede tom textual, não retorno esperado.
+- **Notícias.** Feeds brasileiros dos últimos sete dias, até dez notícias por ativo, deduplicação, classificação com Jev via API e fallback léxico identificado. Filtros e paginação não alteram a nota ponderada da amostra completa. A nota mede tom textual, não retorno esperado.
 - **Screener.** Sete pontos de partida, critérios opcionais, ordenação, escolha de colunas, favoritos e envio de ativos para a análise fundamentalista. Os dados vêm do Fundamentus.
 
 As cinco exportações disponíveis são CSV de fundamentos, alocação, resumo da simulação, percentis por data e resultados completos do screener. Não há geração de relatório HTML.
@@ -26,7 +26,9 @@ python run.py
 
 Abra http://localhost:3000. O comando inicia o Next.js e a API privada em http://127.0.0.1:8000. Ao encerrar o comando, os dois processos terminam.
 
-A lista de ações é local. Fundamentus, Yahoo Finance, Banco Central, Google News e a primeira obtenção do modelo FinBERT precisam de acesso à rede. A indisponibilidade de uma fonte aparece na interface. O fallback léxico não se apresenta como FinBERT.
+A lista de ações é local. Fundamentus, Yahoo Finance, Banco Central, Google News e a API do Jev precisam de acesso à rede. A indisponibilidade de uma fonte aparece na interface. O fallback léxico não se apresenta como Jev.
+
+Exporte `TYPESAFE_API_KEY` no ambiente antes de iniciar a aplicação. O backend envia o título e até 12.000 caracteres do texto combinado à [API TypeSafe](https://docs.typesafe.ai/api), usando `jev-latest`. Probabilidades positivas menos negativas produzem o score. Resultados válidos ficam em cache por uma hora; falhas usam o léxico e suspendem novas chamadas por cinco minutos na sessão. “Atualizar notícias” libera nova tentativa imediatamente.
 
 Para executar os processos separadamente, use dois terminais na raiz do projeto.
 
@@ -47,15 +49,15 @@ npm --prefix frontend run build
 python run.py --production
 ```
 
-O launcher usa um único worker Python. Os resultados de análise e o recurso FinBERT pertencem a esse processo. Adicionar workers sem compartilhar o estado quebra essa arquitetura.
+O launcher usa um único worker Python. Os resultados de análise pertencem a esse processo. Adicionar workers sem compartilhar o estado quebra essa arquitetura.
 
-Para publicar atrás de um proxy HTTPS, mantenha a API privada e configure `B3LAB_ENV=production` e `B3LAB_ORIGIN` com a origem pública exata. A interface e os pedidos `/api` compartilham a mesma origem. O proxy precisa admitir a duração das análises, incluindo o carregamento inicial do modelo. Não há fila de execução nem promessa de implantação serverless.
+Para publicar atrás de um proxy HTTPS, mantenha a API privada e configure `B3LAB_ENV=production` e `B3LAB_ORIGIN` com a origem pública exata. A interface e os pedidos `/api` compartilham a mesma origem. O proxy precisa admitir a duração das análises, incluindo as chamadas à API do Jev. Não há fila de execução nem promessa de implantação serverless.
 
 ### Render
 
 O `render.yaml` cria um serviço web Docker no plano gratuito. O contêiner usa `PORT` e `RENDER_EXTERNAL_URL` do Render como porta e origem pública, e `B3LAB_HOST=0.0.0.0` expõe o Next.js. A API continua privada em `127.0.0.1`.
 
-O plano gratuito tem 512 MB, por isso a imagem é construída sem FinBERT e as notícias usam o fallback léxico. Use o argumento de build `WITH_FINBERT=1` em um plano com mais memória. O disco é efêmero: favoritos e seleções em SQLite se perdem a cada deploy ou reinício.
+Configure `TYPESAFE_API_KEY` como segredo no Render para classificar notícias com Jev. O contêiner não carrega modelos locais. Sem a chave ou quando a API falha, as notícias usam o fallback léxico identificado. O disco é efêmero: favoritos e seleções em SQLite se perdem a cada deploy ou reinício.
 
 O workflow `keep-render-awake.yml` acessa a URL da variável de repositório `B3LAB_URL` a cada 10 minutos para evitar a suspensão por inatividade.
 
@@ -63,6 +65,7 @@ O workflow `keep-render-awake.yml` acessa a URL da variável de repositório `B3
 
 | Variável | Padrão | Uso |
 |---|---|---|
+| `TYPESAFE_API_KEY` | Não definido | Chave da API TypeSafe, usada somente no backend para Jev |
 | `B3LAB_PORT` | `3000` | Porta do Next.js no launcher |
 | `B3LAB_API_PORT` | `8000` | Porta da API no launcher |
 | `B3LAB_API_URL` | `http://127.0.0.1:8000` | Endereço privado usado pelo proxy Next.js |

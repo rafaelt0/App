@@ -14,8 +14,6 @@ lxml==5.2.2
 beautifulsoup4==4.12.3
 requests==2.32.3
 python-bcb==0.4.0
-torch==2.4.1
-transformers==4.44.2
 fastapi==0.142.2
 uvicorn==0.54.0
 

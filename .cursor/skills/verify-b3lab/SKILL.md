@@ -33,7 +33,7 @@ export B3LAB_VERIFY_RUN=<id printed by up>
 
 Options: `--run <id>` names the run; `--production` runs `npm --prefix frontend run build` then `run.py --production`.
 
-**Isolation limits.** Next allows only **one `next dev` per checkout** (`frontend/.next/dev/lock`). If the user already runs `python run.py` / `npm run dev`, `up` refuses. Do **not** stop their server: use `$V up --production` (separate `.next` output, coexists with their dev server) or ask. `--production` rebuilds `frontend/.next`, so never use it while the user or another verification run serves `run.py --production` from this checkout. Run one verification instance per checkout at a time. `http_cache.sqlite` (repo root, requests-cache) and the Hugging Face FinBERT cache are shared with the user's instance; both are caches, not user state.
+**Isolation limits.** Next allows only **one `next dev` per checkout** (`frontend/.next/dev/lock`). If the user already runs `python run.py` / `npm run dev`, `up` refuses. Do **not** stop their server: use `$V up --production` (separate `.next` output, coexists with their dev server) or ask. `--production` rebuilds `frontend/.next`, so never use it while the user or another verification run serves `run.py --production` from this checkout. Run one verification instance per checkout at a time. `http_cache.sqlite` (repo root, requests-cache) is shared with the user's instance; it is a cache, not user state.
 
 ## Doctor
 
