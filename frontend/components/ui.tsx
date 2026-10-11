@@ -71,7 +71,7 @@ export function Loading({ children }: { children?: ReactNode }) {
 export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escolha ações para analisar" }: { value: string[]; onChange: (tickers: string[]) => void | Promise<void>; stocks: Stock[]; max?: number; label?: string }) {
   const id = useId();
   const [query, setQuery] = useState("");
-  const [focused, setFocused] = useState(false);
+  const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,19 +82,24 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
   async function change(next: string[]) {
     if (busy) return;
     setBusy(true); setError(null);
-    try { await onChange(next); setQuery(""); setActive(0); }
+    try { await onChange(next); }
     catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
     finally { setBusy(false); }
   }
-  const expanded = focused && options.length > 0 && value.length < max;
+  function pick(ticker: string) {
+    if (busy) return;
+    setQuery(""); setActive(0); setOpen(false);
+    void change([...value, ticker]);
+  }
+  const expanded = open && options.length > 0 && value.length < max;
   return <div className="ticker-picker"><label htmlFor={id}>{label}</label><div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}>{ticker}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => change(value.filter(item => item !== ticker))}>×</button></span>)}</div>
-    <div className="ticker-search"><Icon name="search" /><input id={id} role="combobox" type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} disabled={value.length >= max} aria-busy={busy} aria-autocomplete="list" aria-expanded={expanded} aria-controls={`${id}-options`} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={event => { setQuery(event.target.value); setActive(0); }} onKeyDown={event => {
-      if (event.key === "Escape") setFocused(false);
-      if (event.key === "ArrowDown") { event.preventDefault(); setActive(index => Math.min(index + 1, options.length - 1)); }
+    <div className="ticker-search"><Icon name="search" /><input id={id} role="combobox" type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} disabled={value.length >= max} aria-busy={busy} aria-autocomplete="list" aria-expanded={expanded} aria-controls={`${id}-options`} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined} onFocus={() => setOpen(true)} onClick={() => setOpen(true)} onBlur={() => setOpen(false)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
+      if (event.key === "Escape") { event.preventDefault(); if (!expanded) setQuery(""); setOpen(false); }
+      if (event.key === "ArrowDown") { event.preventDefault(); if (!expanded) { setOpen(true); setActive(0); } else setActive(index => Math.min(index + 1, options.length - 1)); }
       if (event.key === "ArrowUp") { event.preventDefault(); setActive(index => Math.max(index - 1, 0)); }
-      if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); void change([...value, options[active].ticker]); }
+      if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); pick(options[active].ticker); }
     }} /></div>
-    {expanded && <ul className="ticker-options" id={`${id}-options`} role="listbox">{options.map((stock, index) => <li key={stock.ticker} id={`${id}-option-${index}`} role="option" aria-selected={active === index}><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => change([...value, stock.ticker])}><strong>{stock.ticker}</strong><span>{[stock.company, stock.sector].filter(Boolean).join(" · ") || "Setor não informado"}</span></button></li>)}</ul>}
+    {expanded && <ul className="ticker-options" id={`${id}-options`} role="listbox">{options.map((stock, index) => <li key={stock.ticker} id={`${id}-option-${index}`} role="option" aria-selected={active === index}><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => pick(stock.ticker)}><strong>{stock.ticker}</strong><span>{[stock.company, stock.sector].filter(Boolean).join(" · ") || "Setor não informado"}</span></button></li>)}</ul>}
     <p className="caption" role="status">{value.length}/{max} ativos selecionados.</p>{error && <Notice tone="negative">{error}</Notice>}
   </div>;
 }
