@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Chart from "./Chart";
 import { ExportButton, formatValue, Metrics, Notice, Section, Table } from "./ui";
 import type { Column } from "./ui";
-import { consensusColumns, identityColumns, marketColumns } from "../lib/home";
+import { consensusColumns, marketColumns } from "../lib/home";
 import type { HomeResult } from "../lib/home";
 
 type Props = {
@@ -18,17 +18,7 @@ type Props = {
 
 export default function HomeResults({ ready, selection, watchlist, busy, onFavorite, onRefreshConsensus }: Props) {
   const [comparison,setComparison] = useState("pl");
-  const [activeSection,setActiveSection] = useState<string|null>(null);
   const single=selection.length===1;
-  const sectionLinks=[["home-setor","Setor"],["home-mercado","Mercado"],["home-indicadores","Indicadores"],["home-saude","Saúde financeira"],...(single ? []:[["home-grafico","Comparação"]]),["home-consenso","Preço-alvo"],["home-sintese","Síntese"]];
-  const sectionIds=sectionLinks.map(([id])=>id).join(" ");
-  useEffect(() => {
-    const ids=sectionIds.split(" ");
-    const visible=new Set<string>();
-    const observer=new IntersectionObserver(entries => {entries.forEach(entry => {if(entry.isIntersecting)visible.add(entry.target.id);else visible.delete(entry.target.id);});setActiveSection(ids.find(id=>visible.has(id)) ?? null);},{rootMargin:"0px 0px -60% 0px"});
-    ids.map(id=>document.getElementById(id)).forEach(element => {if(element)observer.observe(element);});
-    return () => observer.disconnect();
-  },[ready.id,sectionIds]);
   const companies=ready.companies;
   const choice=ready.comparison_indicators.find(item=>item.key===comparison);
   const chartCompanies=companies.filter(company=>company.indicators_available);
@@ -47,12 +37,7 @@ export default function HomeResults({ ready, selection, watchlist, busy, onFavor
           <div><dt>Síntese setorial</dt><dd>{company.synthesis.categorias_validas ? `${company.synthesis.favorable_categories}/${company.synthesis.categorias_validas} áreas favoráveis`:"Sem áreas avaliadas"}</dd></div>
         </dl>
       </li>;})}</ul>
-      <div className="home-results-body">
-        <nav className="home-jump-nav" aria-label="Seções da análise"><ul className="home-jump">{sectionLinks.map(([id,label])=><li key={id}><a href={`#${id}`} aria-current={activeSection===id ? "location":undefined}>{label}</a></li>)}</ul></nav>
         <div className="home-sections">
-          <div id="home-setor" className="home-anchor"><Section title="Setor">
-            {single ? companies.map(company=>company.available ? <div className="identity-metrics" key={company.ticker}><Metrics items={[{label:"Empresa",value:company.identity.company},{label:"Setor",value:company.identity.sector},{label:"Subsetor",value:company.identity.subsector}]}/></div>:<Notice key={company.ticker}>Sem dados de setor para {company.ticker}.</Notice>):<Table columns={identityColumns} rows={companies.map(company=>({ticker:company.ticker,...company.identity}))} rowKey="ticker"/>}
-          </Section></div>
           <div id="home-mercado" className="home-anchor"><Section title="Informações de Mercado">
             {single ? companies.map(company=>company.available ? <div key={company.ticker}><Metrics items={marketColumns.filter(column=>column.unit).map(column=>({label:column.label,value:company.market[column.key as keyof typeof company.market] ?? 0,unit:column.unit,digits:column.digits}))}/><p>Última cotação registrada: {company.market.last_quote_date ?? "—"} para {company.ticker}</p></div>:<Notice key={company.ticker}>Sem dados de mercado para {company.ticker}.</Notice>):<Table columns={marketColumns} rows={companies.map(company=>({ticker:company.ticker,...company.market}))} rowKey="ticker"/>}
           </Section></div>
@@ -71,7 +56,6 @@ export default function HomeResults({ ready, selection, watchlist, busy, onFavor
             <p>Fonte: Fundamentus · comparação setorial. Áreas e percentis não constituem recomendação de investimento.</p>
           </article>)}</Section></div>
         </div>
-      </div>
       <div className="next-step-card"><div className="next-step-eyebrow">Próximo passo</div><h2>Analise sua carteira</h2><p>Monte e otimize a carteira com {selection.slice(0,3).join(", ")}{selection.length>3 ? "…":""}.</p><Link href="/portfolio">Abrir Portfólio</Link></div>
   </>;
 }

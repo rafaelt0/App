@@ -53,12 +53,7 @@
 .home-page .home-summary-facts dt { font-size: 13px; color: var(--text-muted); }
 .home-page .home-summary-facts dd { margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
-.home-page .home-results-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
 .home-page .home-sections { display: grid; gap: 40px; min-width: 0; }
-.home-page .home-jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.home-page .home-jump a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 0; background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 500; border-left: 2px solid transparent; }
-.home-page .home-jump a:hover { border-color: var(--brand-primary); color: var(--text-primary); text-decoration: none; }
-.home-page .home-jump a[aria-current="location"] { border-color: var(--brand-primary); background: transparent; color: var(--brand-primary); font-weight: 600; }
 .home-page .home-anchor { min-width: 0; scroll-margin-top: 24px; }
 .home-page .home-anchor .ui-section-heading { margin: 0 0 16px; font-size: 20px; }
 .home-page .home-anchor .analysis-section > p { font-size: 14px; color: var(--text-secondary); }
@@ -110,17 +105,9 @@
   .home-page .home-desk.is-empty { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
   .home-page .home-guide { padding: 8px 0 8px 24px; border-top: 0; border-left: 1px solid var(--border-default); }
 }
-@container workspace (min-width: 960px) {
-  .home-page .home-results-body { grid-template-columns: 184px minmax(0, 1fr); gap: 32px; }
-  .home-page .home-jump-nav { position: sticky; top: 24px; }
-  .home-page .home-jump { flex-direction: column; flex-wrap: nowrap; }
-  .home-page .home-jump a { justify-content: flex-start; width: 100%; }
-}
 @media (max-width: 768px) {
   .home-page .home-results-bar { margin-top: 32px; }
   .home-page .home-quick { margin-top: 20px; }
-  .home-page .home-jump { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
-  .home-page .home-jump a { white-space: nowrap; }
 }
 @media (max-width: 480px) {
   .home-page .quick-start-button { flex-direction: column; align-items: flex-start; gap: 2px; }
