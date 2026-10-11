@@ -179,7 +179,9 @@ and error states.
 Quick-selection shortcuts use compact ticker rows with a bottom rule. Their hover and
 focus states keep the indigo border or outline. Primary task actions have 24px
 horizontal padding. Active screener criteria use a subdued indigo top rule;
-their checkbox and textual state identify which filters are enabled.
+their checkbox and textual state identify which filters are enabled. Inactive
+criteria show only their checkbox; inputs appear when enabled. Active criteria
+also appear above the results as removable chips with the live match count.
 
 Disabled inputs and selects drop to 50% opacity with a not-allowed cursor, the
 same as disabled buttons. A page's primary task form sits in one `.task-panel`
