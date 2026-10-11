@@ -116,26 +116,25 @@ export default function HomePage() {
       <section className="task-panel home-task" aria-labelledby="home-task-title">
         <h2 id="home-task-title" className="ui-section-heading">Selecione ativos para analisar</h2>
         <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
-        <TickerPicker value={selection} onChange={changeSelection} stocks={ordered} max={20}/>
+        <TickerPicker value={selection} onChange={changeSelection} stocks={ordered} max={20} label="Buscar ações"/>
         {!!selection.length && <>
           <div className="actions"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button><button disabled={busy} onClick={()=>void changeSelection([])}>Limpar seleção</button></div>
           <p className="caption">A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
           {!ready && !busy && <Notice>Clique em Analisar para buscar os indicadores das ações selecionadas.</Notice>}
         </>}
-        <div className="home-source" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
         {sectorBusy && <Loading>Ordenando ações por liquidez…</Loading>}
         {!selection.length && <div className="home-quick">
-          <p>Pesquise pelo ticker ou nome da empresa ou use a seleção rápida abaixo.</p>
-          <h3>Seleção rápida · ações líquidas</h3>
+          <h3>Ou escolha uma ação líquida</h3>
           <div className="quick-start-grid">{quickTickers.map(([ticker,sector])=><button className="quick-start-button" key={ticker} onClick={()=>void changeSelection([ticker])}><strong>{ticker}</strong><span className="quick-start-sector">{sector}</span></button>)}</div>
         </div>}
+        <div className="home-source" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
       </section>
       {!selection.length && <aside className="home-guide" aria-labelledby="home-guide-title">
         <h2 id="home-guide-title">Como funciona</h2>
         <ol>
-          <li><strong>Escolha</strong> · Filtre por setor ou pesquise diretamente pelo ticker.</li>
-          <li><strong>Compare</strong> · Compare fundamentos, rentabilidade, crescimento e endividamento lado a lado.</li>
-          <li><strong>Aprofunde</strong> · Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
+          <li><strong>Escolha</strong>Filtre por setor ou pesquise diretamente pelo ticker.</li>
+          <li><strong>Compare</strong>Compare fundamentos, rentabilidade, crescimento e endividamento lado a lado.</li>
+          <li><strong>Aprofunde</strong>Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
         </ol>
         <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
       </aside>}

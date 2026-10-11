@@ -1,9 +1,11 @@
 .pf-setup { padding: 24px; margin-bottom: 32px; }
-.pf-setup-grid { display: grid; gap: 8px 32px; min-width: 0; }
+.pf-setup-grid { display: grid; gap: 24px 32px; min-width: 0; }
 .pf-group { min-width: 0; }
-.pf-step { margin: 24px 0 8px; font-size: 16px; font-weight: 650; color: var(--text-primary); }
+.pf-step { margin: 24px 0 8px; font-size: 18px; font-weight: 650; color: var(--text-primary); }
 .pf-step:first-child { margin-top: 0; }
-.pf-hint { color: var(--text-muted); font-size: 14px; margin: 4px 0 12px; }
+.pf-hint { color: var(--text-muted); font-size: 14px; margin: 4px 0 20px; }
+.pf-group + .pf-group { padding-top: 24px; border-top: 1px solid var(--border-default); }
+.pf-group .ticker-picker > label { margin-top: 0; }
 .pf-settings { margin: 16px 0 0; padding: 16px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-canvas); }
 .pf-settings .controls-grid { margin-bottom: 0; }
 .pf-setup .pf-wide { grid-column: 1 / -1; }
@@ -42,6 +44,7 @@
 .pf-section-lead { color: var(--text-secondary); max-width: 80ch; margin: 0 0 12px; }
 @media (min-width: 1200px) {
   .pf-setup-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .pf-group + .pf-group { padding-top: 0; padding-left: 32px; border-top: 0; border-left: 1px solid var(--border-default); }
 }
 @media (min-width: 1280px) {
   .pf-overview { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
