@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Chart from "../../components/Chart";
 import { useApp } from "../../components/AppProvider";
 import { EmptyState, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
@@ -26,6 +26,7 @@ function Article({article}: {article: NewsArticle}) {
     <div className="news-item-score">
       <span className="news-item-score-label">Score</span>
       <span className={`news-item-score-value is-${tone}`}>{signed.format(article.score)}</span>
+      <span className={`news-score-bar is-${tone}`} aria-hidden="true"><span style={{ "--magnitude": Math.min(1, Math.abs(article.score)) } as CSSProperties} /></span>
     </div>
     <div className="news-item-body">
       <div className="news-item-top">

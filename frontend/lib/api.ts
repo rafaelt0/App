@@ -1,4 +1,25 @@
-export async function api<T>(path: string, body?: unknown, method?: string): Promise<T> {
+let pending = 0;
+const listeners = new Set<(active: boolean) => void>();
+function track<T>(work: Promise<T>): Promise<T> {
+  pending += 1;
+  if (pending === 1) listeners.forEach(listener => listener(true));
+  return work.finally(() => {
+    pending -= 1;
+    if (pending === 0) listeners.forEach(listener => listener(false));
+  });
+}
+/** Reports whether any API request is in flight; the shell uses it for its activity line. */
+export function subscribeActivity(listener: (active: boolean) => void): () => void {
+  listeners.add(listener);
+  listener(pending > 0);
+  return () => { listeners.delete(listener); };
+}
+
+export function api<T>(path: string, body?: unknown, method?: string): Promise<T> {
+  return track(request<T>(path, body, method));
+}
+
+async function request<T>(path: string, body?: unknown, method?: string): Promise<T> {
   const response = await fetch(path, {
     method: method ?? (body === undefined ? "GET" : "POST"),
     credentials: "same-origin",
@@ -19,7 +40,11 @@ export async function api<T>(path: string, body?: unknown, method?: string): Pro
   return response.json() as Promise<T>;
 }
 
-export async function download(path: string): Promise<void> {
+export function download(path: string): Promise<void> {
+  return track(save(path));
+}
+
+async function save(path: string): Promise<void> {
   const response = await fetch(path, { credentials: "same-origin", cache: "no-store" });
   if (!response.ok) {
     const problem: { detail?: string } = await response.json();

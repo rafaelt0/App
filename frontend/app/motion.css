@@ -20,6 +20,14 @@
   from { transform: scaleY(0); }
   to { transform: scaleY(1); }
 }
+@keyframes b3-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes b3-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 @keyframes b3-nav-enter {
   from { opacity: .5; transform: translateX(-4px); }
   to { opacity: 1; transform: none; }
@@ -80,12 +88,14 @@ details[open] > summary::before { transform: translateY(-3px) rotate(45deg); }
   :is(.mcard-grid, .home-summary, .news-list) > :nth-child(n + 5) { --motion-order: 4; }
 
   .plotly-chart .svg-container { animation: b3-fade 400ms var(--motion-ease-out) both; }
-  .pf-weight-fill, .sim-bar > span, .analyst-synthesis-meter > span, .news-model-fill {
+  .pf-weight-fill, .sim-bar > span, .analyst-synthesis-meter > span, .news-model-fill, .mcard-meter > span, .range-fill {
     transform-origin: left center;
     animation: b3-grow 640ms var(--motion-ease-out) both;
   }
   details[open] > :not(summary) { animation: b3-fade 240ms var(--motion-ease-out) both; }
-  .nav-indicator { animation: b3-nav-enter 280ms var(--motion-ease-out) both; }
+  .palette[open] { animation: b3-pop 200ms var(--motion-ease-out) both; }
+  .palette[open]::backdrop { animation: b3-fade-in 200ms ease both; }
+  .mcard, .next-step-card, .home-summary-card { transition: border-color var(--transition-fast), background-color var(--transition-fast); }
   .sidebar nav a[aria-current="page"]::before {
     transform-origin: center;
     animation: b3-marker-enter 280ms var(--motion-ease-out) both;

@@ -18,18 +18,28 @@
 .pf-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 32px; align-items: start; min-width: 0; }
 .pf-overview > .analysis-section { min-width: 0; }
 .pf-kpis .mcard-value { font-size: 26px; }
-.pf-kpis .mcard:first-child .mcard-value { font-size: 30px; }
+.pf-kpis .mcard:first-child { grid-column: span 2; }
+.pf-kpis .mcard:first-child .mcard-value { font-size: 36px; }
 .pf-evidence { display: grid; gap: 0; min-width: 0; }
-.pf-summary { border: 0; padding: 16px 0; margin: 16px 0 0; border-block: 1px solid var(--border-default); }
-.pf-summary dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 16px 32px; margin: 0; }
+.pf-summary { padding: 14px 18px; margin: 16px 0 0; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-panel); box-shadow: var(--highlight); }
+.pf-summary dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 12px 0; margin: 0; }
+.pf-summary dl > div { padding: 0 20px; border-left: 1px solid var(--border-subtle); }
+.pf-summary dl > div:first-child { padding-left: 0; border-left: 0; }
 .pf-summary dt { font-size: 13px; font-weight: 500; color: var(--text-muted); }
 .pf-summary dd { margin: 2px 0 0; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .pf-summary .caption { margin: 12px 0 0; }
+.pf-strip { display: flex; gap: 2px; height: 14px; margin: 8px 0 12px; border-radius: var(--radius-sm); overflow: hidden; }
+.pf-strip > span { min-width: 3px; flex-basis: 0; }
+[data-tone="0"] { --tone: #a8afff; } [data-tone="1"] { --tone: #565fc8; } [data-tone="2"] { --tone: #e1e3ff; }
+[data-tone="3"] { --tone: #7078e8; } [data-tone="4"] { --tone: #bec3ff; } [data-tone="5"] { --tone: #444ca3; }
+.pf-strip > span, .pf-swatch { background: var(--tone, var(--surface-raised)); }
+.pf-swatch { display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 2px; vertical-align: 1px; }
+.pf-swatch[data-tone="-1"] { background: transparent; box-shadow: inset 0 0 0 1px var(--border-strong); }
 .pf-weights { list-style: none; margin: 8px 0 16px; padding: 0; display: grid; gap: 0; border: 0; }
-.pf-weights li { display: grid; grid-template-columns: 88px minmax(0, 1fr) 72px; align-items: center; gap: 12px; min-height: 44px; border-bottom: 1px solid var(--border-default); }
+.pf-weights li { display: grid; grid-template-columns: 96px minmax(0, 1fr) 72px; align-items: center; gap: 12px; min-height: 40px; border-bottom: 1px solid var(--border-subtle); }
 .pf-weight-ticker { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
-.pf-weight-track { height: 4px; border-radius: var(--radius-pill); background: var(--surface-muted); overflow: hidden; }
-.pf-weight-fill { display: block; height: 100%; background: var(--brand-primary); border-radius: var(--radius-pill); }
+.pf-weight-track { height: 6px; border-radius: var(--radius-pill); background: var(--surface-raised); overflow: hidden; }
+.pf-weight-fill { display: block; height: 100%; background: rgb(139 147 255 / .75); border-radius: var(--radius-pill); }
 .pf-weight-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .pf-caption { caption-side: top; text-align: left; padding: 12px; color: var(--text-muted); font-size: 13px; white-space: normal; min-width: 0; }
 .pf-monthly table { min-width: 960px; }
@@ -37,6 +47,10 @@
 .pf-monthly thead th:first-child { position: sticky; left: 0; z-index: 1; border-right: 1px solid var(--border-default); }
 .pf-monthly tbody tr:hover th { background: var(--surface-muted); }
 .pf-monthly td:last-child, .pf-monthly thead th:last-child { border-left: 1px solid var(--border-default); font-weight: 650; }
+.pf-monthly td.pf-heat { color: var(--text-primary); border: 1px solid var(--surface-canvas); }
+.pf-monthly td.pf-heat.is-positive { background: color-mix(in srgb, var(--brand-positive) calc(var(--heat) * 38%), transparent); }
+.pf-monthly td.pf-heat.is-negative { background: color-mix(in srgb, var(--brand-danger) calc(var(--heat) * 38%), transparent); }
+.pf-monthly tbody tr:hover td.pf-heat { filter: brightness(1.15); }
 .pf-stress-check { display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 12px 0; font-size: 14px; }
 .pf-stress-check input { width: 20px; height: 20px; flex: none; }
 .pf-note { color: var(--text-secondary); font-size: 14px; max-width: 80ch; }

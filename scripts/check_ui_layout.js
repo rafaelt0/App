@@ -7,15 +7,24 @@
     failures.push("The document scrolls horizontally.");
   }
   const sections = [...document.querySelectorAll(
-    ".task-panel, .mcard, .home-summary-card, .pf-summary, .pf-weights, .sim-prereq, .sim-run, .news-task, .news-item, .scr-context"
+    ".task-panel, .pf-weights, .sim-prereq, .news-task, .scr-context"
   )].filter(visible);
   for (const section of sections) {
     const style = getComputedStyle(section);
     if (style.backgroundColor !== "rgba(0, 0, 0, 0)") {
       failures.push(`${section.className} has an enclosing background.`);
     }
-    if (parseFloat(style.borderRadius) > 0) {
-      failures.push(`${section.className} has rounded container corners.`);
+  }
+  // Tiles may sit on a surface, but elevation comes from hairlines: no drop shadows or glow.
+  const lengths = shadow => (shadow.match(/-?[\d.]+px/g) ?? []).map(parseFloat);
+  for (const element of document.querySelectorAll("main *")) {
+    const shadow = getComputedStyle(element).boxShadow;
+    if (shadow === "none") continue;
+    for (const layer of shadow.split(/,(?![^(]*\))/)) {
+      if (!layer.includes("inset") && (lengths(layer)[2] ?? 0) > 0) {
+        failures.push(`${element.className || element.tagName} has a blurred shadow.`);
+        break;
+      }
     }
   }
   const primaryActions = [...document.querySelectorAll("button.primary, a.primary")].filter(visible);

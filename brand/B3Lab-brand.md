@@ -31,12 +31,13 @@ coral, and amber are reserved for financial semantics.
 | `--brand-accent` | `#f5b544` | Warnings, yield, return metrics |
 | `--brand-danger` | `#f2757a` | Negative signal, errors, risk |
 | `--brand-info` | `#e879c6` | Categorical and exploratory emphasis |
-| `--surface-canvas` | `#0e1015` | Main application background |
-| `--sidebar-bg` | `#12151c` | Mobile header and menu |
-| `--surface-panel` | `#161a22` | Table headers and supporting surfaces |
-| `--surface-muted` | `#1d222c` | Grouped and selected surfaces |
-| `--surface-raised` | `#252b37` | Menus, tooltips, hover |
-| `--border-default` | `#2b313d` | Borders and dividers |
+| `--surface-app` | `#0a0b0f` | Shell behind the inset frame |
+| `--surface-canvas` | `#0f1116` | Inset content frame |
+| `--sidebar-bg` | `#0a0b0f` | Sidebar, mobile header and menu |
+| `--surface-panel` | `#15171d` | Tiles, ticker cards, table headers |
+| `--surface-muted` | `#1b1e25` | Buttons, chips, badges |
+| `--surface-raised` | `#23262f` | Menus, palette, tooltips, hover |
+| `--border-default` | `rgb(255 255 255 / .085)` | Borders and dividers |
 | `--border-strong` | `#5e687e` | Input and control outlines |
 | `--text-primary` | `#f3f5f9` | Primary text |
 | `--text-secondary` | `#c5cad6` | Supporting copy and labels |
@@ -44,10 +45,11 @@ coral, and amber are reserved for financial semantics.
 | `--chart-grid` | `#646e88` | Visible chart grid and axes |
 | `--text-on-primary` | `#0e1015` | Text on indigo-filled actions |
 
-Color communicates hierarchy and state, never decoration alone. Analytical content sits
-on the canvas, grouped by fine rules and whitespace. Filled surfaces identify
-controls and interaction states. Avoid gradients, glow,
-shadows, and color-only status indicators.
+Color communicates hierarchy and state, never decoration alone. The shell is an
+inset frame on the darkest surface; headline tiles and ticker cards sit on
+layered surfaces with hairline borders, while prose, tables, and charts stay on
+the canvas. Avoid gradients, glow, drop shadows, and color-only status
+indicators. `DESIGN.md` lists the full surface ladder.
 
 All pages share the indigo accent; wayfinding comes from icon, title, and the active navigation link.
 
@@ -66,12 +68,13 @@ lists every shade and its contrast constraints.
 | Section headings | IBM Plex Sans | 500 | 18–20px |
 | Body | IBM Plex Sans | 400 | 14–16px |
 | Financial values | IBM Plex Sans with tabular numerals | 500–650 | 14–30px |
-| Chips / code | System monospace stack | 400–600 | 12px |
+| Tickers / kbd / code | IBM Plex Mono | 400–600 | 11–13px |
 | Labels | IBM Plex Sans | 500–600 | 13px, sentence case |
 
-IBM Plex Sans is bundled in `frontend/app/fonts/` and served locally through
-`next/font/local`. Charts inherit the interface font. System sans remains the
-fallback, and ticker chips, formulas, and code keep the system monospace stack.
+IBM Plex Sans and IBM Plex Mono are bundled in `frontend/app/fonts/` and served
+locally through `next/font/local`. Charts inherit the interface font. Numbers
+stay in Plex Sans with tabular numerals; Plex Mono sets tickers, keyboard
+hints, formulas, and chart value tags.
 
 ## Icons (page set)
 
