@@ -323,5 +323,39 @@ def test_only_limited_evidence_reports_no_note_instead_of_neutral(client, monkey
     assert summary["score100"] is None
     assert summary["raw_score"] is None
     assert summary["coverage"] == 0
-    assert summary["label"] == "EVIDÊNCIA LIMITADA"
+    assert summary["label"] == "Evidência limitada"
     assert summary["counts"]["positive"] == 3
+
+
+def test_mixed_run_reports_the_jev_and_lexicon_split_per_article(context, monkeypatch):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "server-secret")
+    context.portfolio.tickers = ["PETR4"]
+    context.portfolio.weights = {"PETR4": 1}
+    entries = [story("lucro", "https://publisher.example/one"), story("prejuizo", "https://publisher.example/two", age=1)]
+    monkeypatch.setattr(news, "get_brazilian_news", lambda ticker: {"ok": True, "items": entries})
+    monkeypatch.setattr(news, "_cached_article_text", lambda url: "")
+    calls = []
+    def post(*args, **kwargs):
+        calls.append(1)
+        if len(calls) > 1:
+            raise requests.Timeout("unavailable after the first article")
+        return jev_response(.8, .1, .1)
+    monkeypatch.setattr(news.requests, "post", post)
+    model = news.analyze_portfolio(context, context.portfolio)["model"]
+    assert model["available"] is True
+    assert (model["jev_count"], model["lexicon_count"]) == (1, 1)
+    assert model["engines_used"] == ["Jev", "PLN Léxico (fallback)"]
+
+
+def test_summary_status_keeps_neutral_out_of_the_warning_color(context):
+    def summary_for(score):
+        article = {"tickers": ["PETR4"], "score": score, "sentiment": "Neutro", "intensity": "Baixo"}
+        return news.summarize([article], ["PETR4"], {"PETR4": 1}, {"PETR4": True})
+    neutral = summary_for(0)
+    assert neutral["score100"] == 50
+    assert neutral["status"] == "neutral"
+    assert neutral["label"] == "Neutro / equilibrado"
+    assert summary_for(.3)["status"] == "positive"
+    assert summary_for(-.3)["status"] == "negative"
+    assert summary_for(-.3)["label"] == "Pessimista"
+    assert summary_for(-.3)["score100"] == 35
