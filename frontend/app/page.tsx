@@ -22,6 +22,7 @@ export default function HomePage() {
   const [retryAction,setRetryAction] = useState<"analyze"|"consensus"|"source">("analyze");
   const [editRequested,setEditRequested] = useState(false);
   const [stale,setStale] = useState(false);
+  const [sectorUndo,setSectorUndo] = useState<string[]|null>(null);
   const panel = useRef<HTMLElement>(null);
   const pendingAnalysis = useRef<string[]|null>(null);
   const generation = useRef(0);
@@ -55,16 +56,24 @@ export default function HomePage() {
   },[]);
 
   async function changeSelection(tickers:SelectionUpdate) {
-    if(result)setStale(true);generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);
+    if(result)setStale(true);generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);setSectorUndo(null);
     try {await setSelection(tickers);} catch(exc) {setError((exc as Error).message);}
   }
   async function startQuickAnalysis(ticker:string) {
-    generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);
+    generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);setSectorUndo(null);
     pendingAnalysis.current=[ticker];
     try {await setSelection([ticker]);} catch(exc) {pendingAnalysis.current=null;setError((exc as Error).message);}
   }
+  async function undoSectorChange() {
+    const previous=sectorUndo;
+    if(!previous)return;
+    setSectorUndo(null);
+    await changeSelection(previous);
+    setNotice(`Seleção anterior restaurada: ${previous.length} ${previous.length===1 ? "ativo":"ativos"}.`);
+  }
   async function changeSectors(next:string[]) {
     const gen=++sectorGeneration.current;
+    const previous=[...(session?.selection ?? [])];
     setSectors(next);setSectorBusy(true);setError(null);
     try {
       const value=await suggestions(next);
@@ -72,7 +81,10 @@ export default function HomePage() {
       setSuggested(value);
       if(next.length && !next.includes("Todos")) {
         await changeSelection(value.autopick);
-        setNotice(`Selecionamos os ${value.autopick.length} ativos mais líquidos de ${value.count} disponíveis. Você pode adicionar outros pelo campo abaixo.`);
+        setNotice(previous.length
+          ? `Substituímos sua seleção de ${previous.length} ${previous.length===1 ? "ativo":"ativos"} pelos ${value.autopick.length} ativos mais líquidos de ${value.count} disponíveis.`
+          : `Selecionamos os ${value.autopick.length} ativos mais líquidos de ${value.count} disponíveis. Você pode adicionar outros pelo campo abaixo.`);
+        if(previous.length)setSectorUndo(previous);
       }
     } catch(exc) {if(gen===sectorGeneration.current)setError((exc as Error).message);}
     finally {if(gen===sectorGeneration.current)setSectorBusy(false);}
@@ -123,13 +135,13 @@ export default function HomePage() {
     {session.restored && <Notice>Seleção da carteira salva carregada. Revise os ativos e clique em Analisar para atualizar os fundamentos.</Notice>}
     {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ação(ões) da carteira salva não estão na lista B3 e foram removidas da seleção.</Notice>}
     {session.restored && !!session.restoration?.truncated_count && <Notice>A seleção salva tinha {session.restoration.original_count} ações. Carregamos as primeiras 20 ações válidas para manter a análise estável.</Notice>}
-    {notice && <Notice tone="positive">{notice}</Notice>}
+    {notice && <Notice tone="positive">{notice}{sectorUndo && <> <button type="button" onClick={()=>void undoSectorChange()}>Desfazer</button></>}</Notice>}
     <div className={`home-desk${!selection.length ? " is-empty" : ""}`}>
       <section ref={panel} className="task-panel home-task" {...(mode==="collapsed" ? {"aria-label":"Seleção analisada"}:{"aria-labelledby":"home-task-title"})}>
         {mode==="collapsed" ? <SelectionSummary tickers={selection} onEdit={()=>setEditRequested(true)}/> : <>
         <h2 id="home-task-title" className="ui-section-heading">Selecione ativos para analisar</h2>
         <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
-        <TickerPicker value={selection} onChange={changeSelection} stocks={ordered} max={20} label="Buscar ações"/>
+        <TickerPicker value={selection} onChange={changeSelection} stocks={ordered} max={20} label="Buscar ações" watchlist={session.watchlist} onFavorite={ticker=>void favorite(ticker)}/>
         {!!selection.length && <>
           <div className="actions"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button><button disabled={busy} onClick={()=>void changeSelection([])}>Limpar seleção</button></div>
           <p className="caption">A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
@@ -138,7 +150,7 @@ export default function HomePage() {
         {sectorBusy && <Loading>Ordenando ações por liquidez…</Loading>}
         {!selection.length && <div className="home-quick">
           <h3>Ou escolha uma ação líquida</h3>
-          <div className="quick-start-grid">{quickTickers.map(([ticker,sector])=><button className="quick-start-button" key={ticker} onClick={()=>void startQuickAnalysis(ticker)}><strong>{ticker}</strong><span className="quick-start-sector">{sector}</span></button>)}</div>
+          <div className="quick-start-grid">{quickTickers.map(ticker=>{const sector=stockMap.get(ticker)?.sector;return <button className="quick-start-button" key={ticker} onClick={()=>void startQuickAnalysis(ticker)}><strong>{ticker}</strong>{sector && <span className="quick-start-sector">{sector}</span>}</button>;})}</div>
         </div>}
         <div className="home-source" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
         </>}
@@ -146,8 +158,8 @@ export default function HomePage() {
       {!selection.length && <aside className="home-guide" aria-labelledby="home-guide-title">
         <h2 id="home-guide-title">Como funciona</h2>
         <ol>
-          <li><strong>Escolha</strong> Filtre por setor ou pesquise diretamente pelo ticker.</li>
-          <li><strong>Compare</strong> Compare fundamentos, rentabilidade, crescimento e endividamento lado a lado.</li>
+          <li><strong>Escolha</strong> Pesquise pelo ticker ou escolha um setor em “Setores e favoritos”, abaixo.</li>
+          <li><strong>Compare</strong> Compare fundamentos, rentabilidade e crescimento lado a lado; o endividamento fica na aba Saúde financeira.</li>
           <li><strong>Aprofunde</strong> Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
         </ol>
         <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>

@@ -6,7 +6,7 @@ import Chart from "./Chart";
 import { ExportButton, formatValue, Metrics, Notice, Table, ValueText } from "./ui";
 import { PriceRange, TargetRange } from "./RangeBar";
 import type { Column } from "./ui";
-import { consensusColumns, marketColumns } from "../lib/home";
+import { comparisonColors, consensusColumns, marketColumns } from "../lib/home";
 import type { Company, HomeResult } from "../lib/home";
 
 type Props = {
@@ -46,8 +46,8 @@ const resultTabs: ResultTab[] = [
       {single ? companies.map(company=>company.indicators_available ? <div key={company.ticker}>{Object.entries(company.metric_groups).map(([group,metrics])=><div className="home-group" key={group}><h4>{group}</h4><Metrics items={metrics}/><div className="actions">{metrics.filter(metric=>metric.classification).map(metric=><span key={metric.label} className={`home-signal signal-${metric.status}`}>{metric.label}: {metric.classification}</span>)}</div></div>)}</div>:<Notice key={company.ticker}>Sem indicadores para {company.ticker}.</Notice>):<><p>Rentabilidade, margens e crescimento em % · múltiplos em × · dados ausentes: —.</p><Table columns={[{key:"ticker",label:"Ticker"},...ready.comparison_indicators.map(item=>({key:item.key,label:item.label,unit:item.unit,digits:2} as Column))]} rows={companies.map(company=>({ticker:company.ticker,...company.indicators}))} rowKey="ticker"/></>}
     </section>
   </>},
-  {id:"saude",label:"Saúde financeira",available:always,render:({companies})=><>
-    <p>Endividamento e liquidez da empresa. Dívida Líquida/PL acima de 3× e liquidez corrente abaixo de 1× são sinais de alerta; dívida líquida negativa indica caixa líquido.</p>
+  {id:"saude",label:"Saúde financeira",available:always,render:({ready,companies})=><>
+    <p>{ready.health_summary}</p>
     {companies.map(company=><div className="home-company-block" key={company.ticker}><h3>{company.ticker}{company.identity.company ? <> · {company.identity.company}</>:null}</h3>{company.health.metrics.length ? <><Metrics items={company.health.metrics}/>{company.health.diagnostics.map(diag=><Notice key={diag.text} tone={diag.status}>{diag.text}</Notice>)}</>:<Notice>Dados de endividamento não disponíveis via Fundamentus para este ticker.</Notice>}</div>)}
   </>},
   {id:"comparacao",label:"Comparação",available:(_,single)=>!single,render:({ready,companies,comparison,setComparison})=>{
@@ -55,7 +55,7 @@ const resultTabs: ResultTab[] = [
     const chartCompanies=companies.filter(company=>company.indicators_available);
     return <>
       <label>Indicador comparativo<select value={comparison} onChange={event=>setComparison(event.target.value)}>{ready.comparison_indicators.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}</select></label>
-      <Chart figure={{data:[{type:"bar",x:chartCompanies.map(company=>company.ticker),y:chartCompanies.map(company=>company.indicators[comparison]),text:chartCompanies.map(company=>{const value=company.indicators[comparison];return value===null ? "N/D":!company.indicator_available[comparison] ? "N/A":`${value.toFixed(2)}${choice?.unit==="percent" ? "%":""}`;}),textposition:"outside",cliponaxis:false,marker:{color:chartCompanies.map((_,index)=>["#8b93ff","#4fd1c5","#f6ad55","#f472b6","#63b3ed","#a78bfa","#68d391","#fbd38d","#fc8181","#7dd3fc"][index%10])}}],layout:{height:350,title:{text:`Comparativo de ${choice?.label}`},yaxis:{title:{text:choice?.unit==="percent" ? `${choice.label} (%)`:choice?.label}}}}}/>
+      <Chart figure={{data:[{type:"bar",x:chartCompanies.map(company=>company.ticker),y:chartCompanies.map(company=>company.indicators[comparison]),text:chartCompanies.map(company=>{const value=company.indicators[comparison];return value===null ? "—":`${value.toFixed(2)}${choice?.unit==="percent" ? "%":""}`;}),textposition:"outside",cliponaxis:false,marker:{color:chartCompanies.map((_,index)=>comparisonColors[index%comparisonColors.length])}}],layout:{height:350,title:{text:`Comparativo de ${choice?.label}`},yaxis:{title:{text:choice?.unit==="percent" ? `${choice.label} (%)`:choice?.label}}}}}/>
     </>;
   }},
   {id:"preco-alvo",label:"Preço-alvo",available:always,render:({ready,busy,onRefreshConsensus})=><>
