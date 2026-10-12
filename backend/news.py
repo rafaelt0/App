@@ -1,4 +1,4 @@
-"""Portfolio-bound news analysis; provider work is explicitly POST-only."""
+"""Market headlines and portfolio-bound analysis; provider work is POST-only."""
 import datetime as dt
 import hashlib
 import logging
@@ -37,9 +37,8 @@ class NewsRequest(StrictModel):
     portfolio_id: str | None = None
 
 
-@cache_data(ttl=600)
-def _fetch_brazilian_news(ticker):
-    query = urllib.parse.quote(build_news_query(ticker))
+def _fetch_news_query(query):
+    query = urllib.parse.quote(query)
     url = f"https://news.google.com/rss/search?q={query}&hl=pt-BR&gl=BR&ceid=BR:pt-419"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
     with urllib.request.urlopen(req, timeout=8) as response:
@@ -47,6 +46,40 @@ def _fetch_brazilian_news(ticker):
     if len(xml) > 2 * 1024 * 1024:
         raise ValueError("RSS excede 2 MB; feed indisponível, nenhum item pontuado")
     return parse_rss_items(xml)
+
+
+@cache_data(ttl=600)
+def _fetch_brazilian_news(ticker):
+    return _fetch_news_query(build_news_query(ticker))
+
+
+@cache_data(ttl=300)
+def _market_headlines():
+    items = _fetch_news_query('(Ibovespa OR "bolsa brasileira" OR "Banco Central" OR Selic OR "mercado financeiro") when:2d')
+    now = dt.datetime.now(dt.timezone.utc)
+    cutoff = now - dt.timedelta(hours=48)
+    articles = []
+    for item in items:
+        if not cutoff <= item["published"] <= now:
+            continue
+        importance = rank_news_importance(item["title"], item.get("summary", ""))
+        identity = _article_url_key(item["link"]) or item["title"].casefold().strip()
+        articles.append({"id": hashlib.sha256(identity.encode()).hexdigest(),
+                         "title": item["title"], "link": _safe_link(item["link"]),
+                         "provider": item["provider"] or "Fonte não informada",
+                         "published": item["published"].isoformat(),
+                         "importance_rank": importance, "importance_label": NEWS_IMPORTANCE_LABELS[importance]})
+    articles.sort(key=lambda item: (item["importance_rank"], item["published"]), reverse=True)
+    return {"ok": True, "as_of": now.isoformat(), "window_hours": 48, "articles": articles[:12]}
+
+
+@router.post("/market")
+def market_headlines():
+    try:
+        return _market_headlines()
+    except Exception:
+        logger.warning("Market news RSS unavailable", exc_info=True)
+        raise HTTPException(503, "Notícias de mercado indisponíveis no momento. Tente novamente.")
 
 
 @cache_data(ttl=60)
