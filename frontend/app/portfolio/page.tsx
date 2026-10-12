@@ -306,7 +306,7 @@ export default function PortfolioPage() {
       <Section title="Tabela de Retornos Mensais do Portfólio">
         <MonthlyReturns rows={activeResult.monthly_returns} />
       </Section>
-      {activeResult.health && <Section title="Painel de Decisão do Investidor">
+      {activeResult.health && <Section title="Diagnóstico heurístico da carteira">
         <Metrics items={[{ label: "Indicador heurístico", value: activeResult.health.score == null ? null : `${activeResult.health.score}/100` }, { label: "Diagnóstico", value: activeResult.health.label }, { label: "Cobertura", value: activeResult.health.coverage, unit: "percent" }]} />
         {activeResult.health.diagnostics.map((row, index) => <Notice key={index} tone={row.status}>{row.text}</Notice>)}
       </Section>}
@@ -322,7 +322,8 @@ export default function PortfolioPage() {
       </Section>}
       {activeResult.regime && <Section title="Regime de Mercado (Últimos 21 Dias)">
         <Metrics items={[{ label: "Regime", value: activeResult.regime.label }, { label: "Portfólio (21d)", value: activeResult.regime.portfolio, unit: "percent" }, { label: "vs IBOVESPA (21d, pp)", value: activeResult.regime.difference_pp, unit: "number" }, { label: "Volatilidade (21d, a.a.)", value: activeResult.regime.volatility, unit: "percent" }]} />
-        <Notice tone="warning">Sugestão: {activeResult.regime.advice}</Notice>
+        <Notice tone="warning">Sugestão heurística: {activeResult.regime.advice}</Notice>
+        <p className="pf-note">Regra simples sobre os últimos 21 pregões, sem previsão e sem recomendação de investimento.</p>
       </Section>}
       {activeResult.concentration && <Section title="Concentração">
         <Metrics items={[{ label: "HHI Concentração", value: activeResult.concentration.hhi, unit: "integer", help: activeResult.concentration.level }, { label: "Ativos Efetivos", value: `${activeResult.concentration.effective_assets}/${activeResult.concentration.selected_assets}` }, { label: "Maior Peso", value: activeResult.concentration.largest_weight, unit: "percent", status: activeResult.concentration.largest_signal, help: activeResult.concentration.largest_status }]} />

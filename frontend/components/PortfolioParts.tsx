@@ -23,10 +23,11 @@ export function ResultSummary({ result }: { result: PortfolioResult }) {
     ["Alocação", result.allocation_label],
     ["Ativos selecionados", String(result.sample.selected_count)],
     ["Retornos diários completos", `${result.sample.count.toLocaleString("pt-BR")} (${period(result.sample)})`],
-    ["Registro", result.saved ? "Alocação salva" : "Alocação não salva"],
+    ["Salvamento", result.saved ? "Carteira salva" : "Não foi possível salvar"],
   ];
   return <div className="pf-summary"><dl>{items.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-    {result.sample.zero_excluded && <p className="caption">Ativos com peso zero foram excluídos da amostra.</p>}</div>;
+    {result.sample.zero_excluded && <p className="caption">Ativos com peso zero foram excluídos da amostra.</p>}
+    <p className="caption">{result.saved ? "Carteira salva para esta sessão anônima; não é uma conta." : "A análise vale nesta página, mas a carteira não foi salva para esta sessão anônima."}</p></div>;
 }
 
 export function MonthlyReturns({ rows }: { rows: PortfolioResult["monthly_returns"] }) {
