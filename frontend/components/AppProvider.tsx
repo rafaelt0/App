@@ -130,7 +130,7 @@ function Shell({ children }: { children: ReactNode }) {
       {session && <section className="sidebar-watchlist" aria-labelledby="sidebar-watchlist-title">
         <h2 className="sidebar-section-label" id="sidebar-watchlist-title">Favoritos</h2>
         {watchlist.length ? <ul>{watchlist.map(ticker => <li key={ticker}><button type="button" aria-disabled={!known.has(ticker)} title={known.has(ticker) ? `Adicionar ${ticker} à seleção de Fundamentos` : `${ticker} está fora da lista B3`} onClick={() => { if (known.has(ticker)) openTicker(ticker); }}><span>{ticker}</span>{!known.has(ticker) && <small>Fora da lista B3</small>}<Icon name="arrow-right" /></button></li>)}</ul>
-          : <p className="sidebar-watchlist-empty">Use a estrela nos resultados de Fundamentos para guardar ativos aqui.</p>}
+          : <p className="sidebar-watchlist-empty">Use a estrela na busca de ações para guardar ativos aqui.</p>}
       </section>}
       <div className="sidebar-footer">
         <p className="sidebar-note"><strong>Análise quantitativa da B3</strong><span>Dados para pesquisa, não recomendações de investimento.</span></p>

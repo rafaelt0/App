@@ -55,9 +55,12 @@ export default function HomePage() {
     return () => {active=false;};
   },[]);
 
-  async function changeSelection(tickers:SelectionUpdate) {
+  async function updateSelection(tickers:SelectionUpdate) {
     if(result)setStale(true);generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);setSectorUndo(null);
-    try {await setSelection(tickers);} catch(exc) {setError((exc as Error).message);}
+    await setSelection(tickers);
+  }
+  async function changeSelection(tickers:SelectionUpdate) {
+    try {await updateSelection(tickers);} catch(exc) {setError(exc instanceof Error ? exc.message : String(exc));}
   }
   async function startQuickAnalysis(ticker:string) {
     generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);setSectorUndo(null);
@@ -141,9 +144,9 @@ export default function HomePage() {
         {mode==="collapsed" ? <SelectionSummary tickers={selection} onEdit={()=>setEditRequested(true)}/> : <>
         <h2 id="home-task-title" className="ui-section-heading">Selecione ativos para analisar</h2>
         <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
-        <TickerPicker value={selection} onChange={changeSelection} stocks={ordered} max={20} label="Buscar ações" watchlist={session.watchlist} onFavorite={ticker=>void favorite(ticker)}/>
+        <TickerPicker value={selection} onChange={updateSelection} stocks={ordered} max={20} label="Buscar ações" watchlist={session.watchlist} onFavorite={toggleFavorite}/>
         {!!selection.length && <>
-          <div className="actions"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button><button disabled={busy} onClick={()=>void changeSelection([])}>Limpar seleção</button></div>
+          <div className="actions"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button></div>
           <p className="caption">A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
           {!ready && !busy && <Notice>{stale ? "A seleção mudou. Clique em Analisar para atualizar os indicadores." : "Clique em Analisar para buscar os indicadores das ações selecionadas."}</Notice>}
         </>}
@@ -182,7 +185,7 @@ export default function HomePage() {
         </div>
         <div>
           <h3>Favoritos</h3>
-          {!session.watchlist.length && <p>Nenhum favorito ainda. Depois de analisar, use Favoritar para guardar ativos aqui.</p>}
+          {!session.watchlist.length && <p>Nenhum favorito ainda. Use a estrela na busca de ações para guardar ativos aqui.</p>}
           {session.watchlist.map(ticker=>{const full=selection.length>=20 && !selection.includes(ticker);return <div className="home-favorite-row" key={ticker}>
             {stockMap.has(ticker) ? <><button aria-disabled={full} onClick={()=>{if(!full)void changeSelection(current=>Array.from(new Set([...current,ticker])))}}>{ticker}</button>{full && <span>Seleção cheia</span>}</>:<span>{ticker} · fora da lista B3</span>}
             <button aria-label={`Remover ${ticker} dos favoritos`} onClick={()=>void favorite(ticker)}>Remover favorito</button>

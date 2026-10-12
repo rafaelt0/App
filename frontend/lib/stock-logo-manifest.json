@@ -1,0 +1,137 @@
+[
+  {
+    "company": "Petrobras",
+    "tickers": ["PETR3", "PETR4"],
+    "commonsFile": "Petrobras horizontal logo.svg",
+    "asset": "petrobras.png",
+    "author": "Petrobras - Petróleo Brasileiro S.A.",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Petrobras.svg"
+  },
+  {
+    "company": "Banco do Brasil",
+    "tickers": ["BBAS3"],
+    "commonsFile": "Banco do Brasil Logo.svg",
+    "asset": "banco-do-brasil.png",
+    "author": "Banco do Brasil S/A",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Banco_do_Brasil_Logo.svg"
+  },
+  {
+    "company": "Itaú Unibanco",
+    "tickers": ["ITUB3", "ITUB4"],
+    "commonsFile": "ITAU LOGO.svg",
+    "asset": "itau.png",
+    "author": "Banco Itaú",
+    "license": "CC0 1.0 (trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:ITAU_LOGO.svg"
+  },
+  {
+    "company": "Bradesco",
+    "tickers": ["BBDC3", "BBDC4"],
+    "commonsFile": "Banco Bradesco logo (horizontal).png",
+    "asset": "bradesco.png",
+    "author": "FDG.LINCE",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Banco_Bradesco_logo_(horizontal).png"
+  },
+  {
+    "company": "WEG",
+    "tickers": ["WEGE3"],
+    "commonsFile": "Weg logo blue vector.svg",
+    "asset": "weg.png",
+    "author": "WEG",
+    "license": "CC BY-SA 4.0 (attribution and share-alike; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Weg_logo_blue_vector.svg"
+  },
+  {
+    "company": "B3",
+    "tickers": ["B3SA3"],
+    "commonsFile": "Logotipo da B3.svg",
+    "asset": "b3.png",
+    "author": "B3",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Logotipo_da_B3.svg"
+  },
+  {
+    "company": "Ambev",
+    "tickers": ["ABEV3"],
+    "commonsFile": "Ambev logo 2015.svg",
+    "asset": "ambev.png",
+    "author": "Uploaded to Wikimedia Commons; Commons public domain text-logo classification",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Ambev_logo_2015.svg"
+  },
+  {
+    "company": "Embraer",
+    "tickers": ["EMBJ3"],
+    "commonsFile": "Embraer logo.svg",
+    "asset": "embraer.png",
+    "author": "José Maria Ramis Melquizo",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Embraer_logo.svg"
+  },
+  {
+    "company": "Suzano",
+    "tickers": ["SUZB3"],
+    "commonsFile": "Logotipo da Suzano (2019).svg",
+    "asset": "suzano.png",
+    "author": "Suzano",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Logotipo_da_Suzano_(2019).svg"
+  },
+  {
+    "company": "Gerdau",
+    "tickers": ["GGBR3", "GGBR4"],
+    "commonsFile": "Gerdau logo (2011).svg",
+    "asset": "gerdau.png",
+    "author": "Gerdau S.A.",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Gerdau_logo_(2011).svg"
+  },
+  {
+    "company": "Natura",
+    "tickers": ["NATU3"],
+    "commonsFile": "Natura logo.svg",
+    "asset": "natura.png",
+    "author": "Natura Cosméticos S.A.",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Natura_logo.svg"
+  },
+  {
+    "company": "Vale",
+    "tickers": ["VALE3"],
+    "asset": "vale.svg",
+    "author": "Vale S.A.",
+    "license": "Official brand asset; Vale trademark; no reuse license stated in source",
+    "source": "https://www.vale.com/en/investors",
+    "sourceAssetUrl": "https://www.vale.com/documents/d/guest/logo"
+  },
+  {
+    "company": "Lojas Renner",
+    "tickers": ["LREN3"],
+    "commonsFile": "Logotipo das Lojas Renner.svg",
+    "asset": "renner.png",
+    "author": "Lojas Renner",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Logotipo_das_Lojas_Renner.svg"
+  },
+  {
+    "company": "Localiza",
+    "tickers": ["RENT3"],
+    "commonsFile": "Localiza logo 2022.svg",
+    "asset": "localiza.png",
+    "author": "Localiza Rent a Car S/A",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Localiza_logo_2022.svg"
+  },
+  {
+    "company": "Magazine Luiza",
+    "tickers": ["MGLU3"],
+    "commonsFile": "Magazine Luiza (2019).svg",
+    "asset": "magalu.png",
+    "author": "Magazine Luiza",
+    "license": "Public domain (Commons: PD-textlogo; trademark retained)",
+    "source": "https://commons.wikimedia.org/wiki/File:Magazine_Luiza_(2019).svg"
+  }
+]
