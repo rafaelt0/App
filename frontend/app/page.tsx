@@ -128,7 +128,6 @@ export default function HomePage() {
   const ready=session && result && result.revision===session.revision && JSON.stringify(result.requested_tickers)===JSON.stringify(selection) ? result:null;
   if(loading || !session) return <div className="home-page"><PageHeader title="Fundamentos" description="Análise quantitativa · B3" icon="home"/>{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
   const stockMap=new Map(stocks.map(stock => [stock.ticker,stock]));
-  const ordered=[...(suggested?.tickers ?? []),...stocks.map(stock=>stock.ticker)].filter((ticker,index,array)=>array.indexOf(ticker)===index).map(ticker=>stockMap.get(ticker)).filter((stock):stock is typeof stocks[number]=>!!stock);
   const popularSectors=new Set(quickSectors.map(([,sector])=>sector));
   const allSectors=Array.from(new Set(stocks.map(stock=>stock.sector).filter(Boolean))).sort();
   const sectorOptions=["Todos",...allSectors.filter(sector=>popularSectors.has(sector)),...allSectors.filter(sector=>!popularSectors.has(sector))];
@@ -148,7 +147,7 @@ export default function HomePage() {
             <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
           </div>
         </div>
-        <TickerPicker value={selection} onChange={updateSelection} stocks={ordered} max={20} label="Buscar ações" watchlist={session.watchlist} onFavorite={toggleFavorite}/>
+        <TickerPicker value={selection} onChange={updateSelection} stocks={stocks} max={20} label="Buscar ações" watchlist={session.watchlist} onFavorite={toggleFavorite} priority={!!sectors.length && !sectors.includes("Todos") ? suggested?.tickers : undefined}/>
         {!!selection.length && <>
           <div className="actions"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button></div>
           <p className="caption">A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>

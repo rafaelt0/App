@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { download } from "../lib/api";
-import { rankStocks } from "../lib/tickerSearch";
+import { rankStocks, sortStocks, stockSorts, type StockSort } from "../lib/tickerSearch";
 import type { Stock } from "./AppProvider";
 import StockLogo from "./StockLogo";
 
@@ -172,7 +172,7 @@ export function EmptyState({ title, children, href, action, icon = "chart" }: { 
 export function Loading({ children }: { children?: ReactNode }) {
   return <div className="loading-container" role="status" aria-live="polite"><span className="loading-spinner" aria-hidden="true" /><p>{children ?? "Carregando dados para a análise."}</p><span className="loading-track" aria-hidden="true" /></div>;
 }
-export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escolha ações para analisar", watchlist = [], onFavorite }: { value: string[]; onChange: (tickers: string[]) => void | Promise<void>; stocks: Stock[]; max?: number; label?: string; watchlist?: string[]; onFavorite?: (ticker: string) => void | Promise<void> }) {
+export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escolha ações para analisar", watchlist = [], onFavorite, priority }: { value: string[]; onChange: (tickers: string[]) => void | Promise<void>; stocks: Stock[]; max?: number; label?: string; watchlist?: string[]; onFavorite?: (ticker: string) => void | Promise<void>; priority?: string[] }) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const resultRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -187,9 +187,14 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "favorites">("all");
+  const [sort, setSort] = useState<StockSort>("liquidity");
   const [announcement, setAnnouncement] = useState("");
   const [undo, setUndo] = useState<{ before: string[]; after: string[] } | null>(null);
-  const results = useMemo(() => rankStocks(filter === "favorites" ? stocks.filter(stock => watchlist.includes(stock.ticker)) : stocks, query, 40), [filter, query, stocks, watchlist]);
+  const results = useMemo(() => {
+    const pool = sortStocks(filter === "favorites" ? stocks.filter(stock => watchlist.includes(stock.ticker)) : stocks, sort);
+    const first = new Set(priority);
+    return rankStocks([...pool.filter(stock => first.has(stock.ticker)), ...pool.filter(stock => !first.has(stock.ticker))], query, 40);
+  }, [filter, priority, query, sort, stocks, watchlist]);
   const options = results.items;
   useEffect(() => {
     setActive(current => Math.min(current, Math.max(0, options.length - 1)));
@@ -275,10 +280,14 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
     }} /></div>
     <div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}><strong>{ticker}</strong>{onFavorite && <button type="button" className="ticker-chip-favorite" disabled={favoriteBusy} aria-pressed={watchlist.includes(ticker)} aria-label={watchlist.includes(ticker) ? `Remover ${ticker} dos favoritos` : `Adicionar ${ticker} aos favoritos`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => void toggleFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => void toggleTicker(ticker)}>×</button></span>)}</div>
     {open && <div className="ticker-picker-controls">
-      {(onFavorite || watchlist.length > 0) && <div className="ticker-filter" role="group" aria-label="Filtrar ações">
-        <button type="button" aria-pressed={filter === "all"} onClick={() => { setFilter("all"); setActive(0); setOpen(true); }}>Todas</button>
-        <button type="button" aria-pressed={filter === "favorites"} onClick={() => { setFilter("favorites"); setActive(0); setOpen(true); }}>Favoritos <span>{watchlist.length}</span></button>
-      </div>}
+      <div className="ticker-controls-row">
+        {(onFavorite || watchlist.length > 0) && <div className="ticker-filter" role="group" aria-label="Filtrar ações">
+          <button type="button" aria-pressed={filter === "all"} onClick={() => { setFilter("all"); setActive(0); setOpen(true); }}>Todas</button>
+          <button type="button" aria-pressed={filter === "favorites"} onClick={() => { setFilter("favorites"); setActive(0); setOpen(true); }}>Favoritos <span>{watchlist.length}</span></button>
+        </div>}
+        <label className="ticker-sort">Ordenar por<select value={sort} onChange={event => { setSort(event.target.value as StockSort); setActive(0); setOpen(true); }}>{stockSorts.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
+      </div>
+      {sort === "liquidity" && !stocks.some(stock => stock.liquidity !== null) && <p className="caption" role="status">Liquidez indisponível no momento. Exibindo ordem alfabética.</p>}
       {value.length >= max && <p className="ticker-limit-message" role="status">Limite de {max} ativos atingido. Remova um ativo antes de adicionar outro.</p>}
       {expanded && <ul className="ticker-options" aria-label={filter === "favorites" ? "Ações favoritas" : "Resultados da busca"}>{options.map((stock, index) => {
         const selected = isSelected(stock.ticker);

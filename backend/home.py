@@ -13,8 +13,8 @@ from backend.state import artifact, begin, publish, session
 from utils.formatting import extract_debt_metric, get_ev_ebitda_context
 from utils.home_data import (build_analyst_synthesis, clear_fundamentus_cache,
                              compute_sector_ranking, get_fundamentus_data, get_sector_peers)
-from utils.market_data import (clean_numeric_column, compute_target_upside, get_listed_stocks,
-                               get_market_target_data, get_sorted_tickers_by_liquidity)
+from utils.market_data import (clean_numeric_column, compute_target_upside, get_liquidity_by_ticker,
+                               get_listed_stocks, get_market_target_data, get_sorted_tickers_by_liquidity)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/home", tags=["home"])
@@ -231,6 +231,17 @@ def universe():
                            "sectors": sorted(frame["Setor"].dropna().unique()), "selection_limit": 20, "sector_autopick_limit": 8})
     except (OSError, ValueError) as exc:
         raise HTTPException(503, f"Não foi possível carregar a lista de ações da B3: {exc}") from exc
+
+
+@catalog_router.get("/universe/liquidity")
+def universe_liquidity():
+    tickers = get_listed_stocks()["Ticker"].tolist()
+    try:
+        series = get_liquidity_by_ticker()
+        liquidity = series.reindex(tickers)
+    except Exception as exc:
+        raise HTTPException(503, f"Não foi possível carregar a liquidez da Fundamentus: {exc}") from exc
+    return clean_json({"source": "Fundamentus · liquidez média diária em 2 meses (R$)", "fetched_at": series.attrs.get("fetched_at"), "liquidity": liquidity.to_dict()})
 
 
 @catalog_router.post("/universe/suggestions")
