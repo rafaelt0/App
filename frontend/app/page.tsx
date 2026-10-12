@@ -170,6 +170,10 @@ export default function HomePage() {
       </section>
       {!selection.length && <SectorMap stocks={stocks} busy={busy || sectorBusy} onSector={sector=>void changeSectors([sector])}/>}
     </div>
+    {!selection.length && <HomeTools/>}
+    {busy && <Loading>Buscando indicadores, comparação setorial e consensos dos ativos selecionados…</Loading>}
+    {error && <Notice tone="negative">{error}<button disabled={busy} onClick={()=>void (selection.length ? run(retryAction) : suggestions(sectors).then(setSuggested).catch(exc=>setError(exc.message)))}>Tentar novamente</button></Notice>}
+    {ready && <HomeResults ready={ready} selection={selection} watchlist={session.watchlist} busy={busy} onFavorite={ticker=>void favorite(ticker)} onRefreshConsensus={()=>void run("consensus")}/>}
     <details className="home-tools">
       <summary>Setores e favoritos</summary>
       <div className="home-tools-grid">
@@ -200,7 +204,6 @@ export default function HomePage() {
         </div>
       </div>
     </details>
-    {!selection.length && <HomeTools/>}
     <details className="home-guide method-disclosure">
       <summary>Como funciona</summary>
       <div className="home-guide-content">
@@ -212,8 +215,5 @@ export default function HomePage() {
         <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
       </div>
     </details>
-    {busy && <Loading>Buscando indicadores, comparação setorial e consensos dos ativos selecionados…</Loading>}
-    {error && <Notice tone="negative">{error}<button disabled={busy} onClick={()=>void (selection.length ? run(retryAction) : suggestions(sectors).then(setSuggested).catch(exc=>setError(exc.message)))}>Tentar novamente</button></Notice>}
-    {ready && <HomeResults ready={ready} selection={selection} watchlist={session.watchlist} busy={busy} onFavorite={ticker=>void favorite(ticker)} onRefreshConsensus={()=>void run("consensus")}/>}
   </div>;
 }

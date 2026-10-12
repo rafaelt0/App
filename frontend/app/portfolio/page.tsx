@@ -287,7 +287,7 @@ export default function PortfolioPage() {
           {!activeResult.benchmark_available && <Notice>Métricas relativas ao IBOVESPA e análises complementares ficam indisponíveis. Atualize as cotações quando o benchmark responder.</Notice>}
         </Section>
         <Section title="Pesos do Portfólio (%)">
-          <WeightList weights={activeResult.weights} />
+          <WeightList weights={activeResult.weights} stocks={stocks} />
           <ExportButton path={`/api/portfolio/${activeResult.id}/allocation.csv`}>Exportar alocação (CSV)</ExportButton>
         </Section>
       </div>
