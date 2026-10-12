@@ -290,3 +290,38 @@ def test_refresh_refetches_rss_and_text_and_retries_failed_inference(client, con
     assert refreshed["summary"]["counts"] == {"positive": 0, "neutral": 0, "negative": 2}
     assert refreshed["model"]["engines_used"] == ["Jev"]
     assert context.model_retry_at == 0
+
+
+def test_single_term_lexical_items_are_shown_but_excluded_from_the_note(client, monkeypatch):
+    feeds = {
+        "PETR4": [story("prejuizo", "https://publisher.example/weak")],
+        "VALE3": [story("lucro lucro", "https://publisher.example/strong")],
+        "WEGE3": [],
+    }
+    monkeypatch.setattr(news, "get_brazilian_news", lambda ticker: {"ok": True, "items": feeds[ticker]})
+    monkeypatch.setattr(news, "_cached_article_text", lambda url: "")
+    data = client.post("/api/news/analyze", json={"revision": 0}).json()
+    weak = next(article for article in data["articles"] if article["title"] == "prejuizo")
+    assert weak["intensity"] == "Evidência limitada"
+    assert weak["sentiment"] == "Pessimista"
+    summary = data["summary"]
+    # The lone weak negative word would have pulled the note to 60 at PETR4's .2 weight.
+    assert summary["counts"] == {"positive": 1, "neutral": 0, "negative": 1}
+    assert summary["coverage"] == pytest.approx(.3)
+    assert summary["raw_score"] == pytest.approx(1)
+    assert summary["score100"] == 100
+    assert summary["observation_count"] == 2  # Every article-ticker pair is displayed, scored or not.
+    assert summary["tone"][0]["state"] == "Evidência limitada"
+    assert summary["tone"][0]["contribution"] is None
+
+
+def test_only_limited_evidence_reports_no_note_instead_of_neutral(client, monkeypatch):
+    monkeypatch.setattr(news, "get_brazilian_news",
+                        lambda ticker: {"ok": True, "items": [story("lucro", f"https://publisher.example/{ticker}")]})
+    monkeypatch.setattr(news, "_cached_article_text", lambda url: "")
+    summary = client.post("/api/news/analyze", json={"revision": 0}).json()["summary"]
+    assert summary["score100"] is None
+    assert summary["raw_score"] is None
+    assert summary["coverage"] == 0
+    assert summary["label"] == "EVIDÊNCIA LIMITADA"
+    assert summary["counts"]["positive"] == 3

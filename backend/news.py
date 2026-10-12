@@ -20,7 +20,7 @@ from utils.cache import cache_data
 from utils.charts import CHART_DANGER, CHART_POSITIVE, CHART_SECONDARY, apply_plotly_theme
 from utils.news import (
     NEWS_IMPORTANCE_LABELS, _article_url_key, aggregate_ticker_sentiment,
-    analise_sentimento_pln, build_news_query, extract_article_text,
+    analise_sentimento_pln, build_news_query, extract_article_text, has_scoring_evidence,
     merge_shared_articles, parse_rss_items, rank_news_importance,
     recent_rss_sample, sentiment_intensity, ticker_tone_rows,
 )
@@ -130,11 +130,12 @@ def _safe_link(link):
 
 
 def summarize(articles, tickers, weights, feed_status):
+    # Lexical items with limited evidence are shown in counts and articles but excluded from the note.
     observations = [{"ticker": ticker, "score": item["score"]}
-                    for item in articles for ticker in item["tickers"]]
+                    for item in articles if has_scoring_evidence(item) for ticker in item["tickers"]]
     score, coverage = aggregate_ticker_sentiment(observations, weights)
     note = int((score + 1) / 2 * 100) if coverage > 0 else None
-    label = ("SEM DADOS RECENTES" if note is None else
+    label = (("SEM DADOS RECENTES" if not articles else "EVIDÊNCIA LIMITADA") if note is None else
              "FORTEMENTE OTIMISTA" if note >= 80 else "OTIMISTA" if note >= 60 else
              "NEUTRO / EQUILIBRADO" if note >= 40 else "PESSIMISTA" if note >= 20 else "FORTEMENTE PESSIMISTA")
     tone = ticker_tone_rows(articles, tickers, weights, feed_status)
@@ -154,7 +155,7 @@ def summarize(articles, tickers, weights, feed_status):
             "coverage": coverage, "status": status,
             "counts": {key: sum(item["sentiment"] == sentiment for item in articles)
                        for key, sentiment in (("positive", "Otimista"), ("neutral", "Neutro"), ("negative", "Pessimista"))},
-            "observation_count": len(observations), "tone": tone, "distribution": distribution,
+            "observation_count": sum(len(item["tickers"]) for item in articles), "tone": tone, "distribution": distribution,
             "chart": figure(chart)}
 
 
