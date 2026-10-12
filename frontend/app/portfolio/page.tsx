@@ -20,6 +20,18 @@ function valueTrend(result: PortfolioResult): number[] | undefined {
   return numbers.filter((_, index) => index % step === 0 || index === numbers.length - 1);
 }
 
+/** Mirrors the API limits in backend/portfolio.py so invalid edits never reach the server. */
+function withinLimits(inputs: PortfolioInputs): boolean {
+  return inputs.capital >= 100 && inputs.capital <= 1000000 && inputs.lookback_days >= 60 && inputs.lookback_days <= 5000 && inputs.gamma >= 0 && inputs.gamma <= 3 && Object.values(inputs.manual_shares).every(value => Number.isInteger(value) && value >= 0);
+}
+
+function hasManualShares(inputs: PortfolioInputs, selection: readonly string[]): boolean {
+  return inputs.strategy !== "manual" || selection.some(ticker => inputs.manual_shares[ticker] > 0);
+}
+
+/** Pause after the last edit before recalculating, so typing a value does not send one request per keystroke. */
+const AUTO_RECALC_DELAY_MS = 500;
+
 export default function PortfolioPage() {
   const { session, stocks, loading, error: appError, setSelection, refreshSession } = useApp();
   const [inputs, setInputs] = useState<PortfolioInputs>({ strategy: "min_volatility", capital: 10000, lookback_days: 730, manual_shares: {}, gamma: 1 });
@@ -46,6 +58,8 @@ export default function PortfolioPage() {
   const fingerprint = JSON.stringify([selectionKey, inputs]);
   const currentFingerprint = useRef(fingerprint);
   currentFingerprint.current = fingerprint;
+  const validInputs = withinLimits(inputs);
+  const manualValid = hasManualShares(inputs, session?.selection ?? []);
 
   useEffect(() => () => {
     requestGeneration.current += 1;
@@ -118,9 +132,13 @@ export default function PortfolioPage() {
     }
   }
 
+  const runAnalysisRef = useRef(runAnalysis);
+  runAnalysisRef.current = runAnalysis;
   useEffect(() => {
-    if (!busy && loadedSelection === selectionKey && lastSubmitted.current !== fingerprint && session) void runAnalysis();
-  }, [fingerprint, loadedSelection, selectionKey, session, busy, runAnalysis]);
+    if (busy || !session || loadedSelection !== selectionKey || lastSubmitted.current === fingerprint || !validInputs || !manualValid) return;
+    const timer = window.setTimeout(() => void runAnalysisRef.current(), AUTO_RECALC_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [fingerprint, loadedSelection, selectionKey, session, busy, validInputs, manualValid]);
 
   async function changeSelection(tickers: string[]) {
     if (selectionBusy) return;
@@ -181,8 +199,6 @@ export default function PortfolioPage() {
   if (loading || !session) return appError ? <Notice tone="negative">{appError}</Notice> : <Loading>Carregando lista de ações e seleção…</Loading>;
   const activeResult = resultKey === fingerprint ? result : null;
   const count = session.selection.length;
-  const manualValid = inputs.strategy !== "manual" || session.selection.some(ticker => inputs.manual_shares[ticker] > 0);
-  const validInputs = inputs.capital >= 100 && inputs.capital <= 1000000 && inputs.lookback_days >= 60 && inputs.lookback_days <= 5000 && inputs.gamma >= 0 && inputs.gamma <= 3 && Object.values(inputs.manual_shares).every(value => Number.isInteger(value) && value >= 0);
   const core = [["total_return", "Retorno Total", "percent"], ["volatility", "Volatilidade Anual", "percent"], ["sharpe", "Índice Sharpe", "ratio"], ["sortino", "Índice Sortino", "ratio"], ["max_drawdown", "Max Drawdown", "percent"]] as const;
   const extra = [["annual_return", "Retorno Anualizado", "percent"], ["beta", "Beta vs IBOV", "ratio"], ["annual_alpha", "Alpha Anual", "percent"], ["daily_var", "VaR Diário 95% (paramétrico normal)", "percent"], ["historical_var_95", "VaR Histórico 95% (diário)", "percent"], ["cvar_95", "CVaR 95% (diário)", "percent"], ["information_ratio", "Information Ratio (anualizado)", "ratio"]] as const;
 
