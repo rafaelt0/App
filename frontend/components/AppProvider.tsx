@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { api, subscribeActivity } from "../lib/api";
-import CommandPalette from "./CommandPalette";
+import CommandPalette, { SELECTION_FULL_MESSAGE } from "./CommandPalette";
 import { Icon, Loading, Notice } from "./ui";
 
 export type Stock = { ticker: string; company: string; sector: string };
@@ -33,8 +33,7 @@ let bootstrap: Promise<{ session: Session; stocks: Stock[] }> | null = null;
 
 function initialize() {
   if (!bootstrap) {
-    bootstrap = api<Session>("/api/session").then(async session => {
-      const universe = await api<{ stocks: Stock[] }>("/api/universe");
+    bootstrap = Promise.all([api<Session>("/api/session"), api<{ stocks: Stock[] }>("/api/universe")]).then(([session, universe]) => {
       return { session, stocks: universe.stocks };
     }).catch(error => { bootstrap = null; throw error; });
   }
@@ -64,6 +63,7 @@ function Shell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [palette, setPalette] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [shellError, setShellError] = useState<string | null>(null);
   const [shortcut, setShortcut] = useState("Ctrl K");
   useEffect(() => subscribeActivity(setBusy), []);
   useEffect(() => {
@@ -81,8 +81,12 @@ function Shell({ children }: { children: ReactNode }) {
   const known = new Set(stocks.map(stock => stock.ticker));
   const openTicker = useCallback((ticker: string) => {
     setOpen(false);
-    if (!selection.includes(ticker) && selection.length < 20) void setSelection(current => current.includes(ticker) ? [...current] : [...current, ticker]).catch(() => {});
-    router.push("/");
+    if (selection.includes(ticker)) { router.push("/"); return; }
+    if (selection.length >= 20) { setShellError(SELECTION_FULL_MESSAGE); return; }
+    setShellError(null);
+    void setSelection(current => current.includes(ticker) ? [...current] : [...current, ticker])
+      .then(() => router.push("/"))
+      .catch(exc => setShellError(exc instanceof Error ? exc.message : String(exc)));
   }, [router, selection, setSelection]);
   const openPage = useCallback((href: string) => { setOpen(false); router.push(href); }, [router]);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -91,17 +95,19 @@ function Shell({ children }: { children: ReactNode }) {
     setOpen(false);
     if (navRef.current?.contains(document.activeElement) && window.matchMedia("(max-width: 1023px)").matches) menuRef.current?.focus();
   };
-  useEffect(() => {
-    setCollapsed(localStorage.getItem("b3lab-sidebar") === "collapsed");
+  useLayoutEffect(() => {
+    setCollapsed(document.documentElement.dataset.sidebar === "collapsed");
   }, []);
   const toggleCollapsed = () => {
-    setCollapsed(value => {
-      localStorage.setItem("b3lab-sidebar", value ? "expanded" : "collapsed");
-      return !value;
-    });
+    const next = !collapsed;
+    setCollapsed(next);
+    if (next) document.documentElement.dataset.sidebar = "collapsed";
+    else delete document.documentElement.dataset.sidebar;
+    localStorage.setItem("b3lab-sidebar", next ? "collapsed" : "expanded");
   };
   useEffect(() => {
     setOpen(false);
+    setShellError(null);
     if (navRef.current?.contains(document.activeElement) && window.matchMedia("(max-width: 1023px)").matches) menuRef.current?.focus();
   }, [pathname]);
   useEffect(() => {
@@ -114,16 +120,16 @@ function Shell({ children }: { children: ReactNode }) {
     document.addEventListener("keydown", onEscape);
     return () => document.removeEventListener("keydown", onEscape);
   }, [open]);
-  return <div className={`app-shell${collapsed ? " is-collapsed" : ""}`}>
+  return <div className="app-shell">
     <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
     <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><div className="mobile-actions"><button type="button" aria-label="Buscar ativo ou página" onClick={() => setPalette(true)}><Icon name="search" /></button><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></div></header>
     <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
       <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
-      <button type="button" className="sidebar-search" aria-label="Buscar ativo ou página" aria-keyshortcuts="Control+K Meta+K" title={collapsed ? "Buscar" : undefined} onClick={() => setPalette(true)}><Icon name="search" /><span>Buscar</span><kbd>{shortcut}</kbd></button>
+      <button type="button" className="sidebar-search" aria-label="Buscar ativo ou página" aria-keyshortcuts="Control+K Meta+K /" title={collapsed ? "Buscar" : undefined} onClick={() => setPalette(true)}><Icon name="search" /><span>Buscar</span><kbd>{shortcut}</kbd></button>
       <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} aria-label={item.label} title={collapsed ? item.label : undefined} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>
       {session && <section className="sidebar-watchlist" aria-labelledby="sidebar-watchlist-title">
         <h2 className="sidebar-section-label" id="sidebar-watchlist-title">Favoritos</h2>
-        {watchlist.length ? <ul>{watchlist.map(ticker => <li key={ticker}><button type="button" disabled={!known.has(ticker)} title={known.has(ticker) ? `Adicionar ${ticker} à seleção de Fundamentos` : `${ticker} está fora da lista B3`} onClick={() => openTicker(ticker)}><span>{ticker}</span><Icon name="arrow-right" /></button></li>)}</ul>
+        {watchlist.length ? <ul>{watchlist.map(ticker => <li key={ticker}><button type="button" aria-disabled={!known.has(ticker)} title={known.has(ticker) ? `Adicionar ${ticker} à seleção de Fundamentos` : `${ticker} está fora da lista B3`} onClick={() => { if (known.has(ticker)) openTicker(ticker); }}><span>{ticker}</span>{!known.has(ticker) && <small>Fora da lista B3</small>}<Icon name="arrow-right" /></button></li>)}</ul>
           : <p className="sidebar-watchlist-empty">Use a estrela nos resultados de Fundamentos para guardar ativos aqui.</p>}
       </section>}
       <div className="sidebar-footer">
@@ -131,12 +137,12 @@ function Shell({ children }: { children: ReactNode }) {
         <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}</button>
       </div>
     </aside>
-    <main id="conteudo" className="main-frame" aria-busy={busy}>
+    <main id="conteudo" className="main-frame" tabIndex={-1} aria-busy={busy}>
       <div className="workspace-bar"><div className="workspace-location"><span>B3Lab</span><span aria-hidden="true">/</span><span>{currentPage?.label ?? "Pesquisa de ações"}</span></div>
         <div className="workspace-tools">{session && <span className="workspace-selection" data-empty={!selection.length}>{selection.length ? `${selection.length} ${selection.length === 1 ? "ativo selecionado" : "ativos selecionados"}` : "Nenhum ativo selecionado"}</span>}<span className="workspace-market">Mercado brasileiro <span>B3</span></span></div>
         <span className="activity-line" data-active={busy} aria-hidden="true" />
       </div>
-      <div className="main-content">{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></div>
+      <div className="main-content">{shellError && <Notice tone="negative">{shellError}</Notice>}{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></div>
     </main>
     <CommandPalette open={palette} onClose={() => setPalette(false)} pages={navigation} stocks={stocks} watchlist={watchlist} selection={selection} onPage={openPage} onTicker={openTicker} />
   </div>;
