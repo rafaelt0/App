@@ -3,6 +3,8 @@ import { formatCompactValue, formatValue } from "../../components/ui";
 import type { ScreenerColumn, Sort } from "../../lib/screener";
 import StockLogo from "../../components/StockLogo";
 
+const compactMoneyColumns = new Set(["liq2m", "patrliq"]);
+
 type Props = {
   columns: ScreenerColumn[];
   rows: Record<string, unknown>[];
@@ -31,9 +33,10 @@ export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey
       <td><span className="scr-ticker"><StockLogo ticker={ticker} company={typeof row.company === "string" ? row.company : ticker} size={24}/>{ticker}</span></td>
       {columns.map(column => {
         const currency=column.currency ?? (typeof row.currency === "string" ? row.currency : "BRL");
-        const fullValue=formatValue(row[column.key],column.unit,column.unit === "money" ? 2:column.digits,currency);
-        const compact=column.unit === "money" ? formatCompactValue(row[column.key],column.unit,1,currency) : fullValue;
-        return <td key={column.key} className={column.unit && column.unit !== "text" ? "numeric-cell" : undefined} title={compact!==fullValue ? fullValue:undefined} aria-label={compact!==fullValue ? `${column.label}: ${fullValue}`:undefined}>{compact}</td>;
+        const isCompactMoney=column.unit === "money" && compactMoneyColumns.has(column.key);
+        const fullValue=formatValue(row[column.key],column.unit,isCompactMoney ? 2:column.digits,currency);
+        const shown=isCompactMoney ? formatCompactValue(row[column.key],column.unit,1,currency) : fullValue;
+        return <td key={column.key} className={column.unit && column.unit !== "text" ? "numeric-cell" : undefined} title={shown!==fullValue ? fullValue:undefined} aria-label={shown!==fullValue ? `${column.label}: ${fullValue}`:undefined}>{shown}</td>;
       })}
     </tr>;
   })}</tbody></table></div>;

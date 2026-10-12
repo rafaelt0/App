@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import "./screener.css";
 import { useApp } from "../../components/AppProvider";
-import { ExportButton, Icon, Loading, Metrics, Notice, PageHeader, Section } from "../../components/ui";
+import { ExportButton, formatCompactValue, Icon, Loading, Metrics, Notice, PageHeader, Section } from "../../components/ui";
 import { refreshFundamentus } from "../../lib/home";
 import { activeCriteria, applyPreset, canonicalCriteria, criterionDefs, defaults, editControl, queryScreener, screenerConfig, sortKey } from "../../lib/screener";
 import type { Config, Controls, CriterionDef, CriterionKey, Result, ScreenerColumn, Sort } from "../../lib/screener";
@@ -100,6 +100,7 @@ export default function ScreenerPage() {
   const liquidityInvalid=controls.liq2m_enabled && (!Number.isFinite(controls.liq2m_min) || controls.liq2m_min<0 || controls.liq2m_min>liquidityMax);
   const invalidCriteria=liquidityInvalid || (controls.pl_enabled && controls.pl_min>controls.pl_max) || Object.values(canonicalCriteria(controls)).some(value=>typeof value==="number" && !Number.isFinite(value));
   const liquidity=Number.isFinite(controls.liq2m_min) ? controls.liq2m_min.toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:2}) : "Valor inválido";
+  const compactLiquidity=Number.isFinite(controls.liq2m_min) ? formatCompactValue(controls.liq2m_min,"money",1) : "Valor inválido";
   const inputs:Record<CriterionKey,ReactNode>={
     pl:<>
       <div className="scr-pair">
@@ -115,6 +116,7 @@ export default function ScreenerPage() {
     liq2m:<>
       <label htmlFor="scr-liquidity-range">Liquidez média em 2 meses<input id="scr-liquidity-range" type="range" min={0} max={liquidityMax} step="any" value={Number.isFinite(controls.liq2m_min) ? controls.liq2m_min:0} disabled={liquidityInvalid} aria-describedby={liquidityInvalid ? "scr-liquidity-error":undefined} aria-valuetext={liquidity} onChange={event=>edit("liq2m_min",event.currentTarget.valueAsNumber)}/></label>
       <label htmlFor="scr-liquidity-amount">Valor mínimo (R$)<input id="scr-liquidity-amount" type="number" inputMode="decimal" min={0} max={liquidityMax} step="any" value={Number.isNaN(controls.liq2m_min) ? "":controls.liq2m_min} aria-invalid={liquidityInvalid} aria-describedby={liquidityInvalid ? "scr-liquidity-error":undefined} onChange={event=>edit("liq2m_min",event.currentTarget.valueAsNumber)}/></label>
+      <output className="scr-liquidity-readout" title={liquidity}>{compactLiquidity}</output>
       {liquidityInvalid && <p className="scr-field-error" id="scr-liquidity-error">O valor deve estar entre R$ 0 e R$ 100 milhões para consultar o screener.</p>}
       <div className="scr-quick-amounts" role="group" aria-label="Valores rápidos de liquidez">{liquidityShortcuts.map(amount=><button type="button" key={amount} aria-pressed={controls.liq2m_min===amount} onClick={()=>edit("liq2m_min",amount)}>R$ {amount/1_000_000} mi</button>)}</div>
     </>,
@@ -152,7 +154,7 @@ export default function ScreenerPage() {
     <div className="scr-results" aria-busy={busy || actionBusy}>
       <div className="scr-active context-strip" tabIndex={-1} ref={barRef}>
         <p className="scr-chips-label" id="scr-active-label">Critérios ativos</p>
-        {chips.length ? <ul className="scr-chips" aria-labelledby="scr-active-label">{chips.map(chip=><li key={chip.key}><span>{chip.label}</span><button type="button" aria-label={`Remover critério ${chip.label}`} onClick={()=>removeCriterion(chip.enabled)}><span aria-hidden="true">×</span></button></li>)}</ul>:<span className="caption">Nenhum critério ativo; todos os ativos são exibidos.</span>}
+        {chips.length ? <ul className="scr-chips" aria-labelledby="scr-active-label">{chips.map(chip=><li key={chip.key}><span title={chip.title}>{chip.label}</span><button type="button" aria-label={`Remover critério ${chip.label}`} onClick={()=>removeCriterion(chip.enabled)}><span aria-hidden="true">×</span></button></li>)}</ul>:<span className="caption">Nenhum critério ativo; todos os ativos são exibidos.</span>}
         <p className="scr-count" role="status">{result && !busy && !invalidCriteria ? <><strong>{result.matched_count}</strong> de {result.total_count} ações correspondem</>:error || invalidCriteria ? "Resultado indisponível":"Atualizando resultado…"}</p>
       </div>
       {(busy || actionBusy || !config) && !error && <Loading>{actionBusy ? "Atualizando dados da Fundamentus…":"Carregando dados da B3…"}</Loading>}
