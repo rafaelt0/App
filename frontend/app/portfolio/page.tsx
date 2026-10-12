@@ -7,7 +7,7 @@ import Chart from "../../components/Chart";
 import { EmptyState, ExportButton, Loading, Metrics, Notice, PageHeader, Section, Table, TickerPicker } from "../../components/ui";
 import { ElapsedLoading, MonthlyReturns, ResultSummary, WeightList } from "../../components/PortfolioParts";
 import { api } from "../../lib/api";
-import { handoffTickers, metricSignal, period, strategies } from "../../lib/portfolio";
+import { handoffTickers, period, strategies } from "../../lib/portfolio";
 import "./portfolio.css";
 import type { PortfolioInputs, PortfolioResult, StressResult, Strategy } from "../../lib/portfolio";
 
@@ -224,7 +224,7 @@ export default function PortfolioPage() {
   const activeResult = resultKey === fingerprint ? result : null;
   const staleResult = !!result && resultKey !== fingerprint && !busy;
   const count = session.selection.length;
-  const core = [["total_return", "Retorno Total", "percent"], ["volatility", "Volatilidade Anual", "percent"], ["sharpe", "Índice Sharpe", "ratio"], ["sortino", "Índice Sortino", "ratio"], ["max_drawdown", "Max Drawdown", "percent"]] as const;
+  const core = [["total_return", "Retorno Total", "percent"], ["volatility", "Volatilidade Anual", "percent"], ["sharpe", "Índice Sharpe", "ratio"], ["sortino", "Índice Sortino", "ratio"], ["max_drawdown", "Queda máxima (Max Drawdown)", "percent"]] as const;
   const extra = [["annual_return", "Retorno Anualizado", "percent"], ["beta", "Beta vs IBOV", "ratio"], ["annual_alpha", "Alpha Anual", "percent"], ["daily_var", "VaR Diário 95% (paramétrico normal)", "percent"], ["historical_var_95", "VaR Histórico 95% (diário)", "percent"], ["cvar_95", "CVaR 95% (diário)", "percent"], ["information_ratio", "Information Ratio (anualizado)", "ratio"]] as const;
 
   return <>
@@ -281,9 +281,9 @@ export default function PortfolioPage() {
       <div className="pf-overview">
         <Section title="Resumo de Desempenho">
           <div className="pf-kpis">
-            <Metrics items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, status: metricSignal(activeResult.metric_status[key]), help: activeResult.metric_status[key], trend: key === "total_return" ? valueTrend(activeResult) : undefined }))} />
+            <Metrics items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, status: activeResult.metric_signal[key], help: `${activeResult.metric_status[key]}. ${activeResult.metric_help[key]}`, trend: key === "total_return" ? valueTrend(activeResult) : undefined }))} />
           </div>
-          {activeResult.benchmark_available && <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit }))} />}
+          {activeResult.benchmark_available && <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, help: activeResult.metric_help[key] }))} />}
           {!activeResult.benchmark_available && <Notice>Métricas relativas ao IBOVESPA e análises complementares ficam indisponíveis. Atualize as cotações quando o benchmark responder.</Notice>}
         </Section>
         <Section title="Pesos do Portfólio (%)">
@@ -325,7 +325,7 @@ export default function PortfolioPage() {
         <Notice tone="warning">Sugestão: {activeResult.regime.advice}</Notice>
       </Section>}
       {activeResult.concentration && <Section title="Concentração">
-        <Metrics items={[{ label: "HHI Concentração", value: activeResult.concentration.hhi, unit: "integer", help: activeResult.concentration.level }, { label: "Ativos Efetivos", value: `${activeResult.concentration.effective_assets}/${activeResult.concentration.selected_assets}` }, { label: "Maior Peso", value: activeResult.concentration.largest_weight, unit: "percent", status: metricSignal(activeResult.concentration.largest_status), help: activeResult.concentration.largest_status }]} />
+        <Metrics items={[{ label: "HHI Concentração", value: activeResult.concentration.hhi, unit: "integer", help: activeResult.concentration.level }, { label: "Ativos Efetivos", value: `${activeResult.concentration.effective_assets}/${activeResult.concentration.selected_assets}` }, { label: "Maior Peso", value: activeResult.concentration.largest_weight, unit: "percent", status: activeResult.concentration.largest_signal, help: activeResult.concentration.largest_status }]} />
         <Notice tone={activeResult.concentration.diagnostic_status}>{activeResult.concentration.diagnosis}</Notice>
       </Section>}
       {activeResult.charts.drawdown && <Section title="Análise de Drawdown"><Chart figure={activeResult.charts.drawdown} /><h3 className="pf-sub">Máximo Drawdown por Ativo Individual</h3><Table columns={[{ key: "ticker", label: "Ativo" }, { key: "max_drawdown", label: "Máximo Drawdown (%)", unit: "percent" }, { key: "date", label: "Data do Máximo Drawdown" }]} rows={activeResult.asset_drawdowns} rowKey="ticker" /></Section>}

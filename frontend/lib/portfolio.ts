@@ -44,11 +44,6 @@ export function period(sample: Sample): string {
   const format = (value: string) => value.split("-").reverse().join("/");
   return `${format(sample.start)} a ${format(sample.end)}`;
 }
-export function metricSignal(label: string): Signal {
-  if (["Positivo", "Baixa", "Excelente", "Bom", "Controlado", "OK"].includes(label)) return "positive";
-  if (["Negativo", "Alta", "Baixo", "Severo", "Concentrado", "Alto"].includes(label)) return "negative";
-  return label === "N/D" ? "neutral" : "warning";
-}
 export function handoffTickers(raw: string, universe: Set<string>): string[] {
   return [...new Set(raw.split(",").map(value => value.trim().toUpperCase().replace(/\.SA$/, "")).filter(value => universe.has(value)))].slice(0, 20);
 }
