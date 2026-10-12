@@ -119,6 +119,12 @@ def trade_quotes(tickers):
 
 
 def purchase_suggestion(weights, capital, quotes, failed=False):
+    total_weight = sum(weights.values())
+    if not np.isfinite(total_weight) or total_weight <= 0 or any(
+        not np.isfinite(weight) or weight < 0 for weight in weights.values()
+    ):
+        raise ValueError("Portfolio weights must be finite, nonnegative, and have positive total.")
+    weights = {ticker: weight / total_weight for ticker, weight in weights.items()}
     missing = [ticker.removesuffix(".SA") for ticker, weight in weights.items() if weight > 0 and ticker not in quotes]
     unavailable = failed or bool(missing)
     rows, total = [], 0.0
@@ -282,14 +288,28 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
         pass
     available = benchmark is not None and not benchmark.empty
     if not available:
-        warnings.append("Dados do IBOVESPA indisponíveis no momento; métricas relativas e análises complementares ficam indisponíveis. O portfólio permanece válido para simulação.")
+        warnings.append("Dados do IBOVESPA indisponíveis no momento; métricas relativas e análises que dependem do índice ficam indisponíveis. As métricas próprias do portfólio continuam disponíveis.")
     rf = (1 + daily_rf) ** 252 - 1
     historical_rf, historical_rf_source = historical_risk_free(daily.index, start, daily_rf, warnings)
     excess = daily - historical_rf
     cumulative = (1 + daily).cumprod()
     value = cumulative * payload.capital
     drawdown = drawdown_from_returns(daily)
-    metrics = {"total_return": finite_or_none((value.iloc[-1] / payload.capital - 1) * 100), "volatility": finite_or_none(daily.std() * np.sqrt(252) * 100), "sharpe": finite_or_none(qs.stats.sharpe(excess)), "sortino": finite_or_none(qs.stats.sortino(excess)), "max_drawdown": finite_or_none(drawdown.min() * 100)}
+    first_return = daily.index[0] if len(daily) else None
+    prior_closes = prices.index[prices.index < first_return] if first_return is not None else []
+    elapsed = (daily.index[-1] - prior_closes[-1]).days if len(daily) and len(prior_closes) else 0
+    historical_var, expected_shortfall = historical_var_cvar(daily)
+    metrics = {
+        "total_return": finite_or_none((value.iloc[-1] / payload.capital - 1) * 100),
+        "annual_return": finite_or_none(((value.iloc[-1] / payload.capital) ** (365.25 / elapsed) - 1) * 100) if elapsed > 0 else None,
+        "volatility": finite_or_none(daily.std() * np.sqrt(252) * 100),
+        "sharpe": finite_or_none(qs.stats.sharpe(excess)),
+        "sortino": finite_or_none(qs.stats.sortino(excess)),
+        "max_drawdown": finite_or_none(drawdown.min() * 100),
+        "daily_var": finite_or_none(qs.stats.var(daily) * 100),
+        "historical_var_95": finite_or_none(historical_var * 100),
+        "cvar_95": finite_or_none(expected_shortfall * 100),
+    }
     metric_status = {
         "total_return": NO_DATA if metrics["total_return"] is None else "Positivo" if metrics["total_return"] > 0 else "Negativo",
         "volatility": NO_DATA if metrics["volatility"] is None else "Baixa" if metrics["volatility"] < 15 else "Alta" if metrics["volatility"] > 25 else "Moderada",
@@ -314,6 +334,14 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     if quote_failed or missing:
         warnings.append("Fechamento bruto indisponível para " + ", ".join(missing or [t.removesuffix('.SA') for t, w in weights.items() if w > 0]) + "; cotas e totais aparecem como “—”.")
     result = {"strategy": payload.strategy, "mode": MODES[payload.strategy], "allocation_label": label, "capital": payload.capital, "lookback_days": payload.lookback_days, "tickers": payload.tickers, "weights": [{"ticker": ticker.removesuffix('.SA'), "weight": weight} for ticker, weight in weights.items()], "sample": {**sample_info(returns), "selected_count": len(payload.tickers), "zero_excluded": payload.strategy == "manual" and len(returns.columns) < len(payload.tickers)}, "comparison_sample": sample_info(daily) if available else None, "source": {"adjusted_prices": "Yahoo Finance Close ajustado", "trade_quotes": "Yahoo Finance Close bruto (últimos 14 dias)", "selic_source": rf_source, "selic_daily": daily_rf, "selic_annual": rf, "historical_rf": historical_rf_source}, "trade_suggestions": purchases, "trade_totals": totals, "metrics": metrics, "metric_status": metric_status, "metric_signal": {key: signal_for(label) for key, label in metric_status.items()}, "metric_help": METRIC_HELP, "inputs": {"strategy": payload.strategy, "capital": payload.capital, "lookback_days": payload.lookback_days, "gamma": payload.gamma, "manual_shares": payload.manual_shares}, "monthly_returns": years, "benchmark_available": available, "charts": charts, "warnings": warnings, "health": None, "stress": None, "regime": None, "concentration": None, "asset_drawdowns": []}
+    max_weight = max(weights.values()) * 100
+    squares = sum(weight ** 2 for weight in weights.values())
+    hhi, effective = squares * 10000, round(1 / squares, 1)
+    diagnosis = "Alta Concentração: Portfólio fortemente concentrado. Adicione ativos ou redistribua os pesos." if hhi > 5000 else f"Concentração Moderada: Apenas {effective:.1f} ativos efetivos de {len(weights)}." if hhi > 2500 else f"Boa Diversificação: {effective:.1f} ativos efetivos — distribuição equilibrada."
+    result["concentration"] = {"hhi": hhi, "effective_assets": effective, "selected_assets": len(weights), "largest_weight": max_weight, "level": "Baixo" if hhi < 2500 else "Moderado" if hhi < 5000 else "Alto", "diagnosis": diagnosis, "diagnostic_status": "negative" if hhi > 5000 else "warning" if hhi > 2500 else "positive", "largest_status": "OK" if max_weight <= 35 else "Concentrado", "largest_signal": "positive" if max_weight <= 35 else "negative"}
+    charts["drawdown"] = figure(line_chart(drawdown, "Evolução do Drawdown do Portfólio", "Drawdown", CHART_DANGER, percent=True, fill=True))
+    asset_dd = returns.apply(drawdown_from_returns)
+    result["asset_drawdowns"] = sorted([{"ticker": ticker.removesuffix('.SA'), "max_drawdown": asset_dd[ticker].min() * 100, "date": asset_dd[ticker].idxmin().date().isoformat()} for ticker in returns.columns], key=lambda row: row["max_drawdown"])
     if not available:
         return result
     cov = np.cov(daily.squeeze(), benchmark.squeeze())
@@ -331,10 +359,7 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
             pass
     else:
         warnings.append("A variação do IBOVESPA é insuficiente; beta, alfa, R² e information ratio ficaram indisponíveis.")
-    elapsed = (value.index[-1] - value.index[0]).days
-    historical_var, expected_shortfall = historical_var_cvar(daily)
-    metrics.update({"annual_return": finite_or_none(((value.iloc[-1] / payload.capital) ** (365.25 / elapsed) - 1) * 100) if elapsed > 0 else None, "beta": beta, "daily_alpha": alpha, "annual_alpha": finite_or_none(alpha * 252 * 100) if alpha is not None else None, "r_squared": r2, "information_ratio": ir, "daily_var": finite_or_none(qs.stats.var(daily) * 100), "historical_var_95": finite_or_none(historical_var * 100), "cvar_95": finite_or_none(expected_shortfall * 100)})
-    max_weight = max(weights.values()) * 100
+    metrics.update({"beta": beta, "daily_alpha": alpha, "annual_alpha": finite_or_none(alpha * 252 * 100) if alpha is not None else None, "r_squared": r2, "information_ratio": ir})
     result["health"] = health_result(metrics, max_weight)
     active = [ticker for ticker, weight in weights.items() if weight > 0]
     result["stress"] = stress_result(prices.reindex(columns=active), benchmark_prices, weights, start)
@@ -342,13 +367,6 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     recent_bench = (1 + benchmark.tail(21)).prod() - 1
     regime, advice = ("Alta", "Manter exposição. Ativos com momentum positivo podem ser aumentados.") if recent > .03 else ("Queda", "Revise os pesos. Considere reduzir exposição ou adicionar proteção (ex: BOVA11 put).") if recent < -.03 else ("Lateral", "Consolidação. Bom momento para revisar correlações e rebalancear.")
     result["regime"] = {"label": regime, "portfolio": recent * 100, "benchmark": recent_bench * 100, "difference_pp": (recent - recent_bench) * 100, "volatility": daily.tail(21).std() * np.sqrt(252) * 100, "advice": advice}
-    squares = sum(weight ** 2 for weight in weights.values())
-    hhi, effective = squares * 10000, round(1 / squares, 1)
-    diagnosis = "Alta Concentração: Portfólio fortemente concentrado. Adicione ativos ou redistribua os pesos." if hhi > 5000 else f"Concentração Moderada: Apenas {effective:.1f} ativos efetivos de {len(weights)}." if hhi > 2500 else f"Boa Diversificação: {effective:.1f} ativos efetivos — distribuição equilibrada."
-    result["concentration"] = {"hhi": hhi, "effective_assets": effective, "selected_assets": len(weights), "largest_weight": max_weight, "level": "Baixo" if hhi < 2500 else "Moderado" if hhi < 5000 else "Alto", "diagnosis": diagnosis, "diagnostic_status": "negative" if hhi > 5000 else "warning" if hhi > 2500 else "positive", "largest_status": "OK" if max_weight <= 35 else "Concentrado", "largest_signal": "positive" if max_weight <= 35 else "negative"}
-    charts["drawdown"] = figure(line_chart(drawdown, "Evolução do Drawdown do Portfólio", "Drawdown", CHART_DANGER, percent=True, fill=True))
-    asset_dd = returns.apply(drawdown_from_returns)
-    result["asset_drawdowns"] = sorted([{"ticker": ticker.removesuffix('.SA'), "max_drawdown": asset_dd[ticker].min() * 100, "date": asset_dd[ticker].idxmin().date().isoformat()} for ticker in returns.columns], key=lambda row: row["max_drawdown"])
     rolling_var = benchmark.rolling(60).var()
     rolling_beta = daily.rolling(60).cov(benchmark) / rolling_var.where(rolling_var.abs() > 1e-12)
     rolling_excess = excess.rolling(60)
