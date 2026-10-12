@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { api, subscribeActivity } from "../lib/api";
 import CommandPalette, { SELECTION_FULL_MESSAGE } from "./CommandPalette";
 import MarketStrip from "./MarketStrip";
+import MarketNewsPanel from "./MarketNewsPanel";
 import { Icon, Loading, Notice } from "./ui";
 
 export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null };
@@ -147,6 +148,7 @@ function Shell({ children }: { children: ReactNode }) {
       <div className="main-content">{shellError && <Notice tone="negative">{shellError}</Notice>}{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></div>
     </main>
     <CommandPalette open={palette} onClose={() => setPalette(false)} pages={navigation} stocks={stocks} watchlist={watchlist} selection={selection} onPage={openPage} onTicker={openTicker} />
+    <MarketNewsPanel />
   </div>;
 }
 
