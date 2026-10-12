@@ -21,7 +21,16 @@ paired with a sign, glyph, or label.
 Keep the B3Lab name, flask-and-candlestick mark, Brazilian Portuguese copy, and
 current financial behavior. Bundle fonts locally. Do not add gradients, glow,
 blur, drop shadows, decorative texture, remote font services, fake live data
-(ticker tapes, flashing prices), or color-only status.
+(invented quotes, flashing prices), or color-only status.
+
+The market strip under the workspace bar is the one scrolling element. It shows
+only provider values from `/api/market/strip`, focused on B3 and the Brazilian
+market: delayed Yahoo Finance closes for B3 indices, the dollar, and liquid B3
+stocks with a signed daily change and a ▲ or ▼ glyph, then BCB SGS macro rates
+in percent. Each item's title names its source and reference date. A failed source is listed
+as unavailable, never filled in. The strip pauses on hover, focus, and its
+pause button, and becomes a static, horizontally scrollable row under reduced
+motion.
 
 The Next.js interface defaults to dark. Tokens in `frontend/app/globals.css`,
 the chart theme in `frontend/components/Chart.tsx`, and the `CHART_*` constants
@@ -317,7 +326,8 @@ The activity line slides only while a request is in flight and appears after
 180ms, so fast requests do not flash. Keep financial values at their actual values throughout; never
 count them up or animate chart series. Keep card hover stationary and animate
 only its border. Controls use 150ms color feedback and a small press response.
-Do not animate layout or add looping decorative movement. Focus shows a 2px
+Do not animate layout or add looping decorative movement; the market strip's
+slow linear scroll is the only loop. Focus shows a 2px
 indigo outline. Under `prefers-reduced-motion: reduce`, show everything in its
 final state and disable transitions, animations, and smooth scrolling.
 
