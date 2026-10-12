@@ -23,6 +23,25 @@ COLUMN_MAP = {"cotacao": "Cotação (R$)", "pl": "P/L", "pvp": "P/VP", "dy": "Di
               "mrgliq": "Mrg. Líq. (%)", "liqc": "Liq. Corrente", "liq2m": "Liq. 2m (R$)",
               "divbpatr": "Dív. Líq./Patrim.", "c5y": "Cresc. Rec. 5a (%)", "patrliq": "Patrim. Líq. (R$)", "setor": "Setor"}
 PERCENT_FIELDS = {"dy", "roe", "roic", "mrgebit", "mrgliq", "c5y"}
+SORTABLE_FIELDS = tuple(key for key in COLUMN_MAP if key != "setor")
+# Plain-language definitions for each column; shown in the Screener glossary, not used in calculations.
+GLOSSARY = {
+    "cotacao": "Último preço negociado da ação, em reais.",
+    "pl": "Preço dividido pelo lucro por ação dos últimos 12 meses. Negativo indica prejuízo.",
+    "pvp": "Preço dividido pelo valor patrimonial por ação. Abaixo de 1 pode indicar desconto contábil.",
+    "dy": "Proventos pagos nos últimos 12 meses divididos pelo preço atual. Retorno passado; não garante proventos futuros.",
+    "roe": "Lucro dos últimos 12 meses dividido pelo patrimônio líquido.",
+    "roic": "Retorno sobre o capital investido, somando patrimônio e dívida.",
+    "evebitda": "Valor da empresa, com dívida líquida, dividido pelo EBITDA dos últimos 12 meses.",
+    "evebit": "Valor da empresa, com dívida líquida, dividido pelo EBIT dos últimos 12 meses.",
+    "mrgebit": "EBIT dividido pela receita líquida.",
+    "mrgliq": "Lucro líquido dividido pela receita líquida.",
+    "liqc": "Ativo circulante dividido pelo passivo circulante. Abaixo de 1 indica mais obrigações de curto prazo que ativos de curto prazo.",
+    "liq2m": "Média do volume negociado por dia nos últimos 2 meses, em reais.",
+    "divbpatr": "Dívida líquida dividida pelo patrimônio líquido. Negativo indica caixa líquido.",
+    "c5y": "Taxa anual composta de crescimento da receita nos últimos 5 anos.",
+    "patrliq": "Patrimônio líquido contábil, em reais.",
+}
 # Fundamentus prints 0.00 for these when a bank or insurer has no applicable value; a real 0 is not expected here.
 ZERO_MEANS_MISSING = ("psr", "evebit", "evebitda", "mrgebit", "mrgliq", "roic", "liqc", "divbpatr")
 DEFAULT_COLUMNS = ["cotacao", "pl", "pvp", "dy", "roe", "roic", "evebitda", "liq2m"]
@@ -67,12 +86,12 @@ class Criteria(StrictModel):
 
 
 class Sort(StrictModel):
-    field: Literal["liq2m", "pl", "roe", "dy"] = "liq2m"
+    field: str = "liq2m"
     direction: Literal["asc", "desc"] = "desc"
 
     @model_validator(mode="after")
     def supported(self):
-        if (self.field == "pl") != (self.direction == "asc"):
+        if self.field not in SORTABLE_FIELDS:
             raise ValueError("Ordenação não suportada.")
         return self
 
@@ -85,7 +104,7 @@ class Query(StrictModel):
 def columns():
     return [{"key": key, "label": label,
              "unit": "fraction" if key in PERCENT_FIELDS else "money" if key in ("cotacao", "liq2m", "patrliq") else "number" if key == "setor" else "multiple" if key in ("pl", "pvp", "evebitda", "evebit") else "ratio",
-             "digits": 0 if key in ("liq2m", "patrliq") else 2} for key, label in COLUMN_MAP.items()]
+             "digits": 0 if key in ("liq2m", "patrliq") else 2, "help": GLOSSARY.get(key)} for key, label in COLUMN_MAP.items()]
 
 
 def normalize_market(raw):
