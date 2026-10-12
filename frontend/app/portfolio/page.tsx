@@ -269,7 +269,7 @@ export default function PortfolioPage() {
           <button type="button" disabled={selectionBusy} onClick={() => void refreshQuotes()}>Atualizar cotações</button>
           <button type="button" onClick={() => void clearPortfolio()} disabled={selectionBusy || (count === 0 && !session.portfolio_ready)}>Limpar carteira</button>
         </div>
-        {loadedSelection === selectionKey && <p className="pf-actions-note">Após carregar, mudanças nos parâmetros recalculam a análise; trocar os ativos exige carregar novamente.</p>}
+        {loadedSelection === selectionKey && <p className="pf-actions-note">Mudanças nos parâmetros recalculam a análise sozinhas, após meio segundo sem edições e com valores válidos. Trocar os ativos exige clicar em Carregar portfólio.</p>}
       </div>
     </Section>
     {count < 2 && <EmptyState icon="portfolio" title={count === 0 ? "Monte seu portfólio" : "Adicione mais um ativo"}>Selecione pelo menos duas ações para comparar risco, retorno e diversificação.</EmptyState>}
