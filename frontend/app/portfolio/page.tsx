@@ -211,7 +211,7 @@ export default function PortfolioPage() {
             </div>
             <p className="caption">Dados a partir de {new Date(Date.now() - inputs.lookback_days * 86400000).toLocaleDateString("pt-BR")} · dias corridos.</p>
             {inputs.strategy === "manual" && <div className="pf-settings">
-              <h3 className="pf-step">Cotas por ativo</h3><p className="pf-hint">Os pesos serão calculados pelo valor de mercado das cotas informadas; o capital disponível continua sendo a base histórica e da simulação.</p>
+              <h3 className="pf-step">Cotas por ativo</h3><p className="pf-hint">Os pesos serão calculados pelo valor de mercado das cotas informadas; o capital disponível é usado só no histórico de valor do Portfólio. A Simulação tem capital inicial próprio.</p>
               <div className="controls-grid">{session.selection.map(ticker => <label key={ticker}>Cotas de {ticker}<input type="number" min={0} step={1} value={inputs.manual_shares[ticker] ?? 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>)}</div>
             </div>}
             {inputs.strategy === "markowitz" && <div className="pf-settings">
