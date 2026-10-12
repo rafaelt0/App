@@ -36,6 +36,15 @@
   from { opacity: .5; transform: translateX(-4px); }
   to { opacity: 1; transform: none; }
 }
+@keyframes b3-chip-enter {
+  from { opacity: 0; transform: translateY(4px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes b3-save {
+  0% { transform: scale(.85) rotate(-12deg); }
+  55% { transform: scale(1.15) rotate(6deg); }
+  100% { transform: none; }
+}
 
 summary { list-style: none; }
 summary::-webkit-details-marker { display: none; }
@@ -84,32 +93,46 @@ details[open] > summary::before { transform: translateY(-3px) rotate(45deg); }
   .home-sector-map { animation-delay: 160ms; }
   .home-tools-nav { animation-delay: 200ms; }
   .home-sector-strip { transform-origin: left center; animation: b3-grow 640ms var(--motion-ease-out) 240ms both; }
-  .quick-start-grid > * {
+  .quick-start-grid > *, .home-tools-nav li {
     --motion-order: 0;
-    animation: b3-fade var(--motion-duration) var(--motion-ease-out) both;
+    animation: b3-enter var(--motion-duration) var(--motion-ease-out) backwards;
     animation-delay: calc(var(--motion-order) * var(--motion-stagger));
   }
-  .quick-start-grid > :nth-child(2) { --motion-order: 1; }
-  .quick-start-grid > :nth-child(3) { --motion-order: 2; }
-  .quick-start-grid > :nth-child(4) { --motion-order: 3; }
-  .quick-start-grid > :nth-child(n + 5) { --motion-order: 4; }
+  :is(.quick-start-grid, .home-tools-nav ul) > :nth-child(2) { --motion-order: 1; }
+  :is(.quick-start-grid, .home-tools-nav ul) > :nth-child(3) { --motion-order: 2; }
+  :is(.quick-start-grid, .home-tools-nav ul) > :nth-child(4) { --motion-order: 3; }
+  :is(.quick-start-grid, .home-tools-nav ul) > :nth-child(n + 5) { --motion-order: 4; }
 
-  .notice, .loading-container, .result-lead, .ticker-options, .ticker-chip,
-  .analysis-section, .home-results-bar, .next-step-card, .sim-idle {
+  .notice, .loading-container, .result-lead,
+  .analysis-section, .home-results-bar, .next-step-card, .sim-idle,
+  .home-selection-summary, .home-tab-panel:not([hidden]) {
     animation: b3-fade 320ms var(--motion-ease-out) both;
   }
-  .mcard-grid > *, .home-summary > *, .news-list > li {
+  .ticker-picker-controls { animation: b3-pop 200ms var(--motion-ease-out) both; }
+  .ticker-chip { animation: b3-chip-enter 240ms var(--motion-ease-out) both; }
+  .home-favorite-toggle[aria-pressed="true"] > svg,
+  .ticker-chip-favorite[aria-pressed="true"],
+  .ticker-option-favorite[aria-pressed="true"] {
+    animation: b3-save 360ms var(--motion-ease-out);
+  }
+  .ticker-option-check { transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast); }
+  .ticker-option-select[aria-pressed="true"] .ticker-option-check {
+    animation: b3-chip-enter 200ms var(--motion-ease-out) both;
+  }
+  .sidebar nav a { transition: background-color var(--transition-fast), color var(--transition-fast); }
+
+  .mcard-grid > *, .home-summary > *, .news-list > li, .home-sector-list > li {
     --motion-order: 0;
     animation: b3-fade var(--motion-duration) var(--motion-ease-out) both;
     animation-delay: calc(var(--motion-order) * var(--motion-stagger));
   }
-  :is(.mcard-grid, .home-summary, .news-list) > :nth-child(2) { --motion-order: 1; }
-  :is(.mcard-grid, .home-summary, .news-list) > :nth-child(3) { --motion-order: 2; }
-  :is(.mcard-grid, .home-summary, .news-list) > :nth-child(4) { --motion-order: 3; }
-  :is(.mcard-grid, .home-summary, .news-list) > :nth-child(n + 5) { --motion-order: 4; }
+  :is(.mcard-grid, .home-summary, .news-list, .home-sector-list) > :nth-child(2) { --motion-order: 1; }
+  :is(.mcard-grid, .home-summary, .news-list, .home-sector-list) > :nth-child(3) { --motion-order: 2; }
+  :is(.mcard-grid, .home-summary, .news-list, .home-sector-list) > :nth-child(4) { --motion-order: 3; }
+  :is(.mcard-grid, .home-summary, .news-list, .home-sector-list) > :nth-child(n + 5) { --motion-order: 4; }
 
   .plotly-chart .svg-container { animation: b3-fade 400ms var(--motion-ease-out) both; }
-  .pf-weight-fill, .sim-bar > span, .analyst-synthesis-meter > span, .news-model-fill, .mcard-meter > span, .range-fill {
+  .pf-strip, .pf-weight-fill, .sim-bar > span, .analyst-synthesis-meter > span, .news-model-fill, .mcard-meter > span, .range-fill {
     transform-origin: left center;
     animation: b3-grow 640ms var(--motion-ease-out) both;
   }
@@ -130,4 +153,8 @@ details[open] > summary::before { transform: translateY(-3px) rotate(45deg); }
     .sidebar.is-open nav a:nth-child(4) { animation-delay: 90ms; }
     .sidebar.is-open nav a:nth-child(5) { animation-delay: 120ms; }
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-page .home-tools-nav a .home-tool-arrow { transform: none !important; }
 }
