@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Context = { params: Promise<{ path: string[] }> };
-const domains: Record<string, true> = { session: true, universe: true, watchlist: true, home: true, screener: true, portfolio: true, simulation: true, news: true, fundamentus: true };
+const domains: Record<string, true> = { session: true, universe: true, watchlist: true, home: true, screener: true, portfolio: true, simulation: true, news: true, fundamentus: true, market: true };
 
 async function forward(request: NextRequest, context: Context) {
   const { path } = await context.params;

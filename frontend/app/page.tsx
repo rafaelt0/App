@@ -7,6 +7,7 @@ import type { SelectionUpdate } from "../components/AppProvider";
 import SelectionSummary from "./SelectionSummary";
 import SectorIcon from "../components/SectorIcon";
 import HomeResults from "../components/HomeResults";
+import { HomeHero, HomeTools, SectorMap } from "./HomeHero";
 import { Loading, Notice, PageHeader, TickerPicker } from "../components/ui";
 import { analyzeHome, currentAnalysis, quickSectors, quickTickers, refreshConsensus, refreshFundamentus, suggestions } from "../lib/home";
 import type { HomeResult, Suggestions } from "../lib/home";
@@ -136,7 +137,7 @@ export default function HomePage() {
   const sectorOptions=["Todos",...allSectors.filter(sector=>popularSectors.has(sector)),...allSectors.filter(sector=>!popularSectors.has(sector))];
   const mode:"edit"|"collapsed"=ready && !editRequested ? "collapsed":"edit";
   return <div className="home-page">
-    <PageHeader title="Fundamentos" description="Explore fundamentos, compare empresas e aprofunde sua análise da B3." icon="home"/>
+    {selection.length ? <PageHeader title="Fundamentos" description="Explore fundamentos, compare empresas e aprofunde sua análise da B3." icon="home"/> : <HomeHero/>}
     {session.restored && <Notice>Seleção da carteira salva carregada. Revise os ativos e clique em Analisar para atualizar os fundamentos.</Notice>}
     {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ação(ões) da carteira salva não estão na lista B3 e foram removidas da seleção.</Notice>}
     {session.restored && !!session.restoration?.truncated_count && <Notice>A seleção salva tinha {session.restoration.original_count} ações. Carregamos as primeiras 20 ações válidas para manter a análise estável.</Notice>}
@@ -159,11 +160,15 @@ export default function HomePage() {
         {sectorBusy && <Loading>Ordenando ações por liquidez…</Loading>}
         {!selection.length && <div className="home-quick">
           <h3>Ou escolha uma ação líquida</h3>
-          <div className="quick-start-grid">{quickTickers.map(ticker=>{const sector=stockMap.get(ticker)?.sector;return <button className="quick-start-button" key={ticker} onClick={()=>void startQuickAnalysis(ticker)}><img className="quick-start-logo" src={`/logos/${ticker.slice(0,4)}.svg`} alt="" width="32" height="32"/><span className="quick-start-text"><strong>{ticker}</strong>{sector && <span className="quick-start-sector">{sector}</span>}</span></button>;})}</div>
+          <div className="quick-start-grid">{quickTickers.map(ticker=>{const stock=stockMap.get(ticker);return <button className="quick-start-button" key={ticker} onClick={()=>void startQuickAnalysis(ticker)}>
+            <img className="quick-start-logo" src={`/logos/${ticker.slice(0,4)}.svg`} alt="" width="40" height="40"/>
+            <span className="quick-start-text"><strong>{ticker}</strong>{stock?.company && <span className="quick-start-company">{stock.company}</span>}{stock?.sector && <span className="quick-start-sector">{stock.sector}</span>}</span>
+          </button>;})}</div>
         </div>}
         <div className="home-source context-strip" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
         </>}
       </section>
+      {!selection.length && <SectorMap stocks={stocks} busy={busy || sectorBusy} onSector={sector=>void changeSectors([sector])}/>}
     </div>
     <details className="home-tools">
       <summary>Setores e favoritos</summary>
@@ -195,11 +200,12 @@ export default function HomePage() {
         </div>
       </div>
     </details>
+    {!selection.length && <HomeTools/>}
     <details className="home-guide method-disclosure">
       <summary>Como funciona</summary>
       <div className="home-guide-content">
         <ol>
-          <li><strong>Escolha</strong> Pesquise pelo ticker ou escolha um setor em “Setores e favoritos”, abaixo.</li>
+          <li><strong>Escolha</strong> Pesquise pelo ticker ou escolha um setor em “Setores e favoritos”, acima.</li>
           <li><strong>Compare</strong> Compare fundamentos, rentabilidade e crescimento lado a lado; o endividamento fica na aba Saúde financeira.</li>
           <li><strong>Aprofunde</strong> Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
         </ol>
