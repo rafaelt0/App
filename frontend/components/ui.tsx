@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { download } from "../lib/api";
 import { rankStocks } from "../lib/tickerSearch";
 import type { Stock } from "./AppProvider";
+import StockLogo from "./StockLogo";
 
 export type Unit = "money" | "fraction" | "percent" | "ratio" | "multiple" | "number" | "integer" | "text";
 export type Signal = "positive" | "negative" | "warning" | "neutral" | "info";
@@ -171,41 +172,136 @@ export function EmptyState({ title, children, href, action, icon = "chart" }: { 
 export function Loading({ children }: { children?: ReactNode }) {
   return <div className="loading-container" role="status" aria-live="polite"><span className="loading-spinner" aria-hidden="true" /><p>{children ?? "Carregando dados para a análise."}</p><span className="loading-track" aria-hidden="true" /></div>;
 }
-export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escolha ações para analisar", watchlist = [], onFavorite }: { value: string[]; onChange: (tickers: string[]) => void | Promise<void>; stocks: Stock[]; max?: number; label?: string; watchlist?: string[]; onFavorite?: (ticker: string) => void }) {
+export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escolha ações para analisar", watchlist = [], onFavorite }: { value: string[]; onChange: (tickers: string[]) => void | Promise<void>; stocks: Stock[]; max?: number; label?: string; watchlist?: string[]; onFavorite?: (ticker: string) => void | Promise<void> }) {
   const id = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const resultRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const changeLock = useRef(false);
+  const favoriteLock = useRef(false);
+  const dismissed = useRef(false);
+  const pendingFocus = useRef<number | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const results = useMemo(() => rankStocks(stocks.filter(stock => !value.includes(stock.ticker)), query, 40), [query, stocks, value]);
+  const [filter, setFilter] = useState<"all" | "favorites">("all");
+  const [announcement, setAnnouncement] = useState("");
+  const [undo, setUndo] = useState<{ before: string[]; after: string[] } | null>(null);
+  const results = useMemo(() => rankStocks(filter === "favorites" ? stocks.filter(stock => watchlist.includes(stock.ticker)) : stocks, query, 40), [filter, query, stocks, watchlist]);
   const options = results.items;
-  async function change(next: string[]) {
-    if (busy) return;
-    setBusy(true); setError(null);
-    try { await onChange(next); }
+  useEffect(() => {
+    setActive(current => Math.min(current, Math.max(0, options.length - 1)));
+    const target = pendingFocus.current;
+    if (target !== null && open && options.length) {
+      pendingFocus.current = null;
+      resultRefs.current[Math.min(target, options.length - 1)]?.focus();
+    }
+  }, [open, options.length]);
+  const isSelected = (ticker: string) => value.includes(ticker);
+  async function change(next: string[], message: string, saveUndo = true) {
+    if (changeLock.current) return false;
+    changeLock.current = true;
+    setBusy(true); setError(null); setAnnouncement("");
+    const previous = [...value];
+    try {
+      await onChange(next);
+      setUndo(saveUndo ? { before: previous, after: next } : null);
+      setAnnouncement(message);
+      return true;
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+      setAnnouncement("A seleção não foi alterada.");
+      return false;
+    } finally {
+      changeLock.current = false;
+      setBusy(false);
+    }
+  }
+  async function toggleTicker(ticker: string) {
+    if (changeLock.current) return;
+    if (isSelected(ticker)) {
+      const next = value.filter(item => item !== ticker);
+      await change(next, `${ticker} removida da seleção.`);
+      return;
+    }
+    if (value.length >= max) {
+      setError(`Limite de ${max} ativos. Remova um ativo antes de adicionar outro.`);
+      setAnnouncement(`Limite de ${max} ativos atingido.`);
+      return;
+    }
+    await change([...value, ticker], `${ticker} adicionada à seleção.`);
+  }
+  async function toggleFavorite(ticker: string) {
+    if (!onFavorite || favoriteLock.current) return;
+    favoriteLock.current = true;
+    setFavoriteBusy(true); setError(null);
+    try { await onFavorite(ticker); }
     catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
-    finally { setBusy(false); }
+    finally { favoriteLock.current = false; setFavoriteBusy(false); }
   }
-  function pick(ticker: string) {
-    if (busy) return;
-    setQuery(""); setActive(0); setOpen(false);
-    void change([...value, ticker]);
+  function moveFocus(index: number) {
+    const next = Math.max(0, Math.min(index, options.length - 1));
+    setActive(next);
+    resultRefs.current[next]?.focus();
   }
-  const expanded = open && options.length > 0 && value.length < max;
-  return <div className="ticker-picker"><label htmlFor={id}>{label}</label>
-    <div className="ticker-search"><Icon name="search" /><input id={id} role="combobox" type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} disabled={value.length >= max} aria-busy={busy} aria-autocomplete="list" aria-expanded={expanded} aria-controls={`${id}-options`} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined} onFocus={() => setOpen(true)} onClick={() => setOpen(true)} onBlur={() => setOpen(false)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
-      if (event.key === "Escape") { event.preventDefault(); if (!expanded) setQuery(""); setOpen(false); }
-      if (event.key === "ArrowDown") { event.preventDefault(); if (!expanded) { setOpen(true); setActive(0); } else setActive(index => Math.min(index + 1, options.length - 1)); }
-      if (event.key === "ArrowUp") { event.preventDefault(); setActive(index => Math.max(index - 1, 0)); }
-      if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); pick(options[active].ticker); }
-    }} />
-    </div>
-    <div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}>{ticker}{onFavorite && <button type="button" className="ticker-chip-favorite" aria-pressed={watchlist.includes(ticker)} aria-label={`Favoritar ${ticker}`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => onFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => change(value.filter(item => item !== ticker))}>×</button></span>)}</div>
-    {expanded && <ul className="ticker-options" id={`${id}-options`} role="listbox">{options.map((stock, index) => <li key={stock.ticker} id={`${id}-option-${index}`} role="option" aria-selected={active === index}><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => pick(stock.ticker)}><strong>{stock.ticker}</strong><span>{[stock.company, stock.sector].filter(Boolean).join(" · ") || "Setor não informado"}</span></button></li>)}</ul>}
-    {open && query.trim() && !options.length && value.length < max && <p className="caption ticker-search-empty" role="status">Nenhuma ação encontrada para “{query.trim()}”. Tente o ticker ou parte do nome.</p>}
+  function closePicker(restoreFocus: boolean) {
+    dismissed.current = true;
+    setOpen(false);
+    if (restoreFocus) inputRef.current?.focus();
+    window.setTimeout(() => { dismissed.current = false; }, 0);
+  }
+  const expanded = open && options.length > 0;
+  const canUndo = !!undo && value.length === undo.after.length && value.every((ticker, index) => ticker === undo.after[index]);
+  return <div className="ticker-picker" onBlurCapture={event => {
+    const next = event.relatedTarget;
+    const picker = event.currentTarget;
+    if (next instanceof Node) {
+      if (!picker.contains(next)) setOpen(false);
+    } else {
+      queueMicrotask(() => { if (!picker.contains(document.activeElement)) setOpen(false); });
+    }
+  }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); closePicker(true); } }}>
+    <label htmlFor={id}>{label}</label>
+    <div className="ticker-search"><Icon name="search" /><input ref={inputRef} id={id} type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} aria-busy={busy} aria-label={`${label}: buscar ticker ou empresa`} onFocus={() => { if (dismissed.current) dismissed.current = false; else setOpen(true); }} onClick={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
+      if (event.key === "Escape") { event.preventDefault(); closePicker(false); }
+      if (event.key === "ArrowDown" && options.length) {
+        event.preventDefault();
+        if (open) moveFocus(active);
+        else { pendingFocus.current = active; setOpen(true); }
+      }
+      if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); void toggleTicker(options[active].ticker); }
+    }} /></div>
+    <div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}><strong>{ticker}</strong>{onFavorite && <button type="button" className="ticker-chip-favorite" disabled={favoriteBusy} aria-pressed={watchlist.includes(ticker)} aria-label={watchlist.includes(ticker) ? `Remover ${ticker} dos favoritos` : `Adicionar ${ticker} aos favoritos`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => void toggleFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => void toggleTicker(ticker)}>×</button></span>)}</div>
+    {open && <div className="ticker-picker-controls">
+      {(onFavorite || watchlist.length > 0) && <div className="ticker-filter" role="group" aria-label="Filtrar ações">
+        <button type="button" aria-pressed={filter === "all"} onClick={() => { setFilter("all"); setActive(0); setOpen(true); }}>Todas</button>
+        <button type="button" aria-pressed={filter === "favorites"} onClick={() => { setFilter("favorites"); setActive(0); setOpen(true); }}>Favoritos <span>{watchlist.length}</span></button>
+      </div>}
+      {value.length >= max && <p className="ticker-limit-message" role="status">Limite de {max} ativos atingido. Remova um ativo antes de adicionar outro.</p>}
+      {expanded && <ul className="ticker-options" aria-label={filter === "favorites" ? "Ações favoritas" : "Resultados da busca"}>{options.map((stock, index) => {
+        const selected = isSelected(stock.ticker);
+        const favorite = watchlist.includes(stock.ticker);
+        return <li className="ticker-option" key={stock.ticker}>
+          <button ref={node => { resultRefs.current[index] = node; }} type="button" className="ticker-option-select" aria-pressed={selected} aria-disabled={busy} onFocus={() => setActive(index)} onKeyDown={event => {
+            if (event.key === "ArrowDown") { event.preventDefault(); moveFocus(index + 1); }
+            if (event.key === "ArrowUp") { event.preventDefault(); if (index === 0) inputRef.current?.focus(); else moveFocus(index - 1); }
+          }} onClick={event => { void toggleTicker(stock.ticker); if (event.detail !== 0) inputRef.current?.focus(); }}>
+            <span className="ticker-option-check" aria-hidden="true">{selected ? "✓" : "+"}</span>
+            <StockLogo ticker={stock.ticker} company={stock.company} />
+            <span className="ticker-option-copy"><strong>{stock.ticker}</strong><span>{stock.company || "Empresa não informada"}</span><small>{stock.sector || "Setor não informado"}</small></span>
+            <span className={`ticker-option-state${selected ? " is-selected" : ""}`}>{selected ? "Selecionada · remover" : "Adicionar"}</span>
+          </button>
+          {onFavorite && <button type="button" className="ticker-option-favorite" aria-disabled={favoriteBusy} aria-pressed={favorite} aria-label={favorite ? `Remover ${stock.ticker} dos favoritos` : `Adicionar ${stock.ticker} aos favoritos`} title={favorite ? `Remover ${stock.ticker} dos favoritos` : `Adicionar ${stock.ticker} aos favoritos`} onClick={() => void toggleFavorite(stock.ticker)}>{favorite ? "★" : "☆"}</button>}
+        </li>;
+      })}</ul>}
+      {query.trim() && !options.length && <p className="caption ticker-search-empty" role="status">{filter === "favorites" && !watchlist.length ? "Você ainda não tem ações favoritas." : `Nenhuma ação encontrada para “${query.trim()}”. Tente o ticker ou parte do nome.`}</p>}
+      {filter === "favorites" && !query.trim() && !options.length && <p className="caption ticker-search-empty" role="status">Você ainda não tem ações favoritas.</p>}
+    </div>}
     {expanded && results.total > options.length && <p className="caption" role="status">Mostrando {options.length} de {results.total} resultados; refine a busca.</p>}
-    <p className="caption" role="status">{value.length}/{max} ativos selecionados.</p>{error && <Notice tone="negative">{error}</Notice>}
+    <div className="ticker-picker-footer"><p className="caption">{value.length}/{max} ativos selecionados.</p><div>{canUndo && undo && <button type="button" className="ticker-picker-text-button" disabled={busy} onClick={() => void change(undo.before, "Seleção anterior restaurada.", false)}>Desfazer</button>}{value.length > 0 && <button type="button" className="ticker-picker-text-button" disabled={busy} onClick={() => void change([], "Seleção limpa.")}>Limpar</button>}</div></div>
+    <p className="ticker-picker-announcement" role="status" aria-live="polite">{announcement}</p>{error && <Notice tone="negative">{error}</Notice>}
   </div>;
 }
 export function ExportButton({ path, children }: { path: string; children: ReactNode }) {

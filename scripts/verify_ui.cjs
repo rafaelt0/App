@@ -60,15 +60,15 @@ async function main() {
     // A search selection is persisted by the real API without running market analyses.
     await page.goto(baseUrl);
     await settled();
-    const picker = page.getByRole("combobox", { name: "Buscar ações" });
+    const picker = page.getByRole("searchbox", { name: /^Buscar ações/ });
     await picker.fill("WEGE3");
     await picker.press("ArrowDown");
     await picker.press("ArrowUp");
     await picker.press("Enter");
     await page.getByRole("button", { name: "Remover WEGE3", exact: true }).waitFor();
     await check("ticker-selected");
-    await page.getByRole("button", { name: "Favoritar WEGE3", exact: true }).click();
-    await page.waitForFunction(() => document.querySelector('[aria-label="Favoritar WEGE3"]')?.getAttribute("aria-pressed") === "true");
+    await page.getByRole("button", { name: "Adicionar WEGE3 aos favoritos", exact: true }).first().click();
+    await page.waitForFunction(() => document.querySelector('.ticker-chip-favorite[aria-label="Remover WEGE3 dos favoritos"]')?.getAttribute("aria-pressed") === "true");
     await page.screenshot({ path: path.join(output, "home-selected-1440.png"), fullPage: true });
 
     await page.setViewportSize({ width: 375, height: 1000 });
@@ -112,7 +112,7 @@ async function main() {
       await page.goto(baseUrl);
       await settled();
       for (const ticker of ["PETR4", "VALE3"]) {
-        const search = page.getByRole("combobox", { name: "Buscar ações" });
+        const search = page.getByRole("searchbox", { name: /^Buscar ações/ });
         await search.fill(ticker);
         await search.press("Enter");
         await page.getByRole("button", { name: `Remover ${ticker}`, exact: true }).waitFor();
