@@ -5,8 +5,10 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import "./simulacao.css";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
+import { ElapsedLoading } from "../../components/PortfolioParts";
 import { ExportButton, formatValue, Icon, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
 import { api } from "../../lib/api";
+import type { PortfolioResult, Sample } from "../../lib/portfolio";
 import {
   displayedTrajectories, initialInputs, periodLabel, polishFigure, sameInputs, simulationPresets,
   type CalibrationWindow, type SimulationInputs, type SimulationPortfolio, type SimulationResult,
@@ -28,6 +30,9 @@ export default function SimulationPage() {
   const [error, setError] = useState<string | null>(null);
   const [restoreFailed, setRestoreFailed] = useState(false);
   const [restoredNotice, setRestoredNotice] = useState(false);
+  const [sample, setSample] = useState<Sample | null>(null);
+  const [portfolioChanged, setPortfolioChanged] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const generation = useRef(0);
   const restoreRequest = useRef<{ revision: number; promise: Promise<unknown> } | null>(null);
   const activeRevision = useRef(session?.revision);
@@ -61,8 +66,22 @@ export default function SimulationPage() {
           setRestoredNotice(true);
           await refreshSessionRef.current();
         }
-        const snapshot = await api<SimulationPortfolio>("/api/portfolio");
-        if (!cancelled && activeRevision.current === revision && token === generation.current) setPortfolio(snapshot);
+        // Reads only: the owned analysis and last run for this selection are shown, never recalculated.
+        const [snapshot, analysis, run] = await Promise.all([
+          api<SimulationPortfolio>("/api/portfolio"),
+          api<PortfolioResult | null>("/api/portfolio/current"),
+          api<SimulationResult | null>("/api/simulation/current"),
+        ]);
+        if (cancelled || activeRevision.current !== revision || token !== generation.current) return;
+        setPortfolio(snapshot);
+        setSample(analysis?.sample ?? null);
+        if (run) {
+          const { calibration, simulations, initial_capital, years } = run.inputs;
+          setInputs({ calibration, simulations, initial_capital, years });
+          setResult(run);
+          setDisplayCount(Math.min(10, run.inputs.simulations));
+          setDisplayDraft(String(Math.min(10, run.inputs.simulations)));
+        }
       } catch (cause) {
         if (!cancelled && activeRevision.current === revision && token === generation.current) {
           setError(cause instanceof Error ? cause.message : String(cause));
@@ -75,17 +94,18 @@ export default function SimulationPage() {
     void prepare();
     return () => { cancelled = true; };
     // Session readiness, not result or form state, controls portfolio restoration.
-  }, [loading, contextRevision, returnReady, portfolioReady, restoredContext]);
+  }, [loading, contextRevision, returnReady, portfolioReady, restoredContext, reloadKey]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || !portfolio?.id || !portfolio.simulation_ready) return;
+    if (!session || !portfolio?.id || !portfolio.simulation_ready || !inputsValid) return;
     const token = ++generation.current;
     const revision = session.revision;
     const portfolioId = portfolio.id;
     const submitted = { ...inputs, revision, portfolio_id: portfolioId };
     setRunning(true);
     setError(null);
+    setPortfolioChanged(false);
     setResult(null);
     try {
       const calculated = await api<SimulationResult>("/api/simulation/run", submitted);
@@ -95,13 +115,25 @@ export default function SimulationPage() {
       setDisplayDraft(String(Math.min(10, calculated.inputs.simulations)));
       await refreshSession();
     } catch (cause) {
-      if (token === generation.current && activeRevision.current === revision) setError(cause instanceof Error ? cause.message : String(cause));
+      if (token === generation.current && activeRevision.current === revision) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setError(message);
+        setPortfolioChanged(/mudou/.test(message));
+      }
     } finally {
       if (token === generation.current) setRunning(false);
     }
   }
 
-  const visible = result && session && result.revision === session.revision && result.portfolio_id === portfolio?.id && sameInputs(inputs, result.inputs) ? result : null;
+  // The last run stays visible for the same portfolio; changed parameters mark it as outdated instead of hiding it.
+  const sameContext = !!result && !!session && result.revision === session.revision && result.portfolio_id === portfolio?.id;
+  const visible = sameContext ? result : null;
+  const stale = !!visible && !sameInputs(inputs, visible.inputs);
+  const simulationsValid = Number.isInteger(inputs.simulations) && inputs.simulations >= 10 && inputs.simulations <= 3000;
+  const capitalValid = Number.isFinite(inputs.initial_capital) && inputs.initial_capital >= 100;
+  const yearsValid = Number.isInteger(inputs.years) && inputs.years >= 1 && inputs.years <= 10;
+  const inputsValid = simulationsValid && capitalValid && yearsValid;
+  const calibrationText = inputs.calibration === "portfolio" ? "histórico do portfólio" : `últimos ${inputs.calibration} anos até hoje`;
   const individual = useMemo(() => visible ? displayedTrajectories(visible.charts.individual, displayCount) : null, [visible, displayCount]);
   const ready = !!portfolio?.id && portfolio.simulation_ready && portfolio.revision === session?.revision;
   const rawWeights = portfolio ? portfolio.tickers.map(ticker => ({ ticker, weight: portfolio.weights[ticker] })) : [];
@@ -114,6 +146,8 @@ export default function SimulationPage() {
 
   const prerequisite = restoreFailed
     ? { title: "Não foi possível restaurar a carteira", message: "A carteira salva foi encontrada, mas seu histórico não pôde ser carregado. Abra Portfólio e carregue a análise novamente." }
+    : session?.selection.length === 1
+      ? { title: "Adicione mais um ativo", message: "A simulação precisa de pelo menos duas ações na carteira. Adicione mais um ativo na Portfólio para simular." }
     : session?.selection.length
       ? { title: "Atualize o portfólio", message: "A seleção atual não possui histórico analisado. Volte para Portfólio e clique em Carregar portfólio antes de rodar a simulação." }
       : { title: "Portfólio não configurado", message: "Configure seu portfólio na página Portfólio e carregue a análise para liberar a Simulação Monte Carlo." };
@@ -122,6 +156,7 @@ export default function SimulationPage() {
     <PageHeader title="Simulação de portfólio" description="Projete faixas de retorno e risco a partir dos pesos definidos na carteira." icon="simulation" />
     {sessionError && <Notice tone="negative">{sessionError}</Notice>}
     {error && <Notice tone="negative">{error}</Notice>}
+    {portfolioChanged && <Notice tone="warning">A carteira mudou em outra aba ou página. <button type="button" onClick={() => { setPortfolioChanged(false); setError(null); setReloadKey(key => key + 1); void refreshSession(); }}>Atualizar carteira</button></Notice>}
     {loading || preparing ? <Loading>Restaurando contexto da carteira…</Loading> : !ready ?
       <section className="sim-prereq" aria-labelledby="sim-prereq-title">
         <div className="sim-prereq-main">
@@ -143,7 +178,7 @@ export default function SimulationPage() {
       </section> : <>
       {restoredNotice && <Notice>Carteira salva restaurada. Confira os ativos e pesos antes de rodar a simulação.</Notice>}
       <div className="sim-workbench">
-        <form className="sim-form" onSubmit={submit} aria-busy={running}>
+        <form className="sim-form" onSubmit={submit} aria-busy={running} noValidate>
           <div className="task-panel sim-task">
             <h2 className="ui-section-heading">Parâmetros da simulação</h2>
             <p className="sim-step">Ponto de partida</p>
@@ -157,16 +192,19 @@ export default function SimulationPage() {
             </div>
             <div className="controls-grid">
               <label>Número de simulações (trajetórias)
-                <input type="number" required min={10} max={3000} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-n" value={Number.isNaN(inputs.simulations) ? "" : inputs.simulations} onChange={event => setInputs(current => ({ ...current, simulations: event.target.valueAsNumber }))} />
+                <input type="number" required min={10} max={3000} step={1} inputMode="numeric" disabled={running} aria-invalid={!simulationsValid} aria-describedby={simulationsValid ? "sim-help-n" : "sim-help-n sim-error-n"} value={Number.isNaN(inputs.simulations) ? "" : inputs.simulations} onChange={event => setInputs(current => ({ ...current, simulations: event.target.valueAsNumber }))} />
                 <span className="sim-hint" id="sim-help-n">Entre 10 e 3.000.</span>
+                {!simulationsValid && <span className="sim-error" id="sim-error-n">Use um número inteiro entre 10 e 3.000.</span>}
               </label>
               <label>Capital inicial (R$)
-                <input type="number" required min={100} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-c" value={Number.isNaN(inputs.initial_capital) ? "" : inputs.initial_capital} onChange={event => setInputs(current => ({ ...current, initial_capital: event.target.valueAsNumber }))} />
+                <input type="number" required min={100} step={1} inputMode="numeric" disabled={running} aria-invalid={!capitalValid} aria-describedby={capitalValid ? "sim-help-c" : "sim-help-c sim-error-c"} value={Number.isNaN(inputs.initial_capital) ? "" : inputs.initial_capital} onChange={event => setInputs(current => ({ ...current, initial_capital: event.target.valueAsNumber }))} />
                 <span className="sim-hint" id="sim-help-c">Mínimo de R$ 100.</span>
+                {!capitalValid && <span className="sim-error" id="sim-error-c">Informe um valor de pelo menos R$ 100.</span>}
               </label>
               <label>Horizonte (anos)
-                <input type="number" required min={1} max={10} step={1} inputMode="numeric" disabled={running} aria-describedby="sim-help-y" value={Number.isNaN(inputs.years) ? "" : inputs.years} onChange={event => setInputs(current => ({ ...current, years: event.target.valueAsNumber }))} />
+                <input type="number" required min={1} max={10} step={1} inputMode="numeric" disabled={running} aria-invalid={!yearsValid} aria-describedby={yearsValid ? "sim-help-y" : "sim-help-y sim-error-y"} value={Number.isNaN(inputs.years) ? "" : inputs.years} onChange={event => setInputs(current => ({ ...current, years: event.target.valueAsNumber }))} />
                 <span className="sim-hint" id="sim-help-y">Entre 1 e 10 anos.</span>
+                {!yearsValid && <span className="sim-error" id="sim-error-y">Use um número inteiro entre 1 e 10 anos.</span>}
               </label>
               <label>Janela de calibração
                 <select disabled={running} aria-describedby="sim-help-w" value={String(inputs.calibration)} onChange={event => setInputs(current => ({ ...current, calibration: (event.target.value === "portfolio" ? "portfolio" : Number(event.target.value)) as CalibrationWindow }))}>
@@ -175,15 +213,16 @@ export default function SimulationPage() {
                 <span className="sim-hint" id="sim-help-w">Histórico usado para estimar retornos e risco.</span>
               </label>
             </div>
-            <p className="discreet-status">A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos. O horizonte é independente da janela: são 252 dias úteis por ano, com limite de 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p>
+            <p className="discreet-status">Os parâmetros só são aplicados ao clicar em Rodar Simulação; se mudarem depois, o resultado anterior fica marcado como desatualizado. A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos. O horizonte é independente da janela: são 252 dias úteis por ano, com limite de 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p>
             <div className="actions">
-              <button type="submit" className="primary" disabled={running}>{running ? "Rodando simulação…" : "Rodar Simulação"}</button>
+              <button type="submit" className="primary" disabled={running || !inputsValid}>{running ? "Rodando simulação…" : "Rodar Simulação"}</button>
             </div>
           </div>
         </form>
         <aside className="sim-context" aria-label="Alocação usada na simulação">
           <Section title="Alocação usada na simulação">
             {portfolio?.mode && <p className="sim-mode">{portfolio.mode}</p>}
+            {sample && <p className="sim-window">Calibração: {calibrationText}. Histórico do portfólio: {periodLabel(sample)} ({number.format(sample.count)} retornos diários).</p>}
             <ul className="sim-allocation" aria-label="Pesos da carteira na simulação">
               {allocation.map(row => <li key={row.ticker}>
                 <span className="sim-ticker">{row.ticker}</span>
@@ -195,9 +234,10 @@ export default function SimulationPage() {
           </Section>
         </aside>
       </div>
-      {running && <Loading>Rodando simulações Monte Carlo multivariadas…</Loading>}
+      {running && <ElapsedLoading>Rodando simulações Monte Carlo multivariadas…</ElapsedLoading>}
       {!visible && !running && <div className="sim-idle"><Icon name="chart" /><p>Configure os parâmetros acima e clique em Rodar Simulação para ver os resultados.</p></div>}
       {visible && <div className="sim-results">
+        {stale && <div role="status"><Notice tone="warning">Parâmetros alterados desde a última simulação. Os resultados abaixo são da simulação anterior; clique em Rodar Simulação para atualizá-los.</Notice></div>}
         {visible.warnings.map(warning => <Notice key={warning} tone="warning"><strong>Atenção: </strong>{warning}</Notice>)}
         <Section title="Estatísticas da Simulação Monte Carlo">
           <dl className="sim-run">
