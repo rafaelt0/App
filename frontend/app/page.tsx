@@ -5,6 +5,7 @@ import "./home.css";
 import { useApp } from "../components/AppProvider";
 import type { SelectionUpdate } from "../components/AppProvider";
 import SelectionSummary from "./SelectionSummary";
+import SectorIcon from "../components/SectorIcon";
 import HomeResults from "../components/HomeResults";
 import { Loading, Notice, PageHeader, TickerPicker } from "../components/ui";
 import { analyzeHome, currentAnalysis, quickSectors, quickTickers, refreshConsensus, refreshFundamentus, suggestions } from "../lib/home";
@@ -131,6 +132,8 @@ export default function HomePage() {
   const ordered=[...(suggested?.tickers ?? []),...stocks.map(stock=>stock.ticker)].filter((ticker,index,array)=>array.indexOf(ticker)===index).map(ticker=>stockMap.get(ticker)).filter((stock):stock is typeof stocks[number]=>!!stock);
   const popularSectors=new Set(quickSectors.map(([,sector])=>sector));
   const allSectors=Array.from(new Set(stocks.map(stock=>stock.sector).filter(Boolean))).sort();
+  const sectorCounts=new Map<string,number>();
+  for(const stock of stocks)if(stock.sector)sectorCounts.set(stock.sector,(sectorCounts.get(stock.sector) ?? 0)+1);
   const sectorOptions=["Todos",...allSectors.filter(sector=>popularSectors.has(sector)),...allSectors.filter(sector=>!popularSectors.has(sector))];
   const mode:"edit"|"collapsed"=ready && !editRequested ? "collapsed":"edit";
   return <div className="home-page">
@@ -157,7 +160,7 @@ export default function HomePage() {
         {sectorBusy && <Loading>Ordenando ações por liquidez…</Loading>}
         {!selection.length && <div className="home-quick">
           <h3>Ou escolha uma ação líquida</h3>
-          <div className="quick-start-grid">{quickTickers.map(ticker=>{const sector=stockMap.get(ticker)?.sector;return <button className="quick-start-button" key={ticker} onClick={()=>void startQuickAnalysis(ticker)}><strong>{ticker}</strong>{sector && <span className="quick-start-sector">{sector}</span>}</button>;})}</div>
+          <div className="quick-start-grid">{quickTickers.map(ticker=>{const sector=stockMap.get(ticker)?.sector;return <button className="quick-start-button" key={ticker} onClick={()=>void startQuickAnalysis(ticker)}><img className="quick-start-logo" src={`/logos/${ticker.slice(0,4)}.svg`} alt="" width="32" height="32"/><span className="quick-start-text"><strong>{ticker}</strong>{sector && <span className="quick-start-sector">{sector}</span>}</span></button>;})}</div>
         </div>}
         <div className="home-source context-strip" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
         </>}
@@ -172,7 +175,12 @@ export default function HomePage() {
             <legend>Escolha um ou mais setores</legend>
             <div className="checkbox-group-options sector-picker-options">{sectorOptions.map(sector=>{
               const checked=sector==="Todos" ? !sectors.length || sectors.includes("Todos"):sectors.includes(sector);
-              return <label key={sector}><input type="checkbox" checked={checked} onChange={()=>void changeSectors(sector==="Todos" ? []:checked ? sectors.filter(item=>item!==sector):[...sectors.filter(item=>item!=="Todos"),sector])} />{sector}</label>;
+              const count=sector==="Todos" ? stocks.length:sectorCounts.get(sector) ?? 0;
+              return <label key={sector} className="sector-option"><input type="checkbox" checked={checked} onChange={()=>void changeSectors(sector==="Todos" ? []:checked ? sectors.filter(item=>item!==sector):[...sectors.filter(item=>item!=="Todos"),sector])} />
+                <span className="sector-option-icon"><SectorIcon sector={sector}/></span>
+                <span className="sector-option-text"><span className="sector-option-name">{sector==="Todos" ? "Todos os setores":sector}</span><span className="sector-option-count">{count} {count===1 ? "ação":"ações"}</span></span>
+                <svg className="sector-option-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 8.5l2.5 2.5L12 5.5"/></svg>
+              </label>;
             })}</div>
           </fieldset>
           <p>Nenhum setor ou Todos inclui toda a lista B3. Os setores mais buscados aparecem primeiro.</p>
