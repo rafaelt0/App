@@ -29,7 +29,7 @@ export function canonicalCriteria(c:Controls):Criteria {
 }
 export type CriterionKey = "pl"|"roe"|"c5y"|"dy"|"liq2m";
 export type CriterionDef = {key:CriterionKey;group:string;toggle:string;enabled:"pl_enabled"|"roe_enabled"|"c5y_enabled"|"dy_enabled"|"liq2m_enabled";chip:(c:Controls)=>string};
-const amount=(value:number,unit:Unit,digits=Number.isInteger(value) ? 0:1)=>formatValue(value,unit,digits);
+const amount=(value:number,unit:Unit,digits=Number.isInteger(value) ? 0:1)=>Number.isFinite(value) ? formatValue(value,unit,digits):"inválido";
 export const criterionDefs:CriterionDef[] = [
   {key:"pl",group:"Valoração",toggle:"Aplicar faixa de P/L",enabled:"pl_enabled",chip:c=>c.pl_min_exclusive ? `P/L > ${amount(c.pl_min,"number")} e ≤ ${amount(c.pl_max,"multiple")}`:`P/L ${amount(c.pl_min,"number")}–${amount(c.pl_max,"multiple")}`},
   {key:"roe",group:"Qualidade",toggle:"Aplicar ROE mínimo",enabled:"roe_enabled",chip:c=>`ROE ≥ ${amount(c.roe_min,"percent")}`},

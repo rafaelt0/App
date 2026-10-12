@@ -1,6 +1,7 @@
 "use client";
-import { formatValue } from "../../components/ui";
+import { formatCompactValue, formatValue } from "../../components/ui";
 import type { ScreenerColumn, Sort } from "../../lib/screener";
+import StockLogo from "../../components/StockLogo";
 
 type Props = {
   columns: ScreenerColumn[];
@@ -27,8 +28,13 @@ export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey
     const ticker = String(row.ticker);
     return <tr key={ticker} className={selectedKey === ticker ? "selected-row" : undefined}>
       <td><button aria-label={`Selecionar ${ticker}`} aria-pressed={selectedKey === ticker} onClick={() => onSelect(ticker)}>{selectedKey === ticker ? "Selecionado" : "Selecionar"}</button></td>
-      <td>{ticker}</td>
-      {columns.map(column => <td key={column.key} className={column.unit && column.unit !== "text" ? "numeric-cell" : undefined}>{formatValue(row[column.key], column.unit, column.digits, column.currency ?? (typeof row.currency === "string" ? row.currency : "BRL"))}</td>)}
+      <td><span className="scr-ticker"><StockLogo ticker={ticker} company={typeof row.company === "string" ? row.company : ticker} size={24}/>{ticker}</span></td>
+      {columns.map(column => {
+        const currency=column.currency ?? (typeof row.currency === "string" ? row.currency : "BRL");
+        const fullValue=formatValue(row[column.key],column.unit,column.unit === "money" ? 2:column.digits,currency);
+        const compact=column.unit === "money" ? formatCompactValue(row[column.key],column.unit,1,currency) : fullValue;
+        return <td key={column.key} className={column.unit && column.unit !== "text" ? "numeric-cell" : undefined} title={compact!==fullValue ? fullValue:undefined} aria-label={compact!==fullValue ? `${column.label}: ${fullValue}`:undefined}>{compact}</td>;
+      })}
     </tr>;
   })}</tbody></table></div>;
 }
