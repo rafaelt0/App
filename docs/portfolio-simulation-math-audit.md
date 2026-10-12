@@ -38,4 +38,4 @@ O peso histórico arredondado e o peso normalizado da simulação podem diferir 
 
 ## Verificação
 
-Os testes focados reproduziram o gasto acima do capital antes da correção, validaram a normalização da sugestão de compras, confirmaram as métricas independentes do benchmark e preservaram a convenção já existente de pesos limpos nos retornos históricos. A suíte Python completa passou com `PYTHONPATH=. /home/rafael/Projetos/apps/App/.venv/bin/python -m pytest -q`.
+Os testes focados reproduziram o gasto acima do capital antes da correção, validaram a normalização da sugestão de compras, confirmaram as métricas independentes do benchmark e preservaram a convenção já existente de pesos limpos nos retornos históricos. A suíte Python completa passou com `PYTHONPATH=. pytest`, com 257 testes aprovados.
