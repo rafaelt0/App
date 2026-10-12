@@ -34,7 +34,7 @@ const AUTO_RECALC_DELAY_MS = 500;
 const presetWindows = ["730", "365", "1095", "1825", "180"];
 
 export default function PortfolioPage() {
-  const { session, stocks, loading, error: appError, setSelection, refreshSession } = useApp();
+  const { session, stocks, loading, error: appError, setSelection, refreshSession, toggleFavorite } = useApp();
   const [inputs, setInputs] = useState<PortfolioInputs>({ strategy: "min_volatility", capital: 10000, lookback_days: 730, manual_shares: {}, gamma: 1 });
   const [windowChoice, setWindowChoice] = useState("730");
   const [customDays, setCustomDays] = useState(500);
@@ -174,7 +174,6 @@ export default function PortfolioPage() {
     setStressBusy(false);
     setSelectionBusy(true);
     try { await setSelection(tickers); setNotice("Confira a seleção e clique em Carregar portfólio."); }
-    catch (exc) { setError(exc instanceof Error ? exc.message : String(exc)); }
     finally { setSelectionBusy(false); }
   }
 
@@ -238,7 +237,7 @@ export default function PortfolioPage() {
           <div className="pf-group">
             <h3 className="pf-step">1. Escolha os papéis</h3>
             <p className="pf-hint">Selecione de 2 a 20 ações para compor a carteira.</p>
-            <TickerPicker value={session.selection} stocks={stocks} max={20} label="Ações da carteira" onChange={changeSelection} />
+            <TickerPicker value={session.selection} stocks={stocks} max={20} label="Ações da carteira" onChange={changeSelection} watchlist={session.watchlist} onFavorite={toggleFavorite} />
           </div>
           <div className="pf-group">
             <h3 className="pf-step">2. Defina os parâmetros</h3>
