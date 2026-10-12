@@ -136,8 +136,15 @@ bar below 769px to bring the task controls into view sooner. Below 1024px the
 frame flattens into the full-width canvas.
 Each page uses the same shell:
 
-- Fundamentos puts search and quick selections before source metadata and pairs
-  the empty selection with compact ticker rows. Instructions live in a collapsed
+- Fundamentos opens on a landing state while the selection is empty: a compact
+  hero (page icon, a 32–52px headline, one subtitle line) keeps the search above
+  the fold at 375×667 and 1280×720. Quick selections are logo tiles. On wide
+  workspaces the search sits beside a sector map, which is a 100% strip of the
+  largest sectors in the local B3 list with a counted legend whose rows select
+  that sector's most liquid stocks. Tiles for the other four pages follow. Once
+  anything is selected the standard page header returns and the search stays
+  mounted in place.
+- Fundamentos puts search and quick selections before source metadata. Instructions live in a collapsed
   disclosure after sectors and favorites. The task uses the available width. Loaded results lead with ticker
   summary cards: sector and subsector, quote, P/L, ROE, Dividend Yield, the
   sector synthesis, and a star favorite toggle. One tab set follows with Visão
