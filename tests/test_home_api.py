@@ -77,6 +77,20 @@ def test_missing_indicator_stays_null_without_classification():
     assert roic["value"] == 0 and roic["classification"] == "Fraco" and roic["status"] == "negative"
 
 
+def test_only_missing_roe_is_not_classified_as_weak_while_other_fields_stay_present():
+    raw = pd.DataFrame({"Empresa": ["A"], "Setor": ["Banco"], "Subsetor": ["Crédito"], "Cotacao": ["10,00"],
+                        "PL": ["1000"], "ROE": [None], "ROIC": ["12,00%"], "Div_Yield": [None],
+                        "Marg_Liquida": ["10,00%"], "Marg_EBIT": ["12,00%"], "Cres_Rec_5a": [None]}, index=["AAA3"])
+    universe = pd.DataFrame({"Ticker": ["AAA3"], "Setor": ["Banco"]})
+    result = home.build_analysis(raw, pd.DataFrame(), ["AAA3"], universe)
+    metrics = {metric["label"]: metric for group in result["companies"][0]["metric_groups"].values() for metric in group}
+    assert metrics["P/L"]["value"] == 10
+    for label in ("ROE", "Dividend Yield", "Crescimento Receita (5 anos)"):
+        assert metrics[label]["value"] is None and metrics[label]["classification"] is None and metrics[label]["status"] == "neutral"
+    assert result["companies"][0]["indicator_available"]["roe"] is False
+    assert "Dívida Líquida/PL acima de 3×" in result["health_summary"]
+
+
 def test_negative_profit_multiples_are_kept_but_not_classified_as_cheap():
     pl = home.indicator_metric("pl", "P/L", "multiple", "", -4.72, "Serviços")
     assert pl["value"] == -4.72 and pl["status"] == "neutral"

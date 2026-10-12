@@ -21,16 +21,22 @@ router = APIRouter(prefix="/api/home", tags=["home"])
 catalog_router = APIRouter(prefix="/api", tags=["catalog"])
 EXPORT_FIELDS = ["Empresa", "Setor", "Subsetor", "Cotacao", "Min_52_sem", "Max_52_sem",
                  "Marg_Liquida", "Marg_EBIT", "ROE", "ROIC", "Div_Yield", "Cres_Rec_5a", "PL", "EV_EBITDA", "PVP"]
+DEBT_ALERT = 3
+DEBT_WARNING = 1.5
+LIQUIDITY_ALERT = 1
+LIQUIDITY_WARNING = 1.5
+HEALTH_SUMMARY = (f"Endividamento e liquidez da empresa. Dívida Líquida/PL acima de {DEBT_ALERT}× e liquidez corrente abaixo de {LIQUIDITY_ALERT}× "
+                  "são sinais de alerta; dívida líquida negativa indica caixa líquido.")
 INDICATORS = [
-    ("pl", "PL", "P/L", "multiple", "Valuation", "Preço/Lucro: preço dividido pelo lucro por ação dos últimos 12 meses. Múltiplo menor pode indicar desconto, mas depende do setor e do ciclo."),
-    ("pvp", "PVP", "P/VP", "multiple", "Valuation", "Preço/Valor Patrimonial: compara o preço de mercado com o valor contábil. <1 pode indicar desconto."),
-    ("ev_ebitda", "EV_EBITDA", "EV/EBITDA", "multiple", "Valuation", "Enterprise Value / EBITDA dos últimos 12 meses: múltiplo que considera a dívida líquida. Menor pode indicar desconto, conforme o setor."),
+    ("pl", "PL", "P/L", "multiple", "Valoração", "Preço/Lucro: preço dividido pelo lucro por ação dos últimos 12 meses. Múltiplo menor pode indicar desconto, mas depende do setor e do ciclo."),
+    ("pvp", "PVP", "P/VP", "multiple", "Valoração", "Preço/Valor Patrimonial: compara o preço de mercado com o valor contábil. <1 pode indicar desconto."),
+    ("ev_ebitda", "EV_EBITDA", "EV/EBITDA", "multiple", "Valoração", "Enterprise Value / EBITDA dos últimos 12 meses: múltiplo que considera a dívida líquida. Menor pode indicar desconto, conforme o setor."),
     ("roe", "ROE", "ROE", "percent", "Rentabilidade", "Return on Equity: lucro dos últimos 12 meses para cada R$ de patrimônio. Acima de 15% costuma ser considerado bom, mas o referencial varia por setor."),
     ("roic", "ROIC", "ROIC", "percent", "Rentabilidade", "Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida) nos últimos 12 meses. Referência varia por setor."),
     ("net_margin", "Marg_Liquida", "Margem Líquida", "percent", "Rentabilidade", "Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa."),
     ("ebit_margin", "Marg_EBIT", "Margem EBIT", "percent", "Rentabilidade", "Margem operacional antes de juros e impostos. Mede a eficiência operacional."),
-    ("dy", "Div_Yield", "Dividend Yield", "percent", "Crescimento & Yield", "Proventos pagos nos últimos 12 meses (dividendos e JCP, antes do IR) divididos pelo preço atual. Retorno bruto e passado; não garante proventos futuros."),
-    ("growth", "Cres_Rec_5a", "Crescimento Receita (5 anos)", "percent", "Crescimento & Yield", "Taxa de crescimento anual composta da receita nos últimos 5 anos. Referência varia por setor."),
+    ("dy", "Div_Yield", "Dividend Yield", "percent", "Crescimento e dividendos","Proventos pagos nos últimos 12 meses (dividendos e JCP, antes do IR) divididos pelo preço atual. Retorno bruto e passado; não garante proventos futuros."),
+    ("growth", "Cres_Rec_5a", "Crescimento Receita (5 anos)", "percent", "Crescimento e dividendos","Taxa de crescimento anual composta da receita nos últimos 5 anos. Referência varia por setor."),
 ]
 MARKET = [("price", "Cotacao"), ("low_52w", "Min_52_sem"), ("high_52w", "Max_52_sem"),
           ("volume_2m", "Vol_med_2m"), ("market_cap", "Valor_de_mercado")]
@@ -104,14 +110,14 @@ def health(row):
             status = "positive"
             text = f"Dívida Líquida/PL de {debt:.2f}×: caixa líquido — a empresa tem mais caixa do que dívida líquida."
         else:
-            status = "negative" if debt > 3 else "warning" if debt > 1.5 else "positive"
-            text = f"Dívida Líquida/PL de {debt:.2f}× " + ("é elevada — verifique capacidade de pagamento" if debt > 3 else "é moderada — monitorar" if debt > 1.5 else "é saudável")
+            status = "negative" if debt > DEBT_ALERT else "warning" if debt > DEBT_WARNING else "positive"
+            text = f"Dívida Líquida/PL de {debt:.2f}× " + ("é elevada — verifique capacidade de pagamento" if debt > DEBT_ALERT else "é moderada — monitorar" if debt > DEBT_WARNING else "é saudável")
         metrics.append({"label": "Dív. Líquida/PL", "value": debt, "unit": "multiple", "status": status})
         diagnostics.append({"status": status, "text": text})
     if liquidity is not None:
-        status = "negative" if liquidity < 1 else "warning" if liquidity < 1.5 else "positive"
+        status = "negative" if liquidity < LIQUIDITY_ALERT else "warning" if liquidity < LIQUIDITY_WARNING else "positive"
         metrics.append({"label": "Liquidez Corrente", "value": liquidity, "unit": "multiple", "status": status})
-        text = f"Liquidez Corrente {liquidity:.2f}× " + ("< 1 — risco de dificuldade de caixa" if liquidity < 1 else "— margem estreita" if liquidity < 1.5 else "— empresa com boa folga de caixa")
+        text = f"Liquidez Corrente {liquidity:.2f}× " + ("< 1 — risco de dificuldade de caixa" if liquidity < LIQUIDITY_ALERT else "— margem estreita" if liquidity < LIQUIDITY_WARNING else "— empresa com boa folga de caixa")
         diagnostics.append({"status": status, "text": text})
     if ev is not None:
         metric = {"label": "EV / EBIT", "value": ev, "unit": "multiple", "digits": 1,
@@ -200,7 +206,7 @@ def build_analysis(raw, peers, tickers, universe):
                           "health": health(row), "synthesis": {**synthesis, "sector": local_sector or None, "details": details,
                           "favorable_categories": sum(c["veredicto"] == "Favorável" for c in synthesis["categorias"].values())}})
     return clean_json({"requested_tickers": tickers, "missing_tickers": [t for t in tickers if t not in latest.index],
-                       "companies": companies, "comparison_indicators": [{"key": k, "label": label, "unit": unit} for k, _, label, unit, *_ in INDICATORS],
+                       "companies": companies, "health_summary": HEALTH_SUMMARY, "comparison_indicators": [{"key": k, "label": label, "unit": unit} for k, _, label, unit, *_ in INDICATORS],
                        "sources": {"fundamentals": "Fundamentus", "peer_units": "fractions", "detail_percentages": "percentage_points", "detail_multiples": "ratio (scraper /100 correction)"}})
 
 
