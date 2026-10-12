@@ -123,9 +123,10 @@ def test_sector_percentiles_ties_and_minimum_observations():
     peers = pd.DataFrame({"PL": [1, 2, 3, 4], "ROE": [.4, .3, .2, .1], "Div_Yield": [.1, .1, .05, .02]}, index=universe.Ticker)
     result = home.build_analysis(pd.DataFrame({"Setor": ["Outro setor da fonte"]}, index=["AAA3"]), peers, ["AAA3"], universe)["companies"][0]["synthesis"]
     assert result["sector"] == "Máquinas"
-    assert result["favorable_categories"] == 2
-    assert result["categorias"]["Valuation"]["percentil"] == 75
-    assert result["categorias"]["Yield"]["percentil"] == 50
+    # AAA3 is best on P/L and ROE; its DY ties BBB3 and beats CCC3 and DDD3: (2 + 0.5) / 3.
+    assert result["favorable_categories"] == 3
+    assert result["categorias"]["Valuation"]["percentil"] == 100
+    assert result["categorias"]["Yield"]["percentil"] == 83.3
     yield_detail = next(detail for detail in result["details"] if detail["category"] == "Yield")
     assert yield_detail["value"] == 10 and yield_detail["observations"] == 4
     insufficient = home.build_analysis(pd.DataFrame({"Setor": ["Máquinas"]}, index=["AAA3"]), peers.iloc[:2], ["AAA3"], universe)["companies"][0]["synthesis"]
