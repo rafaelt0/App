@@ -10,10 +10,10 @@ from pypfopt.efficient_frontier import EfficientFrontier
 from utils.charts import (
     CHART_ACCENT,
     CHART_BORDER,
-    CHART_DANGER,
     CHART_MUTED,
     CHART_PRIMARY,
     CHART_SECONDARY,
+    CHART_SEQUENTIAL,
     CHART_SURFACE,
     CHART_TEXT,
     apply_plotly_theme,
@@ -135,13 +135,15 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
             marker=dict(
                 size=4,
                 color=results[2, :],
-                colorscale="Viridis",
+                colorscale=[list(stop) for stop in CHART_SEQUENTIAL],
                 showscale=True,
                 colorbar=dict(
                     title=dict(text="Índice Sharpe", font=dict(color=CHART_TEXT)),
                     tickfont=dict(color=CHART_TEXT),
+                    thickness=10,
+                    outlinewidth=0,
                 ),
-                opacity=0.6,
+                opacity=0.65,
             ),
             name="Portfólios Aleatórios",
             text=[
@@ -158,7 +160,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
                 x=efficient_vols,
                 y=efficient_returns,
                 mode="lines",
-                line=dict(color=CHART_PRIMARY, width=3),
+                line=dict(color=CHART_PRIMARY, width=2),
                 name="Fronteira Eficiente",
             )
         )
@@ -169,8 +171,8 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
             y=[opt_return],
             mode="markers",
             marker=dict(
-                color=CHART_DANGER,
-                size=12,
+                color=CHART_ACCENT,
+                size=14,
                 symbol="star",
                 line=dict(color=CHART_SURFACE, width=2),
             ),
@@ -188,7 +190,7 @@ def plot_efficient_frontier_and_random_portfolios(mu, S, cleaned_weights, rf, al
             y=[min_return],
             mode="markers",
             marker=dict(
-                color=CHART_ACCENT,
+                color=CHART_TEXT,
                 size=10,
                 symbol="diamond",
                 line=dict(color=CHART_SURFACE, width=1.5),

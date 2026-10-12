@@ -209,7 +209,7 @@ export default function SimulationPage() {
           <div className="sim-kpis"><Metrics items={[
             { label: "Valor Esperado Final", value: visible.stats.mean_terminal, unit: "money" },
             { label: "CAGR do valor final médio (a.a.)", value: visible.stats.mean_implied_cagr, unit: "fraction", digits: 1, help: "Crescimento anual implícito no valor final médio; não é a média dos CAGRs das trajetórias." },
-            { label: "Probabilidade de Ganho", value: visible.stats.gain_probability, unit: "fraction", digits: 1, help: `Percentual de simulações acima do capital inicial sob o modelo normal. Erro Monte Carlo de até ±${number.format(visible.monte_carlo_error_pp)} p.p. (95% aproximado, pior caso); não inclui incerteza dos parâmetros.` },
+            { label: "Probabilidade de Ganho", value: visible.stats.gain_probability, unit: "fraction", digits: 1, meter: visible.stats.gain_probability, help: `Percentual de simulações acima do capital inicial sob o modelo normal. Erro Monte Carlo de até ±${number.format(visible.monte_carlo_error_pp)} p.p. (95% aproximado, pior caso); não inclui incerteza dos parâmetros.` },
           ]} /></div>
           <h3 className="sim-subhead">Cauda inferior e extremos</h3>
           <Metrics items={[

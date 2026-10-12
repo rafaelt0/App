@@ -7,7 +7,7 @@ import type { Stock } from "./AppProvider";
 
 export type Unit = "money" | "fraction" | "percent" | "ratio" | "multiple" | "number" | "integer" | "text";
 export type Signal = "positive" | "negative" | "warning" | "neutral" | "info";
-export type Metric = { label: string; value: number | string | null; unit?: Unit; currency?: string; digits?: number; status?: Signal; help?: string };
+export type Metric = { label: string; value: number | string | null; unit?: Unit; currency?: string; digits?: number; status?: Signal; help?: string; trend?: number[]; meter?: number };
 export type Column = { key: string; label: string; unit?: Unit; currency?: string; digits?: number };
 
 export function formatValue(value: unknown, unit: Unit = "number", digits = 2, currency = "BRL"): string {
@@ -17,6 +17,38 @@ export function formatValue(value: unknown, unit: Unit = "number", digits = 2, c
   if (unit === "money") { options.style = "currency"; options.currency = currency; }
   if (unit === "fraction") options.style = "percent";
   return new Intl.NumberFormat("pt-BR", options).format(value) + (unit === "percent" ? "%" : unit === "multiple" ? "×" : "");
+}
+
+/** Same text as formatValue, with the currency or unit symbol set apart so large figures read first. */
+export function ValueText({ value, unit = "number", digits = 2, currency = "BRL" }: { value: unknown; unit?: Unit; digits?: number; currency?: string }) {
+  const text = formatValue(value, unit, digits, currency);
+  if (typeof value !== "number" || !Number.isFinite(value) || unit === "text") return <>{text}</>;
+  if (unit === "money") {
+    const parts = new Intl.NumberFormat("pt-BR", { style: "currency", currency, signDisplay: "negative", minimumFractionDigits: digits, maximumFractionDigits: digits }).formatToParts(value);
+    const sign = parts.filter(part => part.type === "minusSign").map(part => part.value).join("");
+    const symbol = parts.filter(part => part.type === "currency").map(part => part.value).join("");
+    const body = parts.filter(part => !["minusSign", "currency", "literal"].includes(part.type)).map(part => part.value).join("");
+    return <>{sign}<span className="value-unit">{symbol}</span>{body}</>;
+  }
+  const suffix = unit === "fraction" ? "%" : unit === "percent" ? "%" : unit === "multiple" ? "×" : "";
+  if (!suffix || !text.endsWith(suffix)) return <>{text}</>;
+  return <>{text.slice(0, -suffix.length).trim()}<span className="value-unit is-suffix">{suffix}</span></>;
+}
+
+const statusGlyphs: Record<Signal, string> = { positive: "✓", negative: "✕", warning: "!", neutral: "•", info: "i" };
+/** Decorative trend line for a value already shown as text; the series comes from the API unchanged. */
+export function Sparkline({ values, tone = "info" }: { values: number[]; tone?: Signal }) {
+  const points = values.filter(Number.isFinite);
+  if (points.length < 2) return null;
+  const min = Math.min(...points), max = Math.max(...points), span = max - min || 1;
+  const coords = points.map((point, index) => [index / (points.length - 1) * 100, 34 - (point - min) / span * 30]);
+  const line = coords.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
+  const [lastX, lastY] = coords[coords.length - 1];
+  return <svg className={`mcard-spark is-${tone}`} viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <polygon className="spark-area" points={`0,36 ${line} 100,36`} />
+    <polyline className="spark-line" points={line} vectorEffect="non-scaling-stroke" />
+    <line className="spark-end" x1={lastX} x2={lastX} y1={lastY} y2={lastY} vectorEffect="non-scaling-stroke" />
+  </svg>;
 }
 
 const iconAssets: Record<string, string> = {
@@ -50,7 +82,16 @@ export function Section({ title, children }: { title: string; children: ReactNod
   return <section className="analysis-section"><h2 className="ui-section-heading">{title}</h2>{children}</section>;
 }
 export function Metrics({ items }: { items: Metric[] }) {
-  return <div className="mcard-grid">{items.map((item, index) => <div className={`mcard${item.unit === "money" ? " mcard-money" : ""}`} key={`${item.label}-${index}`}><div className="mcard-label">{item.label}</div><div className={`mcard-value${item.status ? ` is-${item.status}` : ""}`}>{formatValue(item.value, item.unit, item.digits, item.currency)}</div>{item.help && <p className="metric-help">{item.help}</p>}</div>)}</div>;
+  return <div className="mcard-grid">{items.map((item, index) => {
+    const pill = !!item.status && !!item.help && item.help.length <= 24 && !item.help.includes(".");
+    return <div className={`mcard${item.unit === "money" ? " mcard-money" : ""}`} key={`${item.label}-${index}`}>
+      <div className="mcard-label"><span>{item.label}</span>{pill && <span className={`mcard-status is-${item.status}`}><span aria-hidden="true">{statusGlyphs[item.status!]}</span>{item.help}</span>}</div>
+      <div className={`mcard-value${item.status ? ` is-${item.status}` : ""}`}><ValueText value={item.value} unit={item.unit} digits={item.digits} currency={item.currency} /></div>
+      {item.trend && <Sparkline values={item.trend} tone={item.status ?? "info"} />}
+      {typeof item.meter === "number" && Number.isFinite(item.meter) && <span className="mcard-meter" aria-hidden="true"><span style={{ width: `${Math.min(1, Math.max(0, item.meter)) * 100}%` }} /></span>}
+      {item.help && !pill && <p className="metric-help">{item.help}</p>}
+    </div>;
+  })}</div>;
 }
 export function Table<T extends object>({ columns, rows, onSelect, selectedKey, rowKey = "ticker" }: { columns: Column[]; rows: T[]; onSelect?: (row: T) => void; selectedKey?: string; rowKey?: string }) {
   return <div className="table-scroll" tabIndex={0} aria-label="Tabela de dados"><table><thead><tr>{onSelect && <th scope="col">Selecionar</th>}{columns.map(column => <th key={column.key} scope="col" className={column.unit && column.unit !== "text" ? "numeric-cell" : undefined}>{column.label}</th>)}</tr></thead><tbody>{rows.map((row, index) => {

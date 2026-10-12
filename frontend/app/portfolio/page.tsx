@@ -11,6 +11,15 @@ import { handoffTickers, metricSignal, period, strategies } from "../../lib/port
 import "./portfolio.css";
 import type { PortfolioInputs, PortfolioResult, StressResult, Strategy } from "../../lib/portfolio";
 
+/** Thins the portfolio value series already plotted below into a sparkline for the headline tile. */
+function valueTrend(result: PortfolioResult): number[] | undefined {
+  const values = (result.charts.value.data[0] as { y?: unknown[] } | undefined)?.y;
+  if (!Array.isArray(values)) return undefined;
+  const numbers = values.filter((value): value is number => typeof value === "number");
+  const step = Math.max(1, Math.ceil(numbers.length / 120));
+  return numbers.filter((_, index) => index % step === 0 || index === numbers.length - 1);
+}
+
 export default function PortfolioPage() {
   const { session, stocks, loading, error: appError, setSelection, refreshSession } = useApp();
   const [inputs, setInputs] = useState<PortfolioInputs>({ strategy: "min_volatility", capital: 10000, lookback_days: 730, manual_shares: {}, gamma: 1 });
@@ -230,7 +239,7 @@ export default function PortfolioPage() {
       <div className="pf-overview">
         <Section title="Resumo de Desempenho">
           <div className="pf-kpis">
-            <Metrics items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, status: metricSignal(activeResult.metric_status[key]), help: activeResult.metric_status[key] }))} />
+            <Metrics items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, status: metricSignal(activeResult.metric_status[key]), help: activeResult.metric_status[key], trend: key === "total_return" ? valueTrend(activeResult) : undefined }))} />
           </div>
           {activeResult.benchmark_available && <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit }))} />}
           {!activeResult.benchmark_available && <Notice>Métricas relativas ao IBOVESPA e análises complementares ficam indisponíveis. Atualize as cotações quando o benchmark responder.</Notice>}

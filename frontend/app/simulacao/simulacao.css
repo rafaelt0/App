@@ -10,9 +10,9 @@
 .sim-task > .ui-section-heading { margin: 0 0 24px; font-size: 20px; }
 .sim-step { margin: 0 0 8px; font-weight: 600; font-size: 13px; color: var(--text-secondary); }
 .sim-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 12px; margin: 0 0 24px; }
-.sim-presets button { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; min-height: 72px; padding: 12px 16px; background: var(--surface-canvas); text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.sim-presets button { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; min-height: 72px; padding: 12px 16px; background: var(--surface-panel); border-color: var(--border-default); border-radius: var(--radius-lg); text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .sim-presets button small { font-weight: 400; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
-.sim-presets button[aria-pressed="true"] { border-color: var(--brand-primary); background: var(--brand-primary-surface); }
+.sim-presets button[aria-pressed="true"] { border-color: var(--brand-primary); background: var(--brand-tint); }
 .sim-presets button[aria-pressed="true"] small { color: var(--text-secondary); }
 .sim-task .controls-grid { margin: 0 0 8px; align-items: start; }
 .sim-task .controls-grid label { margin: 0; }
@@ -29,6 +29,7 @@
 .sim-allocation li:last-child { border-bottom: 0; }
 .sim-ticker { font-family: var(--font-mono); font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text-primary); }
 .sim-bar { height: 6px; border-radius: var(--radius-pill); background: var(--surface-raised); overflow: hidden; }
+.sim-bar span { opacity: .8; }
 .sim-bar span { display: block; height: 100%; background: var(--brand-primary); }
 .sim-weight { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; }
 .sim-context .discreet-status { margin: 0; line-height: 1.5; }
@@ -55,17 +56,18 @@
 }
 
 .sim-results { margin: 0; }
-.sim-run { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 0 24px; margin: 0 0 16px; overflow: hidden; border: 0; border-block: 1px solid var(--border-default); }
-.sim-run > div { min-width: 0; padding: 16px 0; }
+.sim-run { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 0; margin: 0 0 16px; overflow: hidden; padding: 0 18px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-panel); box-shadow: var(--highlight); }
+.sim-run > div { min-width: 0; padding: 14px 20px; border-left: 1px solid var(--border-subtle); }
+.sim-run > div:first-child { padding-left: 0; border-left: 0; }
 .sim-run dt { font-size: 13px; color: var(--text-muted); }
-.sim-run dd { margin: 4px 0 0; font-size: 18px; font-weight: 650; color: var(--text-primary); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.sim-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 0 24px; margin: 8px 0 12px; }
+.sim-run dd { margin: 4px 0 0; font-size: 17px; font-weight: 550; color: var(--text-primary); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.sim-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; margin: 8px 0 12px; }
 .sim-kpis .mcard-grid { display: contents; }
-.sim-kpis .mcard { padding: 20px 0; }
-.sim-kpis .mcard-value { font-size: 28px; }
+.sim-kpis .mcard { padding: 16px 18px 18px; }
+.sim-kpis .mcard-value { font-size: 32px; }
 .sim-subhead { margin: 24px 0 8px; font-size: 15px; font-weight: 650; color: var(--text-secondary); }
 .sim-notes { margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
-.sim-notes div { padding: 8px 16px; border: 0; border-left: 2px solid var(--brand-secondary); }
+.sim-notes div { padding: 10px 16px; border: 1px solid var(--border-subtle); border-left: 3px solid var(--brand-secondary); border-radius: var(--radius-md); background: color-mix(in srgb, var(--brand-secondary) 5%, transparent); }
 .sim-notes dt { font-weight: 600; font-size: 14px; }
 .sim-notes dd { margin: 2px 0 0; color: var(--text-secondary); font-size: 14px; }
 .sim-prose { max-width: 78ch; color: var(--text-secondary); }

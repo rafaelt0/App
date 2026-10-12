@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { formatValue } from "./ui";
 import type { PortfolioResult } from "../lib/portfolio";
 import { period } from "../lib/portfolio";
@@ -7,11 +8,13 @@ const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "
 export function WeightList({ weights }: { weights: PortfolioResult["weights"] }) {
   const rows = [...weights].sort((a, b) => b.weight - a.weight);
   const max = Math.max(...rows.map(row => row.weight), 0.0001);
-  return <ul className="pf-weights" aria-label="Pesos do portfólio em porcentagem">{rows.map(row => <li key={row.ticker}>
-    <span className="pf-weight-ticker">{row.ticker}</span>
+  const shown = rows.filter(row => row.weight > 0);
+  return <><div className="pf-strip" aria-hidden="true">{shown.map((row, index) => <span key={row.ticker} data-tone={index % 6} style={{ flexGrow: row.weight }} title={`${row.ticker} ${formatValue(row.weight, "fraction", 2)}`} />)}</div>
+  <ul className="pf-weights" aria-label="Pesos do portfólio em porcentagem">{rows.map(row => <li key={row.ticker}>
+    <span className="pf-weight-ticker"><span className="pf-swatch" data-tone={shown.indexOf(row) % 6} aria-hidden="true" />{row.ticker}</span>
     <span className="pf-weight-track" aria-hidden="true"><span className="pf-weight-fill" style={{ width: `${Math.max(row.weight / max, 0) * 100}%` }} /></span>
     <span className="pf-weight-value">{formatValue(row.weight, "fraction", 2)}</span>
-  </li>)}</ul>;
+  </li>)}</ul></>;
 }
 
 export function ResultSummary({ result }: { result: PortfolioResult }) {
@@ -30,13 +33,14 @@ export function MonthlyReturns({ rows }: { rows: PortfolioResult["monthly_return
   const keys = [...months.map((_, index) => `m${index + 1}`), "ytd"];
   return <div className="table-wrap pf-monthly" tabIndex={0} role="region" aria-label="Retornos mensais do portfólio, em pontos percentuais por mês">
     <table>
-      <caption className="pf-caption">Retorno mensal em %. Sinal + indica ganho; sinal − indica perda; “—” indica mês sem dados.</caption>
+      <caption className="pf-caption">Retorno mensal em %. Sinal + indica ganho; sinal − indica perda; “—” indica mês sem dados. A intensidade do fundo acompanha o tamanho do movimento.</caption>
       <thead><tr><th scope="col">Ano</th>{[...months, "Acumulado no ano"].map(label => <th scope="col" key={label} className="numeric-cell">{label}</th>)}</tr></thead>
       <tbody>{rows.map(row => <tr key={row.year}><th scope="row">{row.year}</th>{keys.map(key => {
         const value = row[key];
         const tone = value == null ? "" : value > 0 ? "is-positive" : value < 0 ? "is-negative" : "is-neutral";
         const text = value == null ? "—" : `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-        return <td key={key} className={`numeric-cell ${tone}`.trim()}>{text}</td>;
+        const heat = value == null ? 0 : Math.min(Math.abs(value) / (key === "ytd" ? 30 : 8), 1);
+        return <td key={key} className={`numeric-cell pf-heat ${tone}`.trim()} style={{ "--heat": heat.toFixed(3) } as CSSProperties}>{text}</td>;
       })}</tr>)}</tbody>
     </table>
   </div>;

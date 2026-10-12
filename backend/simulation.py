@@ -13,8 +13,8 @@ from pydantic import Field
 from backend.serialization import StrictModel, clean_json, csv_response, figure
 from backend.state import artifact, begin, publish, require_portfolio, session
 from utils.charts import (
-    CHART_ACCENT, CHART_DANGER, CHART_MUTED, CHART_PRIMARY,
-    CHART_SECONDARY, CHART_SECONDARY_FILL, CHART_SECONDARY_FILL_STRONG,
+    CHART_MUTED, CHART_PRIMARY, CHART_PRIMARY_FILL, CHART_PRIMARY_FILL_STRONG,
+    CHART_PRIMARY_LIGHT, CHART_PRIMARY_TRACE, CHART_TEXT,
     apply_plotly_theme,
 )
 from utils.portfolio_data import get_portfolio_prices
@@ -153,27 +153,27 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
     individual = go.Figure()
     for i in range(min(50, params.simulations)):
         individual.add_trace(go.Scatter(x=paths.index, y=paths.iloc[:, i], mode="lines", name=f"Simulação {i + 1}",
-                                        line={"width": 1}, opacity=.4))
+                                        line={"width": 1, "color": CHART_PRIMARY_TRACE}))
     _themed(individual, "Exemplos de trajetórias simuladas (modelo normal)")
     individual.update_layout(showlegend=False, margin={"b": 55})
     fan_figure = go.Figure()
     for name, fill, fillcolor, label in (
-        ("P95", None, None, None), ("P5", "tonexty", CHART_SECONDARY_FILL, "Faixa 5%–95%"),
-        ("P75", None, None, None), ("P25", "tonexty", CHART_SECONDARY_FILL_STRONG, "Faixa 25%–75%"),
+        ("P95", None, None, None), ("P5", "tonexty", CHART_PRIMARY_FILL, "Faixa 5%–95%"),
+        ("P75", None, None, None), ("P25", "tonexty", CHART_PRIMARY_FILL_STRONG, "Faixa 25%–75%"),
         ("P50", None, None, "Mediana"),
     ):
         fan_figure.add_trace(go.Scatter(x=fan.index, y=fan[name], fill=fill, fillcolor=fillcolor,
             name=label or name, showlegend=label is not None,
-            line={"color": CHART_PRIMARY if name == "P50" else CHART_SECONDARY, "width": 2.5 if name == "P50" else 1}))
+            line={"color": CHART_PRIMARY_LIGHT if name == "P50" else CHART_PRIMARY_FILL_STRONG, "width": 2 if name == "P50" else .75}))
     _themed(fan_figure, "Faixas de percentis (modelo normal)")
     fan_figure.add_hline(y=capital, line_dash="dash", line_color=CHART_MUTED, line_width=1.5,
-                       annotation_text=f"Capital inicial: R$ {capital:,.0f}", annotation_position="bottom right")
-    histogram = go.Figure(go.Histogram(x=final, nbinsx=30, marker_color=CHART_SECONDARY))
+                       annotation_text=f"Capital inicial: R$ {capital:,.0f}".replace(",", "."), annotation_position="bottom right")
+    histogram = go.Figure(go.Histogram(x=final, nbinsx=30, marker_color=CHART_PRIMARY, opacity=.7))
     histogram.update_layout(bargap=.05)
     for key, text, color, position, shift in (
-        ("q1", "Q1 (25%)", CHART_DANGER, "top left", 0),
-        ("median", "Mediana (50%)", CHART_PRIMARY, "top", 18),
-        ("q3", "Q3 (75%)", CHART_ACCENT, "top right", 36),
+        ("q1", "Q1 (25%)", CHART_MUTED, "top left", 0),
+        ("median", "Mediana (50%)", CHART_TEXT, "top", 18),
+        ("q3", "Q3 (75%)", CHART_MUTED, "top right", 36),
     ):
         histogram.add_vline(x=distribution[key], line_width=2.5 if key == "median" else 2,
             line_dash="solid" if key == "median" else "dash", line_color=color,

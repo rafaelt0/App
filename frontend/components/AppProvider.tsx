@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { api } from "../lib/api";
+import { api, subscribeActivity } from "../lib/api";
+import CommandPalette from "./CommandPalette";
 import { Icon, Loading, Notice } from "./ui";
 
 export type Stock = { ticker: string; company: string; sector: string };
@@ -56,9 +57,34 @@ const navigation = [
 
 function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { session, stocks, setSelection } = useApp();
   const currentPage = navigation.find(item => item.href === pathname);
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [palette, setPalette] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [shortcut, setShortcut] = useState("Ctrl K");
+  useEffect(() => subscribeActivity(setBusy), []);
+  useEffect(() => {
+    if (/Mac|iPhone|iPad/.test(navigator.platform)) setShortcut("⌘K");
+    const onKey = (event: KeyboardEvent) => {
+      const typing = event.target instanceof Element && !!event.target.closest("input, textarea, select, [contenteditable='true']");
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPalette(value => !value); }
+      else if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); setPalette(true); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+  const selection = session?.selection ?? [];
+  const watchlist = session?.watchlist ?? [];
+  const known = new Set(stocks.map(stock => stock.ticker));
+  const openTicker = useCallback((ticker: string) => {
+    setOpen(false);
+    if (!selection.includes(ticker) && selection.length < 20) void setSelection(current => current.includes(ticker) ? [...current] : [...current, ticker]).catch(() => {});
+    router.push("/");
+  }, [router, selection, setSelection]);
+  const openPage = useCallback((href: string) => { setOpen(false); router.push(href); }, [router]);
   const menuRef = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const closeMenu = () => {
@@ -90,19 +116,29 @@ function Shell({ children }: { children: ReactNode }) {
   }, [open]);
   return <div className={`app-shell${collapsed ? " is-collapsed" : ""}`}>
     <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
-    <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></header>
+    <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><div className="mobile-actions"><button type="button" aria-label="Buscar ativo ou página" onClick={() => setPalette(true)}><Icon name="search" /></button><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></div></header>
     <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
       <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
-      <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} aria-label={item.label} title={collapsed ? item.label : undefined} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span>{pathname === item.href && <span className="nav-indicator"><Icon name="arrow-right" /></span>}</Link>)}</nav>
+      <button type="button" className="sidebar-search" aria-label="Buscar ativo ou página" aria-keyshortcuts="Control+K Meta+K" title={collapsed ? "Buscar" : undefined} onClick={() => setPalette(true)}><Icon name="search" /><span>Buscar</span><kbd>{shortcut}</kbd></button>
+      <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} aria-label={item.label} title={collapsed ? item.label : undefined} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>
+      {session && <section className="sidebar-watchlist" aria-labelledby="sidebar-watchlist-title">
+        <h2 className="sidebar-section-label" id="sidebar-watchlist-title">Favoritos</h2>
+        {watchlist.length ? <ul>{watchlist.map(ticker => <li key={ticker}><button type="button" disabled={!known.has(ticker)} title={known.has(ticker) ? `Adicionar ${ticker} à seleção de Fundamentos` : `${ticker} está fora da lista B3`} onClick={() => openTicker(ticker)}><span>{ticker}</span><Icon name="arrow-right" /></button></li>)}</ul>
+          : <p className="sidebar-watchlist-empty">Use a estrela nos resultados de Fundamentos para guardar ativos aqui.</p>}
+      </section>}
       <div className="sidebar-footer">
         <p className="sidebar-note"><strong>Análise quantitativa da B3</strong><span>Dados para pesquisa, não recomendações de investimento.</span></p>
         <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}</button>
       </div>
     </aside>
-    <main id="conteudo" className="main-content">
-      <div className="workspace-bar"><div className="workspace-location"><span>B3Lab</span><span aria-hidden="true">/</span><span>{currentPage?.label ?? "Pesquisa de ações"}</span></div><span className="workspace-market">Mercado brasileiro <span>B3</span></span></div>
-      {children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer>
+    <main id="conteudo" className="main-frame" aria-busy={busy}>
+      <div className="workspace-bar"><div className="workspace-location"><span>B3Lab</span><span aria-hidden="true">/</span><span>{currentPage?.label ?? "Pesquisa de ações"}</span></div>
+        <div className="workspace-tools">{session && <span className="workspace-selection" data-empty={!selection.length}>{selection.length ? `${selection.length} ${selection.length === 1 ? "ativo selecionado" : "ativos selecionados"}` : "Nenhum ativo selecionado"}</span>}<span className="workspace-market">Mercado brasileiro <span>B3</span></span></div>
+        <span className="activity-line" data-active={busy} aria-hidden="true" />
+      </div>
+      <div className="main-content">{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></div>
     </main>
+    <CommandPalette open={palette} onClose={() => setPalette(false)} pages={navigation} stocks={stocks} watchlist={watchlist} selection={selection} onPage={openPage} onTicker={openTicker} />
   </div>;
 }
 
