@@ -91,7 +91,7 @@ export default function ScreenerPage() {
   }
   function removeCriterion(key:CriterionDef["enabled"]) {edit(key,false);barRef.current?.focus();}
   function edit<K extends keyof Controls>(key:K,value:Controls[K]) {setControls(current=>editControl(current,key,value));}
-  if(loading || !session)return <><PageHeader title="Screener de ações" description="Explore ações da B3 com critérios claros e ajustáveis." icon="filter"/>{appError ? <Notice tone="negative">{appError}<button onClick={()=>void refreshSession()}>Tentar novamente</button></Notice>:<Loading/>}</>;
+  if(loading || !session)return <div className="screener-page"><PageHeader title="Screener de ações" description="Explore ações da B3 com critérios claros e ajustáveis." icon="filter"/>{appError ? <Notice tone="negative">{appError}<button onClick={()=>void refreshSession()}>Tentar novamente</button></Notice>:<Loading/>}</div>;
   const selectedCurrent=selected && result?.rows.some(row=>row.ticker===selected) ? selected:null;
   const preset=config?.presets.find(item=>item.name===controls.preset);
   const plInvalid=controls.pl_enabled && controls.pl_min>controls.pl_max;
@@ -117,12 +117,12 @@ export default function ScreenerPage() {
   const presetSortKeys=new Set((config?.sorts ?? []).map(sortKey));
   const sortOptions:Sort[]=config ? [...config.sorts,...(presetSortKeys.has(sortKey(sort)) ? []:[sort])]:[];
   const columnCount=visible?.length ?? 0;
-  return <>
+  return <div className="screener-page">
     <PageHeader title="Screener de ações" description="Explore ações listadas na B3 com critérios claros e ajustáveis. Dados da Fundamentus; consulte a coleta exibida abaixo." icon="filter"/>
     {notice && <Notice tone="positive">{notice}</Notice>}
     <div className="scr-workspace">
     <section className="task-panel scr-filters" aria-labelledby="scr-filters-title">
-      <h2 className="ui-section-heading" id="scr-filters-title"><Icon name="filter"/>Critérios de seleção</h2>
+      <div className="task-heading"><span className="task-step" aria-hidden="true">01</span><div className="task-heading-content"><h2 id="scr-filters-title">Defina os critérios</h2><p>Escolha um ponto de partida e ajuste os limites da busca.</p></div></div>
       <div className="scr-setup">
         <label>Ponto de partida<select value={config ? controls.preset:""} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config ? config.presets.map(item=><option key={item.name}>{item.name}</option>):<option value="">Carregando…</option>}</select></label>
         <label>Ordenar resultados<select value={config ? sortKey(sort):""} disabled={!config} onChange={event=>{const [field,direction]=event.target.value.split(":");setSort({field,direction:direction as Sort["direction"]});}}>{config ? sortOptions.map(option=><option key={sortKey(option)} value={sortKey(option)}>{sortLabel(option)}</option>):<option value="">Carregando…</option>}</select></label>
@@ -144,16 +144,16 @@ export default function ScreenerPage() {
       </div>
     </section>
     <div className="scr-results" aria-busy={busy || actionBusy}>
-      <div className="scr-active" tabIndex={-1} ref={barRef}>
+      <div className="scr-active context-strip" tabIndex={-1} ref={barRef}>
         <p className="scr-chips-label" id="scr-active-label">Critérios ativos</p>
         {chips.length ? <ul className="scr-chips" aria-labelledby="scr-active-label">{chips.map(chip=><li key={chip.key}><span>{chip.label}</span><button type="button" aria-label={`Remover critério ${chip.label}`} onClick={()=>removeCriterion(chip.enabled)}><span aria-hidden="true">×</span></button></li>)}</ul>:<span className="caption">Nenhum critério ativo; todos os ativos são exibidos.</span>}
         <p className="scr-count" role="status">{result && !busy ? <><strong>{result.matched_count}</strong> de {result.total_count} ações correspondem</>:error ? "Resultado indisponível":"Atualizando resultado…"}</p>
       </div>
       {(busy || actionBusy || !config) && !error && <Loading>{actionBusy ? "Atualizando dados da Fundamentus…":"Carregando dados da B3…"}</Loading>}
       {error && <Notice tone="negative"><strong>Não foi possível exibir os resultados.</strong> {error}{!plInvalid && <button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button>}</Notice>}
-      {result && <Section title="Resultados"><div className={busy ? "scr-stale":undefined}>
+      {result && <Section title="Resultados" description="Ajuste as colunas, selecione um ativo ou exporte a lista completa."><div className={busy ? "scr-stale":undefined}>
         <Metrics items={[{label:"Ações correspondentes",value:result.matched_count,unit:"integer",help:`de ${result.total_count} ativos analisados`},{label:"DY médio",value:result.metrics.mean_dy,unit:"percent",digits:2},{label:"ROE médio",value:result.metrics.mean_roe,unit:"percent",digits:2}]}/>
-        <div className="scr-context">
+        <div className="scr-context context-strip">
           <p className="caption">{result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")} · há ${result.age_minutes} min`:"Horário da coleta indisponível; a idade deste dado não pode ser confirmada."}</p>
         </div>
         {!result.matched_count ? <div className="empty-state-card"><span className="empty-state-icon"><Icon name="filter"/></span><h3 className="empty-state-title">Nenhuma ação encontrada</h3><div className="empty-state-message">Reduza os limites ou desative critérios. Dados ausentes não são considerados aprovação.</div><button className="primary" onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button></div>:<>
@@ -181,5 +181,5 @@ export default function ScreenerPage() {
     </div>
     </div>
     <hr/><p className="caption">Fonte: Fundamentus (fundamentus.com.br). Dados com atraso. Esta triagem não é recomendação de investimento; verifique os indicadores e faça sua própria análise.</p>
-  </>;
+  </div>;
 }

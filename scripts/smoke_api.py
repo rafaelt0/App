@@ -47,10 +47,10 @@ def main():
         assert float(percentiles[0][key]) == 10000
     assert math.isclose(float(percentiles[-1]["P5"]), simulation["stats"]["p5_terminal"], abs_tol=1e-8)
     summary = {row["Métrica"]: row["Valor"] for row in exported(f"/api/simulation/{simulation['id']}/summary.csv")}
-    mean = float(summary["Valor Esperado Final"].removeprefix("R$ ").replace(",", ""))
+    mean = float(summary["Valor esperado final (R$)"])
     assert math.isclose(mean, simulation["stats"]["mean_terminal"], abs_tol=.0051)
-    probability = float(summary["Probabilidade de Ganho"].removesuffix("%")) / 100
-    assert math.isclose(probability, simulation["stats"]["gain_probability"], abs_tol=.00051)
+    probability = float(summary["Probabilidade de ganho (%)"]) / 100
+    assert math.isclose(probability, simulation["stats"]["gain_probability"], abs_tol=.000051)
 
     screening = request("/api/screener/query", "POST", {"criteria": {"liq2m_min": 1000000}, "sort": {"field": "liq2m", "direction": "desc"}}).json()
     screened_csv = exported(f"/api/screener/{screening['id']}/results.csv")

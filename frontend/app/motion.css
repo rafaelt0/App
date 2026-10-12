@@ -73,7 +73,7 @@ details[open] > summary::before { transform: translateY(-3px) rotate(45deg); }
   }
   .home-guide, .news-prereq-guide { animation-delay: 140ms; }
 
-  .notice, .loading-container, .ticker-options, .ticker-chip,
+  .notice, .loading-container, .result-lead, .ticker-options, .ticker-chip,
   .analysis-section, .home-results-bar, .next-step-card, .sim-idle {
     animation: b3-fade 320ms var(--motion-ease-out) both;
   }

@@ -146,12 +146,14 @@ export default function NewsPage() {
           <div><dt>Fontes e cobertura</dt><dd>Consulte os links, o motor de análise e a disponibilidade de cada feed.</dd></div>
         </dl>
       </aside></div>}
-      {session?.portfolio_ready && <section className="news-task" aria-label="Carteira e atualização">
-        {snapshot && <ul className="news-portfolio" aria-label="Carteira e pesos">{snapshot.tickers.map(ticker => <li key={ticker}><strong>{ticker}</strong>{formatPercent(snapshot.weights[ticker], 1)}</li>)}</ul>}
-        <div className="news-task-actions">
-          <button className="primary" onClick={() => void execute(true)} disabled={busy}>{busy ? "Atualizando…" : "Atualizar notícias"}</button>
+      {session?.portfolio_ready && <section className="news-task context-strip" aria-label="Carteira e atualização">
+        <div className="news-task-context">
+          {snapshot && <ul className="news-portfolio" aria-label="Carteira e pesos">{snapshot.tickers.map(ticker => <li key={ticker}><strong>{ticker}</strong>{formatPercent(snapshot.weights[ticker], 1)}</li>)}</ul>}
           {snapshot && <p className="news-asof">Amostra em {formatBrasilia(snapshot.as_of)} · {relativeAge(snapshot.as_of)}</p>}
           {snapshot && <p className={`news-engine ${!snapshot.articles.length ? "is-none" : snapshot.model.lexicon_count ? "is-fallback" : ""}`}>{snapshot.articles.length ? engineSplit(snapshot.model, snapshot.articles.length) : "Sem notícias classificadas"}</p>}
+        </div>
+        <div className="news-task-actions">
+          <button className="primary" onClick={() => void execute(true)} disabled={busy}>{busy ? "Atualizando…" : "Atualizar notícias"}</button>
         </div>
       </section>}
       {busy && <Loading>Buscando feeds e textos; classificando com Jev ou léxico quando indisponível…</Loading>}
@@ -161,6 +163,7 @@ export default function NewsPage() {
           {stale && <Notice tone="warning">Amostra com mais de 15 minutos. Use “Atualizar notícias” para buscar os feeds de novo.</Notice>}
           {failed.length > 0 && <div className="news-retry"><button onClick={() => void execute(true)} disabled={busy}>Tentar feeds novamente</button></div>}
         </div>
+        <div className="result-lead news-result-lead"><div className="section-toolbar"><div><h2>Leitura da amostra</h2><p>A nota resume o tom textual; a cobertura indica quanto do peso tem notícias disponíveis.</p></div></div></div>
         <Section title="Tom da amostra disponível">
           <div className="news-summary">
             <div className="news-summary-main">
@@ -184,17 +187,17 @@ export default function NewsPage() {
           </div>
         </Section>
         <Section title="Feed de notícias da carteira">
-          <div className="news-intro">
-            <p className="news-help">Analisamos até {snapshot.max_per_ticker} notícias únicas mais recentes por ativo nos últimos {snapshot.window_days} dias, antes dos filtros: {snapshot.articles.length} artigos únicos · {snapshot.summary.observation_count} observações artigo-ativo. Feeds indisponíveis: {failed.join(", ") || "nenhum"}.</p>
-            <p className="news-help">A cobertura depende do Google News e dos feeds acessíveis. Sem texto acessível usamos descrição RSS ou título. Importância é triagem por palavras-chave, não análise de materialidade. Filtros e “Ver mais” não alteram a nota, o gráfico ou a síntese.</p>
-          </div>
+          <div className="section-toolbar news-filter-toolbar"><div><h3>Filtrar e ordenar notícias</h3><p>Os filtros e “Ver mais” mudam a lista, sem alterar nota, gráfico ou síntese.</p></div></div>
           <div className="news-filters" role="group" aria-label="Filtros do feed">
             <label>Filtrar por ativo<select value={filters.ticker} onChange={event => changeFilter("ticker", event.target.value)}><option value="Todos">Todos os ativos</option>{snapshot.tickers.map(ticker => <option key={ticker} value={ticker}>{ticker} ({snapshot.articles.filter(article => article.tickers.includes(ticker)).length} notícias)</option>)}</select></label>
             <label>Ordenar por<select value={filters.sort} onChange={event => changeFilter("sort", event.target.value)}>{sortModes.map(sort => <option key={sort}>{sort}</option>)}</select></label>
             <label>Filtrar por sentimento<select value={filters.sentiment} onChange={event => changeFilter("sentiment", event.target.value)}><option>Todos</option><option value="Otimista">Otimistas</option><option value="Neutro">Neutras</option><option value="Pessimista">Pessimistas</option></select></label>
             <label>Filtrar por intensidade<select value={filters.intensity} onChange={event => changeFilter("intensity", event.target.value)}><option>Todos</option>{intensityLevels.filter(level => level !== "Evidência limitada" || snapshot.articles.some(article => !article.is_jev)).map(level => <option key={level}>{level}</option>)}</select></label>
-            <p className="news-help news-filters-note">Faixas de intensidade se baseiam no score, não em materialidade. No léxico, menos de dois termos implica evidência limitada; essas notícias não entram na nota agregada.</p>
           </div>
+          <details className="method-disclosure news-method"><summary>Fontes e metodologia</summary><div>
+            <p>Analisamos até {snapshot.max_per_ticker} notícias únicas mais recentes por ativo nos últimos {snapshot.window_days} dias, antes dos filtros: {snapshot.articles.length} artigos únicos · {snapshot.summary.observation_count} observações artigo-ativo. Feeds indisponíveis: {failed.join(", ") || "nenhum"}.</p>
+            <p>A cobertura depende do Google News e dos feeds acessíveis. Sem texto acessível usamos descrição RSS ou título. Importância é triagem por palavras-chave, não análise de materialidade. Faixas de intensidade se baseiam no score, não em materialidade. No léxico, menos de dois termos implica evidência limitada; essas notícias não entram na nota agregada.</p>
+          </div></details>
           {activeFilters.length > 0 && <div className="news-active-filters" aria-label="Filtros ativos">
             {activeFilters.map(key => <button type="button" className="news-chip" key={key} aria-label={`Remover filtro ${filterNames[key]}: ${filters[key]}`} onClick={() => changeFilter(key, initialFilters[key])}>{filterNames[key]}: {filters[key]} <span aria-hidden="true">×</span></button>)}
             <button type="button" className="news-clear" onClick={clearFilters}>Limpar filtros</button>

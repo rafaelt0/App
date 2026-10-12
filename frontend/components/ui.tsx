@@ -113,8 +113,17 @@ export function Icon({ name = "chart" }: { name?: string }) {
 export function PageHeader({ title, description, icon = "chart" }: { title: string; description: string; icon?: string }) {
   return <header className="page-hero"><span className="page-hero-icon"><Icon name={icon} /></span><div className="page-hero-content"><h1 className="page-hero-title">{title}</h1><p className="page-hero-subtitle">{description}</p></div></header>;
 }
-export function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="analysis-section"><h2 className="ui-section-heading">{title}</h2>{children}</section>;
+export function Section({ title, children, description, actions, className }: { title: string; children: ReactNode; description?: string; actions?: ReactNode; className?: string }) {
+  return <section className={`analysis-section${className ? ` ${className}` : ""}`}>
+    <div className="section-toolbar">
+      <div className="section-heading-group">
+        <h2 className="ui-section-heading">{title}</h2>
+        {description && <p className="section-description">{description}</p>}
+      </div>
+      {actions && <div className="section-actions">{actions}</div>}
+    </div>
+    {children}
+  </section>;
 }
 export function Metrics({ items }: { items: Metric[] }) {
   return <div className="mcard-grid">{items.map((item, index) => {
@@ -260,7 +269,6 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
     }
   }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); closePicker(true); } }}>
     <label htmlFor={id}>{label}</label>
-    <div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}><strong>{ticker}</strong>{onFavorite && <button type="button" className="ticker-chip-favorite" disabled={favoriteBusy} aria-pressed={watchlist.includes(ticker)} aria-label={watchlist.includes(ticker) ? `Remover ${ticker} dos favoritos` : `Adicionar ${ticker} aos favoritos`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => void toggleFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => void toggleTicker(ticker)}>×</button></span>)}</div>
     <div className="ticker-search"><Icon name="search" /><input ref={inputRef} id={id} type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} aria-busy={busy} aria-label={`${label}: buscar ticker ou empresa`} onFocus={() => { if (dismissed.current) dismissed.current = false; else setOpen(true); }} onClick={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); closePicker(false); }
       if (event.key === "ArrowDown" && options.length) {
@@ -270,6 +278,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
       }
       if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); void toggleTicker(options[active].ticker); }
     }} /></div>
+    <div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}><strong>{ticker}</strong>{onFavorite && <button type="button" className="ticker-chip-favorite" disabled={favoriteBusy} aria-pressed={watchlist.includes(ticker)} aria-label={watchlist.includes(ticker) ? `Remover ${ticker} dos favoritos` : `Adicionar ${ticker} aos favoritos`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => void toggleFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => void toggleTicker(ticker)}>×</button></span>)}</div>
     {open && <div className="ticker-picker-controls">
       <div className="ticker-controls-row">
         {(onFavorite || watchlist.length > 0) && <div className="ticker-filter" role="group" aria-label="Filtrar ações">
