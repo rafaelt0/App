@@ -181,19 +181,24 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
             annotation_text=text, annotation_position=position, annotation_yshift=shift)
     _themed(histogram, "Distribuição dos valores finais (modelo normal)", "Valor final do portfólio (R$)", "Frequência")
     histogram.update_layout(margin={"t": 120}, title={"y": .97, "yanchor": "top"})
+    # Parameters come first so a saved CSV explains itself; values are numbers with the unit in the label.
+    window = "Histórico do Portfólio" if params.calibration == "portfolio" else f"{params.calibration} anos"
     summary_values = [
-        ("Valor Esperado Final", f"R$ {stats['mean_terminal']:,.2f}"),
-        ("Probabilidade de Ganho", f"{stats['gain_probability'] * 100:.1f}%"),
-        ("CAGR do valor final médio", f"{stats['mean_implied_cagr'] * 100:.1f}% a.a."),
-        ("CAGR do valor final P75", f"{stats['p75_implied_cagr'] * 100:.1f}% a.a."),
-        ("Valor final P5", f"R$ {p5:,.2f}"), ("Retorno final P5", f"{stats['p5_return'] * 100:.1f}%"),
-        ("Média dos 5% menores valores", f"R$ {stats['lower_tail_mean']:,.2f}"),
-        ("Menor valor simulado", f"R$ {stats['minimum']:,.2f}"), ("Maior valor simulado", f"R$ {stats['maximum']:,.2f}"),
+        ("Capital inicial (R$)", capital), ("Trajetórias", params.simulations), ("Horizonte (anos)", params.years),
+        ("Janela de calibração", window), ("Retornos diários na calibração", len(aligned)),
+        ("Período de calibração", f"{calibration['start']} a {calibration['end']}"), ("Data da simulação", today.isoformat()),
+        ("Valor esperado final (R$)", round(stats["mean_terminal"], 2)),
+        ("Probabilidade de ganho (%)", round(stats["gain_probability"] * 100, 2)),
+        ("CAGR do valor final médio (% a.a.)", round(stats["mean_implied_cagr"] * 100, 2)),
+        ("CAGR do valor final P75 (% a.a.)", round(stats["p75_implied_cagr"] * 100, 2)),
+        ("Valor final P5 (R$)", round(float(p5), 2)), ("Retorno final P5 (%)", round(stats["p5_return"] * 100, 2)),
+        ("Média dos 5% menores valores (R$)", round(stats["lower_tail_mean"], 2)),
+        ("Menor valor simulado (R$)", round(stats["minimum"], 2)), ("Maior valor simulado (R$)", round(stats["maximum"], 2)),
     ]
     for row in comparison:
-        for label, value in (("Valor final P5", f"R$ {row['p5']:,.2f}"), ("Valor final P95", f"R$ {row['p95']:,.2f}"),
-                             ("Ganho sobre o capital inicial", f"{row['gain_probability'] * 100:.1f}%")):
-            summary_values.append((f"{row['model']} — {label}", value))
+        for label, value in (("Valor final P5 (R$)", row["p5"]), ("Valor final P95 (R$)", row["p95"]),
+                             ("Ganho sobre o capital inicial (%)", row["gain_probability"] * 100)):
+            summary_values.append((f"{row['model']} — {label}", round(float(value), 2)))
     result = {
         "id": uuid4().hex, "portfolio_id": portfolio.id, "revision": params.revision,
         "inputs": params.model_dump(), "mode": portfolio.mode, "allocation": allocation, "calibration": calibration,
@@ -218,6 +223,18 @@ def run_simulation(params: SimulationRequest, request: Request):
     calculated = compute_simulation(portfolio, params)
     publish(ctx, "simulation", params.revision, generation, calculated, portfolio_id=portfolio.id)
     return calculated.result
+
+
+@router.get("/current")
+def current_simulation(request: Request):
+    """The last simulation for the current portfolio and selection, or null; nothing is recalculated."""
+    ctx = session(request)
+    with ctx.lock:
+        saved = ctx.artifacts.get("simulation")
+        portfolio = ctx.portfolio
+        if saved is None or portfolio is None or saved.portfolio_id != portfolio.id or saved.revision != ctx.revision:
+            return None
+        return saved.result
 
 
 @router.get("/{simulation_id}/summary.csv")
