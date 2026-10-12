@@ -36,7 +36,7 @@ def normalize_numeric_text(value):
 def get_ev_ebitda_context(setor: str):
     """Returns (alt_metric, reason) when EV/EBITDA doesn't apply, or None if it applies normally."""
     s = setor.lower() if setor else ""
-    if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio")):
+    if any(k in s for k in ("banco", "crédito", "credito", "câmbio", "cambio", "intermediários financeiros", "intermediarios financeiros")):
         return (
             "P/L · P/VP",
             "Bancos: resultado financeiro é a atividade-fim — EV/EBITDA não se aplica.",
@@ -51,7 +51,7 @@ def get_ev_ebitda_context(setor: str):
             "Desconto sobre NAV",
             "Holdings: receita de equivalência patrimonial — EBITDA é quase nulo ou negativo.",
         )
-    if any(k in s for k in ("tecnologia", "software", "internet")):
+    if any(k in s for k in ("tecnologia", "software", "internet", "programas e serviços", "programas e servicos")):
         return (
             "EV/Sales",
             "Tech em crescimento: EBITDA frequentemente negativo pelo reinvestimento agressivo.",

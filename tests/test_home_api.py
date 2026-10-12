@@ -31,8 +31,8 @@ def detail_frame():
                          "Subsetor": ["Crédito"] * 2, "Cotacao": ["10,00", "20,00"],
                          "PL": ["900", "1250"], "PVP": ["100", "150"], "EV_EBITDA": ["0", "0"],
                          "ROE": ["5,00%", "15,00%"], "ROIC": ["12,00%", "12,00%"],
-                         "Div_Yield": ["4,00%", "4,01%"], "Dív.Brut/Patrim.": ["1,50", "3,00"],
-                         "Liq. Corr.": ["1,50", "1,00"], "EV_EBIT": ["1200", "2000"]}, index=["AAA3.SA", "AAA3"])
+                         "Div_Yield": ["4,00%", "4,01%"], "Div_Liq_Patrim": ["150", "287"],
+                         "Liquidez_Corr": ["150", "100"], "EV_EBIT": ["1200", "2000"]}, index=["AAA3.SA", "AAA3"])
 
 
 def test_partial_analysis_preserves_order_nulls_raw_export_and_corrected_units(home_api, monkeypatch):
@@ -54,12 +54,51 @@ def test_partial_analysis_preserves_order_nulls_raw_export_and_corrected_units(h
     assert first["indicators"]["roe"] == 15
     assert missing["indicators"]["pl"] is None
     assert missing["health"]["metrics"] == []
+    assert [(m["label"], m["value"]) for m in first["health"]["metrics"]] == [
+        ("Dív. Líquida/PL", 2.87), ("Liquidez Corrente", 1.0), ("EV / EBIT", 20.0)]
+    assert [m["status"] for m in first["health"]["metrics"]] == ["warning", "warning", "warning"]
+    missing_metrics = [m for group in missing["metric_groups"].values() for m in group]
+    assert all(m["value"] is None and m["status"] == "neutral" and m["classification"] is None for m in missing_metrics)
     raw = client.get(f"/api/home/{result['id']}/fundamentals.csv")
     assert raw.content.startswith(b"\xef\xbb\xbf")
     csv = pd.read_csv(io.BytesIO(raw.content), index_col=0)
     assert csv["PL"].tolist() == [900, 1250]
     assert csv["ROE"].tolist() == ["5,00%", "15,00%"]
     assert "fundamentus_AAA3+BBB4_" in raw.headers["content-disposition"]
+
+
+def test_missing_indicator_stays_null_without_classification():
+    for key in ("roic", "dy", "roe", "pl", "ev_ebitda"):
+        metric = home.indicator_metric(key, "X", "percent", "", None, "Intermediários Financeiros")
+        assert metric["value"] is None and metric["status"] == "neutral" and metric["classification"] is None
+    roic = home.indicator_metric("roic", "ROIC", "percent", "", 0, "Intermediários Financeiros")
+    assert roic["value"] == 0 and roic["classification"] == "Fraco" and roic["status"] == "negative"
+
+
+def test_negative_profit_multiples_are_kept_but_not_classified_as_cheap():
+    pl = home.indicator_metric("pl", "P/L", "multiple", "", -4.72, "Serviços")
+    assert pl["value"] == -4.72 and pl["status"] == "neutral"
+    assert pl["classification"] == "Prejuízo — múltiplo não interpretável"
+    ev = home.indicator_metric("ev_ebitda", "EV/EBITDA", "multiple", "", -0.5, "Serviços")
+    assert ev["value"] == -0.5 and ev["status"] == "neutral"
+    assert ev["classification"] == "EBITDA negativo — múltiplo não interpretável"
+    assert home.indicator_metric("pl", "P/L", "multiple", "", 8, "Serviços")["classification"] is None
+
+
+def test_financial_intermediaries_get_bank_ev_ebitda_explanation():
+    bank = home.indicator_metric("ev_ebitda", "EV/EBITDA", "multiple", "", .009, "Intermediários Financeiros")
+    assert bank["value"] is None and bank["classification"] == "P/L · P/VP"
+    tech = home.indicator_metric("ev_ebitda", "EV/EBITDA", "multiple", "", .009, "Programas e Serviços")
+    assert tech["classification"] == "EV/Sales"
+
+
+def test_net_debt_and_liquidity_use_fundamentus_keys_scaled_from_hundredths():
+    net_cash = home.health(pd.Series({"Div_Liq_Patrim": "-020", "Liquidez_Corr": "250"}))
+    assert net_cash["metrics"][0] == {"label": "Dív. Líquida/PL", "value": pytest.approx(-0.2), "unit": "multiple", "status": "positive"}
+    assert net_cash["metrics"][1]["value"] == pytest.approx(2.5)
+    assert net_cash["diagnostics"][0]["status"] == "positive" and "caixa líquido" in net_cash["diagnostics"][0]["text"]
+    stale_keys = home.health(pd.Series({"Dív.Brut/Patrim.": "300", "Liq. Corr.": "100"}))
+    assert stale_keys["metrics"] == []
 
 
 def test_single_metric_exact_classification_and_health_boundaries():
@@ -70,11 +109,13 @@ def test_single_metric_exact_classification_and_health_boundaries():
     assert dy["classification"] == "Moderado" and dy["status"] == "positive"
     ev = home.indicator_metric("ev_ebitda", "EV/EBITDA", "ratio", "", .009, "Banco")
     assert ev["value"] is None and ev["classification"] == "P/L · P/VP"
-    result = home.health(pd.Series({"Div_Brut_Patrim": "3,00", "Liq_Corr": "1,00", "EV/EBIT": "2000"}))
-    assert [metric["status"] for metric in result["metrics"]] == ["warning", "warning", "warning"]
+    result = home.health(pd.Series({"Div_Liq_Patrim": "310", "Liquidez_Corr": "100", "EV/EBIT": "2000"}))
+    assert [metric["status"] for metric in result["metrics"]] == ["negative", "warning", "warning"]
     assert len(result["diagnostics"]) == 2
-    healthy = home.health(pd.Series({"Div.Brut/Patrim.": 1.5, "Liq. Corr": 1.5, "EV_EBIT": 1200}))
+    healthy = home.health(pd.Series({"Div_Liq_Patrim": "150", "Liquidez_Corr": "150", "EV_EBIT": "1200"}))
     assert [metric["status"] for metric in healthy["metrics"]] == ["positive"] * 3
+    negative_ebit = home.health(pd.Series({"EV_EBIT": "-300"}))
+    assert negative_ebit["metrics"][0]["status"] == "neutral" and "não interpretável" in negative_ebit["metrics"][0]["help"]
 
 
 def test_sector_percentiles_ties_and_minimum_observations():
