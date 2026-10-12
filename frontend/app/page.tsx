@@ -22,6 +22,7 @@ export default function HomePage() {
   const [retryAction,setRetryAction] = useState<"analyze"|"consensus"|"source">("analyze");
   const [editRequested,setEditRequested] = useState(false);
   const panel = useRef<HTMLElement>(null);
+  const pendingAnalysis = useRef<string[]|null>(null);
   const generation = useRef(0);
   const sectorGeneration = useRef(0);
   const analyzedRevision = useRef<number|null>(null);
@@ -29,6 +30,12 @@ export default function HomePage() {
   revision.current = session?.revision;
   useEffect(() => {generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);},[session?.revision]);
   useEffect(() => {if(editRequested)panel.current?.querySelector<HTMLInputElement>("input[type=search]")?.focus();},[editRequested]);
+  useEffect(() => {
+    // Quick-start runs after the new selection is rendered, so the revision reset above does not discard it.
+    if(!pendingAnalysis.current || !session || JSON.stringify(session.selection)!==JSON.stringify(pendingAnalysis.current))return;
+    pendingAnalysis.current=null;
+    void run();
+  },[session]);
   useEffect(() => {
     const unavailable=new URLSearchParams(window.location.search).get("unavailable");
     if(unavailable)setNotice(`${unavailable} está fora da lista local B3. A seleção foi removida; escolha outro ativo para analisar.`);
@@ -41,6 +48,11 @@ export default function HomePage() {
   async function changeSelection(tickers:SelectionUpdate) {
     generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);
     try {await setSelection(tickers);} catch(exc) {setError((exc as Error).message);}
+  }
+  async function startQuickAnalysis(ticker:string) {
+    generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);
+    pendingAnalysis.current=[ticker];
+    try {await setSelection([ticker]);} catch(exc) {pendingAnalysis.current=null;setError((exc as Error).message);}
   }
   async function changeSectors(next:string[]) {
     const gen=++sectorGeneration.current;
@@ -117,7 +129,7 @@ export default function HomePage() {
         {sectorBusy && <Loading>Ordenando ações por liquidez…</Loading>}
         {!selection.length && <div className="home-quick">
           <h3>Ou escolha uma ação líquida</h3>
-          <div className="quick-start-grid">{quickTickers.map(([ticker,sector])=><button className="quick-start-button" key={ticker} onClick={()=>void changeSelection([ticker])}><strong>{ticker}</strong><span className="quick-start-sector">{sector}</span></button>)}</div>
+          <div className="quick-start-grid">{quickTickers.map(([ticker,sector])=><button className="quick-start-button" key={ticker} onClick={()=>void startQuickAnalysis(ticker)}><strong>{ticker}</strong><span className="quick-start-sector">{sector}</span></button>)}</div>
         </div>}
         <div className="home-source" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
         </>}
