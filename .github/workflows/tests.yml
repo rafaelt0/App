@@ -16,6 +16,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements-dev.txt
+      - run: python scripts/fetch_stock_logos.py --check
       - run: PYTHONPATH=. pytest
   next:
     runs-on: ubuntu-latest

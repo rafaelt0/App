@@ -6,6 +6,7 @@ import "./simulacao.css";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
 import { ElapsedLoading } from "../../components/PortfolioParts";
+import StockLogo from "../../components/StockLogo";
 import { ExportButton, formatValue, Icon, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
 import { api } from "../../lib/api";
 import type { PortfolioResult, Sample } from "../../lib/portfolio";
@@ -19,7 +20,7 @@ const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 const yearsLabel = (years: number) => `${number.format(years)} ${years === 1 ? "ano" : "anos"}`;
 
 export default function SimulationPage() {
-  const { session, loading, error: sessionError, refreshSession } = useApp();
+  const { session, stocks, loading, error: sessionError, refreshSession } = useApp();
   const [portfolio, setPortfolio] = useState<SimulationPortfolio | null>(null);
   const [inputs, setInputs] = useState<SimulationInputs>(initialInputs);
   const [result, setResult] = useState<SimulationResult | null>(null);
@@ -227,7 +228,7 @@ export default function SimulationPage() {
             {sample && <p className="sim-window">Calibração: {calibrationText}. Histórico do portfólio: {periodLabel(sample)} ({number.format(sample.count)} retornos diários).</p>}
             <ul className="sim-allocation" aria-label="Pesos da carteira na simulação">
               {allocation.map(row => <li key={row.ticker}>
-                <span className="sim-ticker">{row.ticker}</span>
+                <span className="sim-asset"><StockLogo ticker={row.ticker} company={stocks.find(stock => stock.ticker === row.ticker)?.company ?? row.ticker} size={24} /><span className="sim-ticker">{row.ticker}</span></span>
                 <span className="sim-bar" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(1, row.weight)) * 100}%` }} /></span>
                 <span className="sim-weight">{percent.format(row.weight)}</span>
               </li>)}
