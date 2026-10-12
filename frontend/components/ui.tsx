@@ -6,32 +6,17 @@ import { download } from "../lib/api";
 import { rankStocks, sortStocks, stockSorts, type StockSort } from "../lib/tickerSearch";
 import type { Stock } from "./AppProvider";
 import StockLogo from "./StockLogo";
+import { formatCompactValue, formatPercent, formatValue, missingValue } from "../lib/formatting";
+import type { Unit } from "../lib/formatting";
 
-export type Unit = "money" | "fraction" | "percent" | "ratio" | "multiple" | "number" | "integer" | "text";
+export { formatCompactValue, formatPercent, formatValue, missingValue };
+export type { Unit };
+
 export type Signal = "positive" | "negative" | "warning" | "neutral" | "info";
-export type Metric = { label: string; value: number | string | null; unit?: Unit; currency?: string; digits?: number; status?: Signal; help?: string; trend?: number[]; meter?: number };
-export type Column = { key: string; label: string; unit?: Unit; currency?: string; digits?: number; signed?: boolean };
+export type Metric = { label: string; value: number | string | null; unit?: Unit; currency?: string; digits?: number; compact?: boolean; status?: Signal; help?: string; trend?: number[]; meter?: number };
+export type Column = { key: string; label: string; unit?: Unit; currency?: string; digits?: number; signed?: boolean; compact?: boolean };
 
-/** The one representation for a missing or non-finite value, in tables, metrics and text. */
-export const missingValue = "—";
 const minus = "−";
-function localize(value: number, options: Intl.NumberFormatOptions): string {
-  return new Intl.NumberFormat("pt-BR", options).format(value).replace(/-/g, minus);
-}
-
-export function formatValue(value: unknown, unit: Unit = "number", digits = 2, currency = "BRL", signed = false): string {
-  if (value === null || value === undefined || (typeof value === "number" && !Number.isFinite(value))) return missingValue;
-  if (typeof value !== "number" || unit === "text") return String(value);
-  const options: Intl.NumberFormatOptions = { signDisplay: signed ? "exceptZero" : "negative", minimumFractionDigits: unit === "integer" ? 0 : digits, maximumFractionDigits: unit === "integer" ? 0 : digits };
-  if (unit === "money") { options.style = "currency"; options.currency = currency; }
-  if (unit === "fraction") options.style = "percent";
-  return localize(value, options) + (unit === "percent" ? "%" : unit === "multiple" ? "×" : "");
-}
-
-/** Fraction shown as a percent with one explicit precision; use it wherever a share or return is printed. */
-export function formatPercent(value: unknown, digits = 1): string {
-  return formatValue(value, "fraction", digits);
-}
 
 const brasiliaZone = "America/Sao_Paulo";
 const brasiliaDate = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: brasiliaZone });
@@ -55,8 +40,10 @@ export function relativeAge(value: string, now = Date.now()): string {
 }
 
 /** Same text as formatValue, with the currency or unit symbol set apart so large figures read first. */
-export function ValueText({ value, unit = "number", digits = 2, currency = "BRL" }: { value: unknown; unit?: Unit; digits?: number; currency?: string }) {
-  const text = formatValue(value, unit, digits, currency);
+export function ValueText({ value, unit = "number", digits = 2, currency = "BRL", compact = false }: { value: unknown; unit?: Unit; digits?: number; currency?: string; compact?: boolean }) {
+  const text = compact ? formatCompactValue(value, unit, 1, currency) : formatValue(value, unit, digits, currency);
+  const exact = compact ? formatValue(value, unit, unit === "money" ? Math.max(2, digits) : digits, currency) : text;
+  if (compact && exact !== text) return <span title={exact} aria-label={exact}>{text}</span>;
   if (typeof value !== "number" || !Number.isFinite(value) || unit === "text") return <>{text}</>;
   if (unit === "money") {
     const parts = new Intl.NumberFormat("pt-BR", { style: "currency", currency, signDisplay: "negative", minimumFractionDigits: digits, maximumFractionDigits: digits }).formatToParts(value);
@@ -130,7 +117,7 @@ export function Metrics({ items }: { items: Metric[] }) {
     const pill = !!item.status && !!item.help && item.help.length <= 24 && !item.help.includes(".");
     return <div className={`mcard${item.unit === "money" ? " mcard-money" : ""}`} key={`${item.label}-${index}`}>
       <div className="mcard-label"><span>{item.label}</span>{pill && <span className={`mcard-status is-${item.status}`}><span aria-hidden="true">{statusGlyphs[item.status!]}</span>{item.help}</span>}</div>
-      <div className={`mcard-value${item.status ? ` is-${item.status}` : ""}`}><ValueText value={item.value} unit={item.unit} digits={item.digits} currency={item.currency} /></div>
+      <div className={`mcard-value${item.status ? ` is-${item.status}` : ""}`}><ValueText value={item.value} unit={item.unit} digits={item.digits} currency={item.currency} compact={item.compact} /></div>
       {item.trend && <Sparkline values={item.trend} tone={item.status ?? "info"} />}
       {typeof item.meter === "number" && Number.isFinite(item.meter) && <span className="mcard-meter" aria-hidden="true"><span style={{ width: `${Math.min(1, Math.max(0, item.meter)) * 100}%` }} /></span>}
       {item.help && !pill && <p className="metric-help">{item.help}</p>}
@@ -160,7 +147,14 @@ export function Table<T extends object>({ columns, rows, onSelect, selectedKey, 
   })}</tr></thead><tbody>{ordered.map((row, index) => {
     const values = row as Record<string, unknown>;
     const key = String(values[rowKey] ?? index);
-    return <tr key={key} className={selectedKey === key ? "selected-row" : undefined}>{onSelect && <td><button aria-label={`Selecionar ${key}`} aria-pressed={selectedKey === key} onClick={() => onSelect(row)}>{selectedKey === key ? "Selecionado" : "Selecionar"}</button></td>}{columns.map(column => <td key={column.key} className={isNumericColumn(column) ? "numeric-cell" : undefined}>{formatValue(values[column.key], column.unit, column.digits, column.currency ?? (typeof values.currency === "string" ? values.currency : "BRL"), column.signed)}</td>)}</tr>;
+      return <tr key={key} className={selectedKey === key ? "selected-row" : undefined}>{onSelect && <td><button aria-label={`Selecionar ${key}`} aria-pressed={selectedKey === key} onClick={() => onSelect(row)}>{selectedKey === key ? "Selecionado" : "Selecionar"}</button></td>}{columns.map(column => {
+        const value = values[column.key];
+        const currency = column.currency ?? (typeof values.currency === "string" ? values.currency : "BRL");
+        const exactDigits = column.compact && column.unit === "money" ? Math.max(2, column.digits ?? 2) : column.digits;
+        const exact = formatValue(value, column.unit, exactDigits, currency, column.signed);
+        const shown = column.compact ? formatCompactValue(value, column.unit, 1, currency, column.signed) : exact;
+        return <td key={column.key} className={isNumericColumn(column) ? "numeric-cell" : undefined}>{shown === exact ? shown : <span title={exact} aria-label={exact}>{shown}</span>}</td>;
+      })}</tr>;
   })}</tbody></table></div>;
 }
 export function Notice({ children, tone = "info" }: { children: ReactNode; tone?: Signal }) {

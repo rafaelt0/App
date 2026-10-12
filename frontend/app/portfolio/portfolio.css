@@ -37,8 +37,9 @@
 .pf-swatch { display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 2px; vertical-align: 1px; }
 .pf-swatch[data-tone="-1"] { background: transparent; box-shadow: inset 0 0 0 1px var(--border-strong); }
 .pf-weights { list-style: none; margin: 8px 0 16px; padding: 0; display: grid; gap: 0; border: 0; }
-.pf-weights li { display: grid; grid-template-columns: 96px minmax(0, 1fr) 72px; align-items: center; gap: 12px; min-height: 40px; border-bottom: 1px solid var(--border-subtle); }
-.pf-weight-ticker { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.pf-weights li { display: grid; grid-template-columns: 112px minmax(0, 1fr) 72px; align-items: center; gap: 12px; min-height: 40px; border-bottom: 1px solid var(--border-subtle); }
+.pf-weight-ticker { display: flex; align-items: center; gap: 6px; min-width: 0; font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.pf-weight-ticker .pf-swatch { flex: none; margin: 0; }
 .pf-weight-track { height: 6px; border-radius: var(--radius-pill); background: var(--surface-raised); overflow: hidden; }
 .pf-weight-fill { display: block; height: 100%; background: rgb(139 147 255 / .75); border-radius: var(--radius-pill); }
 .pf-weight-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -68,7 +69,7 @@
   .pf-kpis .mcard:first-child .mcard-value { font-size: 26px; }
 }
 @media (max-width: 480px) {
-  .pf-weights li { grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 8px; }
+  .pf-weights li { grid-template-columns: 96px minmax(0, 1fr) 64px; gap: 8px; }
   .pf-setup .actions > * { flex: 1 1 100%; width: 100%; }
   .pf-actions-primary { min-width: 0; }
 }

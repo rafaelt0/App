@@ -1,17 +1,19 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { formatValue, Loading } from "./ui";
+import StockLogo from "./StockLogo";
+import type { Stock } from "./AppProvider";
 import type { PortfolioResult } from "../lib/portfolio";
 import { period } from "../lib/portfolio";
 
 const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-export function WeightList({ weights }: { weights: PortfolioResult["weights"] }) {
+export function WeightList({ weights, stocks }: { weights: PortfolioResult["weights"]; stocks: Stock[] }) {
   const rows = [...weights].sort((a, b) => b.weight - a.weight);
   const max = Math.max(...rows.map(row => row.weight), 0.0001);
   const shown = rows.filter(row => row.weight > 0);
   return <><div className="pf-strip" aria-hidden="true">{shown.map((row, index) => <span key={row.ticker} data-tone={index % 6} style={{ flexGrow: row.weight }} title={`${row.ticker} ${formatValue(row.weight, "fraction", 2)}`} />)}</div>
   <ul className="pf-weights" aria-label="Pesos do portfólio em porcentagem">{rows.map(row => <li key={row.ticker}>
-    <span className="pf-weight-ticker"><span className="pf-swatch" data-tone={shown.indexOf(row) % 6} aria-hidden="true" />{row.ticker}</span>
+    <span className="pf-weight-ticker"><span className="pf-swatch" data-tone={shown.indexOf(row) % 6} aria-hidden="true" /><StockLogo ticker={row.ticker} company={stocks.find(stock => stock.ticker === row.ticker)?.company ?? row.ticker} size={24}/><span>{row.ticker}</span></span>
     <span className="pf-weight-track" aria-hidden="true"><span className="pf-weight-fill" style={{ width: `${Math.max(row.weight / max, 0) * 100}%` }} /></span>
     <span className="pf-weight-value">{formatValue(row.weight, "fraction", 2)}</span>
   </li>)}</ul></>;
