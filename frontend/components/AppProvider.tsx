@@ -7,7 +7,7 @@ import { api, subscribeActivity } from "../lib/api";
 import CommandPalette, { SELECTION_FULL_MESSAGE } from "./CommandPalette";
 import { Icon, Loading, Notice } from "./ui";
 
-export type Stock = { ticker: string; company: string; sector: string };
+export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null };
 export type Session = {
   selection: string[];
   revision: number;
@@ -33,8 +33,8 @@ let bootstrap: Promise<{ session: Session; stocks: Stock[] }> | null = null;
 
 function initialize() {
   if (!bootstrap) {
-    bootstrap = Promise.all([api<Session>("/api/session"), api<{ stocks: Stock[] }>("/api/universe")]).then(([session, universe]) => {
-      return { session, stocks: universe.stocks };
+    bootstrap = Promise.all([api<Session>("/api/session"), api<{ stocks: Omit<Stock, "liquidity">[] }>("/api/universe")]).then(([session, universe]) => {
+      return { session, stocks: universe.stocks.map(stock => ({ ...stock, liquidity: null })) };
     }).catch(error => { bootstrap = null; throw error; });
   }
   return bootstrap;
@@ -168,6 +168,14 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     }).catch(reason => { if (active) { setError(reason instanceof Error ? reason.message : String(reason)); setLoading(false); } });
     return () => { active = false; };
   }, [accept]);
+  useEffect(() => {
+    if (loading || error) return;
+    let active = true;
+    api<{ liquidity: Record<string, number | null> }>("/api/universe/liquidity").then(value => {
+      if (active) setStocks(current => current.map(stock => ({ ...stock, liquidity: value.liquidity[stock.ticker] ?? null })));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [loading, error]);
   const refreshSession = useCallback(() => enqueue(async () => {
     accept(await api<Session>("/api/session"));
   }), [accept, enqueue]);

@@ -358,7 +358,11 @@ details[open] summary { margin-bottom: 12px; }
 .ticker-chip button:hover:not(:disabled) { background: transparent; color: var(--brand-danger); }
 .ticker-chip .ticker-chip-favorite { color: var(--brand-accent); font-size: 17px; }
 .ticker-picker-controls { position: absolute; z-index: 5; inset-inline: 0; margin-top: 6px; padding: 8px; border: 1px solid var(--border-hover); border-radius: var(--radius-lg); background: var(--surface-raised); }
+.ticker-controls-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 6px; }
 .ticker-filter { display: flex; gap: 6px; margin: 0 0 6px; }
+.ticker-controls-row .ticker-filter { margin: 0; }
+.ticker-sort { display: flex; align-items: center; gap: 8px; margin-left: auto; color: var(--text-secondary); font-size: 12.5px; }
+.ticker-sort select { display: block; width: auto; min-height: 34px; margin-top: 0; padding: 4px 10px; font-size: 12.5px; }
 .ticker-filter button { min-height: 34px; padding: 5px 10px; border-color: transparent; background: transparent; box-shadow: none; color: var(--text-secondary); font-size: 12.5px; }
 .ticker-filter button[aria-pressed="true"] { border-color: var(--brand-primary); background: var(--brand-tint); color: var(--text-primary); }
 .ticker-filter button span { color: var(--text-muted); font-variant-numeric: var(--numeric); }
