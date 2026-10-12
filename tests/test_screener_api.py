@@ -78,7 +78,16 @@ def test_unknown_filters_ranges_and_invalid_sort_rejected(screener_api):
                      {"dy_min": .31}, {"liq2m_min": 100_000_001}, {"pl_min_exclusive": True}]:
         assert client.post("/api/screener/query", json={"criteria": criteria}).status_code == 422
     with pytest.raises(ValidationError):
-        screener.Sort(field="roe", direction="asc")
+        screener.Sort(field="made_up")
+    with pytest.raises(ValidationError):
+        screener.Sort(field="setor")
+
+
+def test_any_numeric_column_sorts_in_both_directions_with_nulls_last():
+    desc, _ = screener.screen(market_frame(), screener.Query(sort=screener.Sort(field="roe", direction="desc")))
+    assert [row["ticker"] for row in desc["rows"]] == ["AAA3", "BBB4", "ZERO3", "NULL3"]
+    asc, _ = screener.screen(market_frame(), screener.Query(sort=screener.Sort(field="roe", direction="asc")))
+    assert [row["ticker"] for row in asc["rows"]] == ["ZERO3", "BBB4", "AAA3", "NULL3"]
 
 
 def test_sort_nulls_last_and_exact_lower_boundary():

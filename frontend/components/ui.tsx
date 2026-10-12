@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { download } from "../lib/api";
+import { rankStocks } from "../lib/tickerSearch";
 import type { Stock } from "./AppProvider";
 
 export type Unit = "money" | "fraction" | "percent" | "ratio" | "multiple" | "number" | "integer" | "text";
@@ -161,17 +162,15 @@ export function EmptyState({ title, children, href, action, icon = "chart" }: { 
 export function Loading({ children }: { children?: ReactNode }) {
   return <div className="loading-container" role="status" aria-live="polite"><span className="loading-spinner" aria-hidden="true" /><p>{children ?? "Carregando dados para a análise."}</p><span className="loading-track" aria-hidden="true" /></div>;
 }
-export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escolha ações para analisar" }: { value: string[]; onChange: (tickers: string[]) => void | Promise<void>; stocks: Stock[]; max?: number; label?: string }) {
+export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escolha ações para analisar", watchlist = [], onFavorite }: { value: string[]; onChange: (tickers: string[]) => void | Promise<void>; stocks: Stock[]; max?: number; label?: string; watchlist?: string[]; onFavorite?: (ticker: string) => void }) {
   const id = useId();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const options = useMemo(() => {
-    const needle = query.toLocaleLowerCase("pt-BR");
-    return stocks.filter(stock => !value.includes(stock.ticker) && `${stock.ticker} ${stock.company} ${stock.sector}`.toLocaleLowerCase("pt-BR").includes(needle)).slice(0, 40);
-  }, [query, stocks, value]);
+  const results = useMemo(() => rankStocks(stocks.filter(stock => !value.includes(stock.ticker)), query, 40), [query, stocks, value]);
+  const options = results.items;
   async function change(next: string[]) {
     if (busy) return;
     setBusy(true); setError(null);
@@ -185,7 +184,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
     void change([...value, ticker]);
   }
   const expanded = open && options.length > 0 && value.length < max;
-  return <div className="ticker-picker"><label htmlFor={id}>{label}</label><div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}>{ticker}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => change(value.filter(item => item !== ticker))}>×</button></span>)}</div>
+  return <div className="ticker-picker"><label htmlFor={id}>{label}</label><div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}>{ticker}{onFavorite && <button type="button" className="ticker-chip-favorite" aria-pressed={watchlist.includes(ticker)} aria-label={`Favoritar ${ticker}`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => onFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => change(value.filter(item => item !== ticker))}>×</button></span>)}</div>
     <div className="ticker-search"><Icon name="search" /><input id={id} role="combobox" type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} disabled={value.length >= max} aria-busy={busy} aria-autocomplete="list" aria-expanded={expanded} aria-controls={`${id}-options`} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined} onFocus={() => setOpen(true)} onClick={() => setOpen(true)} onBlur={() => setOpen(false)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); if (!expanded) setQuery(""); setOpen(false); }
       if (event.key === "ArrowDown") { event.preventDefault(); if (!expanded) { setOpen(true); setActive(0); } else setActive(index => Math.min(index + 1, options.length - 1)); }
@@ -193,6 +192,8 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
       if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); pick(options[active].ticker); }
     }} /></div>
     {expanded && <ul className="ticker-options" id={`${id}-options`} role="listbox">{options.map((stock, index) => <li key={stock.ticker} id={`${id}-option-${index}`} role="option" aria-selected={active === index}><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => pick(stock.ticker)}><strong>{stock.ticker}</strong><span>{[stock.company, stock.sector].filter(Boolean).join(" · ") || "Setor não informado"}</span></button></li>)}</ul>}
+    {open && query.trim() && !options.length && value.length < max && <p className="caption ticker-search-empty" role="status">Nenhuma ação encontrada para “{query.trim()}”. Tente o ticker ou parte do nome.</p>}
+    {expanded && results.total > options.length && <p className="caption" role="status">Mostrando {options.length} de {results.total} resultados; refine a busca.</p>}
     <p className="caption" role="status">{value.length}/{max} ativos selecionados.</p>{error && <Notice tone="negative">{error}</Notice>}
   </div>;
 }

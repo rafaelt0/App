@@ -31,7 +31,6 @@
 .home-page .home-selection-list { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-width: 0; margin: 0; font-size: 14px; }
 .home-page .home-selection-label { color: var(--text-muted); }
 .home-page .home-selection-tickers { font-family: var(--font-mono); font-size: 14px; color: var(--text-primary); overflow-wrap: anywhere; }
-.home-page .home-selection-more { color: var(--brand-primary); font-weight: 600; }
 .home-page .home-selection-count { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
 .home-page .sector-picker-options label:has(> input[type="checkbox"]) { min-height: 44px; }
@@ -60,6 +59,10 @@
 .home-page .home-favorite-toggle:hover:not(:disabled) { background: var(--hover-tint); border-color: transparent; color: var(--text-primary); }
 .home-page .home-favorite-toggle svg { width: 20px; height: 20px; flex-basis: 20px; }
 .home-page .home-favorite-toggle[aria-pressed="true"] { color: var(--brand-accent); }
+.home-page .ticker-chip .ticker-chip-favorite { min-width: 36px; min-height: 36px; padding: 0 6px; font-size: 15px; line-height: 1; }
+.home-page .ticker-chip .ticker-chip-favorite:hover:not(:disabled) { color: var(--brand-accent); }
+.home-page .ticker-chip .ticker-chip-favorite[aria-pressed="true"] { color: var(--brand-accent); }
+.home-page .ticker-search-empty { margin: 8px 0 0; }
 .home-page .home-summary-company, .home-page .home-summary-sector { margin: 0; overflow-wrap: anywhere; }
 .home-page .home-summary-company { font-size: 14.5px; font-weight: 550; color: var(--text-primary); }
 .home-page .home-summary-sector { font-size: 12.5px; color: var(--text-muted); }
