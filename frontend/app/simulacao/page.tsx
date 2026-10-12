@@ -152,7 +152,7 @@ export default function SimulationPage() {
       ? { title: "Atualize o portfólio", message: "A seleção atual não possui histórico analisado. Volte para Portfólio e clique em Carregar portfólio antes de rodar a simulação." }
       : { title: "Portfólio não configurado", message: "Configure seu portfólio na página Portfólio e carregue a análise para liberar a Simulação Monte Carlo." };
 
-  return <>
+  return <div className="simulation-page">
     <PageHeader title="Simulação de portfólio" description="Projete faixas de retorno e risco a partir dos pesos definidos na carteira." icon="simulation" />
     {sessionError && <Notice tone="negative">{sessionError}</Notice>}
     {error && <Notice tone="negative">{error}</Notice>}
@@ -180,8 +180,8 @@ export default function SimulationPage() {
       <div className="sim-workbench">
         <form className="sim-form" onSubmit={submit} aria-busy={running} noValidate>
           <div className="task-panel sim-task">
-            <h2 className="ui-section-heading">Parâmetros da simulação</h2>
-            <p className="sim-step">Ponto de partida</p>
+            <div className="task-heading"><span className="task-step" aria-hidden="true">01</span><div className="task-heading-content"><h2>Defina a simulação</h2><p>Configure o horizonte, o capital e as hipóteses do cenário.</p></div></div>
+            <p className="sim-step">Pontos de partida</p>
             <div className="sim-presets" role="group" aria-label="Pontos de partida">
               {simulationPresets.map(preset => {
                 const active = inputs.simulations === preset.simulations && inputs.initial_capital === preset.initial_capital && inputs.years === preset.years;
@@ -213,13 +213,15 @@ export default function SimulationPage() {
                 <span className="sim-hint" id="sim-help-w">Histórico usado para estimar retornos e risco.</span>
               </label>
             </div>
-            <p className="discreet-status">Os parâmetros só são aplicados ao clicar em Rodar Simulação; se mudarem depois, o resultado anterior fica marcado como desatualizado. A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos. O horizonte é independente da janela: são 252 dias úteis por ano, com limite de 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p>
+            <p className="discreet-status sim-submit-note">Os parâmetros só são aplicados ao clicar em Rodar Simulação; se mudarem depois, o resultado anterior fica marcado como desatualizado.</p>
             <div className="actions">
               <button type="submit" className="primary" disabled={running || !inputsValid}>{running ? "Rodando simulação…" : "Rodar Simulação"}</button>
             </div>
+            <details className="method-disclosure sim-method"><summary>Premissas e calibração</summary><div><p>A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos.</p><p>O horizonte é independente da janela: são 252 dias úteis por ano, com limite de 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p></div></details>
           </div>
         </form>
         <aside className="sim-context" aria-label="Alocação usada na simulação">
+          <div className="task-heading sim-context-heading"><span className="task-step" aria-hidden="true">02</span><div className="task-heading-content"><h2>Revise a alocação</h2><p>Pesos da carteira carregada usados no cálculo.</p></div></div>
           <Section title="Alocação usada na simulação">
             {portfolio?.mode && <p className="sim-mode">{portfolio.mode}</p>}
             {sample && <p className="sim-window">Calibração: {calibrationText}. Histórico do portfólio: {periodLabel(sample)} ({number.format(sample.count)} retornos diários).</p>}
@@ -239,14 +241,15 @@ export default function SimulationPage() {
       {visible && <div className="sim-results">
         {stale && <div role="status"><Notice tone="warning">Parâmetros alterados desde a última simulação. Os resultados abaixo são da simulação anterior; clique em Rodar Simulação para atualizá-los.</Notice></div>}
         {visible.warnings.map(warning => <Notice key={warning} tone="warning"><strong>Atenção: </strong>{warning}</Notice>)}
+        <div className="context-strip sim-run-context"><dl className="sim-run">
+          <div><dt>Horizonte</dt><dd>{yearsLabel(visible.inputs.years)}</dd></div>
+          <div><dt>Trajetórias</dt><dd>{number.format(visible.inputs.simulations)}</dd></div>
+          <div><dt>Capital inicial</dt><dd>{formatValue(visible.inputs.initial_capital, "money")}</dd></div>
+          <div><dt>Janela de calibração</dt><dd>{visible.inputs.calibration === "portfolio" ? "Histórico do Portfólio" : `${visible.inputs.calibration} anos`}</dd></div>
+        </dl></div>
+        <div className="result-lead"><div className="section-toolbar"><div><h2>Resultados da simulação</h2><p>Resumo da execução enviada e cenários estimados.</p></div></div></div>
         <Section title="Estatísticas da Simulação Monte Carlo">
-          <dl className="sim-run">
-            <div><dt>Horizonte</dt><dd>{yearsLabel(visible.inputs.years)}</dd></div>
-            <div><dt>Trajetórias</dt><dd>{number.format(visible.inputs.simulations)}</dd></div>
-            <div><dt>Capital inicial</dt><dd>{formatValue(visible.inputs.initial_capital, "money")}</dd></div>
-            <div><dt>Janela de calibração</dt><dd>{visible.inputs.calibration === "portfolio" ? "Histórico do Portfólio" : `${visible.inputs.calibration} anos`}</dd></div>
-          </dl>
-          <div className="sim-kpis"><Metrics items={[
+          <div className="sim-kpis metrics-primary"><Metrics items={[
             { label: "Valor Esperado Final", value: visible.stats.mean_terminal, unit: "money" },
             { label: "CAGR do valor final médio (a.a.)", value: visible.stats.mean_implied_cagr, unit: "fraction", digits: 1, help: "Crescimento anual implícito no valor final médio; não é a média dos CAGRs das trajetórias." },
             { label: "Probabilidade de Ganho", value: visible.stats.gain_probability, unit: "fraction", digits: 1, meter: visible.stats.gain_probability, help: `Percentual de simulações acima do capital inicial sob o modelo normal. Erro Monte Carlo de até ±${number.format(visible.monte_carlo_error_pp)} p.p. (95% aproximado, pior caso); não inclui incerteza dos parâmetros.` },
@@ -329,5 +332,5 @@ export default function SimulationPage() {
         </Section>
       </div>}
     </>}
-  </>;
+  </div>;
 }

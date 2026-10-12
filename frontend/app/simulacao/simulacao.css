@@ -98,3 +98,22 @@
   .sim-allocation li { grid-template-columns: minmax(48px, auto) minmax(0, 1fr) auto; gap: 8px; }
   .sim-weight { min-width: 48px; }
 }
+
+.simulation-page .sim-task > .task-heading { margin-bottom: 24px; }
+.simulation-page .sim-context-heading { margin-bottom: 16px; }
+.simulation-page .sim-submit-note { max-width: 80ch; margin: 12px 0 0; }
+.simulation-page .sim-method { margin-top: 16px; }
+.simulation-page .sim-method p:last-child { margin-bottom: 0; }
+.simulation-page .sim-prereq { gap: 16px 32px; }
+.simulation-page .sim-prereq-title { margin: 8px 0; }
+.simulation-page .sim-prereq-message { margin-bottom: 12px; }
+.simulation-page .sim-prereq-outputs { padding-top: 16px; }
+.simulation-page .sim-prereq-outputs ul { gap: 6px; margin-bottom: 8px; }
+.simulation-page .sim-run-context { margin: 0; }
+.simulation-page .sim-run-context .sim-run { grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.simulation-page .sim-run-context .sim-run > div { padding: 4px 16px; }
+.simulation-page .sim-run-context .sim-run > div:first-child { padding-left: 0; }
+.simulation-page .sim-results > .result-lead { margin-bottom: 0; }
+@media (max-width: 768px) {
+  .simulation-page .sim-run-context .sim-run > div { padding-inline: 0; border-left: 0; }
+}

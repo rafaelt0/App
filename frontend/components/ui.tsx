@@ -112,8 +112,17 @@ export function Icon({ name = "chart" }: { name?: string }) {
 export function PageHeader({ title, description, icon = "chart" }: { title: string; description: string; icon?: string }) {
   return <header className="page-hero"><span className="page-hero-icon"><Icon name={icon} /></span><div className="page-hero-content"><h1 className="page-hero-title">{title}</h1><p className="page-hero-subtitle">{description}</p></div></header>;
 }
-export function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="analysis-section"><h2 className="ui-section-heading">{title}</h2>{children}</section>;
+export function Section({ title, children, description, actions, className }: { title: string; children: ReactNode; description?: string; actions?: ReactNode; className?: string }) {
+  return <section className={`analysis-section${className ? ` ${className}` : ""}`}>
+    <div className="section-toolbar">
+      <div className="section-heading-group">
+        <h2 className="ui-section-heading">{title}</h2>
+        {description && <p className="section-description">{description}</p>}
+      </div>
+      {actions && <div className="section-actions">{actions}</div>}
+    </div>
+    {children}
+  </section>;
 }
 export function Metrics({ items }: { items: Metric[] }) {
   return <div className="mcard-grid">{items.map((item, index) => {
@@ -184,13 +193,15 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
     void change([...value, ticker]);
   }
   const expanded = open && options.length > 0 && value.length < max;
-  return <div className="ticker-picker"><label htmlFor={id}>{label}</label><div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}>{ticker}{onFavorite && <button type="button" className="ticker-chip-favorite" aria-pressed={watchlist.includes(ticker)} aria-label={`Favoritar ${ticker}`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => onFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => change(value.filter(item => item !== ticker))}>×</button></span>)}</div>
+  return <div className="ticker-picker"><label htmlFor={id}>{label}</label>
     <div className="ticker-search"><Icon name="search" /><input id={id} role="combobox" type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} disabled={value.length >= max} aria-busy={busy} aria-autocomplete="list" aria-expanded={expanded} aria-controls={`${id}-options`} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined} onFocus={() => setOpen(true)} onClick={() => setOpen(true)} onBlur={() => setOpen(false)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); if (!expanded) setQuery(""); setOpen(false); }
       if (event.key === "ArrowDown") { event.preventDefault(); if (!expanded) { setOpen(true); setActive(0); } else setActive(index => Math.min(index + 1, options.length - 1)); }
       if (event.key === "ArrowUp") { event.preventDefault(); setActive(index => Math.max(index - 1, 0)); }
       if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); pick(options[active].ticker); }
-    }} /></div>
+    }} />
+    </div>
+    <div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}>{ticker}{onFavorite && <button type="button" className="ticker-chip-favorite" aria-pressed={watchlist.includes(ticker)} aria-label={`Favoritar ${ticker}`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => onFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => change(value.filter(item => item !== ticker))}>×</button></span>)}</div>
     {expanded && <ul className="ticker-options" id={`${id}-options`} role="listbox">{options.map((stock, index) => <li key={stock.ticker} id={`${id}-option-${index}`} role="option" aria-selected={active === index}><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => pick(stock.ticker)}><strong>{stock.ticker}</strong><span>{[stock.company, stock.sector].filter(Boolean).join(" · ") || "Setor não informado"}</span></button></li>)}</ul>}
     {open && query.trim() && !options.length && value.length < max && <p className="caption ticker-search-empty" role="status">Nenhuma ação encontrada para “{query.trim()}”. Tente o ticker ou parte do nome.</p>}
     {expanded && results.total > options.length && <p className="caption" role="status">Mostrando {options.length} de {results.total} resultados; refine a busca.</p>}

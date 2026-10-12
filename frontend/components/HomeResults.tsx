@@ -105,9 +105,9 @@ export default function HomeResults({ ready, selection, watchlist, busy, onFavor
   }
   return <>
       {!!ready.missing_tickers.length && <Notice tone="warning">Dados Fundamentus indisponíveis para {ready.missing_tickers.join(", ")}. Os dados disponíveis foram preservados e os caches da fonte invalidados.</Notice>}
-      <div className="home-results-bar">
+      <div className="home-results-bar result-lead section-toolbar">
         <div className="home-results-heading"><h2>Resultado da análise</h2><p className="caption">{companies.length} {companies.length===1 ? "ativo analisado":"ativos analisados"}: {ready.requested_tickers.join(", ")}</p></div>
-        <div className="home-results-actions"><ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>Exportar CSV bruto</ExportButton></div>
+        <div className="home-results-actions section-actions"><ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>Exportar CSV bruto</ExportButton></div>
       </div>
       <ul className="home-summary" aria-label="Resumo dos ativos analisados">{companies.map(company=>{const saved=watchlist.includes(company.ticker);const favorable=company.synthesis.favorable_categories;const valid=company.synthesis.categorias_validas;return <li className="home-summary-card" key={company.ticker}>
         <div className="home-summary-head"><strong className="home-summary-ticker ticker-badge">{company.ticker}</strong><button type="button" className="home-favorite-toggle" aria-pressed={saved} aria-label={`Favoritar ${company.ticker}`} title={saved ? `${company.ticker} está nos favoritos`:`Adicionar ${company.ticker} aos favoritos`} onClick={()=>onFavorite(company.ticker)}><svg width="20" height="20" viewBox="0 0 24 24" fill={saved ? "currentColor":"none"} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></button></div>
@@ -116,7 +116,7 @@ export default function HomeResults({ ready, selection, watchlist, busy, onFavor
         <dl className="home-summary-facts">
           <div className="home-summary-quote"><dt>Cotação</dt><dd><ValueText value={company.market.price} unit="money" currency={company.market.currency}/></dd></div>
           {summaryIndicators.map(item=><div className="home-summary-indicator" key={item.key}><dt>{item.label}</dt><dd><ValueText value={company.indicators[item.key]} unit={item.unit} digits={2}/></dd></div>)}
-          <div className="home-summary-row"><dt>Síntese setorial</dt><dd>{valid ? <><span className="home-summary-meter" aria-hidden="true">{Array.from({length:valid},(_,index)=><span key={index} data-on={index<favorable}/>)}</span>{favorable}/{valid} áreas favoráveis</>:"Sem áreas avaliadas"}</dd></div>
+          <div className="home-summary-row home-summary-synthesis"><dt>Síntese setorial</dt><dd>{valid ? <><span className="home-summary-meter" aria-hidden="true">{Array.from({length:valid},(_,index)=><span key={index} data-on={index<favorable}/>)}</span>{favorable}/{valid} áreas favoráveis</>:"Sem áreas avaliadas"}</dd></div>
         </dl>
         <PriceRange low={company.market.low_52w} high={company.market.high_52w} price={company.market.price} currency={company.market.currency} date={company.market.last_quote_date}/>
       </li>;})}</ul>
@@ -124,6 +124,6 @@ export default function HomeResults({ ready, selection, watchlist, busy, onFavor
       {tabs.map(tab=><div className="home-tab-panel" role="tabpanel" key={tab.id} id={`home-panel-${tab.id}`} aria-labelledby={`home-tab-${tab.id}`} tabIndex={0} hidden={tab.id!==activeTab.id}>
         {tab.id===activeTab.id && tab.render({ready,companies,single,busy,comparison,setComparison,onRefreshConsensus})}
       </div>)}
-      <div className="next-step-card"><div className="next-step-eyebrow">Próximo passo</div><h2>Analise sua carteira</h2><p>Monte e otimize a carteira com {selection.slice(0,3).join(", ")}{selection.length>3 ? "…":""}.</p><Link href="/portfolio">Abrir Portfólio</Link></div>
+      <div className="next-step-card"><div className="next-step-eyebrow">Próximo passo</div><h2>Analise sua carteira</h2><p>Monte e otimize a carteira com {selection.slice(0,3).join(", ")}{selection.length>3 ? "…":""}.</p><Link className="button-link" href="/portfolio">Abrir Portfólio</Link></div>
   </>;
 }

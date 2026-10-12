@@ -94,3 +94,25 @@
 @media (max-width: 1023px) {
   .scr-active { position: static; }
 }
+
+/* Page-scoped refinements keep the full criteria list in document flow. */
+.screener-page .scr-workspace { gap: 0 28px; }
+.screener-page .scr-filters { position: static; max-height: none; overflow: visible; padding-right: 0; }
+.screener-page .scr-active { position: static; padding: 12px 0; border: 0; border-block: 1px solid var(--border-default); border-radius: 0; background: transparent; box-shadow: none; }
+.screener-page .scr-criterion { padding-inline: 12px; border-top-width: 1px; }
+.screener-page .scr-criterion[data-active="true"] { border-top: 2px solid var(--brand-primary); border-right-color: var(--border-default); border-bottom-color: var(--border-default); border-left-color: var(--border-default); background: color-mix(in srgb, var(--brand-primary) 5%, var(--surface-panel)); }
+.screener-page .scr-criterion > label:has(> input[type="checkbox"]) { min-height: 44px; }
+.screener-page .scr-criterion > label > input[type="checkbox"] { width: 20px; height: 20px; }
+.screener-page .scr-chips li, .screener-page .scr-chips li button, .screener-page .scr-quick-amounts button { min-height: 44px; }
+.screener-page .scr-table tbody td:first-child button, .screener-page .scr-sort { min-height: 44px; }
+.screener-page .scr-stale { opacity: 1; }
+.screener-page .scr-context { padding: 8px 0; border-block: 1px solid var(--border-subtle); }
+.screener-page .scr-results .analysis-section { min-width: 0; }
+@container workspace (min-width: 960px) {
+  .screener-page .scr-workspace { grid-template-columns: minmax(304px, 320px) minmax(0, 1fr); gap: 28px; }
+  .screener-page .scr-filters { position: static; max-height: none; overflow: visible; }
+  .screener-page .scr-criteria { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .screener-page .scr-quick-amounts button { flex: 1 1 auto; }
+}
