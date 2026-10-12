@@ -257,3 +257,129 @@ def test_daily_returns_drops_only_rows_before_every_series_has_history():
     assert list(returns.index) == list(dates[4:])
     assert returns.loc[dates[4], "NEW.SA"] == pytest.approx(0.10)
     assert not returns.isna().any().any()
+
+
+def test_stress_portfolio_and_benchmark_both_include_start_day_return():
+    import pandas as pd
+    import pytest
+
+    from utils.portfolio_data import calculate_historical_stress
+
+    dates = pd.bdate_range("2020-01-01", periods=6)  # 1, 2, 3, 6, 7 and 8 Jan
+    prices = pd.DataFrame({"AAA.SA": [100, 110, 110, 110, 110, 110]}, index=dates)
+    benchmark = pd.Series([100.0, 120, 120, 120, 120, 120], index=dates)
+
+    results = calculate_historical_stress(
+        prices, benchmark, {"AAA.SA": 1.0}, {"Crise": ("2020-01-02", "2020-01-08")}
+    )
+
+    assert results[0]["Portfólio"] == pytest.approx(0.10)
+    assert results[0]["IBOV"] == pytest.approx(0.20)
+
+
+def test_drawdown_counts_first_day_loss_against_initial_capital():
+    import pandas as pd
+    import pytest
+
+    from utils.portfolio_data import drawdown_from_returns
+
+    drawdown = drawdown_from_returns(pd.Series([-0.10, 0.0, 0.05]))
+
+    assert drawdown.min() == pytest.approx(-0.10)
+    assert drawdown.iloc[-1] == pytest.approx(-0.055)
+
+
+def test_historical_var_and_cvar_use_empirical_tail():
+    import pandas as pd
+    import pytest
+
+    from utils.portfolio_data import historical_var_cvar
+
+    returns = pd.Series([-0.10, -0.08, -0.06, -0.04] + [0.01] * 16)
+
+    var, cvar = historical_var_cvar(returns)
+
+    assert var == pytest.approx(-0.081)
+    assert cvar == pytest.approx(-0.10)
+
+
+def test_align_daily_rates_forward_fills_and_rejects_uncovered_dates():
+    import pandas as pd
+    import pytest
+
+    from utils.portfolio_data import align_daily_rates
+
+    rates = pd.Series([0.0001, 0.0002], index=pd.to_datetime(["2024-01-02", "2024-01-04"]))
+    index = pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"])
+
+    aligned = align_daily_rates(rates, index)
+
+    assert list(aligned.index) == list(index)
+    assert list(aligned) == pytest.approx([0.0001, 0.0001, 0.0002])
+    with pytest.raises(ValueError, match="não cobre"):
+        align_daily_rates(rates, pd.to_datetime(["2024-01-01"]))
+
+
+def test_cdi_rates_convert_percent_per_day_and_request_bounded_windows(monkeypatch):
+    import datetime
+    import re
+
+    import pandas as pd
+    import pytest
+
+    from utils import portfolio_data
+
+    requested = []
+
+    def fake_fetch(url):
+        requested.append(url)
+        window_start = re.search(r"dataInicial=(\d{2}/\d{2}/\d{4})", url).group(1)
+        return [{"data": window_start, "valor": "0.05"}]
+
+    monkeypatch.setattr(portfolio_data, "_fetch_bcb_series", fake_fetch)
+    portfolio_data.get_cdi_daily_rates.clear()
+    start = datetime.date.today() - datetime.timedelta(days=4000)
+
+    rates = portfolio_data.get_cdi_daily_rates(start)
+
+    first_day = start - datetime.timedelta(days=10)
+    assert len(requested) == 3
+    assert requested[0].startswith(
+        "https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json&"
+    )
+    assert f"dataInicial={first_day:%d/%m/%Y}" in requested[0]
+    assert f"dataFinal={datetime.date.today():%d/%m/%Y}" in requested[-1]
+    assert isinstance(rates.index, pd.DatetimeIndex)
+    assert rates.index.is_monotonic_increasing
+    assert rates.tolist() == pytest.approx([0.0005] * 3)
+
+
+def test_cdi_rejects_non_finite_bcb_values(monkeypatch):
+    import datetime
+
+    import pytest
+
+    from utils import portfolio_data
+
+    monkeypatch.setattr(
+        portfolio_data, "_fetch_bcb_series", lambda url: [{"data": "02/01/2024", "valor": "nan"}]
+    )
+    portfolio_data.get_cdi_daily_rates.clear()
+
+    with pytest.raises(ValueError, match="inválidos"):
+        portfolio_data.get_cdi_daily_rates(datetime.date(2024, 1, 2))
+
+
+
+def test_stress_benchmark_keeps_move_across_missing_close():
+    from utils.portfolio_data import calculate_historical_stress
+
+    dates = pd.bdate_range("2020-01-01", periods=8)
+    prices = pd.DataFrame({"AAA.SA": [100.0] * 8}, index=dates)
+    benchmark = pd.Series([100.0, 100, 100, np.nan, 90, 90, 90, 90], index=dates)
+
+    result = calculate_historical_stress(
+        prices, benchmark, {"AAA.SA": 1.0}, {"Crise": ("2020-01-02", "2020-01-10")}
+    )
+
+    assert result[0]["IBOV"] == pytest.approx(-0.10)

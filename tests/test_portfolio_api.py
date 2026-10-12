@@ -29,6 +29,7 @@ def market(monkeypatch):
     monkeypatch.setattr(api, "get_portfolio_trade_prices", lambda tickers: raw_quotes.loc[:, list(tickers)])
     monkeypatch.setattr(api, "get_benchmark_prices", lambda start: benchmark)
     monkeypatch.setattr(api, "get_selic_rate", lambda: .0001)
+    monkeypatch.setattr(api, "get_cdi_daily_rates", lambda start: pd.Series(.0001, index=prices.index))
     saved = []
     monkeypatch.setattr(api.db, "portfolio_save", lambda uid, tickers, weights: saved.append((uid, tickers, weights)) or True)
     ctx = SessionState(uid="owner", selection=["AAA3", "BBB4"])
@@ -299,9 +300,9 @@ def test_long_stress_uses_active_assets_and_checks_current_snapshot(market, monk
     stress = api.stress(result["id"], api.StressRequest(long_history=True), request(market.ctx))
     assert fetched == [(("AAA3.SA",), date(2008, 8, 1))]
     fiscal = next(row for row in stress["rows"] if row["crisis"] == "Crise fiscal brasileira (2024)")
-    # Portfolio slices prices before pct_change; benchmark differences precede slicing.
+    # Both sides start from the last close before the crisis (2024-11-25), so the start day's return is included.
     within = prices.loc["2024-11-26":"2024-12-30"]
-    assert fiscal["portfolio"] == pytest.approx(1.01 ** (len(within) - 1) - 1)
+    assert fiscal["portfolio"] == pytest.approx(1.01 ** len(within) - 1)
     assert fiscal["benchmark"] == pytest.approx(1.005 ** len(within) - 1)
     assert fiscal["difference_pp"] == pytest.approx((fiscal["portfolio"] - fiscal["benchmark"]) * 100)
     def stale_prices(tickers, start):
@@ -336,10 +337,10 @@ def test_refresh_invalidates_all_cross_page_readiness_and_source_caches(market, 
     market.ctx.artifacts["simulation"] = {"id": "simulation"}
     market.ctx.artifacts["news"] = {"id": "news"}
     cleared = []
-    for name in ("get_portfolio_prices", "get_portfolio_trade_prices", "get_benchmark_prices", "get_selic_rate"):
+    for name in ("get_portfolio_prices", "get_portfolio_trade_prices", "get_benchmark_prices", "get_selic_rate", "get_cdi_daily_rates"):
         monkeypatch.setattr(getattr(api, name), "clear", lambda name=name: cleared.append(name), raising=False)
     api.refresh(api.RefreshRequest(), request(market.ctx))
-    assert set(cleared) == {"get_portfolio_prices", "get_portfolio_trade_prices", "get_benchmark_prices", "get_selic_rate"}
+    assert set(cleared) == {"get_portfolio_prices", "get_portfolio_trade_prices", "get_benchmark_prices", "get_selic_rate", "get_cdi_daily_rates"}
     assert market.ctx.portfolio is None
     assert market.ctx.artifacts == {}
     assert market.ctx.restored is False
@@ -347,3 +348,92 @@ def test_refresh_invalidates_all_cross_page_readiness_and_source_caches(market, 
         api.allocation_csv(result["id"], request(market.ctx))
     with pytest.raises(HTTPException):
         require_portfolio(market.ctx, returns=True)
+
+
+def realized_daily(market):
+    weights = market.ctx.portfolio.weights
+    return market.returns.dot([weights[column.removesuffix(".SA")] for column in market.returns.columns])
+
+
+def test_historical_ratios_use_daily_cdi_excess_returns(market, monkeypatch):
+    cdi = pd.Series(np.linspace(.0001, .0004, len(market.prices.index)), index=market.prices.index)
+    monkeypatch.setattr(api, "get_cdi_daily_rates", lambda start: cdi)
+    result = api.analyze(payload(market), request(market.ctx))
+    daily = realized_daily(market)
+    excess = daily - cdi.loc[daily.index]
+    downside = np.sqrt((np.minimum(excess, 0) ** 2).sum() / len(excess))
+    assert result["source"]["historical_rf"].startswith("BCB SGS 12")
+    assert result["metrics"]["sharpe"] == pytest.approx(excess.mean() / excess.std() * np.sqrt(252))
+    assert result["metrics"]["sortino"] == pytest.approx(excess.mean() / downside * np.sqrt(252))
+    benchmark = market.benchmark_returns.loc[daily.index]
+    bench_excess = benchmark - cdi.loc[daily.index]
+    beta = np.cov(daily, benchmark)[0, 1] / np.cov(daily, benchmark)[1, 1]
+    assert result["metrics"]["annual_alpha"] == pytest.approx((excess.mean() - beta * bench_excess.mean()) * 252 * 100)
+    tail = excess.tail(60)
+    rolling = result["charts"]["rolling_sharpe"]["data"][0]["y"]
+    assert rolling[-1] == pytest.approx(tail.mean() / tail.std() * np.sqrt(252))
+
+
+def test_cdi_outage_flags_constant_selic_fallback(market, monkeypatch):
+    def unavailable(start):
+        raise OSError("BCB outage")
+    monkeypatch.setattr(api, "get_cdi_daily_rates", unavailable)
+    result = api.analyze(payload(market), request(market.ctx))
+    daily = realized_daily(market)
+    excess = daily - .0001
+    assert result["source"]["historical_rf"].startswith("Selic atual constante")
+    assert any("CDI" in warning and "BCB outage" in warning for warning in result["warnings"])
+    assert result["metrics"]["sharpe"] == pytest.approx(excess.mean() / excess.std() * np.sqrt(252))
+
+
+def test_information_ratio_is_annualized(market):
+    result = api.analyze(payload(market), request(market.ctx))
+    daily = realized_daily(market)
+    difference = daily - market.benchmark_returns.loc[daily.index]
+    assert result["metrics"]["information_ratio"] == pytest.approx(difference.mean() / difference.std() * np.sqrt(252))
+
+
+def test_max_drawdown_counts_first_day_loss_against_initial_capital(market, monkeypatch):
+    prices = market.prices.copy()
+    prices.iloc[1] = prices.iloc[0] * .9
+    monkeypatch.setattr(api, "get_portfolio_prices", lambda tickers, start: prices.loc[:, list(tickers)])
+    result = api.analyze(payload(market, strategy="manual", manual_shares={"AAA3": 1, "BBB4": 1}), request(market.ctx))
+    returns = prices.pct_change(fill_method=None).dropna()
+    weights = market.ctx.portfolio.weights
+    daily = returns.dot([weights[column.removesuffix(".SA")] for column in returns.columns])
+    wealth = (1 + daily).cumprod()
+    expected = float((wealth / np.maximum(wealth.cummax(), 1.0) - 1).min())
+    assert daily.iloc[0] == pytest.approx(-.1)
+    assert result["metrics"]["max_drawdown"] == pytest.approx(expected * 100)
+    assert result["metrics"]["max_drawdown"] == pytest.approx(-10)
+
+
+def test_var_metrics_separate_parametric_historical_and_expected_shortfall(market):
+    from statistics import NormalDist
+
+    result = api.analyze(payload(market), request(market.ctx))
+    daily = realized_daily(market)
+    cutoff = np.percentile(daily, 5)
+    assert result["metrics"]["daily_var"] == pytest.approx(NormalDist(daily.mean(), daily.std()).inv_cdf(.05) * 100)
+    assert result["metrics"]["historical_var_95"] == pytest.approx(cutoff * 100)
+    assert result["metrics"]["cvar_95"] == pytest.approx(daily[daily <= cutoff].mean() * 100)
+    assert result["metrics"]["cvar_95"] <= result["metrics"]["historical_var_95"]
+
+
+def test_effective_assets_keep_one_decimal(market):
+    result = api.analyze(payload(market, strategy="manual", manual_shares={"AAA3": 69, "BBB4": 74}), request(market.ctx))
+    assert result["concentration"]["hhi"] == pytest.approx(5200)
+    assert result["concentration"]["effective_assets"] == pytest.approx(1.9)
+
+
+@pytest.mark.parametrize(("target", "mode"), [
+    ("news", "Carteira restaurada"),
+    ("simulation", "Carteira restaurada (janela padrão de 730 dias)"),
+])
+def test_restored_portfolio_label_is_generic_without_saved_strategy(market, monkeypatch, target, mode):
+    market.ctx.restored = True
+    monkeypatch.setattr(api.db, "portfolio_get", lambda uid: (["AAA3", "BBB4"], {"AAA3.SA": .8, "BBB4.SA": .2}))
+    monkeypatch.setattr(api, "get_portfolio_prices", lambda tickers, start: market.prices.loc[:, list(tickers)])
+    restored = api.restore_portfolio(market.ctx, target, 0)
+    assert restored.result["mode"] == mode
+    assert "Markowitz" not in restored.result["mode"]
