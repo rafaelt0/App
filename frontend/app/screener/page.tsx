@@ -4,10 +4,13 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import "./screener.css";
 import { useApp } from "../../components/AppProvider";
-import { ExportButton, Icon, Loading, Metrics, Notice, PageHeader, Section, Table } from "../../components/ui";
+import { ExportButton, Icon, Loading, Metrics, Notice, PageHeader, Section } from "../../components/ui";
 import { refreshFundamentus } from "../../lib/home";
-import { activeCriteria, applyPreset, canonicalCriteria, criterionDefs, defaults, editControl, queryScreener, screenerConfig } from "../../lib/screener";
-import type { Config, Controls, CriterionDef, CriterionKey, Result, Sort } from "../../lib/screener";
+import { activeCriteria, applyPreset, canonicalCriteria, criterionDefs, defaults, editControl, queryScreener, screenerConfig, sortKey } from "../../lib/screener";
+import type { Config, Controls, CriterionDef, CriterionKey, Result, ScreenerColumn, Sort } from "../../lib/screener";
+import ScreenerTable from "./ScreenerTable";
+
+const liquidityShortcuts = [1_000_000, 2_000_000, 5_000_000, 20_000_000];
 
 export default function ScreenerPage() {
   const {session,stocks,loading,error:appError,setSelection,toggleFavorite,refreshSession} = useApp();
@@ -38,11 +41,11 @@ export default function ScreenerPage() {
     if(!session || !config)return;
     const gen=++generation.current;
     const rev=session.revision;
-    setResult(null);setBusy(true);setError(null);
-    if(controls.pl_enabled && controls.pl_min>controls.pl_max) {setError("O P/L mínimo não pode ser maior que o P/L máximo.");setBusy(false);return;}
+    setBusy(true);setError(null);
+    if(controls.pl_enabled && controls.pl_min>controls.pl_max) {setResult(null);setError("O P/L mínimo não pode ser maior que o P/L máximo.");setBusy(false);return;}
     const criteria=canonicalCriteria(controls);
     if(Object.values(criteria).some(value=>typeof value==="number" && !Number.isFinite(value))) {
-      setError("Preencha todos os limites dos critérios ativos com números válidos.");setBusy(false);return;
+      setResult(null);setError("Preencha todos os limites dos critérios ativos com números válidos.");setBusy(false);return;
     }
     const timer=setTimeout(()=>{
       queryScreener(criteria,sort).then(value=>{
@@ -53,7 +56,7 @@ export default function ScreenerPage() {
         setResult(value);
         setLimit(25);
         setVisible(current=>current===null ? value.default_columns:current.filter(key=>value.available_columns.some(column=>column.key===key)));
-      }).catch(exc=>{if(gen===generation.current && revision.current===rev)setError(exc.message);}).finally(()=>{if(gen===generation.current)setBusy(false);});
+      }).catch(exc=>{if(gen===generation.current && revision.current===rev){setResult(null);setError(exc.message);}}).finally(()=>{if(gen===generation.current)setBusy(false);});
     },200);
     return ()=>{clearTimeout(timer);generation.current++;};
   },[config,controls,sort,reload,session?.revision]);
@@ -71,6 +74,15 @@ export default function ScreenerPage() {
       await setSelection(known ? [selected]:[]);
       router.push(known ? "/":`/?unavailable=${encodeURIComponent(selected)}`);
     } catch(exc){setError((exc as Error).message);}finally{setActionBusy(false);}
+  }
+  function sortBy(field:string) {
+    setSort(current => current.field===field ? {field,direction:current.direction==="asc" ? "desc":"asc"} : {field,direction:"desc"});
+  }
+  function columnLabel(field:string) {
+    return config?.columns.find(column=>column.key===field)?.label ?? field;
+  }
+  function sortLabel(option:Sort) {
+    return option.label ?? `${columnLabel(option.field)} (${option.direction==="asc" ? "menor primeiro":"maior primeiro"})`;
   }
   async function favorite() {
     if(!selected)return;
@@ -96,9 +108,14 @@ export default function ScreenerPage() {
     roe:<label>ROE mínimo (%)<input type="number" inputMode="decimal" min={0} max={80} step={1} value={Number.isNaN(controls.roe_min) ? "":controls.roe_min} onChange={event=>edit("roe_min",event.target.valueAsNumber)}/></label>,
     c5y:<label>Crescimento mínimo (%)<input type="number" inputMode="decimal" min={0} max={100} step={1} value={Number.isNaN(controls.c5y_min) ? "":controls.c5y_min} onChange={event=>edit("c5y_min",event.target.valueAsNumber)}/></label>,
     dy:<label>Dividend yield mínimo (%)<input type="number" inputMode="decimal" min={0} max={30} step={.5} value={Number.isNaN(controls.dy_min) ? "":controls.dy_min} onChange={event=>edit("dy_min",event.target.valueAsNumber)}/></label>,
-    liq2m:<label>Liquidez média 2 meses mínima<input type="range" min={0} max={100000000} step={100000} value={Number.isNaN(controls.liq2m_min) ? 0:controls.liq2m_min} onChange={event=>edit("liq2m_min",event.target.valueAsNumber)}/><output className="scr-output">{liquidity}</output></label>,
+    liq2m:<>
+      <label>Liquidez média 2 meses mínima<input type="range" min={0} max={100000000} step={100000} value={Number.isNaN(controls.liq2m_min) ? 0:controls.liq2m_min} onChange={event=>edit("liq2m_min",event.target.valueAsNumber)}/><output className="scr-output">{liquidity}</output></label>
+      <div className="scr-quick-amounts" role="group" aria-label="Valores rápidos de liquidez">{liquidityShortcuts.map(amount=><button type="button" key={amount} aria-pressed={controls.liq2m_min===amount} onClick={()=>edit("liq2m_min",amount)}>R$ {amount/1_000_000} mi</button>)}</div>
+    </>,
   };
   const chips=activeCriteria(controls);
+  const presetSortKeys=new Set((config?.sorts ?? []).map(sortKey));
+  const sortOptions:Sort[]=config ? [...config.sorts,...(presetSortKeys.has(sortKey(sort)) ? []:[sort])]:[];
   const columnCount=visible?.length ?? 0;
   return <>
     <PageHeader title="Screener de ações" description="Explore ações listadas na B3 com critérios claros e ajustáveis. Dados da Fundamentus; consulte a coleta exibida abaixo." icon="filter"/>
@@ -108,7 +125,7 @@ export default function ScreenerPage() {
       <h2 className="ui-section-heading" id="scr-filters-title"><Icon name="filter"/>Critérios de seleção</h2>
       <div className="scr-setup">
         <label>Ponto de partida<select value={config ? controls.preset:""} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config ? config.presets.map(item=><option key={item.name}>{item.name}</option>):<option value="">Carregando…</option>}</select></label>
-        <label>Ordenar resultados<select value={config ? sort.field:""} disabled={!config} onChange={event=>{const value=config?.sorts.find(option=>option.field===event.target.value);if(value)setSort(value);}}>{config ? config.sorts.map(option=><option key={option.field} value={option.field}>{option.label}</option>):<option value="">Carregando…</option>}</select></label>
+        <label>Ordenar resultados<select value={config ? sortKey(sort):""} disabled={!config} onChange={event=>{const [field,direction]=event.target.value.split(":");setSort({field,direction:direction as Sort["direction"]});}}>{config ? sortOptions.map(option=><option key={sortKey(option)} value={sortKey(option)}>{sortLabel(option)}</option>):<option value="">Carregando…</option>}</select></label>
       </div>
       {preset?.description && <p className="caption scr-preset-note">{preset.description}</p>}
       <div className="scr-criteria">
@@ -134,30 +151,33 @@ export default function ScreenerPage() {
       </div>
       {(busy || actionBusy || !config) && !error && <Loading>{actionBusy ? "Atualizando dados da Fundamentus…":"Carregando dados da B3…"}</Loading>}
       {error && <Notice tone="negative"><strong>Não foi possível exibir os resultados.</strong> {error}{!plInvalid && <button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button>}</Notice>}
-      {result && <Section title="Resultados">
+      {result && <Section title="Resultados"><div className={busy ? "scr-stale":undefined}>
         <Metrics items={[{label:"Ações correspondentes",value:result.matched_count,unit:"integer",help:`de ${result.total_count} ativos analisados`},{label:"DY médio",value:result.metrics.mean_dy,unit:"percent",digits:2},{label:"ROE médio",value:result.metrics.mean_roe,unit:"percent",digits:2}]}/>
         <div className="scr-context">
           <p className="caption">{result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")} · há ${result.age_minutes} min`:"Horário da coleta indisponível; a idade deste dado não pode ser confirmada."}</p>
         </div>
         {!result.matched_count ? <div className="empty-state-card"><span className="empty-state-icon"><Icon name="filter"/></span><h3 className="empty-state-title">Nenhuma ação encontrada</h3><div className="empty-state-message">Reduza os limites ou desative critérios. Dados ausentes não são considerados aprovação.</div><button className="primary" onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button></div>:<>
           <details className="scr-columns"><summary>Colunas exibidas ({columnCount} de {result.available_columns.length})</summary><fieldset className="checkbox-group"><legend>Indicadores na tabela</legend><div className="checkbox-group-options">{result.available_columns.map(column=><label key={column.key}><input type="checkbox" checked={visible?.includes(column.key) ?? false} onChange={event=>setVisible(current=>{const next=new Set(current ?? []);if(event.target.checked)next.add(column.key);else next.delete(column.key);return result.available_columns.map(item=>item.key).filter(key=>next.has(key));})}/>{column.label}</label>)}</div></fieldset></details>
+          <details className="scr-columns scr-glossary"><summary>Entenda os indicadores exibidos</summary>
+            <dl>{result.available_columns.filter(column=>visible?.includes(column.key) && column.help).map(column=><div key={column.key}><dt>{column.label}</dt><dd>{column.help}</dd></div>)}</dl>
+          </details>
           <div className="scr-selection" data-selected={selectedCurrent ? "true":"false"} role="region" aria-label="Ação selecionada" aria-live="polite">
             {selectedCurrent ? <>
               <strong>Ação selecionada: {selectedCurrent}</strong>
-              <div className="actions"><button className="primary" disabled={actionBusy} onClick={()=>void handoff()}>Ver preço-alvo</button><button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favoritado":"☆ Favoritar"}</button><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
-              <p className="caption">Abrir Home substitui a seleção; clique em Analisar para buscar fundamentos e consenso.</p>
+              <div className="actions"><button className="primary" disabled={actionBusy} onClick={()=>void handoff()}>Analisar em Fundamentos</button><button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favoritado":"☆ Favoritar"}</button><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
+              <p className="caption">Abrir Fundamentos substitui a seleção atual; clique em Analisar para buscar indicadores, preço-alvo e consenso.</p>
             </>:<>
               <p className="caption">Selecione uma linha para abrir a análise de preço-alvo ou gerenciar favoritos. As colunas exibidas não alteram a seleção nem o CSV.</p>
               <div className="actions"><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
             </>}
           </div>
           <div className="scr-table">
-            <Table columns={[{key:"ticker",label:"Papel"},...result.available_columns.filter(column=>visible?.includes(column.key))]} rows={result.rows.slice(0,limit)} rowKey="ticker" selectedKey={selectedCurrent ?? undefined} onSelect={row=>setSelected(String(row.ticker))}/>
+            <ScreenerTable columns={result.available_columns.filter(column=>visible?.includes(column.key))} rows={result.rows.slice(0,limit)} sort={sort} onSort={sortBy} selectedKey={selectedCurrent ?? undefined} onSelect={setSelected}/>
           </div>
           <p className="caption" role="status">Exibindo {Math.min(limit,result.rows.length)} de {result.rows.length} ações.</p>
           {result.rows.length>limit && <button className="scr-more" onClick={()=>setLimit(previous=>previous+25)}>Ver mais {Math.min(25,result.rows.length-limit)} ações ({result.rows.length-limit} restantes)</button>}
         </>}
-      </Section>}
+      </div></Section>}
     </div>
     </div>
     <hr/><p className="caption">Fonte: Fundamentus (fundamentus.com.br). Dados com atraso. Esta triagem não é recomendação de investimento; verifique os indicadores e faça sua própria análise.</p>
