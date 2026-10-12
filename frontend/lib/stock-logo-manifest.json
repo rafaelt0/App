@@ -1,7 +1,10 @@
 [
   {
     "company": "Petrobras",
-    "tickers": ["PETR3", "PETR4"],
+    "tickers": [
+      "PETR3",
+      "PETR4"
+    ],
     "commonsFile": "Petrobras horizontal logo.svg",
     "asset": "petrobras.png",
     "author": "Petrobras - Petróleo Brasileiro S.A.",
@@ -10,7 +13,9 @@
   },
   {
     "company": "Banco do Brasil",
-    "tickers": ["BBAS3"],
+    "tickers": [
+      "BBAS3"
+    ],
     "commonsFile": "Banco do Brasil Logo.svg",
     "asset": "banco-do-brasil.png",
     "author": "Banco do Brasil S/A",
@@ -19,7 +24,10 @@
   },
   {
     "company": "Itaú Unibanco",
-    "tickers": ["ITUB3", "ITUB4"],
+    "tickers": [
+      "ITUB3",
+      "ITUB4"
+    ],
     "commonsFile": "ITAU LOGO.svg",
     "asset": "itau.png",
     "author": "Banco Itaú",
@@ -28,7 +36,10 @@
   },
   {
     "company": "Bradesco",
-    "tickers": ["BBDC3", "BBDC4"],
+    "tickers": [
+      "BBDC3",
+      "BBDC4"
+    ],
     "commonsFile": "Banco Bradesco logo (horizontal).png",
     "asset": "bradesco.png",
     "author": "FDG.LINCE",
@@ -37,7 +48,9 @@
   },
   {
     "company": "WEG",
-    "tickers": ["WEGE3"],
+    "tickers": [
+      "WEGE3"
+    ],
     "commonsFile": "Weg logo blue vector.svg",
     "asset": "weg.png",
     "author": "WEG",
@@ -46,7 +59,9 @@
   },
   {
     "company": "B3",
-    "tickers": ["B3SA3"],
+    "tickers": [
+      "B3SA3"
+    ],
     "commonsFile": "Logotipo da B3.svg",
     "asset": "b3.png",
     "author": "B3",
@@ -55,7 +70,9 @@
   },
   {
     "company": "Ambev",
-    "tickers": ["ABEV3"],
+    "tickers": [
+      "ABEV3"
+    ],
     "commonsFile": "Ambev logo 2015.svg",
     "asset": "ambev.png",
     "author": "Uploaded to Wikimedia Commons; Commons public domain text-logo classification",
@@ -64,7 +81,9 @@
   },
   {
     "company": "Embraer",
-    "tickers": ["EMBJ3"],
+    "tickers": [
+      "EMBJ3"
+    ],
     "commonsFile": "Embraer logo.svg",
     "asset": "embraer.png",
     "author": "José Maria Ramis Melquizo",
@@ -73,7 +92,9 @@
   },
   {
     "company": "Suzano",
-    "tickers": ["SUZB3"],
+    "tickers": [
+      "SUZB3"
+    ],
     "commonsFile": "Logotipo da Suzano (2019).svg",
     "asset": "suzano.png",
     "author": "Suzano",
@@ -82,7 +103,10 @@
   },
   {
     "company": "Gerdau",
-    "tickers": ["GGBR3", "GGBR4"],
+    "tickers": [
+      "GGBR3",
+      "GGBR4"
+    ],
     "commonsFile": "Gerdau logo (2011).svg",
     "asset": "gerdau.png",
     "author": "Gerdau S.A.",
@@ -91,7 +115,9 @@
   },
   {
     "company": "Natura",
-    "tickers": ["NATU3"],
+    "tickers": [
+      "NATU3"
+    ],
     "commonsFile": "Natura logo.svg",
     "asset": "natura.png",
     "author": "Natura Cosméticos S.A.",
@@ -100,7 +126,9 @@
   },
   {
     "company": "Vale",
-    "tickers": ["VALE3"],
+    "tickers": [
+      "VALE3"
+    ],
     "asset": "vale.svg",
     "author": "Vale S.A.",
     "license": "Official brand asset; Vale trademark; no reuse license stated in source",
@@ -109,7 +137,9 @@
   },
   {
     "company": "Lojas Renner",
-    "tickers": ["LREN3"],
+    "tickers": [
+      "LREN3"
+    ],
     "commonsFile": "Logotipo das Lojas Renner.svg",
     "asset": "renner.png",
     "author": "Lojas Renner",
@@ -118,7 +148,9 @@
   },
   {
     "company": "Localiza",
-    "tickers": ["RENT3"],
+    "tickers": [
+      "RENT3"
+    ],
     "commonsFile": "Localiza logo 2022.svg",
     "asset": "localiza.png",
     "author": "Localiza Rent a Car S/A",
@@ -127,11 +159,2927 @@
   },
   {
     "company": "Magazine Luiza",
-    "tickers": ["MGLU3"],
+    "tickers": [
+      "MGLU3"
+    ],
     "commonsFile": "Magazine Luiza (2019).svg",
     "asset": "magalu.png",
     "author": "Magazine Luiza",
     "license": "Public domain (Commons: PD-textlogo; trademark retained)",
     "source": "https://commons.wikimedia.org/wiki/File:Magazine_Luiza_(2019).svg"
+  },
+  {
+    "company": "ALLIAR",
+    "tickers": [
+      "AALR3"
+    ],
+    "asset": "aalr3.svg",
+    "author": "ALLIAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AALR3.svg"
+  },
+  {
+    "company": "ABC BRASIL",
+    "tickers": [
+      "ABCB4"
+    ],
+    "asset": "abcb4.svg",
+    "author": "ABC BRASIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ABCB4.svg"
+  },
+  {
+    "company": "AERIS",
+    "tickers": [
+      "AERI3"
+    ],
+    "asset": "aeri3.svg",
+    "author": "AERIS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AERI3.svg"
+  },
+  {
+    "company": "BRASILAGRO",
+    "tickers": [
+      "AGRO3"
+    ],
+    "asset": "agro3.svg",
+    "author": "BRASILAGRO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AGRO3.svg"
+  },
+  {
+    "company": "AGROGALAXY",
+    "tickers": [
+      "AGXY3"
+    ],
+    "asset": "agxy3.svg",
+    "author": "AGROGALAXY",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AGXY3.svg"
+  },
+  {
+    "company": "ALLIED",
+    "tickers": [
+      "ALLD3"
+    ],
+    "asset": "alld3.svg",
+    "author": "ALLIED",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ALLD3.svg"
+  },
+  {
+    "company": "ALLOS",
+    "tickers": [
+      "ALOS3"
+    ],
+    "asset": "alos3.svg",
+    "author": "ALLOS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ALOS3.svg"
+  },
+  {
+    "company": "ALPARGATAS",
+    "tickers": [
+      "ALPA3",
+      "ALPA4"
+    ],
+    "asset": "alpa3.svg",
+    "author": "ALPARGATAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ALPA3.svg"
+  },
+  {
+    "company": "ESTAPAR",
+    "tickers": [
+      "ALPK3"
+    ],
+    "asset": "alpk3.svg",
+    "author": "ESTAPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ALPK3.svg"
+  },
+  {
+    "company": "ALUPAR",
+    "tickers": [
+      "ALUP11",
+      "ALUP3",
+      "ALUP4"
+    ],
+    "asset": "alup11.svg",
+    "author": "ALUPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ALUP11.svg"
+  },
+  {
+    "company": "LOJAS MARISA",
+    "tickers": [
+      "AMAR3"
+    ],
+    "asset": "amar3.svg",
+    "author": "LOJAS MARISA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AMAR3.svg"
+  },
+  {
+    "company": "AMBIPAR",
+    "tickers": [
+      "AMBP3"
+    ],
+    "asset": "ambp3.svg",
+    "author": "AMBIPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AMBP3.svg"
+  },
+  {
+    "company": "AMERICANAS",
+    "tickers": [
+      "AMER3"
+    ],
+    "asset": "amer3.svg",
+    "author": "AMERICANAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AMER3.svg"
+  },
+  {
+    "company": "AUTOMOB",
+    "tickers": [
+      "AMOB3"
+    ],
+    "asset": "amob3.svg",
+    "author": "AUTOMOB",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AMOB3.svg"
+  },
+  {
+    "company": "ANIMA",
+    "tickers": [
+      "ANIM3"
+    ],
+    "asset": "anim3.svg",
+    "author": "ANIMA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ANIM3.svg"
+  },
+  {
+    "company": "ARMAC",
+    "tickers": [
+      "ARML3"
+    ],
+    "asset": "arml3.svg",
+    "author": "ARMAC",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ARML3.svg"
+  },
+  {
+    "company": "ASSAI",
+    "tickers": [
+      "ASAI3"
+    ],
+    "asset": "asai3.svg",
+    "author": "ASSAI",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ASAI3.svg"
+  },
+  {
+    "company": "ATOM EDUC",
+    "tickers": [
+      "ATED3"
+    ],
+    "asset": "ated3.svg",
+    "author": "ATOM EDUC",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ATED3.svg"
+  },
+  {
+    "company": "AUREN",
+    "tickers": [
+      "AURE3"
+    ],
+    "asset": "aure3.svg",
+    "author": "AUREN",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AURE3.svg"
+  },
+  {
+    "company": "ALPHAVILLE",
+    "tickers": [
+      "AVLL3"
+    ],
+    "asset": "avll3.svg",
+    "author": "ALPHAVILLE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AVLL3.svg"
+  },
+  {
+    "company": "AXIA ENERGIA",
+    "tickers": [
+      "AXIA3",
+      "AXIA6"
+    ],
+    "asset": "axia3.svg",
+    "author": "AXIA ENERGIA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AXIA3.svg"
+  },
+  {
+    "company": "AZEVEDO",
+    "tickers": [
+      "AZEV3",
+      "AZEV4"
+    ],
+    "asset": "azev3.svg",
+    "author": "AZEVEDO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AZEV3.svg"
+  },
+  {
+    "company": "AZT ENERGIA",
+    "tickers": [
+      "AZTE3"
+    ],
+    "asset": "azte3.svg",
+    "author": "AZT ENERGIA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AZTE3.svg"
+  },
+  {
+    "company": "AZUL",
+    "tickers": [
+      "AZUL3"
+    ],
+    "asset": "azul3.svg",
+    "author": "AZUL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AZUL3.svg"
+  },
+  {
+    "company": "AZZAS 2154",
+    "tickers": [
+      "AZZA3"
+    ],
+    "asset": "azza3.svg",
+    "author": "AZZAS 2154",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/AZZA3.svg"
+  },
+  {
+    "company": "BAUMER",
+    "tickers": [
+      "BALM3",
+      "BALM4"
+    ],
+    "asset": "balm3.svg",
+    "author": "BAUMER",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BALM3.svg"
+  },
+  {
+    "company": "EXCELSIOR",
+    "tickers": [
+      "BAUH4"
+    ],
+    "asset": "bauh4.png",
+    "author": "EXCELSIOR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://github.com/thefintz/icones-b3",
+    "sourceAssetUrl": "https://raw.githubusercontent.com/thefintz/icones-b3/main/icones/BAUH4.png"
+  },
+  {
+    "company": "AMAZONIA",
+    "tickers": [
+      "BAZA3"
+    ],
+    "asset": "baza3.svg",
+    "author": "AMAZONIA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BAZA3.svg"
+  },
+  {
+    "company": "BBSEGURIDADE",
+    "tickers": [
+      "BBSE3"
+    ],
+    "asset": "bbse3.svg",
+    "author": "BBSEGURIDADE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BBSE3.svg"
+  },
+  {
+    "company": "BARDELLA",
+    "tickers": [
+      "BDLL3",
+      "BDLL4"
+    ],
+    "asset": "bdll3.svg",
+    "author": "BARDELLA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BDLL3.svg"
+  },
+  {
+    "company": "MINERVA",
+    "tickers": [
+      "BEEF3"
+    ],
+    "asset": "beef3.svg",
+    "author": "MINERVA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BEEF3.svg"
+  },
+  {
+    "company": "BANESTES",
+    "tickers": [
+      "BEES3",
+      "BEES4"
+    ],
+    "asset": "bees3.svg",
+    "author": "BANESTES",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BEES3.svg"
+  },
+  {
+    "company": "BANESE",
+    "tickers": [
+      "BGIP4"
+    ],
+    "asset": "bgip4.svg",
+    "author": "BANESE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BGIP4.svg"
+  },
+  {
+    "company": "CASAS BAHIA",
+    "tickers": [
+      "BHIA3"
+    ],
+    "asset": "bhia3.svg",
+    "author": "CASAS BAHIA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BHIA3.svg"
+  },
+  {
+    "company": "BIOMM",
+    "tickers": [
+      "BIOM3"
+    ],
+    "asset": "biom3.svg",
+    "author": "BIOMM",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BIOM3.svg"
+  },
+  {
+    "company": "BLAU",
+    "tickers": [
+      "BLAU3"
+    ],
+    "asset": "blau3.svg",
+    "author": "BLAU",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BLAU3.svg"
+  },
+  {
+    "company": "MERCANTIL",
+    "tickers": [
+      "BMEB3",
+      "BMEB4"
+    ],
+    "asset": "bmeb3.svg",
+    "author": "MERCANTIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BMEB3.svg"
+  },
+  {
+    "company": "BANCO BMG",
+    "tickers": [
+      "BMGB4"
+    ],
+    "asset": "bmgb4.svg",
+    "author": "BANCO BMG",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BMGB4.svg"
+  },
+  {
+    "company": "MERC INVEST",
+    "tickers": [
+      "BMIN4"
+    ],
+    "asset": "bmin4.svg",
+    "author": "MERC INVEST",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BMIN4.svg"
+  },
+  {
+    "company": "BIC MONARK",
+    "tickers": [
+      "BMKS3"
+    ],
+    "asset": "bmks3.svg",
+    "author": "BIC MONARK",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BMKS3.svg"
+  },
+  {
+    "company": "BEMOBI TECH",
+    "tickers": [
+      "BMOB3"
+    ],
+    "asset": "bmob3.svg",
+    "author": "BEMOBI TECH",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BMOB3.svg"
+  },
+  {
+    "company": "NORD BRASIL",
+    "tickers": [
+      "BNBR3"
+    ],
+    "asset": "bnbr3.svg",
+    "author": "NORD BRASIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BNBR3.svg"
+  },
+  {
+    "company": "BOMBRIL",
+    "tickers": [
+      "BOBR4"
+    ],
+    "asset": "bobr4.svg",
+    "author": "BOMBRIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BOBR4.svg"
+  },
+  {
+    "company": "BTGP BANCO",
+    "tickers": [
+      "BPAC11",
+      "BPAC3",
+      "BPAC5"
+    ],
+    "asset": "bpac11.svg",
+    "author": "BTGP BANCO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BPAC11.svg"
+  },
+  {
+    "company": "BRADESPAR",
+    "tickers": [
+      "BRAP3",
+      "BRAP4"
+    ],
+    "asset": "brap3.svg",
+    "author": "BRADESPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BRAP3.svg"
+  },
+  {
+    "company": "BRAVA",
+    "tickers": [
+      "BRAV3"
+    ],
+    "asset": "brav3.svg",
+    "author": "BRAVA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BRAV3.svg"
+  },
+  {
+    "company": "BR PARTNERS",
+    "tickers": [
+      "BRBI11"
+    ],
+    "asset": "brbi11.svg",
+    "author": "BR PARTNERS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BRBI11.svg"
+  },
+  {
+    "company": "BRASKEM",
+    "tickers": [
+      "BRKM3",
+      "BRKM5"
+    ],
+    "asset": "brkm3.svg",
+    "author": "BRASKEM",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BRKM3.svg"
+  },
+  {
+    "company": "BANRISUL",
+    "tickers": [
+      "BRSR3",
+      "BRSR6"
+    ],
+    "asset": "brsr3.svg",
+    "author": "BANRISUL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BRSR3.svg"
+  },
+  {
+    "company": "BRISANET",
+    "tickers": [
+      "BRST3"
+    ],
+    "asset": "brst3.svg",
+    "author": "BRISANET",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BRST3.svg"
+  },
+  {
+    "company": "BRB BANCO",
+    "tickers": [
+      "BSLI3",
+      "BSLI4"
+    ],
+    "asset": "bsli3.svg",
+    "author": "BRB BANCO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BSLI3.svg"
+  },
+  {
+    "company": "CAMBUCI",
+    "tickers": [
+      "CAMB3"
+    ],
+    "asset": "camb3.svg",
+    "author": "CAMBUCI",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CAMB3.svg"
+  },
+  {
+    "company": "CAMIL",
+    "tickers": [
+      "CAML3"
+    ],
+    "asset": "caml3.svg",
+    "author": "CAMIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CAML3.svg"
+  },
+  {
+    "company": "MELIUZ",
+    "tickers": [
+      "CASH3"
+    ],
+    "asset": "cash3.svg",
+    "author": "MELIUZ",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CASH3.svg"
+  },
+  {
+    "company": "CBA",
+    "tickers": [
+      "CBAV3"
+    ],
+    "asset": "cbav3.svg",
+    "author": "CBA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CBAV3.svg"
+  },
+  {
+    "company": "AMPLA ENERG",
+    "tickers": [
+      "CBEE3"
+    ],
+    "asset": "cbee3.svg",
+    "author": "AMPLA ENERG",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CBEE3.svg"
+  },
+  {
+    "company": "CEA MODAS",
+    "tickers": [
+      "CEAB3"
+    ],
+    "asset": "ceab3.svg",
+    "author": "CEA MODAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CEAB3.svg"
+  },
+  {
+    "company": "CEB",
+    "tickers": [
+      "CEBR3",
+      "CEBR5",
+      "CEBR6"
+    ],
+    "asset": "cebr3.svg",
+    "author": "CEB",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CEBR3.svg"
+  },
+  {
+    "company": "CEDRO",
+    "tickers": [
+      "CEDO4"
+    ],
+    "asset": "cedo4.svg",
+    "author": "CEDRO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CEDO4.svg"
+  },
+  {
+    "company": "COELBA",
+    "tickers": [
+      "CEEB3"
+    ],
+    "asset": "ceeb3.svg",
+    "author": "COELBA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CEEB3.svg"
+  },
+  {
+    "company": "COMGAS",
+    "tickers": [
+      "CGAS3",
+      "CGAS5"
+    ],
+    "asset": "cgas3.svg",
+    "author": "COMGAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CGAS3.svg"
+  },
+  {
+    "company": "GRAZZIOTIN",
+    "tickers": [
+      "CGRA3",
+      "CGRA4"
+    ],
+    "asset": "cgra3.svg",
+    "author": "GRAZZIOTIN",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CGRA3.svg"
+  },
+  {
+    "company": "CELESC",
+    "tickers": [
+      "CLSC3",
+      "CLSC4"
+    ],
+    "asset": "clsc3.svg",
+    "author": "CELESC",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CLSC3.svg"
+  },
+  {
+    "company": "CEMIG",
+    "tickers": [
+      "CMIG3",
+      "CMIG4"
+    ],
+    "asset": "cmig3.svg",
+    "author": "CEMIG",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CMIG3.svg"
+  },
+  {
+    "company": "CSNMINERACAO",
+    "tickers": [
+      "CMIN3"
+    ],
+    "asset": "cmin3.svg",
+    "author": "CSNMINERACAO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CMIN3.svg"
+  },
+  {
+    "company": "COELCE",
+    "tickers": [
+      "COCE5"
+    ],
+    "asset": "coce5.svg",
+    "author": "COELCE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/COCE5.svg"
+  },
+  {
+    "company": "COGNA ON",
+    "tickers": [
+      "COGN3"
+    ],
+    "asset": "cogn3.svg",
+    "author": "COGNA ON",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/COGN3.svg"
+  },
+  {
+    "company": "CPFL ENERGIA",
+    "tickers": [
+      "CPFE3"
+    ],
+    "asset": "cpfe3.svg",
+    "author": "CPFL ENERGIA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CPFE3.svg"
+  },
+  {
+    "company": "COPEL",
+    "tickers": [
+      "CPLE3"
+    ],
+    "asset": "cple3.svg",
+    "author": "COPEL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CPLE3.svg"
+  },
+  {
+    "company": "CRISTAL",
+    "tickers": [
+      "CRPG5"
+    ],
+    "asset": "crpg5.svg",
+    "author": "CRISTAL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CRPG5.svg"
+  },
+  {
+    "company": "COSAN",
+    "tickers": [
+      "CSAN3"
+    ],
+    "asset": "csan3.svg",
+    "author": "COSAN",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CSAN3.svg"
+  },
+  {
+    "company": "CRUZEIRO EDU",
+    "tickers": [
+      "CSED3"
+    ],
+    "asset": "csed3.svg",
+    "author": "CRUZEIRO EDU",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CSED3.svg"
+  },
+  {
+    "company": "COPASA",
+    "tickers": [
+      "CSMG3"
+    ],
+    "asset": "csmg3.svg",
+    "author": "COPASA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CSMG3.svg"
+  },
+  {
+    "company": "SID NACIONAL",
+    "tickers": [
+      "CSNA3"
+    ],
+    "asset": "csna3.svg",
+    "author": "SID NACIONAL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CSNA3.svg"
+  },
+  {
+    "company": "CSU DIGITAL",
+    "tickers": [
+      "CSUD3"
+    ],
+    "asset": "csud3.svg",
+    "author": "CSU DIGITAL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CSUD3.svg"
+  },
+  {
+    "company": "CONTAX",
+    "tickers": [
+      "CTAX3"
+    ],
+    "asset": "ctax3.svg",
+    "author": "CONTAX",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CTAX3.svg"
+  },
+  {
+    "company": "KARSTEN",
+    "tickers": [
+      "CTKA4"
+    ],
+    "asset": "ctka4.svg",
+    "author": "KARSTEN",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CTKA4.svg"
+  },
+  {
+    "company": "CURY S/A",
+    "tickers": [
+      "CURY3"
+    ],
+    "asset": "cury3.svg",
+    "author": "CURY S/A",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CURY3.svg"
+  },
+  {
+    "company": "CVC BRASIL",
+    "tickers": [
+      "CVCB3"
+    ],
+    "asset": "cvcb3.svg",
+    "author": "CVC BRASIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CVCB3.svg"
+  },
+  {
+    "company": "CAIXA SEGURI",
+    "tickers": [
+      "CXSE3"
+    ],
+    "asset": "cxse3.svg",
+    "author": "CAIXA SEGURI",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CXSE3.svg"
+  },
+  {
+    "company": "CYRELA REALT",
+    "tickers": [
+      "CYRE3",
+      "CYRE4"
+    ],
+    "asset": "cyre3.svg",
+    "author": "CYRELA REALT",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CYRE3.svg"
+  },
+  {
+    "company": "DASA",
+    "tickers": [
+      "DASA3"
+    ],
+    "asset": "dasa3.svg",
+    "author": "DASA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/DASA3.svg"
+  },
+  {
+    "company": "DESKTOP",
+    "tickers": [
+      "DESK3"
+    ],
+    "asset": "desk3.svg",
+    "author": "DESKTOP",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/DESK3.svg"
+  },
+  {
+    "company": "DEXXOS PAR",
+    "tickers": [
+      "DEXP3",
+      "DEXP4"
+    ],
+    "asset": "dexp3.svg",
+    "author": "DEXXOS PAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/DEXP3.svg"
+  },
+  {
+    "company": "DIRECIONAL",
+    "tickers": [
+      "DIRR3"
+    ],
+    "asset": "dirr3.svg",
+    "author": "DIRECIONAL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/DIRR3.svg"
+  },
+  {
+    "company": "D1000VFARMA",
+    "tickers": [
+      "DMVF3"
+    ],
+    "asset": "dmvf3.svg",
+    "author": "D1000VFARMA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/DMVF3.svg"
+  },
+  {
+    "company": "DOHLER",
+    "tickers": [
+      "DOHL4"
+    ],
+    "asset": "dohl4.svg",
+    "author": "DOHLER",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/DOHL4.svg"
+  },
+  {
+    "company": "DOTZ SA",
+    "tickers": [
+      "DOTZ3"
+    ],
+    "asset": "dotz3.svg",
+    "author": "DOTZ SA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/DOTZ3.svg"
+  },
+  {
+    "company": "DEXCO",
+    "tickers": [
+      "DXCO3"
+    ],
+    "asset": "dxco3.svg",
+    "author": "DEXCO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/DXCO3.svg"
+  },
+  {
+    "company": "ACO ALTONA",
+    "tickers": [
+      "EALT3",
+      "EALT4"
+    ],
+    "asset": "ealt3.svg",
+    "author": "ACO ALTONA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/EALT3.svg"
+  },
+  {
+    "company": "ECORODOVIAS",
+    "tickers": [
+      "ECOR3"
+    ],
+    "asset": "ecor3.svg",
+    "author": "ECORODOVIAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ECOR3.svg"
+  },
+  {
+    "company": "ENGIE BRASIL",
+    "tickers": [
+      "EGIE3"
+    ],
+    "asset": "egie3.svg",
+    "author": "ENGIE BRASIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/EGIE3.svg"
+  },
+  {
+    "company": "EMAE",
+    "tickers": [
+      "EMAE4"
+    ],
+    "asset": "emae4.svg",
+    "author": "EMAE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/EMAE4.svg"
+  },
+  {
+    "company": "ENEVA",
+    "tickers": [
+      "ENEV3"
+    ],
+    "asset": "enev3.svg",
+    "author": "ENEVA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ENEV3.svg"
+  },
+  {
+    "company": "ENERGISA",
+    "tickers": [
+      "ENGI11",
+      "ENGI3",
+      "ENGI4"
+    ],
+    "asset": "engi11.svg",
+    "author": "ENERGISA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ENGI11.svg"
+  },
+  {
+    "company": "ENJOEI",
+    "tickers": [
+      "ENJU3"
+    ],
+    "asset": "enju3.svg",
+    "author": "ENJOEI",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ENJU3.svg"
+  },
+  {
+    "company": "ENERGISA MT",
+    "tickers": [
+      "ENMT3",
+      "ENMT4"
+    ],
+    "asset": "enmt3.svg",
+    "author": "ENERGISA MT",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ENMT3.svg"
+  },
+  {
+    "company": "EMBPAR S/A",
+    "tickers": [
+      "EPAR3"
+    ],
+    "asset": "epar3.svg",
+    "author": "EMBPAR S/A",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/EPAR3.svg"
+  },
+  {
+    "company": "EQTL PARA",
+    "tickers": [
+      "EQPA3"
+    ],
+    "asset": "eqpa3.svg",
+    "author": "EQTL PARA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/EQPA3.svg"
+  },
+  {
+    "company": "EQUATORIAL",
+    "tickers": [
+      "EQTL3"
+    ],
+    "asset": "eqtl3.svg",
+    "author": "EQUATORIAL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/EQTL3.svg"
+  },
+  {
+    "company": "ESPACOLASER",
+    "tickers": [
+      "ESPA3"
+    ],
+    "asset": "espa3.svg",
+    "author": "ESPACOLASER",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ESPA3.svg"
+  },
+  {
+    "company": "ESTRELA",
+    "tickers": [
+      "ESTR4"
+    ],
+    "asset": "estr4.svg",
+    "author": "ESTRELA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ESTR4.svg"
+  },
+  {
+    "company": "ETERNIT",
+    "tickers": [
+      "ETER3"
+    ],
+    "asset": "eter3.svg",
+    "author": "ETERNIT",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ETER3.svg"
+  },
+  {
+    "company": "EUCATEX",
+    "tickers": [
+      "EUCA3",
+      "EUCA4"
+    ],
+    "asset": "euca3.svg",
+    "author": "EUCATEX",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/EUCA3.svg"
+  },
+  {
+    "company": "EVEN",
+    "tickers": [
+      "EVEN3"
+    ],
+    "asset": "even3.svg",
+    "author": "EVEN",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/EVEN3.svg"
+  },
+  {
+    "company": "EZTEC",
+    "tickers": [
+      "EZTC3"
+    ],
+    "asset": "eztc3.svg",
+    "author": "EZTEC",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/EZTC3.svg"
+  },
+  {
+    "company": "FERBASA",
+    "tickers": [
+      "FESA4"
+    ],
+    "asset": "fesa4.svg",
+    "author": "FERBASA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/FESA4.svg"
+  },
+  {
+    "company": "FER HERINGER",
+    "tickers": [
+      "FHER3"
+    ],
+    "asset": "fher3.svg",
+    "author": "FER HERINGER",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/FHER3.svg"
+  },
+  {
+    "company": "FICTORALIMEN",
+    "tickers": [
+      "FICT3"
+    ],
+    "asset": "fict3.svg",
+    "author": "FICTORALIMEN",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/FICT3.svg"
+  },
+  {
+    "company": "UNIFIQUE",
+    "tickers": [
+      "FIQE3"
+    ],
+    "asset": "fiqe3.svg",
+    "author": "UNIFIQUE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/FIQE3.svg"
+  },
+  {
+    "company": "FLEURY",
+    "tickers": [
+      "FLRY3"
+    ],
+    "asset": "flry3.svg",
+    "author": "FLEURY",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/FLRY3.svg"
+  },
+  {
+    "company": "FRAS-LE",
+    "tickers": [
+      "FRAS3"
+    ],
+    "asset": "fras3.svg",
+    "author": "FRAS-LE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/FRAS3.svg"
+  },
+  {
+    "company": "GAFISA",
+    "tickers": [
+      "GFSA3"
+    ],
+    "asset": "gfsa3.svg",
+    "author": "GAFISA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/GFSA3.svg"
+  },
+  {
+    "company": "GPS",
+    "tickers": [
+      "GGPS3"
+    ],
+    "asset": "ggps3.svg",
+    "author": "GPS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/GGPS3.svg"
+  },
+  {
+    "company": "GRUPO MATEUS",
+    "tickers": [
+      "GMAT3"
+    ],
+    "asset": "gmat3.svg",
+    "author": "GRUPO MATEUS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/GMAT3.svg"
+  },
+  {
+    "company": "GERDAU MET",
+    "tickers": [
+      "GOAU3",
+      "GOAU4"
+    ],
+    "asset": "goau3.svg",
+    "author": "GERDAU MET",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/GOAU3.svg"
+  },
+  {
+    "company": "GRENDENE",
+    "tickers": [
+      "GRND3"
+    ],
+    "asset": "grnd3.svg",
+    "author": "GRENDENE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/GRND3.svg"
+  },
+  {
+    "company": "HAGA S/A",
+    "tickers": [
+      "HAGA3",
+      "HAGA4"
+    ],
+    "asset": "haga3.svg",
+    "author": "HAGA S/A",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/HAGA3.svg"
+  },
+  {
+    "company": "HAPVIDA",
+    "tickers": [
+      "HAPV3"
+    ],
+    "asset": "hapv3.svg",
+    "author": "HAPVIDA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/HAPV3.svg"
+  },
+  {
+    "company": "HELBOR",
+    "tickers": [
+      "HBOR3"
+    ],
+    "asset": "hbor3.svg",
+    "author": "HELBOR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/HBOR3.svg"
+  },
+  {
+    "company": "HBR REALTY",
+    "tickers": [
+      "HBRE3"
+    ],
+    "asset": "hbre3.svg",
+    "author": "HBR REALTY",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/HBRE3.svg"
+  },
+  {
+    "company": "HIDROVIAS",
+    "tickers": [
+      "HBSA3"
+    ],
+    "asset": "hbsa3.svg",
+    "author": "HIDROVIAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/HBSA3.svg"
+  },
+  {
+    "company": "HYPERA",
+    "tickers": [
+      "HYPE3"
+    ],
+    "asset": "hype3.svg",
+    "author": "HYPERA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/HYPE3.svg"
+  },
+  {
+    "company": "INFRACOMM",
+    "tickers": [
+      "IFCM3"
+    ],
+    "asset": "ifcm3.svg",
+    "author": "INFRACOMM",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/IFCM3.svg"
+  },
+  {
+    "company": "IGUATEMI S.A",
+    "tickers": [
+      "IGTI11",
+      "IGTI3"
+    ],
+    "asset": "igti11.svg",
+    "author": "IGUATEMI S.A",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/IGTI11.svg"
+  },
+  {
+    "company": "INEPAR",
+    "tickers": [
+      "INEP3",
+      "INEP4"
+    ],
+    "asset": "inep3.svg",
+    "author": "INEPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/INEP3.svg"
+  },
+  {
+    "company": "INTELBRAS",
+    "tickers": [
+      "INTB3"
+    ],
+    "asset": "intb3.svg",
+    "author": "INTELBRAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/INTB3.svg"
+  },
+  {
+    "company": "IRBBRASIL RE",
+    "tickers": [
+      "IRBR3"
+    ],
+    "asset": "irbr3.svg",
+    "author": "IRBBRASIL RE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/IRBR3.svg"
+  },
+  {
+    "company": "ISA ENERGIA",
+    "tickers": [
+      "ISAE3",
+      "ISAE4"
+    ],
+    "asset": "isae3.svg",
+    "author": "ISA ENERGIA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ISAE3.svg"
+  },
+  {
+    "company": "ITAUSA",
+    "tickers": [
+      "ITSA3",
+      "ITSA4"
+    ],
+    "asset": "itsa3.svg",
+    "author": "ITAUSA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ITSA3.svg"
+  },
+  {
+    "company": "JALLESMACHAD",
+    "tickers": [
+      "JALL3"
+    ],
+    "asset": "jall3.svg",
+    "author": "JALLESMACHAD",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/JALL3.svg"
+  },
+  {
+    "company": "JOAO FORTES",
+    "tickers": [
+      "JFEN3"
+    ],
+    "asset": "jfen3.svg",
+    "author": "JOAO FORTES",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/JFEN3.svg"
+  },
+  {
+    "company": "JHSF PART",
+    "tickers": [
+      "JHSF3"
+    ],
+    "asset": "jhsf3.svg",
+    "author": "JHSF PART",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/JHSF3.svg"
+  },
+  {
+    "company": "JSL",
+    "tickers": [
+      "JSLG3"
+    ],
+    "asset": "jslg3.svg",
+    "author": "JSL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/JSLG3.svg"
+  },
+  {
+    "company": "KEPLER WEBER",
+    "tickers": [
+      "KEPL3"
+    ],
+    "asset": "kepl3.svg",
+    "author": "KEPLER WEBER",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/KEPL3.svg"
+  },
+  {
+    "company": "KLABIN S/A",
+    "tickers": [
+      "KLBN11",
+      "KLBN3",
+      "KLBN4"
+    ],
+    "asset": "klbn11.svg",
+    "author": "KLABIN S/A",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/KLBN11.svg"
+  },
+  {
+    "company": "TERRASANTAPA",
+    "tickers": [
+      "LAND3"
+    ],
+    "asset": "land3.svg",
+    "author": "TERRASANTAPA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LAND3.svg"
+  },
+  {
+    "company": "LAVVI",
+    "tickers": [
+      "LAVV3"
+    ],
+    "asset": "lavv3.svg",
+    "author": "LAVVI",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LAVV3.svg"
+  },
+  {
+    "company": "METAL LEVE",
+    "tickers": [
+      "LEVE3"
+    ],
+    "asset": "leve3.svg",
+    "author": "METAL LEVE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LEVE3.svg"
+  },
+  {
+    "company": "LIGHT S/A",
+    "tickers": [
+      "LIGT3"
+    ],
+    "asset": "ligt3.svg",
+    "author": "LIGHT S/A",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LIGT3.svg"
+  },
+  {
+    "company": "QUERO-QUERO",
+    "tickers": [
+      "LJQQ3"
+    ],
+    "asset": "ljqq3.svg",
+    "author": "QUERO-QUERO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LJQQ3.svg"
+  },
+  {
+    "company": "LOG COM PROP",
+    "tickers": [
+      "LOGG3"
+    ],
+    "asset": "logg3.svg",
+    "author": "LOG COM PROP",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LOGG3.svg"
+  },
+  {
+    "company": "LOG-IN",
+    "tickers": [
+      "LOGN3"
+    ],
+    "asset": "logn3.svg",
+    "author": "LOG-IN",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LOGN3.svg"
+  },
+  {
+    "company": "LOPES BRASIL",
+    "tickers": [
+      "LPSB3"
+    ],
+    "asset": "lpsb3.svg",
+    "author": "LOPES BRASIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LPSB3.svg"
+  },
+  {
+    "company": "LUPATECH",
+    "tickers": [
+      "LUPA3"
+    ],
+    "asset": "lupa3.svg",
+    "author": "LUPATECH",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LUPA3.svg"
+  },
+  {
+    "company": "TREVISA",
+    "tickers": [
+      "LUXM4"
+    ],
+    "asset": "luxm4.svg",
+    "author": "TREVISA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LUXM4.svg"
+  },
+  {
+    "company": "LWSA",
+    "tickers": [
+      "LWSA3"
+    ],
+    "asset": "lwsa3.svg",
+    "author": "LWSA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LWSA3.svg"
+  },
+  {
+    "company": "MATER DEI",
+    "tickers": [
+      "MATD3"
+    ],
+    "asset": "matd3.svg",
+    "author": "MATER DEI",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MATD3.svg"
+  },
+  {
+    "company": "MARFRIG",
+    "tickers": [
+      "MBRF3"
+    ],
+    "asset": "mbrf3.svg",
+    "author": "MARFRIG",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MBRF3.svg"
+  },
+  {
+    "company": "M.DIASBRANCO",
+    "tickers": [
+      "MDIA3"
+    ],
+    "asset": "mdia3.svg",
+    "author": "M.DIASBRANCO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MDIA3.svg"
+  },
+  {
+    "company": "MOURA DUBEUX",
+    "tickers": [
+      "MDNE3"
+    ],
+    "asset": "mdne3.svg",
+    "author": "MOURA DUBEUX",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MDNE3.svg"
+  },
+  {
+    "company": "IMC S/A",
+    "tickers": [
+      "MEAL3"
+    ],
+    "asset": "meal3.svg",
+    "author": "IMC S/A",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MEAL3.svg"
+  },
+  {
+    "company": "MELNICK",
+    "tickers": [
+      "MELK3"
+    ],
+    "asset": "melk3.svg",
+    "author": "MELNICK",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MELK3.svg"
+  },
+  {
+    "company": "MANGELS INDL",
+    "tickers": [
+      "MGEL4"
+    ],
+    "asset": "mgel4.svg",
+    "author": "MANGELS INDL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MGEL4.svg"
+  },
+  {
+    "company": "MILLS",
+    "tickers": [
+      "MILS3"
+    ],
+    "asset": "mils3.svg",
+    "author": "MILLS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MILS3.svg"
+  },
+  {
+    "company": "MULTILASER",
+    "tickers": [
+      "MLAS3"
+    ],
+    "asset": "mlas3.svg",
+    "author": "MULTILASER",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MLAS3.svg"
+  },
+  {
+    "company": "MUNDIAL",
+    "tickers": [
+      "MNDL3"
+    ],
+    "asset": "mndl3.svg",
+    "author": "MUNDIAL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MNDL3.svg"
+  },
+  {
+    "company": "MINUPAR",
+    "tickers": [
+      "MNPR3"
+    ],
+    "asset": "mnpr3.svg",
+    "author": "MINUPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MNPR3.svg"
+  },
+  {
+    "company": "MOTIVA SA",
+    "tickers": [
+      "MOTV3"
+    ],
+    "asset": "motv3.svg",
+    "author": "MOTIVA SA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MOTV3.svg"
+  },
+  {
+    "company": "MOVIDA",
+    "tickers": [
+      "MOVI3"
+    ],
+    "asset": "movi3.svg",
+    "author": "MOVIDA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MOVI3.svg"
+  },
+  {
+    "company": "MRV",
+    "tickers": [
+      "MRVE3"
+    ],
+    "asset": "mrve3.svg",
+    "author": "MRV",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MRVE3.svg"
+  },
+  {
+    "company": "MITRE REALTY",
+    "tickers": [
+      "MTRE3"
+    ],
+    "asset": "mtre3.svg",
+    "author": "MITRE REALTY",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MTRE3.svg"
+  },
+  {
+    "company": "METISA",
+    "tickers": [
+      "MTSA4"
+    ],
+    "asset": "mtsa4.svg",
+    "author": "METISA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MTSA4.svg"
+  },
+  {
+    "company": "MULTIPLAN",
+    "tickers": [
+      "MULT3"
+    ],
+    "asset": "mult3.svg",
+    "author": "MULTIPLAN",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MULT3.svg"
+  },
+  {
+    "company": "IOCHP-MAXION",
+    "tickers": [
+      "MYPK3"
+    ],
+    "asset": "mypk3.svg",
+    "author": "IOCHP-MAXION",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/MYPK3.svg"
+  },
+  {
+    "company": "NUTRIPLANT",
+    "tickers": [
+      "NUTR3"
+    ],
+    "asset": "nutr3.svg",
+    "author": "NUTRIPLANT",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/NUTR3.svg"
+  },
+  {
+    "company": "ORANJEBTC",
+    "tickers": [
+      "OBTC3"
+    ],
+    "asset": "obtc3.svg",
+    "author": "ORANJEBTC",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/OBTC3.svg"
+  },
+  {
+    "company": "OUROFINO S/A",
+    "tickers": [
+      "OFSA3"
+    ],
+    "asset": "ofsa3.svg",
+    "author": "OUROFINO S/A",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/OFSA3.svg"
+  },
+  {
+    "company": "Oi",
+    "tickers": [
+      "OIBR3",
+      "OIBR4"
+    ],
+    "asset": "oibr3.svg",
+    "author": "Oi",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/OIBR3.svg"
+  },
+  {
+    "company": "ONCOCLINICAS",
+    "tickers": [
+      "ONCO3"
+    ],
+    "asset": "onco3.svg",
+    "author": "ONCOCLINICAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ONCO3.svg"
+  },
+  {
+    "company": "OCEANPACT",
+    "tickers": [
+      "OPCT3"
+    ],
+    "asset": "opct3.svg",
+    "author": "OCEANPACT",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/OPCT3.svg"
+  },
+  {
+    "company": "ORIZON",
+    "tickers": [
+      "ORVR3"
+    ],
+    "asset": "orvr3.svg",
+    "author": "ORIZON",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ORVR3.svg"
+  },
+  {
+    "company": "OSX BRASIL",
+    "tickers": [
+      "OSXB3"
+    ],
+    "asset": "osxb3.svg",
+    "author": "OSX BRASIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/OSXB3.svg"
+  },
+  {
+    "company": "COMPASS",
+    "tickers": [
+      "PASS3"
+    ],
+    "asset": "pass3.svg",
+    "author": "COMPASS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PASS3.svg"
+  },
+  {
+    "company": "PANATLANTICA",
+    "tickers": [
+      "PATI3"
+    ],
+    "asset": "pati3.svg",
+    "author": "PANATLANTICA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PATI3.svg"
+  },
+  {
+    "company": "P.ACUCAR-CBD",
+    "tickers": [
+      "PCAR3"
+    ],
+    "asset": "pcar3.svg",
+    "author": "P.ACUCAR-CBD",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PCAR3.svg"
+  },
+  {
+    "company": "PDG REALT",
+    "tickers": [
+      "PDGR3"
+    ],
+    "asset": "pdgr3.svg",
+    "author": "PDG REALT",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PDGR3.svg"
+  },
+  {
+    "company": "PADTEC",
+    "tickers": [
+      "PDTC3"
+    ],
+    "asset": "pdtc3.svg",
+    "author": "PADTEC",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PDTC3.svg"
+  },
+  {
+    "company": "PROFARMA",
+    "tickers": [
+      "PFRM3"
+    ],
+    "asset": "pfrm3.svg",
+    "author": "PROFARMA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PFRM3.svg"
+  },
+  {
+    "company": "PAGUE MENOS",
+    "tickers": [
+      "PGMN3"
+    ],
+    "asset": "pgmn3.svg",
+    "author": "PAGUE MENOS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PGMN3.svg"
+  },
+  {
+    "company": "PINE",
+    "tickers": [
+      "PINE3",
+      "PINE4"
+    ],
+    "asset": "pine3.svg",
+    "author": "PINE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PINE3.svg"
+  },
+  {
+    "company": "PLANOEPLANO",
+    "tickers": [
+      "PLPL3"
+    ],
+    "asset": "plpl3.svg",
+    "author": "PLANOEPLANO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PLPL3.svg"
+  },
+  {
+    "company": "PARANAPANEMA",
+    "tickers": [
+      "PMAM3"
+    ],
+    "asset": "pmam3.svg",
+    "author": "PARANAPANEMA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PMAM3.svg"
+  },
+  {
+    "company": "DIMED",
+    "tickers": [
+      "PNVL3"
+    ],
+    "asset": "pnvl3.svg",
+    "author": "DIMED",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PNVL3.svg"
+  },
+  {
+    "company": "MARCOPOLO",
+    "tickers": [
+      "POMO3",
+      "POMO4"
+    ],
+    "asset": "pomo3.svg",
+    "author": "MARCOPOLO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/POMO3.svg"
+  },
+  {
+    "company": "POSITIVO TEC",
+    "tickers": [
+      "POSI3"
+    ],
+    "asset": "posi3.svg",
+    "author": "POSITIVO TEC",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/POSI3.svg"
+  },
+  {
+    "company": "PRIO",
+    "tickers": [
+      "PRIO3"
+    ],
+    "asset": "prio3.svg",
+    "author": "PRIO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PRIO3.svg"
+  },
+  {
+    "company": "PRINER",
+    "tickers": [
+      "PRNR3"
+    ],
+    "asset": "prnr3.svg",
+    "author": "PRINER",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PRNR3.svg"
+  },
+  {
+    "company": "PORTO SEGURO",
+    "tickers": [
+      "PSSA3"
+    ],
+    "asset": "pssa3.svg",
+    "author": "PORTO SEGURO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PSSA3.svg"
+  },
+  {
+    "company": "PORTOBELLO",
+    "tickers": [
+      "PTBL3"
+    ],
+    "asset": "ptbl3.svg",
+    "author": "PORTOBELLO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/PTBL3.svg"
+  },
+  {
+    "company": "QUALICORP",
+    "tickers": [
+      "QUAL3"
+    ],
+    "asset": "qual3.svg",
+    "author": "QUALICORP",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/QUAL3.svg"
+  },
+  {
+    "company": "RAIADROGASIL",
+    "tickers": [
+      "RADL3"
+    ],
+    "asset": "radl3.svg",
+    "author": "RAIADROGASIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RADL3.svg"
+  },
+  {
+    "company": "RUMO S.A.",
+    "tickers": [
+      "RAIL3"
+    ],
+    "asset": "rail3.svg",
+    "author": "RUMO S.A.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RAIL3.svg"
+  },
+  {
+    "company": "RAIZEN",
+    "tickers": [
+      "RAIZ4"
+    ],
+    "asset": "raiz4.svg",
+    "author": "RAIZEN",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RAIZ4.svg"
+  },
+  {
+    "company": "IRANI",
+    "tickers": [
+      "RANI3"
+    ],
+    "asset": "rani3.svg",
+    "author": "IRANI",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RANI3.svg"
+  },
+  {
+    "company": "RANDON PART",
+    "tickers": [
+      "RAPT3",
+      "RAPT4"
+    ],
+    "asset": "rapt3.svg",
+    "author": "RANDON PART",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RAPT3.svg"
+  },
+  {
+    "company": "RECRUSUL",
+    "tickers": [
+      "RCSL3",
+      "RCSL4"
+    ],
+    "asset": "rcsl3.svg",
+    "author": "RECRUSUL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RCSL3.svg"
+  },
+  {
+    "company": "REDE D OR",
+    "tickers": [
+      "RDOR3"
+    ],
+    "asset": "rdor3.svg",
+    "author": "REDE D OR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RDOR3.svg"
+  },
+  {
+    "company": "PETRORECSA",
+    "tickers": [
+      "RECV3"
+    ],
+    "asset": "recv3.svg",
+    "author": "PETRORECSA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RECV3.svg"
+  },
+  {
+    "company": "RIACHUELO",
+    "tickers": [
+      "RIAA3"
+    ],
+    "asset": "riaa3.svg",
+    "author": "RIACHUELO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RIAA3.svg"
+  },
+  {
+    "company": "RENOVA",
+    "tickers": [
+      "RNEW3",
+      "RNEW4"
+    ],
+    "asset": "rnew3.svg",
+    "author": "RENOVA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RNEW3.svg"
+  },
+  {
+    "company": "ROMI",
+    "tickers": [
+      "ROMI3"
+    ],
+    "asset": "romi3.svg",
+    "author": "ROMI",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/ROMI3.svg"
+  },
+  {
+    "company": "ALFA HOLDING",
+    "tickers": [
+      "RPAD5"
+    ],
+    "asset": "rpad5.svg",
+    "author": "ALFA HOLDING",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RPAD5.svg"
+  },
+  {
+    "company": "PET MANGUINH",
+    "tickers": [
+      "RPMG3"
+    ],
+    "asset": "rpmg3.svg",
+    "author": "PET MANGUINH",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RPMG3.svg"
+  },
+  {
+    "company": "RIOSULENSE",
+    "tickers": [
+      "RSUL4"
+    ],
+    "asset": "rsul4.svg",
+    "author": "RIOSULENSE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RSUL4.svg"
+  },
+  {
+    "company": "REVEE",
+    "tickers": [
+      "RVEE3"
+    ],
+    "asset": "rvee3.svg",
+    "author": "REVEE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RVEE3.svg"
+  },
+  {
+    "company": "SANTANDER BR",
+    "tickers": [
+      "SANB11",
+      "SANB3",
+      "SANB4"
+    ],
+    "asset": "sanb11.svg",
+    "author": "SANTANDER BR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SANB11.svg"
+  },
+  {
+    "company": "SANEPAR",
+    "tickers": [
+      "SAPR11",
+      "SAPR3",
+      "SAPR4"
+    ],
+    "asset": "sapr11.svg",
+    "author": "SANEPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SAPR11.svg"
+  },
+  {
+    "company": "BRADSAUDE",
+    "tickers": [
+      "SAUD3"
+    ],
+    "asset": "saud3.svg",
+    "author": "BRADSAUDE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SAUD3.svg"
+  },
+  {
+    "company": "GRUPO SBF",
+    "tickers": [
+      "SBFG3"
+    ],
+    "asset": "sbfg3.svg",
+    "author": "GRUPO SBF",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SBFG3.svg"
+  },
+  {
+    "company": "SABESP",
+    "tickers": [
+      "SBSP3"
+    ],
+    "asset": "sbsp3.svg",
+    "author": "SABESP",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SBSP3.svg"
+  },
+  {
+    "company": "SAO CARLOS",
+    "tickers": [
+      "SCAR3"
+    ],
+    "asset": "scar3.svg",
+    "author": "SAO CARLOS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SCAR3.svg"
+  },
+  {
+    "company": "SER EDUCA",
+    "tickers": [
+      "SEER3"
+    ],
+    "asset": "seer3.svg",
+    "author": "SER EDUCA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SEER3.svg"
+  },
+  {
+    "company": "SEQUOIA LOG",
+    "tickers": [
+      "SEQL3"
+    ],
+    "asset": "seql3.svg",
+    "author": "SEQUOIA LOG",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SEQL3.svg"
+  },
+  {
+    "company": "SCHULZ",
+    "tickers": [
+      "SHUL4"
+    ],
+    "asset": "shul4.svg",
+    "author": "SCHULZ",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SHUL4.svg"
+  },
+  {
+    "company": "SIMPAR",
+    "tickers": [
+      "SIMH3"
+    ],
+    "asset": "simh3.svg",
+    "author": "SIMPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SIMH3.svg"
+  },
+  {
+    "company": "SLC AGRICOLA",
+    "tickers": [
+      "SLCE3"
+    ],
+    "asset": "slce3.svg",
+    "author": "SLC AGRICOLA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SLCE3.svg"
+  },
+  {
+    "company": "SMART FIT",
+    "tickers": [
+      "SMFT3"
+    ],
+    "asset": "smft3.svg",
+    "author": "SMART FIT",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SMFT3.svg"
+  },
+  {
+    "company": "SAO MARTINHO",
+    "tickers": [
+      "SMTO3"
+    ],
+    "asset": "smto3.svg",
+    "author": "SAO MARTINHO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SMTO3.svg"
+  },
+  {
+    "company": "SANSUY",
+    "tickers": [
+      "SNSY5"
+    ],
+    "asset": "snsy5.svg",
+    "author": "SANSUY",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SNSY5.svg"
+  },
+  {
+    "company": "BOA SAFRA",
+    "tickers": [
+      "SOJA3"
+    ],
+    "asset": "soja3.svg",
+    "author": "BOA SAFRA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SOJA3.svg"
+  },
+  {
+    "company": "SONDOTECNICA",
+    "tickers": [
+      "SOND6"
+    ],
+    "asset": "sond6.svg",
+    "author": "SONDOTECNICA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SOND6.svg"
+  },
+  {
+    "company": "SYN PROP TEC",
+    "tickers": [
+      "SYNE3"
+    ],
+    "asset": "syne3.svg",
+    "author": "SYN PROP TEC",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/SYNE3.svg"
+  },
+  {
+    "company": "TAESA",
+    "tickers": [
+      "TAEE11",
+      "TAEE3",
+      "TAEE4"
+    ],
+    "asset": "taee11.svg",
+    "author": "TAESA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TAEE11.svg"
+  },
+  {
+    "company": "TAURUS ARMAS",
+    "tickers": [
+      "TASA3",
+      "TASA4"
+    ],
+    "asset": "tasa3.svg",
+    "author": "TAURUS ARMAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TASA3.svg"
+  },
+  {
+    "company": "TECNISA",
+    "tickers": [
+      "TCSA3"
+    ],
+    "asset": "tcsa3.svg",
+    "author": "TECNISA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TCSA3.svg"
+  },
+  {
+    "company": "TECHNOS",
+    "tickers": [
+      "TECN3"
+    ],
+    "asset": "tecn3.svg",
+    "author": "TECHNOS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TECN3.svg"
+  },
+  {
+    "company": "TELEBRAS",
+    "tickers": [
+      "TELB3",
+      "TELB4"
+    ],
+    "asset": "telb3.svg",
+    "author": "TELEBRAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TELB3.svg"
+  },
+  {
+    "company": "TENDA",
+    "tickers": [
+      "TEND3"
+    ],
+    "asset": "tend3.svg",
+    "author": "TENDA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TEND3.svg"
+  },
+  {
+    "company": "TRACK FIELD",
+    "tickers": [
+      "TFCO4"
+    ],
+    "asset": "tfco4.svg",
+    "author": "TRACK FIELD",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TFCO4.svg"
+  },
+  {
+    "company": "TEGMA",
+    "tickers": [
+      "TGMA3"
+    ],
+    "asset": "tgma3.svg",
+    "author": "TEGMA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TGMA3.svg"
+  },
+  {
+    "company": "TIM",
+    "tickers": [
+      "TIMS3"
+    ],
+    "asset": "tims3.svg",
+    "author": "TIM",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TIMS3.svg"
+  },
+  {
+    "company": "TOTVS",
+    "tickers": [
+      "TOTS3"
+    ],
+    "asset": "tots3.svg",
+    "author": "TOTVS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TOTS3.svg"
+  },
+  {
+    "company": "TRIUNFO PART",
+    "tickers": [
+      "TPIS3"
+    ],
+    "asset": "tpis3.svg",
+    "author": "TRIUNFO PART",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TPIS3.svg"
+  },
+  {
+    "company": "TRISUL",
+    "tickers": [
+      "TRIS3"
+    ],
+    "asset": "tris3.svg",
+    "author": "TRISUL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TRIS3.svg"
+  },
+  {
+    "company": "3TENTOS",
+    "tickers": [
+      "TTEN3"
+    ],
+    "asset": "tten3.svg",
+    "author": "3TENTOS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TTEN3.svg"
+  },
+  {
+    "company": "TUPY",
+    "tickers": [
+      "TUPY3"
+    ],
+    "asset": "tupy3.svg",
+    "author": "TUPY",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TUPY3.svg"
+  },
+  {
+    "company": "UNICASA",
+    "tickers": [
+      "UCAS3"
+    ],
+    "asset": "ucas3.svg",
+    "author": "UNICASA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/UCAS3.svg"
+  },
+  {
+    "company": "ULTRAPAR",
+    "tickers": [
+      "UGPA3"
+    ],
+    "asset": "ugpa3.svg",
+    "author": "ULTRAPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/UGPA3.svg"
+  },
+  {
+    "company": "UNIPAR",
+    "tickers": [
+      "UNIP3",
+      "UNIP5",
+      "UNIP6"
+    ],
+    "asset": "unip3.svg",
+    "author": "UNIPAR",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/UNIP3.svg"
+  },
+  {
+    "company": "USIMINAS",
+    "tickers": [
+      "USIM3",
+      "USIM5"
+    ],
+    "asset": "usim3.svg",
+    "author": "USIMINAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/USIM3.svg"
+  },
+  {
+    "company": "VAMOS",
+    "tickers": [
+      "VAMO3"
+    ],
+    "asset": "vamo3.svg",
+    "author": "VAMOS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VAMO3.svg"
+  },
+  {
+    "company": "VIBRA",
+    "tickers": [
+      "VBBR3"
+    ],
+    "asset": "vbbr3.svg",
+    "author": "VIBRA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VBBR3.svg"
+  },
+  {
+    "company": "VITTIA",
+    "tickers": [
+      "VITT3"
+    ],
+    "asset": "vitt3.svg",
+    "author": "VITTIA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VITT3.svg"
+  },
+  {
+    "company": "VIVARA S.A.",
+    "tickers": [
+      "VIVA3"
+    ],
+    "asset": "viva3.svg",
+    "author": "VIVARA S.A.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VIVA3.svg"
+  },
+  {
+    "company": "VIVER",
+    "tickers": [
+      "VIVR3"
+    ],
+    "asset": "vivr3.svg",
+    "author": "VIVER",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VIVR3.svg"
+  },
+  {
+    "company": "TELEF BRASIL",
+    "tickers": [
+      "VIVT3"
+    ],
+    "asset": "vivt3.svg",
+    "author": "TELEF BRASIL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VIVT3.svg"
+  },
+  {
+    "company": "VALID",
+    "tickers": [
+      "VLID3"
+    ],
+    "asset": "vlid3.svg",
+    "author": "VALID",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VLID3.svg"
+  },
+  {
+    "company": "VESTE",
+    "tickers": [
+      "VSTE3"
+    ],
+    "asset": "vste3.svg",
+    "author": "VESTE",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VSTE3.svg"
+  },
+  {
+    "company": "VITRUEDUCA",
+    "tickers": [
+      "VTRU3"
+    ],
+    "asset": "vtru3.svg",
+    "author": "VITRUEDUCA",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VTRU3.svg"
+  },
+  {
+    "company": "VULCABRAS",
+    "tickers": [
+      "VULC3"
+    ],
+    "asset": "vulc3.svg",
+    "author": "VULCABRAS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VULC3.svg"
+  },
+  {
+    "company": "VIVEO",
+    "tickers": [
+      "VVEO3"
+    ],
+    "asset": "vveo3.svg",
+    "author": "VIVEO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VVEO3.svg"
+  },
+  {
+    "company": "WDC NETWORKS",
+    "tickers": [
+      "WDCN3"
+    ],
+    "asset": "wdcn3.svg",
+    "author": "WDC NETWORKS",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/WDCN3.svg"
+  },
+  {
+    "company": "WESTWING",
+    "tickers": [
+      "WEST3"
+    ],
+    "asset": "west3.svg",
+    "author": "WESTWING",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/WEST3.svg"
+  },
+  {
+    "company": "WHIRLPOOL",
+    "tickers": [
+      "WHRL3",
+      "WHRL4"
+    ],
+    "asset": "whrl3.svg",
+    "author": "WHIRLPOOL",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/WHRL3.svg"
+  },
+  {
+    "company": "WIZ CO",
+    "tickers": [
+      "WIZC3"
+    ],
+    "asset": "wizc3.svg",
+    "author": "WIZ CO",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/WIZC3.svg"
+  },
+  {
+    "company": "WLM IND COM",
+    "tickers": [
+      "WLMM4"
+    ],
+    "asset": "wlmm4.svg",
+    "author": "WLM IND COM",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/WLMM4.svg"
+  },
+  {
+    "company": "YDUQS PART",
+    "tickers": [
+      "YDUQ3"
+    ],
+    "asset": "yduq3.svg",
+    "author": "YDUQS PART",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/YDUQ3.svg"
+  },
+  {
+    "company": "Grupo PetzCobasi",
+    "tickers": [
+      "AUAU3"
+    ],
+    "asset": "petzcobasi.svg",
+    "author": "Grupo PetzCobasi",
+    "license": "Official brand asset; issuer trademark; no reuse license stated in source",
+    "source": "https://ri.petzcobasi.com.br/",
+    "sourceAssetUrl": "https://cdn-sites-assets.mziq.com/wp-content/themes/mziq_petz_ri_redesign/img/Logo-horizontal-grupo-petz-cobasi.svg"
+  },
+  {
+    "company": "Grupo Toky",
+    "tickers": [
+      "TOKY3"
+    ],
+    "asset": "toky.png",
+    "author": "Grupo Toky",
+    "license": "Official brand asset; issuer trademark; no reuse license stated in source",
+    "source": "https://investors.grupotoky.com.br/",
+    "sourceAssetUrl": "https://cdn-sites-assets.mziq.com/wp-content/uploads/sites/590/2025/03/Logo-grupo-toky.png"
   }
 ]

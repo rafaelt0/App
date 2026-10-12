@@ -18,7 +18,7 @@
 }
 
 .initials {
-  color: var(--text-secondary);
+  color: #343b48;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;

@@ -30,6 +30,7 @@
 .sim-allocation { display: grid; gap: 0; margin: 0 0 12px; padding: 0; list-style: none; }
 .sim-allocation li { display: grid; grid-template-columns: minmax(56px, auto) minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; border-bottom: 1px solid var(--border-default); }
 .sim-allocation li:last-child { border-bottom: 0; }
+.sim-asset { display: inline-flex; align-items: center; gap: 8px; }
 .sim-ticker { font-family: var(--font-mono); font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text-primary); }
 .sim-bar { height: 6px; border-radius: var(--radius-pill); background: var(--surface-raised); overflow: hidden; }
 .sim-bar span { opacity: .8; }
