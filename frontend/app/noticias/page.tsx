@@ -57,7 +57,7 @@ function Article({article}: {article: NewsArticle}) {
           {article.neg_terms.length ? article.neg_terms.map((term, index) => <span className="news-term-chip is-negative" key={`${index}-${term}`}>{term} </span>) : <span>Nenhum</span>}
           <p className="news-model-formula">Score = (Pos − Neg) / (Pos + Neg)<br />
             {article.evidence_count ? `(${article.pos_terms.length} − ${article.neg_terms.length}) / ${article.evidence_count} = ${decimal.format(article.score)}` : "Sem termos encontrados: score 0 (sem evidência, não confiança na neutralidade)."}</p>
-          <p className="news-model-note">{article.evidence_count} evidências · Tamanho do texto tokenizado: {article.raw_text_length} palavras. Menos de dois termos implica evidência limitada. Frases, negação e repetições são consideradas.</p>
+          <p className="news-model-note">{article.evidence_count} evidências · Tamanho do texto tokenizado: {article.raw_text_length} palavras. Menos de dois termos implica evidência limitada, e a notícia fica fora da nota agregada. Frases, negação e repetições são consideradas.</p>
         </>}
       </details>
     </div>
@@ -173,7 +173,7 @@ export default function NewsPage() {
             <label>Ordenar por<select value={filters.sort} onChange={event => changeFilter("sort", event.target.value)}>{sortModes.map(sort => <option key={sort}>{sort}</option>)}</select></label>
             <label>Filtrar por sentimento<select value={filters.sentiment} onChange={event => changeFilter("sentiment", event.target.value)}><option>Todos</option><option value="Otimista">Otimistas</option><option value="Neutro">Neutras</option><option value="Pessimista">Pessimistas</option></select></label>
             <label>Filtrar por intensidade<select value={filters.intensity} onChange={event => changeFilter("intensity", event.target.value)}><option>Todos</option>{intensityLevels.filter(level => level !== "Evidência limitada" || snapshot.articles.some(article => !article.is_jev)).map(level => <option key={level}>{level}</option>)}</select></label>
-            <p className="news-help news-filters-note">Faixas de intensidade se baseiam no score, não em materialidade. No léxico, menos de dois termos implica evidência limitada.</p>
+            <p className="news-help news-filters-note">Faixas de intensidade se baseiam no score, não em materialidade. No léxico, menos de dois termos implica evidência limitada; essas notícias não entram na nota agregada.</p>
           </div>
           <div className="news-results" role="status" aria-live="polite">
             <span>Mostrando <strong>{visible.length}</strong> de <strong>{articles.length}</strong> notícias após filtros</span>

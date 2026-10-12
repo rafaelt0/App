@@ -32,7 +32,8 @@ def detail_frame():
                          "PL": ["900", "1250"], "PVP": ["100", "150"], "EV_EBITDA": ["0", "0"],
                          "ROE": ["5,00%", "15,00%"], "ROIC": ["12,00%", "12,00%"],
                          "Div_Yield": ["4,00%", "4,01%"], "Div_Liq_Patrim": ["150", "287"],
-                         "Liquidez_Corr": ["150", "100"], "EV_EBIT": ["1200", "2000"]}, index=["AAA3.SA", "AAA3"])
+                         "Liquidez_Corr": ["150", "100"], "EV_EBIT": ["1200", "2000"],
+                         "Marg_Liquida": ["0,0%", "0,0%"]}, index=["AAA3.SA", "AAA3"])
 
 
 def test_partial_analysis_preserves_order_nulls_raw_export_and_corrected_units(home_api, monkeypatch):
@@ -52,6 +53,7 @@ def test_partial_analysis_preserves_order_nulls_raw_export_and_corrected_units(h
     assert first["market"]["price"] == 20
     assert first["indicators"]["pl"] == 12.5
     assert first["indicators"]["roe"] == 15
+    assert first["indicators"]["net_margin"] is None  # Fundamentus 0,0% placeholder for banks
     assert missing["indicators"]["pl"] is None
     assert missing["health"]["metrics"] == []
     assert [(m["label"], m["value"]) for m in first["health"]["metrics"]] == [
@@ -83,6 +85,14 @@ def test_negative_profit_multiples_are_kept_but_not_classified_as_cheap():
     assert ev["value"] == -0.5 and ev["status"] == "neutral"
     assert ev["classification"] == "EBITDA negativo — múltiplo não interpretável"
     assert home.indicator_metric("pl", "P/L", "multiple", "", 8, "Serviços")["classification"] is None
+
+
+def test_negative_equity_marks_pvp_and_roe_as_not_interpretable():
+    for key, value in (("pvp", -0.4), ("roe", 69.0)):
+        metric = home.indicator_metric(key, key.upper(), "percent", "", value, "Telecomunicações", negative_equity=True)
+        assert metric["value"] == value and metric["status"] == "neutral"
+        assert metric["classification"] == "Patrimônio líquido negativo — indicador não interpretável"
+    assert home.indicator_metric("roe", "ROE", "percent", "", 69.0, "")["classification"] == "Forte"
 
 
 def test_financial_intermediaries_get_bank_ev_ebitda_explanation():

@@ -122,13 +122,15 @@ def health(row):
     return {"metrics": metrics, "diagnostics": diagnostics}
 
 
-def indicator_metric(key, label, unit, help_text, value, sector):
+def indicator_metric(key, label, unit, help_text, value, sector, negative_equity=False):
     metric = {"label": label, "value": value, "unit": unit, "digits": 2, "help": help_text, "status": "neutral", "classification": None}
     if value is None:  # missing source data stays null: no classification, no colour
         return metric
     if key == "ev_ebitda" and abs(value) < .01:
         context = get_ev_ebitda_context(sector)
         metric.update(value=None, classification=context[0] if context else "N/D", help=context[1] if context else "Dado não disponível para este ticker via Fundamentus.")
+    elif key in ("pvp", "roe") and negative_equity:
+        metric["classification"] = "Patrimônio líquido negativo — indicador não interpretável"
     elif key == "pl" and value < 0:
         metric["classification"] = "Prejuízo — múltiplo não interpretável"
     elif key == "ev_ebitda" and value < 0:
@@ -169,8 +171,11 @@ def build_analysis(raw, peers, tickers, universe):
             value = numeric(ind_row.get(source))
             if value is not None and unit == "multiple":
                 value /= 100
+            if key in ("net_margin", "ebit_margin") and value == 0:
+                value = None  # Fundamentus prints 0,0% for banks and insurers, where margins do not apply
             indicators[key] = value
-            metric = indicator_metric(key, label, unit, help_text, value, sector)
+            negative_equity = indicators.get("pvp") is not None and indicators["pvp"] < 0
+            metric = indicator_metric(key, label, unit, help_text, value, sector, negative_equity)
             metric_groups.setdefault(group, []).append(metric)
             indicator_available[key] = metric["value"] is not None
         local_sector = sector_lookup.get(ticker, "")
