@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { formatValue } from "../components/ui";
+import { formatCompactValue, formatValue } from "../components/ui";
 import type { Column, Unit } from "../components/ui";
 export type Criteria = {pl_min?:number;pl_max?:number;pl_min_exclusive?:boolean;roe_min?:number;dy_min?:number;c5y_min?:number;liq2m_min?:number};
 export type Sort = {field:string;direction:"asc"|"desc";label?:string};
@@ -29,7 +29,7 @@ export function canonicalCriteria(c:Controls):Criteria {
 }
 export type CriterionKey = "pl"|"roe"|"c5y"|"dy"|"liq2m";
 export type CriterionDef = {key:CriterionKey;group:string;toggle:string;enabled:"pl_enabled"|"roe_enabled"|"c5y_enabled"|"dy_enabled"|"liq2m_enabled";chip:(c:Controls)=>string};
-const amount=(value:number,unit:Unit,digits=Number.isInteger(value) ? 0:1)=>formatValue(value,unit,digits);
+const amount=(value:number,unit:Unit,digits=Number.isInteger(value) ? 0:1)=>!Number.isFinite(value) ? "inválido":unit === "money" ? formatCompactValue(value,unit,1):formatValue(value,unit,digits);
 export const criterionDefs:CriterionDef[] = [
   {key:"pl",group:"Valoração",toggle:"Aplicar faixa de P/L",enabled:"pl_enabled",chip:c=>c.pl_min_exclusive ? `P/L > ${amount(c.pl_min,"number")} e ≤ ${amount(c.pl_max,"multiple")}`:`P/L ${amount(c.pl_min,"number")}–${amount(c.pl_max,"multiple")}`},
   {key:"roe",group:"Qualidade",toggle:"Aplicar ROE mínimo",enabled:"roe_enabled",chip:c=>`ROE ≥ ${amount(c.roe_min,"percent")}`},
@@ -37,7 +37,7 @@ export const criterionDefs:CriterionDef[] = [
   {key:"dy",group:"Dividendos",toggle:"Aplicar dividend yield mínimo",enabled:"dy_enabled",chip:c=>`DY ≥ ${amount(c.dy_min,"percent")}`},
   {key:"liq2m",group:"Liquidez",toggle:"Aplicar liquidez mínima",enabled:"liq2m_enabled",chip:c=>`Liquidez 2m ≥ ${amount(c.liq2m_min,"money",0)}`},
 ];
-export const activeCriteria = (c:Controls) => criterionDefs.filter(def=>c[def.enabled]).map(def=>({key:def.key,enabled:def.enabled,label:def.chip(c)}));
+export const activeCriteria = (c:Controls) => criterionDefs.filter(def=>c[def.enabled]).map(def=>({key:def.key,enabled:def.enabled,label:def.chip(c),title:def.key === "liq2m" && Number.isFinite(c.liq2m_min) ? formatValue(c.liq2m_min,"money",2):undefined}));
 export const sortKey = (sort:Pick<Sort,"field"|"direction">) => `${sort.field}:${sort.direction}`;
 export const screenerConfig = () => api<Config>("/api/screener/config");
 export const queryScreener = (criteria:Criteria,sort:Sort) => api<Result>("/api/screener/query",{criteria,sort:{field:sort.field,direction:sort.direction}});

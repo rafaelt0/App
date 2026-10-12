@@ -21,7 +21,8 @@
 .scr-criterion > label:has(> input[type="checkbox"]) { min-height: 44px; margin: 0; }
 .scr-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .scr-criterion input[type="range"] { min-height: 44px; padding: 0; accent-color: var(--brand-primary); }
-.scr-output { display: block; margin-top: 4px; color: var(--text-primary); font-size: 14px; font-variant-numeric: tabular-nums; }
+.scr-ticker { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.scr-liquidity-readout { display: block; margin-top: 4px; color: var(--text-primary); font-size: 14px; font-variant-numeric: tabular-nums; }
 .scr-field-error { margin: 12px 0 0; color: var(--brand-danger); font-size: 13px; font-weight: 600; }
 .scr-criterion input[aria-invalid="true"] { border-color: var(--brand-danger); }
 .scr-criterion > .caption { margin: 12px 0 0; }
