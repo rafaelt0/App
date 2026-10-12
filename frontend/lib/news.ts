@@ -23,7 +23,7 @@ export interface NewsSnapshot {
   as_of: string; window_days: number; max_per_ticker: number;
   feeds: {ticker: string; ok: boolean; recent_count: number}[];
   articles: NewsArticle[];
-  model: {available: boolean; name: string; engines_used: string[]; retry_after: number | null};
+  model: {available: boolean; name: string; engines_used: string[]; jev_count: number; lexicon_count: number; retry_after: number | null};
   summary: {raw_score: number | null; score100: number | null; label: string; coverage: number;
     status: "positive" | "warning" | "negative" | "neutral";
     counts: {positive: number; neutral: number; negative: number}; observation_count: number;

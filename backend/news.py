@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Request
 from backend.serialization import StrictModel, clean_json, figure
 from backend.state import begin, publish, require_portfolio, session
 from utils.cache import cache_data
-from utils.charts import CHART_DANGER, CHART_POSITIVE, CHART_SECONDARY, apply_plotly_theme
+from utils.charts import CHART_DANGER, CHART_POSITIVE, CHART_SECONDARY, CHART_TEXT, apply_plotly_theme
 from utils.news import (
     NEWS_IMPORTANCE_LABELS, _article_url_key, aggregate_ticker_sentiment,
     analise_sentimento_pln, build_news_query, extract_article_text, has_scoring_evidence,
@@ -135,22 +135,26 @@ def summarize(articles, tickers, weights, feed_status):
                     for item in articles if has_scoring_evidence(item) for ticker in item["tickers"]]
     score, coverage = aggregate_ticker_sentiment(observations, weights)
     note = int((score + 1) / 2 * 100) if coverage > 0 else None
-    label = (("SEM DADOS RECENTES" if not articles else "EVIDÊNCIA LIMITADA") if note is None else
-             "FORTEMENTE OTIMISTA" if note >= 80 else "OTIMISTA" if note >= 60 else
-             "NEUTRO / EQUILIBRADO" if note >= 40 else "PESSIMISTA" if note >= 20 else "FORTEMENTE PESSIMISTA")
+    label = (("Sem dados recentes" if not articles else "Evidência limitada") if note is None else
+             "Fortemente otimista" if note >= 80 else "Otimista" if note >= 60 else
+             "Neutro / equilibrado" if note >= 40 else "Pessimista" if note >= 20 else "Fortemente pessimista")
     tone = ticker_tone_rows(articles, tickers, weights, feed_status)
     distribution = [{key: row[key] for key in ("ticker", "positive", "neutral", "negative")} for row in tone]
     chart = go.Figure()
-    for key, name, color in (("negative", "Pessimista", CHART_DANGER),
+    # Trace order matches the legend, the counts table and the summary cards: Otimistas, Neutras, Pessimistas.
+    for key, name, color in (("positive", "Otimista", CHART_POSITIVE),
                              ("neutral", "Neutro", CHART_SECONDARY),
-                             ("positive", "Otimista", CHART_POSITIVE)):
-        chart.add_trace(go.Bar(name=name, y=tickers, x=[row[key] for row in distribution],
-                               orientation="h", marker={"color": color}))
-    chart.update_layout(barmode="stack", title="Notícias por ativo", height=max(280, 190 + len(tickers) * 40),
-                        margin={"l": 48, "r": 12, "t": 46, "b": 118},
-                        xaxis={"dtick": 1}, legend={"orientation": "h", "y": -.27, "x": 0})
+                             ("negative", "Pessimista", CHART_DANGER)):
+        values = [row[key] for row in distribution]
+        # Segment counts are printed inside the bar; zero segments stay blank.
+        chart.add_trace(go.Bar(name=name, y=tickers, x=values, orientation="h", marker={"color": color},
+                               text=[str(value) if value else "" for value in values],
+                               textposition="inside", textfont={"color": CHART_TEXT}))
+    chart.update_layout(barmode="stack", title="Observações artigo-ativo por ativo", height=max(280, 190 + len(tickers) * 40),
+                        xaxis={"dtick": 1})
     apply_plotly_theme(chart)
-    status = "neutral" if note is None else "positive" if note >= 60 else "warning" if note >= 40 else "negative"
+    # Neutral sentiment uses the cyan neutral token; amber is kept for real warnings only.
+    status = "neutral" if note is None or 40 <= note < 60 else "positive" if note >= 60 else "negative"
     return {"raw_score": score if coverage > 0 else None, "score100": note, "label": label,
             "coverage": coverage, "status": status,
             "counts": {key: sum(item["sentiment"] == sentiment for item in articles)
@@ -190,10 +194,13 @@ def analyze_portfolio(ctx, portfolio):
                              "evidence_count": result.get("evidence_count"), "raw_text_length": result["raw_text_length"],
                              "intensity": sentiment_intensity(result["score"], None if result["is_jev"] else result["evidence_count"])})
     summary = summarize(articles, portfolio.tickers, portfolio.weights, {feed["ticker"]: feed["ok"] for feed in feeds})
+    # Jev can fail partway through a run, so the split is per article rather than a single flag.
+    jev_count = sum(article["is_jev"] for article in articles)
     return clean_json({"id": uuid.uuid4().hex, "revision": portfolio.revision, "portfolio_id": portfolio.id,
                        "tickers": portfolio.tickers, "weights": portfolio.weights, "as_of": now.isoformat(),
                        "window_days": 7, "max_per_ticker": 10, "feeds": feeds, "articles": articles, "summary": summary,
-                       "model": {"available": any(a["is_jev"] for a in articles), "name": "Jev", "engines_used": sorted({a["engine"] for a in articles}),
+                       "model": {"available": jev_count > 0, "name": "Jev", "engines_used": sorted({a["engine"] for a in articles}),
+                                 "jev_count": jev_count, "lexicon_count": len(articles) - jev_count,
                                  "retry_after": ctx.model_retry_at or None}})
 
 
