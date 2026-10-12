@@ -72,6 +72,21 @@ details[open] > summary::before { transform: translateY(-3px) rotate(45deg); }
     animation: b3-enter var(--motion-duration) var(--motion-ease-out) 80ms both;
   }
   .home-guide, .news-prereq-guide { animation-delay: 140ms; }
+  .home-sector-map, .home-tools-nav {
+    animation: b3-enter var(--motion-duration) var(--motion-ease-out) 120ms both;
+  }
+  .home-sector-map { animation-delay: 160ms; }
+  .home-tools-nav { animation-delay: 200ms; }
+  .home-sector-strip { transform-origin: left center; animation: b3-grow 640ms var(--motion-ease-out) 240ms both; }
+  .quick-start-grid > * {
+    --motion-order: 0;
+    animation: b3-fade var(--motion-duration) var(--motion-ease-out) both;
+    animation-delay: calc(var(--motion-order) * var(--motion-stagger));
+  }
+  .quick-start-grid > :nth-child(2) { --motion-order: 1; }
+  .quick-start-grid > :nth-child(3) { --motion-order: 2; }
+  .quick-start-grid > :nth-child(4) { --motion-order: 3; }
+  .quick-start-grid > :nth-child(n + 5) { --motion-order: 4; }
 
   .notice, .loading-container, .result-lead, .ticker-options, .ticker-chip,
   .analysis-section, .home-results-bar, .next-step-card, .sim-idle {
