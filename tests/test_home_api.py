@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from backend import home
 from backend.state import SessionState, replace_selection
+from utils import market_data
 
 
 @pytest.fixture
@@ -266,3 +267,26 @@ def test_empty_detail_source_reports_failure_not_zero_cards(home_api, monkeypatc
     response = client.post("/api/home/analyze", json={"tickers": ctx.selection, "revision": 0})
     assert response.status_code == 503 and "não retornou dados" in response.json()["detail"]
     assert "home" not in ctx.artifacts
+
+
+def test_universe_liquidity_maps_brazilian_values_and_nulls_missing_tickers(home_api, monkeypatch):
+    client, _, _ = home_api
+    frame = pd.DataFrame({"Liq.2meses": ["1.234.567,89", "", "0,00"]}, index=["AAA3", "BBB4", "DDD3"])
+    frame.attrs["fetched_at"] = "2026-10-12T12:00:00+00:00"
+    monkeypatch.setattr(market_data, "get_full_market_data", lambda: frame)
+    response = client.get("/api/universe/liquidity")
+    assert response.status_code == 200
+    assert response.json() == {"source": "Fundamentus · liquidez média diária em 2 meses (R$)", "fetched_at": "2026-10-12T12:00:00+00:00",
+                               "liquidity": {"AAA3": 1234567.89, "BBB4": None, "CCC3": None, "DDD3": 0.0}}
+
+
+def test_universe_liquidity_fetch_failure_is_503_not_empty_success(home_api, monkeypatch):
+    client, _, _ = home_api
+
+    def unavailable():
+        raise RuntimeError("fonte indisponível")
+
+    monkeypatch.setattr(market_data, "get_full_market_data", unavailable)
+    response = client.get("/api/universe/liquidity")
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Não foi possível carregar a liquidez da Fundamentus: fonte indisponível"

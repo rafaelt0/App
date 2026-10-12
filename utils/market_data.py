@@ -118,6 +118,14 @@ def get_full_market_data():
     return frame
 
 
+def get_liquidity_by_ticker() -> pd.Series:
+    """Return Fundamentus' two-month average daily traded volume (BRL) indexed by ticker."""
+    frame = get_full_market_data()
+    liquidity = clean_numeric_column(frame["Liq.2meses"]).astype(float)
+    liquidity.attrs["fetched_at"] = frame.attrs.get("fetched_at")
+    return liquidity
+
+
 @cache_data(ttl=86400)
 def get_sorted_tickers_by_liquidity(tickers_list):
     try:
