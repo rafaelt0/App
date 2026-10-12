@@ -45,6 +45,7 @@ B3Lab uses Next.js and React for its five-page interface and a Python 3.11 FastA
 | `filter_stocks` | `utils/screener.py` | Applies only enabled fundamental criteria |
 | `simulate_portfolio` | `utils/simulation.py` | Deterministic daily-rebalanced paths |
 | `parse_rss_items` | `utils/news.py` | Recent-news parsing and deduplication |
+| `market_strip` | `utils/market_strip.py` | BCB macro and delayed Yahoo quotes for the shell strip |
 | `useApp` | `frontend/components/AppProvider.tsx` | Shared selection, watchlist, and serialized context transitions |
 | `PageHeader`, `Metrics`, `Table` | `frontend/components/ui.tsx` | Shared presentation with explicit units and nulls |
 

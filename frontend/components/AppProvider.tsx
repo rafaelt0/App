@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { api, subscribeActivity } from "../lib/api";
 import CommandPalette, { SELECTION_FULL_MESSAGE } from "./CommandPalette";
+import MarketStrip from "./MarketStrip";
 import { Icon, Loading, Notice } from "./ui";
 
 export type Stock = { ticker: string; company: string; sector: string };
@@ -142,6 +143,7 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="workspace-tools">{session && <span className="workspace-selection" data-empty={!selection.length}>{selection.length ? `${selection.length} ${selection.length === 1 ? "ativo selecionado" : "ativos selecionados"}` : "Nenhum ativo selecionado"}</span>}<span className="workspace-market">Mercado brasileiro <span>B3</span></span></div>
         <span className="activity-line" data-active={busy} aria-hidden="true" />
       </div>
+      <MarketStrip />
       <div className="main-content">{shellError && <Notice tone="negative">{shellError}</Notice>}{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></div>
     </main>
     <CommandPalette open={palette} onClose={() => setPalette(false)} pages={navigation} stocks={stocks} watchlist={watchlist} selection={selection} onPage={openPage} onTicker={openTicker} />

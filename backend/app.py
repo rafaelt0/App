@@ -197,7 +197,7 @@ def clear_portfolio(request: Request):
         return session_payload(ctx)
 
 
-from backend import home, news, portfolio, screener, simulation
+from backend import home, market, news, portfolio, screener, simulation
 
 app.include_router(home.router)
 app.include_router(home.catalog_router)
@@ -205,3 +205,4 @@ app.include_router(screener.router)
 app.include_router(portfolio.router)
 app.include_router(simulation.router)
 app.include_router(news.router)
+app.include_router(market.router)
