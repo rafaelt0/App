@@ -1,0 +1,46 @@
+/** Line icons for the official B3 sector names. Unknown sectors get a neutral tag, never a guessed category. */
+const sectorPaths: Record<string, string> = {
+  Todos: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  "Agropecuária": "M12 21v-9M12 12C12 7 8.5 4 4 4c0 5 3 8 8 8zM12 15c0-4 3-7 8-7 0 4-3 7-8 7z",
+  "Alimentos Processados": "M7 3v18M4 3v5a3 3 0 0 0 6 0V3M18 21V3c-2.5 1-4 4-4 9h4",
+  "Automóveis e Motocicletas": "M5 17h14v-5l-2-5H7l-2 5zM3 12h18M5 17v2m14-2v2M8 14h.01M16 14h.01",
+  Bebidas: "M8 3h8l-1 9a3 3 0 0 1-6 0zM12 15v6m-4 0h8M8.5 8h7",
+  "Computadores e Equipamentos": "M3 4h18v12H3zM8 20h8M12 16v4",
+  "Comércio": "M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2",
+  "Comércio e Distribuição": "M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10",
+  "Construção Civil": "M4 21V5l8-2v18M12 8h8v13M3 21h18M7 8h2m-2 4h2m-2 4h2m6-4h2m-2 4h2",
+  "Construção e Engenharia": "M3 18h18v3H3zM5 18a7 7 0 0 1 14 0M10 11V8h4v3",
+  Diversos: "M7.5 4a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zM13 4h7v7h-7zM7.5 13l4 7h-8zM16.5 13l3.5 3.5-3.5 3.5-3.5-3.5z",
+  Equipamentos: "M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9 7 7m10 10 2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1",
+  "Exploração de Imóveis": "M3 11l9-8 9 8M5 9v12h14V9M10 21v-6h4v6",
+  "Gás": "M12 3c1 4 6 6 6 11a6 6 0 0 1-12 0c0-3 2-5 3-6 0 2 1 3 2 3 0-3-1-5 1-8z",
+  "Holdings Diversificadas": "M3 7h18v13H3zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18",
+  "Hoteis e Restaurantes": "M3 20V6m0 8h18v6M21 14v-2a3 3 0 0 0-3-3h-7v5M5.5 11.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0",
+  "Intermediários Financeiros": "M12 3l9 5H3zM5 10v8m4.7-8v8m4.6-8v8M19 10v8M3 21h18",
+  "Madeira e Papel": "M12 21v-5M12 3l6 9h-3l4 4H5l4-4H6z",
+  "Materiais Diversos": "M12 3l9 5-9 5-9-5zM3 13l9 5 9-5",
+  "Material de Transporte": "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z",
+  "Medicamentos e Outros Produtos": "M4.5 12.5l8-8a4.95 4.95 0 0 1 7 7l-8 8a4.95 4.95 0 0 1-7-7zM8.5 8.5l7 7",
+  "Mineração": "M6 3h12l4 6-10 12L2 9zM2 9h20M12 21 8 9l4-6 4 6z",
+  "Máquinas e Equipamentos": "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z",
+  "Petróleo, Gás e Biocombustíveis": "M3 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16M2 21h13M6 8h5M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3",
+  "Previdência e Seguros": "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4",
+  "Produtos de Uso Pessoal e de Limpeza": "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z",
+  "Programas e Serviços": "M8 8l-4 4 4 4m8-8 4 4-4 4M14 5l-4 14",
+  "Químicos": "M9 3h6M10 3v6L4 19a1.5 1.5 0 0 0 1.3 2h13.4a1.5 1.5 0 0 0 1.3-2L14 9V3M7 15h10",
+  "Serv.Méd.Hospit. Análises e Diagnósticos": "M3 12h4l2-5 4 10 2-5h6",
+  "Serviços Diversos": "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.1a4 4 0 0 1 0 7.8M22 21v-1a6 6 0 0 0-4-5.6",
+  "Serviços Financeiros Diversos": "M2 6h20v12H2zM2 10h20M6 15h4",
+  "Siderurgia e Metalurgia": "M3 21V10l6 4v-4l6 4V5h6v16zM3 21h18",
+  "Tecidos, Vestuário e Calçados": "M8 3 3 6l2 5 3-1v11h8V10l3 1 2-5-5-3c0 2-2 3-4 3S8 5 8 3z",
+  "Telecomunicações": "M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M12 12h.01",
+  Transporte: "M2 6h12v10H2zM14 10h4l3 3v3h-7M4 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0M15 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0",
+  "Utilidades Domésticas": "M4 11V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3M2 13a2 2 0 0 1 4 0v2h12v-2a2 2 0 0 1 4 0v5H2zM4 18v2m16-2v2",
+  "Viagens e Lazer": "M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM16 8l-2 6-6 2 2-6z",
+  "Água e Saneamento": "M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z",
+};
+const fallback = "M3 12V4h8l10 10-8 8zM7.5 7.5h.01";
+
+export default function SectorIcon({ sector }: { sector: string }) {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d={sectorPaths[sector] ?? fallback} /></svg>;
+}

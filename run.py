@@ -5,9 +5,21 @@ import signal
 import subprocess
 import sys
 import threading
+import urllib.request
 
 
 ROOT = Path(__file__).resolve().parent
+KEEPALIVE_SECONDS = 600
+
+
+def keep_alive(url, stopping):
+    # O plano gratuito do Render suspende o serviço após 15 min sem tráfego externo.
+    while not stopping.wait(KEEPALIVE_SECONDS):
+        try:
+            with urllib.request.urlopen(url, timeout=60) as response:
+                response.read(1)
+        except Exception as error:
+            print(f"Keep-alive falhou: {error}", flush=True)
 
 
 def main():
@@ -33,6 +45,8 @@ def main():
             frontend_args += ["--hostname", host]
         processes.append(subprocess.Popen(["npm", "run", "start" if args.production else "dev", "--", *frontend_args], cwd=ROOT / "frontend", env=environment, start_new_session=True))
         print(f"B3Lab em http://localhost:{port}. API privada em 127.0.0.1:{api_port}.", flush=True)
+        if keepalive_url := os.environ.get("B3LAB_KEEPALIVE_URL"):
+            threading.Thread(target=keep_alive, args=(keepalive_url, stopping), daemon=True).start()
         while not stopping.wait(.25):
             failed = next((process for process in processes if process.poll() is not None), None)
             if failed is not None:

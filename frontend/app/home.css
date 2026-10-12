@@ -15,8 +15,9 @@
 .home-page .quick-start-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 232px), 1fr)); gap: 12px; }
 .home-page .quick-start-button { min-width: 0; min-height: 72px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-panel); box-shadow: var(--highlight); text-align: left; }
 .home-page .quick-start-button:hover:not(:disabled) { background: var(--surface-panel); border-color: var(--brand-primary); }
-.home-page .quick-start-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.home-page .quick-start-text > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.home-page .quick-start-logo { flex: none; width: 40px; height: 40px; border-radius: var(--radius-sm); }
+.home-page .quick-start-text { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.home-page .quick-start-text > span { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .home-page .quick-start-button strong { font-family: var(--font-mono); font-size: 14px; font-weight: 600; letter-spacing: .02em; transition: color var(--transition-fast); }
 .home-page .quick-start-button:hover strong { color: var(--brand-primary); }
 .home-page .quick-start-company { color: var(--text-secondary); font-size: 13px; font-weight: 500; }
@@ -77,8 +78,19 @@
 .home-page .home-selection-count { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .home-page .home-selection-summary > button { flex: 0 0 auto; }
 
-.home-page .sector-picker-options label:has(> input[type="checkbox"]) { min-height: 44px; }
-.home-page .sector-picker-options input[type="checkbox"] { width: 18px; height: 18px; }
+.home-page .sector-picker { padding: 12px 4px 4px; }
+.home-page .sector-picker legend { padding: 0 8px; color: var(--text-secondary); font-size: 13px; }
+.home-page .sector-picker-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 340px; padding: 4px 8px 8px; scrollbar-width: thin; }
+.home-page .sector-picker-options label.sector-option { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px 8px 8px; background: var(--surface-muted); }
+.home-page .sector-option input[type="checkbox"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.home-page .sector-option:has(input:focus-visible) { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
+.home-page .sector-option-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--text-secondary); }
+.home-page .sector-option:has(input:checked) .sector-option-icon { background: var(--brand-tint); color: var(--brand-primary); }
+.home-page .sector-option-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.home-page .sector-option-name { font-size: 13px; font-weight: 550; line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
+.home-page .sector-option-count { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.home-page .sector-option-check { flex: none; width: 18px; height: 18px; border: 1px solid var(--border-strong); border-radius: 5px; fill: none; stroke: transparent; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.home-page .sector-option:has(input:checked) .sector-option-check { border-color: var(--brand-primary); background: var(--brand-primary); stroke: var(--surface-app); }
 
 .home-page details.home-tools { margin: 24px 0 0; padding: 12px 0 0; border: 0; border-top: 1px solid var(--border-default); border-radius: 0; background: transparent; }
 .home-page .home-tools-grid { gap: 16px; }

@@ -59,7 +59,7 @@ O `render.yaml` cria um serviço web Docker no plano gratuito. O contêiner usa 
 
 Configure `TYPESAFE_API_KEY` como segredo no Render para classificar notícias com Jev. O contêiner não carrega modelos locais. Sem a chave ou quando a API falha, as notícias usam o fallback léxico identificado. O disco é efêmero: favoritos e seleções em SQLite se perdem a cada deploy ou reinício.
 
-O workflow `keep-render-awake.yml` acessa a URL da variável de repositório `B3LAB_URL` a cada 10 minutos para evitar a suspensão por inatividade.
+O plano gratuito suspende o serviço após 15 minutos sem tráfego. Para evitar a suspensão, o launcher acessa a própria URL pública (`RENDER_EXTERNAL_URL`) a cada 10 minutos. O workflow `keep-render-awake.yml` acessa a URL da variável de repositório `B3LAB_URL` como reserva, mas o GitHub executa agendamentos com atraso e pode passar horas sem rodar. As 750 horas mensais do plano gratuito cobrem um serviço ativo o mês inteiro.
 
 ## Configuração
 
@@ -73,6 +73,7 @@ O workflow `keep-render-awake.yml` acessa a URL da variável de repositório `B3
 | `B3LAB_DB` | `b3_data.db` na raiz | Arquivo SQLite gravável e persistente |
 | `B3LAB_ENV` | Não definido | `production` exige cookie Secure e a origem configurada |
 | `B3LAB_HOST` | `127.0.0.1` | Endereço de escuta do Next.js no launcher |
+| `B3LAB_KEEPALIVE_URL` | `RENDER_EXTERNAL_URL` no contêiner | URL acessada pelo launcher a cada 10 minutos; vazio desativa |
 
 O launcher configura `B3LAB_API_URL` a partir de `B3LAB_API_PORT` quando não há endereço explícito. Portas personalizadas devem usar uma origem correspondente; `localhost` e `127.0.0.1` são origens distintas.
 

@@ -28,5 +28,5 @@ COPY --from=frontend /app/frontend/node_modules ./frontend/node_modules
 ENV B3LAB_ENV=production \
     B3LAB_HOST=0.0.0.0
 EXPOSE 10000
-# O Render define PORT e RENDER_EXTERNAL_URL; B3LAB_ORIGIN explícito tem prioridade.
-CMD ["sh", "-c", "B3LAB_PORT=${PORT:-10000} B3LAB_ORIGIN=${B3LAB_ORIGIN:-$RENDER_EXTERNAL_URL} exec python run.py --production"]
+# O Render define PORT e RENDER_EXTERNAL_URL; B3LAB_ORIGIN e B3LAB_KEEPALIVE_URL explícitos têm prioridade.
+CMD ["sh", "-c", "B3LAB_PORT=${PORT:-10000} B3LAB_ORIGIN=${B3LAB_ORIGIN:-$RENDER_EXTERNAL_URL} B3LAB_KEEPALIVE_URL=${B3LAB_KEEPALIVE_URL-$RENDER_EXTERNAL_URL} exec python run.py --production"]
