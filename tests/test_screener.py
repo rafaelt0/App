@@ -26,7 +26,7 @@ def test_presets_include_only_stocks_meeting_their_criteria(stocks):
     assert set(filter_stocks(stocks, PRESET_FILTERS["Lucro a preço moderado"]).index) == {
         "AAA3"
     }
-    assert set(filter_stocks(stocks, PRESET_FILTERS["Dividendos sustentáveis"]).index) == {
+    assert set(filter_stocks(stocks, PRESET_FILTERS["Renda atual (12m)"]).index) == {
         "AAA3"
     }
     assert set(
@@ -94,7 +94,7 @@ def test_brazilian_presets_apply_only_their_stated_thresholds():
     )
 
     assert list(filter_stocks(frame, PRESET_FILTERS["Valor descontado"]).index) == ["VALUE"]
-    assert set(filter_stocks(frame, PRESET_FILTERS["Dividendos sustentáveis"]).index) == {
+    assert set(filter_stocks(frame, PRESET_FILTERS["Renda atual (12m)"]).index) == {
         "VALUE", "HIGH_PL", "LOW_ROE"
     }
     assert list(
