@@ -111,6 +111,7 @@
 .home-page .home-summary-card { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 14px 16px 16px; border: 1px solid var(--border-default); border-radius: var(--radius-xl); background: var(--surface-panel); box-shadow: var(--highlight); }
 .home-page .home-summary-card:hover { border-color: var(--border-hover); }
 .home-page .home-summary-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -6px -8px 2px 0; }
+.home-page .home-summary-identity { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .home-page .home-favorite-toggle { flex: 0 0 44px; width: 44px; padding: 0; border-color: transparent; background: transparent; box-shadow: none; color: var(--text-muted); }
 .home-page .home-favorite-toggle:hover:not(:disabled) { background: var(--hover-tint); border-color: transparent; color: var(--text-primary); }
 .home-page .home-favorite-toggle svg { width: 20px; height: 20px; flex-basis: 20px; }

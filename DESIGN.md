@@ -153,12 +153,13 @@ Each page uses the same shell:
   that sector's most liquid stocks. Tiles for the other four pages follow. Once
   anything is selected the standard page header returns and the search stays
   mounted in place.
-- Fundamentos puts search and quick selections before source metadata. Instructions live in a collapsed
-  disclosure after sectors and favorites. The task uses the available width. Loaded results lead with ticker
-  summary cards: sector and subsector, quote, P/L, ROE, Dividend Yield, the
-  sector synthesis, and a star favorite toggle. One tab set follows with Visão
-  geral (market data and indicators), Saúde financeira, Comparação when more
-  than one ticker is analyzed, Preço-alvo, and Síntese.
+- Fundamentos puts search and quick selections before source metadata. The task
+  uses the available width. Loaded results lead with ticker summary cards:
+  sector and subsector, quote, P/L, ROE, Dividend Yield, the sector synthesis,
+  and a star favorite toggle. One tab set follows with Visão geral (market data
+  and indicators), Saúde financeira, Comparação when more than one ticker is
+  analyzed, Preço-alvo, and Síntese. Results appear before the collapsed Setores
+  e favoritos and Como funciona disclosures.
 - Portfólio puts asset selection beside parameters on wide screens, then groups
   headline metrics with the allocation before the historical evidence.
 - Simulação puts parameters before the allocation in reading order and beside
