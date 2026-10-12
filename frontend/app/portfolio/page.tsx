@@ -284,7 +284,7 @@ export default function PortfolioPage() {
           </div>
           <h3 className="pf-sub pf-complementary-heading">Métricas complementares</h3>
           {activeResult.benchmark_available && <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, help: activeResult.metric_help[key] }))} />}
-          {!activeResult.benchmark_available && <Notice>Métricas relativas ao IBOVESPA e análises complementares ficam indisponíveis. Atualize as cotações quando o benchmark responder.</Notice>}
+          {!activeResult.benchmark_available && <Notice>Comparações e análises que dependem do IBOVESPA ficam indisponíveis; as métricas próprias do portfólio continuam disponíveis. Atualize as cotações quando o benchmark responder.</Notice>}
         </Section>
         <Section title="Pesos do Portfólio (%)">
           <WeightList weights={activeResult.weights} stocks={stocks} />

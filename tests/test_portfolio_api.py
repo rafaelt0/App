@@ -81,6 +81,20 @@ def test_partial_quotes_suppress_totals_without_losing_allocation():
     assert rows[2]["shares"] == 0 and rows[2]["effective_weight"] == 0
 
 
+def test_purchase_suggestions_cannot_spend_more_than_capital_after_weight_rounding():
+    rows, totals, missing = api.purchase_suggestion(
+        {"AAA3.SA": .50001, "BBB4.SA": .50001},
+        1_000_000.,
+        {"AAA3.SA": (1., pd.Timestamp("2025-01-02")),
+         "BBB4.SA": (1., pd.Timestamp("2025-01-02"))},
+    )
+
+    assert missing == []
+    assert sum(row["suggested_weight"] for row in rows) == pytest.approx(1.)
+    assert totals["allocated"] <= 1_000_000.
+    assert totals["cash"] >= 0
+
+
 def test_min_volatility_solves_risk_not_equal_weight(market):
     result = api.analyze(payload(market), request(market.ctx))
     weights = np.array(list(market.ctx.portfolio.weights.values()))
@@ -146,12 +160,20 @@ def test_benchmark_outage_preserves_core_and_simulation_context(market, monkeypa
     monkeypatch.setattr(api, "get_benchmark_prices", unavailable)
     result = api.analyze(payload(market), request(market.ctx))
     assert result["benchmark_available"] is False
-    assert set(result["metrics"]) == {"total_return", "volatility", "sharpe", "sortino", "max_drawdown"}
-    assert result["health"] is None and result["stress"] is None and result["regime"] is None and result["concentration"] is None
-    assert set(result["charts"]) == {"value"}
+    assert {"annual_return", "daily_var", "historical_var_95", "cvar_95"} <= set(result["metrics"])
+    assert result["health"] is None and result["stress"] is None and result["regime"] is None
+    assert result["concentration"] is not None
+    assert set(result["charts"]) == {"value", "drawdown"}
     assert require_portfolio(market.ctx, returns=True).returns.equals(market.returns)
     weights = list(market.ctx.portfolio.weights.values())
     assert result["metrics"]["total_return"] == pytest.approx(((1 + market.returns.dot(weights)).prod() - 1) * 100)
+    elapsed = (market.prices.index[-1] - market.prices.index[0]).days
+    expected_return = ((1 + market.returns.dot(weights)).prod() ** (365.25 / elapsed) - 1) * 100
+    assert result["metrics"]["annual_return"] == pytest.approx(expected_return)
+    historical = market.returns.dot(weights)
+    cutoff = historical.quantile(.05)
+    assert result["metrics"]["historical_var_95"] == pytest.approx(cutoff * 100)
+    assert result["metrics"]["cvar_95"] == pytest.approx(historical[historical <= cutoff].mean() * 100)
 
 
 def test_benchmark_alignment_changes_metric_window_not_calibration(market, monkeypatch):
@@ -164,6 +186,11 @@ def test_benchmark_alignment_changes_metric_window_not_calibration(market, monke
     assert result["comparison_sample"]["count"] == len(aligned_dates)
     assert market.ctx.portfolio.returns.equals(market.returns)
     assert result["metrics"]["total_return"] == pytest.approx(((1 + daily).prod() - 1) * 100)
+    first_close = market.prices.index[market.prices.index < aligned_dates[0]][-1]
+    elapsed = (daily.index[-1] - first_close).days
+    assert result["metrics"]["annual_return"] == pytest.approx(
+        ((1 + daily).prod() ** (365.25 / elapsed) - 1) * 100
+    )
     expected_beta = np.cov(daily, shortened.pct_change(fill_method=None).dropna())[0, 1] / shortened.pct_change(fill_method=None).dropna().var()
     assert result["metrics"]["beta"] == pytest.approx(expected_beta)
     assert result["metrics"]["annual_alpha"] == pytest.approx(((daily.mean() - .0001) - expected_beta * (shortened.pct_change(fill_method=None).dropna().mean() - .0001)) * 252 * 100)
