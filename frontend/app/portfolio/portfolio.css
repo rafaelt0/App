@@ -72,3 +72,11 @@
   .pf-setup .actions > * { flex: 1 1 100%; width: 100%; }
   .pf-actions-primary { min-width: 0; }
 }
+
+.portfolio-page .pf-summary { padding: 12px 0; margin: 0; border: 0; border-block: 1px solid var(--border-default); border-radius: 0; background: transparent; box-shadow: none; }
+.portfolio-page .pf-complementary-heading { margin-top: 24px; }
+.portfolio-page .pf-results { gap: 12px; }
+.portfolio-page .pf-kpis .mcard:first-child .mcard-value { font-size: 32px; }
+@media (max-width: 768px) {
+  .portfolio-page .pf-kpis .mcard:first-child .mcard-value { font-size: 24px; }
+}

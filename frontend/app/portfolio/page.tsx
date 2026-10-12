@@ -226,21 +226,20 @@ export default function PortfolioPage() {
   const core = [["total_return", "Retorno Total", "percent"], ["volatility", "Volatilidade Anual", "percent"], ["sharpe", "Índice Sharpe", "ratio"], ["sortino", "Índice Sortino", "ratio"], ["max_drawdown", "Queda máxima (Max Drawdown)", "percent"]] as const;
   const extra = [["annual_return", "Retorno Anualizado", "percent"], ["beta", "Beta vs IBOV", "ratio"], ["annual_alpha", "Alpha Anual", "percent"], ["daily_var", "VaR Diário 95% (paramétrico normal)", "percent"], ["historical_var_95", "VaR Histórico 95% (diário)", "percent"], ["cvar_95", "CVaR 95% (diário)", "percent"], ["information_ratio", "Information Ratio (anualizado)", "ratio"]] as const;
 
-  return <>
+  return <div className="portfolio-page">
     <PageHeader title="Otimização de portfólio" description="Monte uma carteira, compare risco e retorno e revise os pesos antes de investir." icon="portfolio" />
     {appError && <Notice tone="negative">{appError}</Notice>}
     {notice && <Notice>{notice}</Notice>}
     {error && <Notice tone="negative">{error}</Notice>}
-    <Section title="Montagem da carteira">
+    <Section title="Montagem da carteira" className="pf-task-section">
       <div className="task-panel pf-setup">
         <div className="pf-setup-grid">
           <div className="pf-group">
-            <h3 className="pf-step">1. Escolha os papéis</h3>
-            <p className="pf-hint">Selecione de 2 a 20 ações para compor a carteira.</p>
+            <div className="task-heading"><span className="task-step" aria-hidden="true">01</span><div className="task-heading-content"><h3>Escolha os papéis</h3><p>Selecione de 2 a 20 ações para compor a carteira.</p></div></div>
             <TickerPicker value={session.selection} stocks={stocks} max={20} label="Ações da carteira" onChange={changeSelection} watchlist={session.watchlist} onFavorite={toggleFavorite} />
           </div>
           <div className="pf-group">
-            <h3 className="pf-step">2. Defina os parâmetros</h3>
+            <div className="task-heading"><span className="task-step" aria-hidden="true">02</span><div className="task-heading-content"><h3>Defina os parâmetros</h3><p>Escolha o histórico, o capital e a estratégia da carteira.</p></div></div>
             <div className="controls-grid">
               <label>Período de análise<select disabled={busy} value={windowChoice} onChange={event => { const value = event.target.value; setWindowChoice(value); setInputs(previous => ({ ...previous, lookback_days: value === "custom" ? customDays : Number(value) })); }}>
                 <option value="730">2 Anos (Padrão)</option><option value="365">1 Ano</option><option value="1095">3 Anos</option><option value="1825">5 Anos</option><option value="180">6 Meses</option><option value="custom">Personalizado (Dias)</option>
@@ -277,11 +276,13 @@ export default function PortfolioPage() {
     {activeResult && <div className="pf-results">
       {activeResult.warnings.map((warning, index) => <Notice tone="warning" key={index}>{warning}</Notice>)}
       <ResultSummary result={activeResult} />
+      <div className="result-lead"><div className="section-toolbar"><div><h2>Resultados do portfólio</h2><p>Desempenho histórico e composição dos pesos calculados.</p></div></div></div>
       <div className="pf-overview">
         <Section title="Resumo de Desempenho">
-          <div className="pf-kpis">
+          <div className="pf-kpis metrics-primary">
             <Metrics items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, status: activeResult.metric_signal[key], help: `${activeResult.metric_status[key]}. ${activeResult.metric_help[key]}`, trend: key === "total_return" ? valueTrend(activeResult) : undefined }))} />
           </div>
+          <h3 className="pf-sub pf-complementary-heading">Métricas complementares</h3>
           {activeResult.benchmark_available && <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, help: activeResult.metric_help[key] }))} />}
           {!activeResult.benchmark_available && <Notice>Métricas relativas ao IBOVESPA e análises complementares ficam indisponíveis. Atualize as cotações quando o benchmark responder.</Notice>}
         </Section>
@@ -336,5 +337,5 @@ export default function PortfolioPage() {
       <p className="discreet-status">Fontes: {activeResult.source.adjusted_prices}; {activeResult.source.trade_quotes}; Selic: {activeResult.source.selic_source} ({(activeResult.source.selic_annual * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% a.a.); taxa livre de risco histórica: {activeResult.source.historical_rf}.</p>
       <div className="next-step-card"><h3>Portfólio configurado</h3><p>Projete trajetórias com Monte Carlo.</p><Link className="button-link" href="/simulacao">Abrir Simulação</Link></div>
     </div>}
-  </>;
+  </div>;
 }

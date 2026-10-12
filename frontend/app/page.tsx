@@ -142,8 +142,12 @@ export default function HomePage() {
     <div className={`home-desk${!selection.length ? " is-empty" : ""}`}>
       <section ref={panel} className="task-panel home-task" {...(mode==="collapsed" ? {"aria-label":"Seleção analisada"}:{"aria-labelledby":"home-task-title"})}>
         {mode==="collapsed" ? <SelectionSummary tickers={selection} onEdit={()=>setEditRequested(true)}/> : <>
-        <h2 id="home-task-title" className="ui-section-heading">Selecione ativos para analisar</h2>
-        <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
+        <div className="task-heading">
+          <span className="task-step" aria-hidden="true">01</span>
+          <div className="task-heading-content"><h2 id="home-task-title">Selecione ativos para analisar</h2>
+            <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
+          </div>
+        </div>
         <TickerPicker value={selection} onChange={updateSelection} stocks={ordered} max={20} label="Buscar ações" watchlist={session.watchlist} onFavorite={toggleFavorite}/>
         {!!selection.length && <>
           <div className="actions"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button></div>
@@ -155,18 +159,9 @@ export default function HomePage() {
           <h3>Ou escolha uma ação líquida</h3>
           <div className="quick-start-grid">{quickTickers.map(ticker=>{const sector=stockMap.get(ticker)?.sector;return <button className="quick-start-button" key={ticker} onClick={()=>void startQuickAnalysis(ticker)}><strong>{ticker}</strong>{sector && <span className="quick-start-sector">{sector}</span>}</button>;})}</div>
         </div>}
-        <div className="home-source" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
+        <div className="home-source context-strip" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
         </>}
       </section>
-      {!selection.length && <aside className="home-guide" aria-labelledby="home-guide-title">
-        <h2 id="home-guide-title">Como funciona</h2>
-        <ol>
-          <li><strong>Escolha</strong> Pesquise pelo ticker ou escolha um setor em “Setores e favoritos”, abaixo.</li>
-          <li><strong>Compare</strong> Compare fundamentos, rentabilidade e crescimento lado a lado; o endividamento fica na aba Saúde financeira.</li>
-          <li><strong>Aprofunde</strong> Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
-        </ol>
-        <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
-      </aside>}
     </div>
     <details className="home-tools">
       <summary>Setores e favoritos</summary>
@@ -191,6 +186,17 @@ export default function HomePage() {
             <button aria-label={`Remover ${ticker} dos favoritos`} onClick={()=>void favorite(ticker)}>Remover favorito</button>
           </div>;})}
         </div>
+      </div>
+    </details>
+    <details className="home-guide method-disclosure">
+      <summary>Como funciona</summary>
+      <div className="home-guide-content">
+        <ol>
+          <li><strong>Escolha</strong> Pesquise pelo ticker ou escolha um setor em “Setores e favoritos”, abaixo.</li>
+          <li><strong>Compare</strong> Compare fundamentos, rentabilidade e crescimento lado a lado; o endividamento fica na aba Saúde financeira.</li>
+          <li><strong>Aprofunde</strong> Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
+        </ol>
+        <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
       </div>
     </details>
     {busy && <Loading>Buscando indicadores, comparação setorial e consensos dos ativos selecionados…</Loading>}
