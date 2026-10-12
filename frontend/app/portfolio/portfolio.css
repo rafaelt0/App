@@ -30,8 +30,9 @@
 .pf-summary .caption { margin: 12px 0 0; }
 .pf-strip { display: flex; gap: 2px; height: 14px; margin: 8px 0 12px; border-radius: var(--radius-sm); overflow: hidden; }
 .pf-strip > span { min-width: 3px; flex-basis: 0; }
-[data-tone="0"] { --tone: #a8afff; } [data-tone="1"] { --tone: #565fc8; } [data-tone="2"] { --tone: #e1e3ff; }
-[data-tone="3"] { --tone: #7078e8; } [data-tone="4"] { --tone: #bec3ff; } [data-tone="5"] { --tone: #444ca3; }
+/* Adjacent segments alternate light and dark so neighbours in the weight-sorted strip stay distinguishable. */
+[data-tone="0"] { --tone: #a8afff; } [data-tone="1"] { --tone: #444ca3; } [data-tone="2"] { --tone: #e1e3ff; }
+[data-tone="3"] { --tone: #565fc8; } [data-tone="4"] { --tone: #7078e8; } [data-tone="5"] { --tone: #bec3ff; }
 .pf-strip > span, .pf-swatch { background: var(--tone, var(--surface-raised)); }
 .pf-swatch { display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 2px; vertical-align: 1px; }
 .pf-swatch[data-tone="-1"] { background: transparent; box-shadow: inset 0 0 0 1px var(--border-strong); }

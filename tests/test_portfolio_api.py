@@ -102,11 +102,11 @@ def test_hrp_preserves_library_allocation(market):
 
 def test_markowitz_l2_target_return_and_full_frontier(market):
     result = api.analyze(payload(market, strategy="markowitz", gamma=1), request(market.ctx))
-    assert result["allocation_label"] == "Retorno-alvo com L2"
+    assert result["allocation_label"] == "Retorno-alvo com regularização L2"
     frontier = result["charts"]["frontier"]["data"]
     random = next(trace for trace in frontier if trace["name"] == "Portfólios Aleatórios")
     assert len(random["x"]) == 5000
-    star = next(trace for trace in frontier if trace["name"] == "Retorno-alvo com L2")
+    star = next(trace for trace in frontier if trace["name"] == "Retorno-alvo com regularização L2")
     mu, covariance = api.estimate_markowitz_inputs(market.returns)
     weights = np.array(list(market.ctx.portfolio.weights.values()))
     assert star["y"][0] == pytest.approx(weights @ mu.values)
@@ -426,14 +426,59 @@ def test_effective_assets_keep_one_decimal(market):
     assert result["concentration"]["effective_assets"] == pytest.approx(1.9)
 
 
-@pytest.mark.parametrize(("target", "mode"), [
-    ("news", "Carteira restaurada"),
-    ("simulation", "Carteira restaurada (janela padrão de 730 dias)"),
+@pytest.mark.parametrize(("saved", "target", "mode"), [
+    ({"AAA3.SA": .8, "BBB4.SA": .2}, "news", "Carteira restaurada"),
+    ({"AAA3.SA": .8, "BBB4.SA": .2}, "simulation", "Pesos salvos (restaurados)"),
+    ({"AAA3.SA": .8}, "simulation", "Pesos salvos com complemento igual (restaurados)"),
+    ({}, "simulation", "Pesos iguais (sem otimização)"),
 ])
-def test_restored_portfolio_label_is_generic_without_saved_strategy(market, monkeypatch, target, mode):
+def test_restored_label_names_the_weight_source_not_an_optimizer(market, monkeypatch, saved, target, mode):
     market.ctx.restored = True
-    monkeypatch.setattr(api.db, "portfolio_get", lambda uid: (["AAA3", "BBB4"], {"AAA3.SA": .8, "BBB4.SA": .2}))
+    monkeypatch.setattr(api.db, "portfolio_get", lambda uid: (["AAA3", "BBB4"], saved))
     monkeypatch.setattr(api, "get_portfolio_prices", lambda tickers, start: market.prices.loc[:, list(tickers)])
     restored = api.restore_portfolio(market.ctx, target, 0)
     assert restored.result["mode"] == mode
     assert "Markowitz" not in restored.result["mode"]
+    assert "730" not in restored.result["mode"]
+
+
+def test_current_returns_only_the_session_analysis_for_the_current_selection(market):
+    assert api.current(request(market.ctx)) is None
+    result = api.analyze(payload(market, strategy="hrp", capital=5000), request(market.ctx))
+    current = api.current(request(market.ctx))
+    assert current["id"] == result["id"]
+    assert current["inputs"] == {"strategy": "hrp", "capital": 5000, "lookback_days": 730, "gamma": 1, "manual_shares": {}}
+    assert api.current(request(SessionState(uid="other", selection=["AAA3", "BBB4"]))) is None
+    replace_selection(market.ctx, ["AAA3"], 0)
+    assert api.current(request(market.ctx)) is None
+
+
+def test_trade_suggestions_export_keeps_raw_price_units_and_owner(market):
+    result = api.analyze(payload(market), request(market.ctx))
+    response = api.trades_csv(result["id"], request(market.ctx))
+    frame = pd.read_csv(__import__("io").BytesIO(response.body), encoding="utf-8-sig")
+    assert sorted(frame["Ativo"]) == ["AAA3", "BBB4"]
+    assert "Preço bruto de fechamento (R$)" in frame.columns
+    assert frame["Peso sugerido (%)"].sum() == pytest.approx(100, abs=.1)
+    assert f"portfolio_compras_{date.today()}.csv" in response.headers["content-disposition"]
+    with pytest.raises(HTTPException) as error:
+        api.trades_csv(result["id"], request(SessionState(uid="other")))
+    assert error.value.status_code == 404
+
+
+def test_metric_signal_and_help_are_owned_by_python(market):
+    result = api.analyze(payload(market), request(market.ctx))
+    assert set(result["metric_signal"]) == set(result["metric_status"])
+    for key, label in result["metric_status"].items():
+        assert result["metric_signal"][key] == api.signal_for(label)
+    assert api.signal_for("Sem dados") == "neutral"
+    assert api.signal_for("Baixa") == "positive" and api.signal_for("Alta") == "negative"
+    assert api.signal_for("Moderada") == "warning"
+    assert result["metric_help"]["sharpe"].endswith("Acima de 1,0 é excelente.")
+
+
+def test_markowitz_missing_target_return_warns_and_keeps_min_volatility(market, monkeypatch):
+    monkeypatch.setattr(api, "bound_efficient_return", lambda *args: None)
+    result = api.analyze(payload(market, strategy="markowitz", gamma=1), request(market.ctx))
+    assert result["allocation_label"] == "Mínima Volatilidade"
+    assert any("retorno-alvo" in warning for warning in result["warnings"])

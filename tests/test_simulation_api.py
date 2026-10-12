@@ -230,10 +230,13 @@ def test_owned_api_csv_numeric_units_and_stale_result_invalidation():
     assert summary.content.startswith(b"\xef\xbb\xbf")
     assert "monte_carlo_resumo_" in summary.headers["content-disposition"]
     rows = pd.read_csv(StringIO(summary.content.decode("utf-8-sig"))).set_index("Métrica")["Valor"]
-    money = float(rows["Valor final P5"].removeprefix("R$ ").replace(",", ""))
-    assert money == pytest.approx(result["stats"]["p5_terminal"], abs=.005)
-    assert float(rows["Retorno final P5"].removesuffix("%")) == pytest.approx(result["stats"]["p5_return"] * 100, abs=.05)
-    assert float(rows["Reamostragem histórica — Ganho sobre o capital inicial"].removesuffix("%")) == pytest.approx(result["comparison"][1]["gain_probability"] * 100, abs=.05)
+    assert float(rows["Valor final P5 (R$)"]) == pytest.approx(result["stats"]["p5_terminal"], abs=.005)
+    assert float(rows["Retorno final P5 (%)"]) == pytest.approx(result["stats"]["p5_return"] * 100, abs=.005)
+    assert float(rows["Reamostragem histórica — Ganho sobre o capital inicial (%)"]) == pytest.approx(result["comparison"][1]["gain_probability"] * 100, abs=.005)
+    assert float(rows["Capital inicial (R$)"]) == pytest.approx(params().initial_capital)
+    assert int(rows["Trajetórias"]) == params().simulations
+    assert int(rows["Horizonte (anos)"]) == params().years
+    assert rows["Janela de calibração"] == "Histórico do Portfólio"
     exported = client.get(f"/api/simulation/{result['id']}/percentiles.csv")
     assert exported.content.startswith(b"\xef\xbb\xbf")
     assert "monte_carlo_percentis_" in exported.headers["content-disposition"]
@@ -271,3 +274,16 @@ def test_selection_change_during_compute_cannot_publish(monkeypatch):
     response = client_for(ctx).post("/api/simulation/run", json=params().model_dump())
     assert response.status_code == 409
     assert "simulation" not in ctx.artifacts
+
+
+def test_current_simulation_is_scoped_to_portfolio_and_selection():
+    portfolio = snapshot()
+    ctx = SessionState(uid="simulation-current", selection=portfolio.tickers, portfolio=portfolio)
+    client = client_for(ctx)
+    assert client.get("/api/simulation/current").json() is None
+    result = client.post("/api/simulation/run", json=params().model_dump()).json()
+    current = client.get("/api/simulation/current").json()
+    assert current["id"] == result["id"]
+    assert current["inputs"]["simulations"] == params().simulations
+    replace_selection(ctx, ["CCC3", "BBB4"], 0)
+    assert client.get("/api/simulation/current").json() is None

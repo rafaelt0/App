@@ -18,6 +18,9 @@
 .sim-task .controls-grid label { margin: 0; }
 .sim-hint { display: block; margin: 6px 0 0; color: var(--text-muted); font-size: 13px; font-weight: 400; }
 .sim-task > .discreet-status { margin: 12px 0 0; max-width: 80ch; line-height: 1.5; }
+.sim-error { display: block; margin: 6px 0 0; color: var(--brand-danger); font-size: 13px; font-weight: 500; }
+.sim-task input[aria-invalid="true"] { border-color: var(--brand-danger); }
+.sim-window { margin: 0 0 12px; color: var(--text-secondary); font-size: 14px; }
 .sim-task .actions { margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--border-default); }
 .sim-task .actions button.primary { min-width: 200px; }
 

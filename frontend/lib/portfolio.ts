@@ -27,6 +27,9 @@ export interface PortfolioResult {
   trade_suggestions: { ticker: string; price: number | null; quote_date: string | null; shares: number | null; effective_value: number | null; suggested_value: number; suggested_weight: number; effective_weight: number | null }[];
   trade_totals: { allocated: number; cash: number; efficiency: number } | null;
   metrics: Record<string, number | null>; metric_status: Record<string, string>;
+  metric_signal: Record<string, Signal>; metric_help: Record<string, string>;
+  inputs: { strategy: Strategy; capital: number; lookback_days: number; gamma: number; manual_shares: Record<string, number> };
+  restored?: boolean;
   monthly_returns: (Record<string, number | null> & { year: number })[];
   benchmark_available: boolean;
   charts: Record<string, PlotFigure>;
@@ -34,17 +37,12 @@ export interface PortfolioResult {
   health: { score: number | null; coverage: number; label: string; diagnostics: { text: string; status: Signal }[] } | null;
   stress: StressResult | null;
   regime: { label: string; portfolio: number; benchmark: number; difference_pp: number; volatility: number; advice: string } | null;
-  concentration: { hhi: number; effective_assets: number; selected_assets: number; largest_weight: number; level: string; diagnosis: string; diagnostic_status: Signal; largest_status: string } | null;
+  concentration: { hhi: number; effective_assets: number; selected_assets: number; largest_weight: number; level: string; diagnosis: string; diagnostic_status: Signal; largest_status: string; largest_signal: Signal } | null;
   asset_drawdowns: { ticker: string; max_drawdown: number; date: string }[];
 }
 export function period(sample: Sample): string {
   const format = (value: string) => value.split("-").reverse().join("/");
   return `${format(sample.start)} a ${format(sample.end)}`;
-}
-export function metricSignal(label: string): Signal {
-  if (["Positivo", "Baixa", "Excelente", "Bom", "Controlado", "OK"].includes(label)) return "positive";
-  if (["Negativo", "Alta", "Baixo", "Severo", "Concentrado", "Alto"].includes(label)) return "negative";
-  return label === "N/D" ? "neutral" : "warning";
 }
 export function handoffTickers(raw: string, universe: Set<string>): string[] {
   return [...new Set(raw.split(",").map(value => value.trim().toUpperCase().replace(/\.SA$/, "")).filter(value => universe.has(value)))].slice(0, 20);

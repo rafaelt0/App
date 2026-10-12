@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
-import { formatValue } from "./ui";
+import { useEffect, useState, type CSSProperties } from "react";
+import { formatValue, Loading } from "./ui";
 import type { PortfolioResult } from "../lib/portfolio";
 import { period } from "../lib/portfolio";
 
@@ -23,10 +23,11 @@ export function ResultSummary({ result }: { result: PortfolioResult }) {
     ["Alocação", result.allocation_label],
     ["Ativos selecionados", String(result.sample.selected_count)],
     ["Retornos diários completos", `${result.sample.count.toLocaleString("pt-BR")} (${period(result.sample)})`],
-    ["Registro", result.saved ? "Alocação salva" : "Alocação não salva"],
+    ["Salvamento", result.saved ? "Carteira salva" : "Não foi possível salvar"],
   ];
   return <div className="pf-summary"><dl>{items.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-    {result.sample.zero_excluded && <p className="caption">Ativos com peso zero foram excluídos da amostra.</p>}</div>;
+    {result.sample.zero_excluded && <p className="caption">Ativos com peso zero foram excluídos da amostra.</p>}
+    <p className="caption">{result.saved ? "Carteira salva para esta sessão anônima; não é uma conta." : "A análise vale nesta página, mas a carteira não foi salva para esta sessão anônima."}</p></div>;
 }
 
 export function MonthlyReturns({ rows }: { rows: PortfolioResult["monthly_returns"] }) {
@@ -44,4 +45,15 @@ export function MonthlyReturns({ rows }: { rows: PortfolioResult["monthly_return
       })}</tr>)}</tbody>
     </table>
   </div>;
+}
+
+/** Loading with the run time in a hidden span, so the live region is not re-announced every second. */
+export function ElapsedLoading({ children }: { children: string }) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = window.setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return <Loading>{children} <span aria-hidden="true">Rodando há {seconds} s.</span></Loading>;
 }
