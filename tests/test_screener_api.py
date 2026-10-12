@@ -136,3 +136,63 @@ def test_source_error_and_changed_selection_do_not_publish(screener_api, monkeyp
     monkeypatch.setattr(screener, "get_full_market_data", changed)
     assert client.post("/api/screener/query", json={}).status_code == 409
     assert "screener" not in ctx.artifacts
+
+
+def fundamentus_frame():
+    frame = pd.DataFrame({
+        "Cotação": ["30,00", "15,00", "5,00"],
+        "P/L": [9.5, 12, -3], "P/VP": [1.9, 2.0, -1.2], "PSR": [0, 1.5, .4],
+        "Div.Yield": [0.0, .07, 0.0], "EV/EBIT": [0, 6, 0], "EV/EBITDA": [0, 5, 7],
+        "Mrg Ebit": [0, .2, -.1], "Mrg. Líq.": [0, .1, -.3], "ROIC": [0, .15, -.05],
+        "ROE": [.2, .18, .69], "Liq. Corr.": [0, 1.3, .8], "Liq.2meses": [5_000_000, 4_000_000, 3_000_000],
+        "Dív. Líq./Patrim.": [0, .5, 4], "Cresc. Rec.5a": [.1, .1, -.2],
+    }, index=["ITUB4", "BBSE3", "OIBR3"])
+    frame.attrs["fetched_at"] = "2025-01-01T12:00:00+00:00"
+    return frame
+
+
+BANK_ZERO_COLUMNS = ("psr", "evebit", "evebitda", "mrgebit", "mrgliq", "roic", "liqc", "divbpatr")
+
+
+def test_zero_placeholders_for_banks_are_missing_while_real_zeros_stay():
+    frame = screener.normalize_market(fundamentus_frame())
+    for column in BANK_ZERO_COLUMNS:
+        assert pd.isna(frame.loc["ITUB4", column]), column
+    assert frame.loc["ITUB4", "dy"] == 0.0  # a real zero DY is valid
+    assert frame.loc["ITUB4", "pl"] == 9.5
+    assert frame.loc["BBSE3", "evebitda"] == 5
+    assert frame.loc["BBSE3", "roic"] == .15
+
+
+def test_placeholder_missing_values_serialize_as_null_in_results():
+    result, exported = screener.screen(fundamentus_frame(), screener.Query())
+    rows = {row["ticker"]: row for row in result["rows"]}
+    assert rows["ITUB4"]["roic"] is None and rows["ITUB4"]["evebitda"] is None
+    assert rows["ITUB4"]["liqc"] is None and rows["ITUB4"]["divbpatr"] is None
+    assert rows["ITUB4"]["dy"] == 0.0
+    assert rows["BBSE3"]["evebitda"] == 5
+    assert "roic" in result["default_columns"] and "evebitda" in result["default_columns"]
+    assert pd.isna(exported.loc["ITUB4", "ROIC (%)"])
+
+
+def test_negative_equity_drops_roe_and_pvp_so_roe_filters_exclude_it():
+    frame = screener.normalize_market(fundamentus_frame())
+    assert pd.isna(frame.loc["OIBR3", "pvp"]) and pd.isna(frame.loc["OIBR3", "roe"])
+    assert frame.loc["OIBR3", "pl"] == -3  # negative P/L is a real reported value
+    assert frame.loc["BBSE3", "roe"] == .18 and frame.loc["BBSE3", "pvp"] == 2.0
+
+    result, _ = screener.screen(fundamentus_frame(), screener.Query(criteria=screener.Criteria(roe_min=.12)))
+    assert [row["ticker"] for row in result["rows"]] == ["ITUB4", "BBSE3"]
+
+    everything, _ = screener.screen(fundamentus_frame(), screener.Query())
+    oibr = next(row for row in everything["rows"] if row["ticker"] == "OIBR3")
+    assert oibr["roe"] is None and oibr["pvp"] is None
+    assert everything["metrics"]["mean_roe"] == pytest.approx(19)
+
+
+def test_dividend_preset_is_labelled_as_trailing_twelve_month_yield():
+    presets = {preset["name"]: preset for preset in screener.config()["presets"]}
+    assert "Dividendos sustentáveis" not in presets
+    preset = presets["Renda atual (12m)"]
+    assert preset["criteria"]["dy_min"] == 0.06
+    assert "12 meses" in preset["description"] and "payout" in preset["description"]

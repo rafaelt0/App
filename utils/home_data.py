@@ -1,11 +1,14 @@
 """Fundamentus sources and sector-relative fundamental calculations."""
 
 import logging
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 import fundamentus
+import numpy as np
 import pandas as pd
+from scipy.stats import trim_mean
 from utils.cache import cache_data
 
 from utils import db as _db
@@ -38,6 +41,8 @@ FUNDAMENTUS_RENAME = {
     "Mrg Ebit": "Marg_EBIT",
     "Mrg. Líq.": "Marg_Liquida",
     "Div.Yield": "Div_Yield",
+    "Liq.2meses": "Liq_2meses",
+    "Patrim. Líq": "Patrim_Liq",
 }
 
 # Múltiplos a comparar na seção de peers: (coluna interna, nome display, menor=melhor?, categoria)
@@ -54,6 +59,17 @@ MULTIPLES_CFG = [
     ("Div_Yield", "Div. Yield (%)", False, "Yield"),
 ]
 COLS_NEEDED = [c[0] for c in MULTIPLES_CFG]
+# Campos auxiliares (não são múltiplos): liquidez para escolher a classe de ação
+# representativa do emissor e patrimônio líquido para detectar patrimônio negativo.
+LIQUIDITY_COL = "Liq_2meses"
+EQUITY_COL = "Patrim_Liq"
+AUX_COLS = (LIQUIDITY_COL, EQUITY_COL)
+# Com patrimônio líquido negativo, P/VP e ROE deixam de ter significado econômico.
+NEGATIVE_EQUITY_NULLED = ("PVP", "ROE")
+# Único múltiplo em que 0 é um valor real (não pagou dividendos) e não "não aplicável".
+ZERO_IS_VALUE = {"Div_Yield"}
+# Proporção cortada em cada extremo da média aparada do setor.
+TRIM_PROPORTION = 0.1
 
 
 def build_analyst_synthesis(
@@ -245,6 +261,29 @@ def get_sector_peers():
         return pd.DataFrame()
 
 
+def _issuer_of(ticker) -> str:
+    """Issuer key shared by a company's share classes (PETR3, PETR4 -> PETR, TAEE11 -> TAEE)."""
+    root = re.sub(r"\d+$", "", str(ticker).strip().upper())
+    return root[:4]
+
+
+def _one_class_per_issuer(frame: pd.DataFrame) -> pd.DataFrame:
+    """Keep the most liquid share class of each issuer; ties keep the earlier row."""
+    if frame.empty:
+        return frame
+    if LIQUIDITY_COL in frame.columns:
+        liquidity = frame[LIQUIDITY_COL].to_numpy(dtype=float)
+        # Missing liquidity sorts after every observed class.
+        keys = np.where(np.isnan(liquidity), np.inf, -liquidity)
+    else:
+        keys = np.zeros(len(frame))
+    ordered = frame.iloc[np.lexsort((np.arange(len(frame)), keys))]
+    duplicated = (
+        pd.Series([_issuer_of(t) for t in ordered.index]).duplicated(keep="first").to_numpy()
+    )
+    return ordered.iloc[~duplicated]
+
+
 def compute_sector_ranking(peers_raw: pd.DataFrame, ticker: str, setor: str, b3_data: pd.DataFrame) -> pd.DataFrame:
     """Rank one ticker's multiples against its Fundamentus sector peers.
 
@@ -253,21 +292,43 @@ def compute_sector_ranking(peers_raw: pd.DataFrame, ticker: str, setor: str, b3_
     (columns Ticker/Setor), used to restrict peers to the same sector.
 
     Returns one row per available multiple in MULTIPLES_CFG: Múltiplo, Valor,
-    Mediana Setor, Média Setor, Peers (n), Percentil, Veredicto. Percentil is
-    the share of sector peers this ticker outperforms on that multiple
-    (100 = best in sector). Empty DataFrame if the ticker has no usable data.
+    Mediana Setor, Média Setor, Peers (n), Percentil, Veredicto.
+
+    - Percentil is the share of sector peers this ticker outperforms on that
+      multiple, with ties counted as half (midrank). The ticker's own issuer is
+      excluded from the peers, so the best peer-relative value is 100.
+    - Peers (n) counts the ticker plus its comparable peers (one share class per
+      issuer, the most liquid one).
+    - Mediana Setor and Média Setor (10% trimmed mean) describe the same sector
+      observations, including the ticker.
+
+    Empty DataFrame if the ticker has no usable data.
     """
     cols_available = [c for c in COLS_NEEDED if c in peers_raw.columns]
-    peers_df = peers_raw[cols_available].copy()
-    for col in cols_available:
+    aux_available = [c for c in AUX_COLS if c in peers_raw.columns]
+    peers_df = peers_raw[cols_available + aux_available].copy()
+    for col in cols_available + aux_available:
         peers_df[col] = clean_numeric_column(peers_df[col])
 
-    # Fundamentus usa 0 para indicar "não aplicável" em muitos múltiplos;
-    # remove também outliers absurdos nos múltiplos onde menor = melhor.
+    # Patrimônio líquido negativo (P/VP < 0 ou Patrim. Líq. <= 0) torna P/VP e
+    # ROE sem sentido; a linha sai dessas distribuições, ticker e peers incluídos.
+    negative_equity = np.zeros(len(peers_df), dtype=bool)
+    if "PVP" in peers_df.columns:
+        negative_equity |= (peers_df["PVP"] < 0).to_numpy()
+    if EQUITY_COL in peers_df.columns:
+        negative_equity |= (peers_df[EQUITY_COL] <= 0).to_numpy()
+    for mult in NEGATIVE_EQUITY_NULLED:
+        if mult in peers_df.columns:
+            peers_df.loc[negative_equity, mult] = pd.NA
+
+    # Fundamentus usa 0 para indicar "não aplicável" na maioria dos múltiplos;
+    # Div. Yield = 0 é um pagador nulo real e permanece na distribuição.
+    # Remove também outliers absurdos nos múltiplos onde menor = melhor.
     for mult, _name, lower_better, _categoria in MULTIPLES_CFG:
         if mult not in peers_df.columns:
             continue
-        peers_df.loc[peers_df[mult] == 0, mult] = pd.NA
+        if mult not in ZERO_IS_VALUE:
+            peers_df.loc[peers_df[mult] == 0, mult] = pd.NA
         if lower_better:
             peers_df.loc[
                 (peers_df[mult].notna())
@@ -275,7 +336,8 @@ def compute_sector_ranking(peers_raw: pd.DataFrame, ticker: str, setor: str, b3_
                 mult,
             ] = pd.NA
 
-    peers_df = peers_df.dropna(how="all")
+    has_value = peers_df[cols_available].notna().any(axis=1).to_numpy()
+    peers_df = peers_df[has_value]
     if ticker not in peers_df.index:
         return pd.DataFrame()
 
@@ -283,23 +345,37 @@ def compute_sector_ranking(peers_raw: pd.DataFrame, ticker: str, setor: str, b3_
     if ticker not in tickers_do_setor:
         tickers_do_setor.append(ticker)
 
+    ticker_issuer = _issuer_of(ticker)
+    other_issuer = np.array(
+        [_issuer_of(t) != ticker_issuer for t in peers_df.index], dtype=bool
+    )
+    other_peers = peers_df[other_issuer]
+
     rows = []
     for mult, name, lower_better, categoria in MULTIPLES_CFG:
         if mult not in peers_df.columns or pd.isna(peers_df.loc[ticker, mult]):
             continue
-        val = peers_df.loc[ticker, mult]
-        col_data = peers_df[mult].dropna()
+        val = float(peers_df.loc[ticker, mult])
+        # One share class per issuer, chosen among the classes reporting this multiple.
+        with_multiple = other_peers[other_peers[mult].notna().to_numpy()]
+        peer_values = _one_class_per_issuer(with_multiple)[mult]
 
-        col_data_sector = col_data[col_data.index.isin(tickers_do_setor)]
-        if col_data_sector.empty:
-            col_data_sector = col_data
+        sector_values = peer_values[peer_values.index.isin(tickers_do_setor)]
+        if sector_values.empty:
+            sector_values = peer_values
 
-        n_peers = len(col_data_sector)
-        pct = (
-            (col_data_sector > val).sum() / n_peers * 100
-            if lower_better
-            else (col_data_sector < val).sum() / n_peers * 100
-        )
+        n_peers = len(sector_values)
+        if n_peers == 0:
+            # Sem peers comparáveis não há percentil; a linha não é emitida.
+            continue
+        if lower_better:
+            beaten = (sector_values > val).sum()
+        else:
+            beaten = (sector_values < val).sum()
+        ties = (sector_values == val).sum()
+        pct = (beaten + 0.5 * ties) / n_peers * 100
+
+        observed = np.append(sector_values.to_numpy(dtype=float), val)
 
         if pct >= 70:
             veredicto = "Favorável"
@@ -313,10 +389,10 @@ def compute_sector_ranking(peers_raw: pd.DataFrame, ticker: str, setor: str, b3_
                 "Categoria": categoria,
                 "Múltiplo": name,
                 "Valor": round(val, 2),
-                "Mediana Setor": round(col_data_sector.median(), 2),
-                "Média Setor": round(col_data_sector.mean(), 2),
-                "Peers (n)": n_peers,
-                "Percentil": round(pct, 1),
+                "Mediana Setor": round(float(np.median(observed)), 2),
+                "Média Setor": round(float(trim_mean(observed, TRIM_PROPORTION)), 2),
+                "Peers (n)": n_peers + 1,
+                "Percentil": round(float(pct), 1),
                 "Veredicto": veredicto,
             }
         )

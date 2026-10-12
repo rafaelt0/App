@@ -17,7 +17,7 @@ from utils.charts import (
     CHART_PRIMARY_LIGHT, CHART_PRIMARY_TRACE, CHART_TEXT,
     apply_plotly_theme,
 )
-from utils.portfolio_data import get_portfolio_prices
+from utils.portfolio_data import daily_returns, get_portfolio_prices
 from utils.simulation import annualized_log_return_stats, bootstrap_terminal_values, simulate_portfolio
 
 router = APIRouter(prefix="/api/simulation", tags=["simulation"])
@@ -72,7 +72,8 @@ def calibration_sample(portfolio, calibration, today):
         if isinstance(prices.columns, pd.MultiIndex):
             prices = prices.copy()
             prices.columns = ["_".join(map(str, column)).strip() for column in prices.columns]
-        returns = prices.pct_change(fill_method=None)
+        # Only positive-weight columns shape the sample, so a zero-weight ticker's gaps cannot shorten it.
+        returns = daily_returns(prices.loc[:, [column for column in columns if column in prices.columns]])
     missing = [column.removesuffix(".SA") for column in columns if column not in returns.columns]
     if missing:
         _invalid(f"Não há retornos disponíveis para todos os ativos com peso positivo: {', '.join(missing)}.")

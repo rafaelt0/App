@@ -7,6 +7,7 @@ import time
 
 import numpy as np
 import pandas as pd
+import requests
 from utils.cache import cache_data
 import yfinance as yf
 from bcb import sgs
@@ -15,6 +16,10 @@ from pypfopt import expected_returns, risk_models
 logger = logging.getLogger(__name__)
 _YF_DOWNLOAD_ATTEMPTS = 3
 _YF_DOWNLOAD_TIMEOUT_SECONDS = 15
+_BCB_CDI_DAILY_SERIES = 12
+_BCB_TIMEOUT_SECONDS = 15
+# The BCB daily SGS endpoint rejects long date ranges, so CDI is requested in chunks.
+_BCB_MAX_WINDOW_DAYS = 1825
 
 
 def _download_close(tickers_yf, start_date, auto_adjust=True):
@@ -121,6 +126,61 @@ def get_selic_rate():
     return daily_val
 
 
+def _fetch_bcb_series(url):
+    response = requests.get(url, timeout=_BCB_TIMEOUT_SECONDS)
+    response.raise_for_status()
+    return response.json()
+
+
+@cache_data(ttl=3600)
+def get_cdi_daily_rates(start_date):
+    """Return daily CDI as fractions per day, indexed by date, from before start_date."""
+    # Margin so forward-filling can supply a rate for the first trading day.
+    first = pd.Timestamp(start_date) - pd.Timedelta(days=10)
+    last = pd.Timestamp(datetime.date.today())
+    rows = []
+    window_start = first
+    while window_start <= last:
+        window_end = min(window_start + pd.Timedelta(days=_BCB_MAX_WINDOW_DAYS - 1), last)
+        url = (
+            f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{_BCB_CDI_DAILY_SERIES}/dados"
+            f"?formato=json&dataInicial={window_start:%d/%m/%Y}&dataFinal={window_end:%d/%m/%Y}"
+        )
+        rows.extend(_fetch_bcb_series(url))
+        window_start = window_end + pd.Timedelta(days=1)
+    if not rows:
+        raise ValueError("BCB retornou série CDI vazia.")
+    dates = pd.to_datetime([row["data"] for row in rows], format="%d/%m/%Y")
+    # SGS 12 is published in percent per day.
+    values = np.array([float(row["valor"]) for row in rows], dtype=float) / 100
+    if not np.isfinite(values).all() or (values < 0).any():
+        raise ValueError("BCB retornou valores de CDI inválidos.")
+    rates = pd.Series(values, index=dates).sort_index()
+    return rates[~rates.index.duplicated(keep="last")]
+
+
+def align_daily_rates(rates, index):
+    """Forward-fill daily rates onto portfolio dates; fail if any date stays uncovered."""
+    aligned = rates.reindex(rates.index.union(index)).sort_index().ffill().reindex(index)
+    if aligned.isna().any():
+        raise ValueError("A série de CDI não cobre todas as datas da carteira.")
+    return aligned
+
+
+def drawdown_from_returns(returns):
+    """Drawdown per date for a wealth curve that starts at 1.0 before the first return."""
+    wealth = (1 + returns).cumprod()
+    peaks = wealth.cummax().clip(lower=1.0)
+    return wealth / peaks - 1
+
+
+def historical_var_cvar(returns, confidence=0.95):
+    """Empirical VaR and expected shortfall of daily returns, as fractions."""
+    var = float(returns.quantile(1 - confidence))
+    tail = returns[returns <= var]
+    return var, float(tail.mean())
+
+
 @cache_data(ttl=3600)
 def get_portfolio_prices(tickers_yf, start_date):
     return _download_close(tickers_yf, start_date)
@@ -151,6 +211,20 @@ def estimate_markowitz_inputs(returns):
     )
 
 
+def daily_returns(prices):
+    """Return simple daily returns without erasing other assets' moves over a missing price.
+
+    Interior gaps are forward-filled per series, so the move across a gap is kept on the
+    day the price reappears. Leading and trailing gaps stay missing, and only the rows
+    left incomplete by them are dropped.
+    """
+    filled = prices.ffill().where(prices.bfill().notna())
+    gaps = int((prices.isna() & filled.notna()).sum().sum())
+    if gaps:
+        logger.info("Filled %d interior missing price(s) before computing returns.", gaps)
+    return filled.pct_change(fill_method=None).dropna()
+
+
 def align_weights_to_columns(weights, columns):
     """Return weights in column order, failing when a required ticker is absent."""
     missing = [column for column in columns if column not in weights]
@@ -172,17 +246,21 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
     portfolio_prices = portfolio_prices.loc[:, active_columns]
 
     benchmark_returns = (
-        benchmark_prices.pct_change(fill_method=None).dropna()
+        daily_returns(benchmark_prices)
         if benchmark_prices is not None and not benchmark_prices.empty
         else pd.Series(dtype=float, index=pd.DatetimeIndex([]))
     )
     results = []
     for name, (start, end) in crises.items():
         start, end = pd.Timestamp(start), pd.Timestamp(end)
+        # Start from the last close before the crisis so the start day's return is included,
+        # matching the benchmark returns (which are computed from the full price series).
+        prior_closes = portfolio_prices.index[portfolio_prices.index < start]
+        window_start = prior_closes[-1] if len(prior_closes) else start
         period_prices = portfolio_prices.loc[
-            (portfolio_prices.index >= start) & (portfolio_prices.index <= end)
+            (portfolio_prices.index >= window_start) & (portfolio_prices.index <= end)
         ]
-        period_returns = period_prices.pct_change(fill_method=None).dropna()
+        period_returns = daily_returns(period_prices)
         if len(period_returns) < 5:
             continue
 

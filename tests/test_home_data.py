@@ -38,7 +38,8 @@ def test_compute_sector_ranking_favoravel_for_cheap_low_multiple():
     )
     rank = compute_sector_ranking(peers_raw, "AAA1", "Bancos", _b3_data())
     row = rank[rank["Múltiplo"] == "P/L"].iloc[0]
-    assert row["Percentil"] == 75.0
+    # AAA1 beats all three peers (10, 15, 20), so it is the best in sector.
+    assert row["Percentil"] == 100.0
     assert row["Veredicto"] == "Favorável"
     assert row["Peers (n)"] == 4
 
@@ -60,7 +61,7 @@ def test_compute_sector_ranking_higher_better_metric_inverts_direction():
     )
     rank = compute_sector_ranking(peers_raw, "DDD1", "Bancos", _b3_data())
     row = rank[rank["Múltiplo"] == "ROE (%)"].iloc[0]
-    assert row["Percentil"] == 75.0
+    assert row["Percentil"] == 100.0
     assert row["Veredicto"] == "Favorável"
 
 
@@ -112,14 +113,14 @@ def test_build_analyst_synthesis_marks_three_favorable_categories_attractive():
         for signal in synthesis["pontos_positivos"]
         if signal[0].startswith("P/L ")
     )
-    assert pl_signal[0] == "P/L 1 · P75.0 · n=4"
-    assert "percentil 75.0" in pl_signal[1]
+    assert pl_signal[0] == "P/L 1 · P100.0 · n=4"
+    assert "percentil 100.0" in pl_signal[1]
     roe_signal = next(
         signal
         for signal in synthesis["pontos_positivos"]
         if signal[0].startswith("ROE ")
     )
-    assert roe_signal[0] == "ROE 40% · P75.0 · n=4"
+    assert roe_signal[0] == "ROE 40% · P100.0 · n=4"
     assert "valor 40%" in roe_signal[1]
 
 
@@ -192,8 +193,8 @@ def test_build_analyst_synthesis_excludes_indicators_with_fewer_than_three_peers
     assert synthesis["indicadores_validos"] == 3
     assert synthesis["categorias_validas"] == 3
     assert synthesis["categorias"]["Valuation"] == {
-        "percentil": 66.7,
-        "veredicto": "Neutro",
+        "percentil": 100.0,
+        "veredicto": "Favorável",
         "indicadores_validos": 1,
     }
     assert not any(
@@ -206,8 +207,8 @@ def test_build_analyst_synthesis_excludes_indicators_with_fewer_than_three_peers
         for label, _ in group
     )
     assert any(
-        label == "P/VP 1 · P66.7 · n=3"
-        for label, _ in synthesis["alertas"]
+        label == "P/VP 1 · P100.0 · n=3"
+        for label, _ in synthesis["pontos_positivos"]
     )
 
 
@@ -222,7 +223,7 @@ def test_build_analyst_synthesis_weights_categories_equally():
 
     assert synthesis["categorias"] == {
         "Valuation": {
-            "percentil": 75.0,
+            "percentil": 100.0,
             "veredicto": "Favorável",
             "indicadores_validos": 5,
         },
@@ -232,7 +233,8 @@ def test_build_analyst_synthesis_weights_categories_equally():
             "indicadores_validos": 4,
         },
         "Yield": {
-            "percentil": 50.0,
+            # DY 2 beats 1 and 1.5 and loses to 3: (2 + 0) / 3.
+            "percentil": 66.7,
             "veredicto": "Neutro",
             "indicadores_validos": 1,
         },

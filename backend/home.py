@@ -22,15 +22,15 @@ catalog_router = APIRouter(prefix="/api", tags=["catalog"])
 EXPORT_FIELDS = ["Empresa", "Setor", "Subsetor", "Cotacao", "Min_52_sem", "Max_52_sem",
                  "Marg_Liquida", "Marg_EBIT", "ROE", "ROIC", "Div_Yield", "Cres_Rec_5a", "PL", "EV_EBITDA", "PVP"]
 INDICATORS = [
-    ("pl", "PL", "P/L", "multiple", "Valuation", "Preço/Lucro: quantas vezes o mercado paga pelo lucro anual. Menor = mais barato."),
+    ("pl", "PL", "P/L", "multiple", "Valuation", "Preço/Lucro: preço dividido pelo lucro por ação dos últimos 12 meses. Múltiplo menor pode indicar desconto, mas depende do setor e do ciclo."),
     ("pvp", "PVP", "P/VP", "multiple", "Valuation", "Preço/Valor Patrimonial: compara o preço de mercado com o valor contábil. <1 pode indicar desconto."),
-    ("ev_ebitda", "EV_EBITDA", "EV/EBITDA", "multiple", "Valuation", "Enterprise Value / EBITDA: múltiplo de valuation que considera a dívida. Menor = mais barato."),
-    ("roe", "ROE", "ROE", "percent", "Rentabilidade", "Return on Equity: lucro gerado para cada R$ de patrimônio. Acima de 15% é considerado bom."),
-    ("roic", "ROIC", "ROIC", "percent", "Rentabilidade", "Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida)."),
+    ("ev_ebitda", "EV_EBITDA", "EV/EBITDA", "multiple", "Valuation", "Enterprise Value / EBITDA dos últimos 12 meses: múltiplo que considera a dívida líquida. Menor pode indicar desconto, conforme o setor."),
+    ("roe", "ROE", "ROE", "percent", "Rentabilidade", "Return on Equity: lucro dos últimos 12 meses para cada R$ de patrimônio. Acima de 15% costuma ser considerado bom, mas o referencial varia por setor."),
+    ("roic", "ROIC", "ROIC", "percent", "Rentabilidade", "Return on Invested Capital: eficiência no uso de todo o capital (próprio + dívida) nos últimos 12 meses. Referência varia por setor."),
     ("net_margin", "Marg_Liquida", "Margem Líquida", "percent", "Rentabilidade", "Percentual da receita que vira lucro líquido. Quanto maior, mais lucrativa a empresa."),
     ("ebit_margin", "Marg_EBIT", "Margem EBIT", "percent", "Rentabilidade", "Margem operacional antes de juros e impostos. Mede a eficiência operacional."),
-    ("dy", "Div_Yield", "Dividend Yield", "percent", "Crescimento & Yield", "Dividendos pagos divididos pelo preço. Percentual de retorno em dividendos ao ano."),
-    ("growth", "Cres_Rec_5a", "Crescimento Receita (5 anos)", "percent", "Crescimento & Yield", "Taxa de crescimento anual composta da receita nos últimos 5 anos."),
+    ("dy", "Div_Yield", "Dividend Yield", "percent", "Crescimento & Yield", "Proventos pagos nos últimos 12 meses (dividendos e JCP, antes do IR) divididos pelo preço atual. Retorno bruto e passado; não garante proventos futuros."),
+    ("growth", "Cres_Rec_5a", "Crescimento Receita (5 anos)", "percent", "Crescimento & Yield", "Taxa de crescimento anual composta da receita nos últimos 5 anos. Referência varia por setor."),
 ]
 MARKET = [("price", "Cotacao"), ("low_52w", "Min_52_sem"), ("high_52w", "Max_52_sem"),
           ("volume_2m", "Vol_med_2m"), ("market_cap", "Valor_de_mercado")]
@@ -92,15 +92,21 @@ def consensus(tickers, refresh=False):
 
 
 def health(row):
-    debt = clean_json(extract_debt_metric(row, ["Dív.Brut/Patrim.", "Div_Brut_Patrim", "Div.Brut/Patrim."]))
-    liquidity = clean_json(extract_debt_metric(row, ["Liq. Corr.", "Liq_Corr", "Liq. Corr"]))
+    debt = clean_json(extract_debt_metric(row, ["Div_Liq_Patrim"]))
+    debt = debt / 100 if debt is not None else None  # Fundamentus hundredths; negative = net cash
+    liquidity = clean_json(extract_debt_metric(row, ["Liquidez_Corr"]))
+    liquidity = liquidity / 100 if liquidity is not None else None
     ev = clean_json(extract_debt_metric(row, ["EV_EBIT", "EV/EBIT"]))
     ev = ev / 100 if ev is not None else None
     metrics, diagnostics = [], []
     if debt is not None:
-        status = "negative" if debt > 3 else "warning" if debt > 1.5 else "positive"
-        metrics.append({"label": "Dívida / Patrimônio", "value": debt, "unit": "multiple", "status": status})
-        text = f"Dívida/PL de {debt:.1f}× " + ("é elevada — verifique capacidade de pagamento" if debt > 3 else "é moderada — monitorar" if debt > 1.5 else "é saudável")
+        if debt < 0:
+            status = "positive"
+            text = f"Dívida Líquida/PL de {debt:.2f}×: caixa líquido — a empresa tem mais caixa do que dívida líquida."
+        else:
+            status = "negative" if debt > 3 else "warning" if debt > 1.5 else "positive"
+            text = f"Dívida Líquida/PL de {debt:.2f}× " + ("é elevada — verifique capacidade de pagamento" if debt > 3 else "é moderada — monitorar" if debt > 1.5 else "é saudável")
+        metrics.append({"label": "Dív. Líquida/PL", "value": debt, "unit": "multiple", "status": status})
         diagnostics.append({"status": status, "text": text})
     if liquidity is not None:
         status = "negative" if liquidity < 1 else "warning" if liquidity < 1.5 else "positive"
@@ -108,26 +114,36 @@ def health(row):
         text = f"Liquidez Corrente {liquidity:.2f}× " + ("< 1 — risco de dificuldade de caixa" if liquidity < 1 else "— margem estreita" if liquidity < 1.5 else "— empresa com boa folga de caixa")
         diagnostics.append({"status": status, "text": text})
     if ev is not None:
-        metrics.append({"label": "EV / EBIT", "value": ev, "unit": "multiple", "digits": 1,
-                        "status": "negative" if ev > 20 else "warning" if ev > 12 else "positive"})
+        metric = {"label": "EV / EBIT", "value": ev, "unit": "multiple", "digits": 1,
+                  "status": "negative" if ev > 20 else "warning" if ev > 12 else "positive"}
+        if ev <= 0:
+            metric.update(status="neutral", help="EBIT negativo — múltiplo não interpretável.")
+        metrics.append(metric)
     return {"metrics": metrics, "diagnostics": diagnostics}
 
 
-def indicator_metric(key, label, unit, help_text, value, sector):
+def indicator_metric(key, label, unit, help_text, value, sector, negative_equity=False):
     metric = {"label": label, "value": value, "unit": unit, "digits": 2, "help": help_text, "status": "neutral", "classification": None}
-    shown = value if value is not None else 0  # single-card legacy presentation only
-    if key == "ev_ebitda" and abs(shown) < .01:
+    if value is None:  # missing source data stays null: no classification, no colour
+        return metric
+    if key == "ev_ebitda" and abs(value) < .01:
         context = get_ev_ebitda_context(sector)
         metric.update(value=None, classification=context[0] if context else "N/D", help=context[1] if context else "Dado não disponível para este ticker via Fundamentus.")
+    elif key in ("pvp", "roe") and negative_equity:
+        metric["classification"] = "Patrimônio líquido negativo — indicador não interpretável"
+    elif key == "pl" and value < 0:
+        metric["classification"] = "Prejuízo — múltiplo não interpretável"
+    elif key == "ev_ebitda" and value < 0:
+        metric["classification"] = "EBITDA negativo — múltiplo não interpretável"
     elif key in ("roe", "roic", "net_margin", "ebit_margin", "growth"):
         high, low = (12, 5) if key == "roic" else (10, 0) if key == "growth" else (15, 5)
         strong = "Alta" if "margin" in key else "Forte"
         weak = "Baixa" if "margin" in key else "Negativo" if key == "growth" else "Fraco"
         middle = "Média" if "margin" in key else "Moderado"
-        metric.update(classification=strong if shown > high else weak if shown < low else middle,
-                      status="positive" if shown > high else "negative" if shown < low else "neutral")
+        metric.update(classification=strong if value > high else weak if value < low else middle,
+                      status="positive" if value > high else "negative" if value < low else "neutral")
     elif key == "dy":
-        metric.update(classification="Alto" if shown > 6 else "Baixo" if shown < 2 else "Moderado", status="positive" if shown > 4 else "neutral")
+        metric.update(classification="Alto" if value > 6 else "Baixo" if value < 2 else "Moderado", status="positive" if value > 4 else "neutral")
     return metric
 
 
@@ -155,8 +171,11 @@ def build_analysis(raw, peers, tickers, universe):
             value = numeric(ind_row.get(source))
             if value is not None and unit == "multiple":
                 value /= 100
+            if key in ("net_margin", "ebit_margin") and value == 0:
+                value = None  # Fundamentus prints 0,0% for banks and insurers, where margins do not apply
             indicators[key] = value
-            metric = indicator_metric(key, label, unit, help_text, value, sector)
+            negative_equity = indicators.get("pvp") is not None and indicators["pvp"] < 0
+            metric = indicator_metric(key, label, unit, help_text, value, sector, negative_equity)
             metric_groups.setdefault(group, []).append(metric)
             indicator_available[key] = metric["value"] is not None
         local_sector = sector_lookup.get(ticker, "")

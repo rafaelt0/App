@@ -18,10 +18,11 @@ from backend.state import PortfolioSnapshot, artifact, begin, publish, session
 from utils import db
 from utils.market_data import get_listed_stocks
 from utils.portfolio_data import (
-    align_benchmark_returns, align_weights_to_columns, bound_efficient_return,
-    calculate_historical_stress, estimate_markowitz_inputs, evaluate_portfolio_health,
-    find_crisis_history_gaps, finite_or_none, get_benchmark_prices,
-    get_portfolio_prices, get_portfolio_trade_prices, get_selic_rate,
+    align_benchmark_returns, align_daily_rates, align_weights_to_columns, bound_efficient_return,
+    calculate_historical_stress, daily_returns, drawdown_from_returns, estimate_markowitz_inputs,
+    evaluate_portfolio_health, find_crisis_history_gaps, finite_or_none, get_benchmark_prices,
+    get_cdi_daily_rates, get_portfolio_prices, get_portfolio_trade_prices, get_selic_rate,
+    historical_var_cvar,
 )
 from utils.portfolio_charts import plot_efficient_frontier_and_random_portfolios
 from utils.charts import (
@@ -91,7 +92,7 @@ def history(tickers, start):
     if missing:
         raise HTTPException(422, f"Não foi possível obter cotações para: {', '.join(missing)}. Remova esses ativos ou tente novamente mais tarde.")
     prices = prices.loc[:, tickers]
-    returns = prices.pct_change(fill_method=None).dropna()
+    returns = daily_returns(prices)
     if len(returns) < 30:
         first = prices.apply(lambda column: column.first_valid_index())
         suspects = [f"{ticker.removesuffix('.SA')} (sem cotações)" for ticker in first[first.isna()].index]
@@ -154,7 +155,13 @@ def optimize(strategy, returns, manual_weights, rf, gamma, warnings):
             frontier.max_sharpe(risk_free_rate=rf)
             label = "Max Sharpe (Markowitz)"
             if gamma > 0:
-                target = bound_efficient_return(frontier.portfolio_performance(risk_free_rate=rf)[0], float(mu.min()), float(mu.max()))
+                max_return = frontier.portfolio_performance(risk_free_rate=rf)[0]
+                floor = EfficientFrontier(mu, covariance)
+                floor.min_volatility()
+                min_return = floor.portfolio_performance()[0]
+                # Level 0 targets the Max Sharpe return; level 3 targets the Min Volatility return.
+                level = min(gamma / 3, 1.0)
+                target = bound_efficient_return(min_return + (1 - level) * (max_return - min_return), min_return, max_return)
                 frontier = EfficientFrontier(mu, covariance)
                 if target is None:
                     frontier.min_volatility()
@@ -175,6 +182,15 @@ def optimize(strategy, returns, manual_weights, rf, gamma, warnings):
 
 def sample_info(returns):
     return {"count": len(returns), "start": returns.index.min().date().isoformat(), "end": returns.index.max().date().isoformat()}
+
+
+def historical_risk_free(index, start, daily_rf, warnings):
+    """Daily risk-free rates for historical metrics: CDI by date, else a flagged constant Selic."""
+    try:
+        return align_daily_rates(get_cdi_daily_rates(start), index), "BCB SGS 12 (CDI diário, alinhado por data)"
+    except Exception as exc:
+        warnings.append(f"Não foi possível buscar o CDI diário no BCB ({exc}). Sharpe, Sortino e alfa históricos usam a Selic atual constante, que não reflete a taxa de cada dia.")
+        return pd.Series(daily_rf, index=index), "Selic atual constante (CDI diário indisponível)"
 
 
 def line_chart(series, title, name, color=CHART_PRIMARY, percent=False, fill=False, reference=None):
@@ -242,9 +258,12 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     if not available:
         warnings.append("Dados do IBOVESPA indisponíveis no momento; métricas relativas e análises complementares ficam indisponíveis. O portfólio permanece válido para simulação.")
     rf = (1 + daily_rf) ** 252 - 1
+    historical_rf, historical_rf_source = historical_risk_free(daily.index, start, daily_rf, warnings)
+    excess = daily - historical_rf
     cumulative = (1 + daily).cumprod()
     value = cumulative * payload.capital
-    metrics = {"total_return": finite_or_none((value.iloc[-1] / payload.capital - 1) * 100), "volatility": finite_or_none(daily.std() * np.sqrt(252) * 100), "sharpe": finite_or_none(qs.stats.sharpe(daily, rf=rf)), "sortino": finite_or_none(qs.stats.sortino(daily, rf=rf)), "max_drawdown": finite_or_none(qs.stats.max_drawdown(daily) * 100)}
+    drawdown = drawdown_from_returns(daily)
+    metrics = {"total_return": finite_or_none((value.iloc[-1] / payload.capital - 1) * 100), "volatility": finite_or_none(daily.std() * np.sqrt(252) * 100), "sharpe": finite_or_none(qs.stats.sharpe(excess)), "sortino": finite_or_none(qs.stats.sortino(excess)), "max_drawdown": finite_or_none(drawdown.min() * 100)}
     metric_status = {
         "total_return": "N/D" if metrics["total_return"] is None else "Positivo" if metrics["total_return"] > 0 else "Negativo",
         "volatility": "N/D" if metrics["volatility"] is None else "Baixa" if metrics["volatility"] < 15 else "Alta" if metrics["volatility"] > 25 else "Moderada",
@@ -268,25 +287,27 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     purchases, totals, missing = purchase_suggestion(weights, payload.capital, quotes, quote_failed)
     if quote_failed or missing:
         warnings.append("Fechamento bruto indisponível para " + ", ".join(missing or [t.removesuffix('.SA') for t, w in weights.items() if w > 0]) + "; cotas e totais aparecem como N/D.")
-    result = {"strategy": payload.strategy, "mode": MODES[payload.strategy], "allocation_label": label, "capital": payload.capital, "lookback_days": payload.lookback_days, "tickers": payload.tickers, "weights": [{"ticker": ticker.removesuffix('.SA'), "weight": weight} for ticker, weight in weights.items()], "sample": {**sample_info(returns), "selected_count": len(payload.tickers), "zero_excluded": payload.strategy == "manual" and len(returns.columns) < len(payload.tickers)}, "comparison_sample": sample_info(daily) if available else None, "source": {"adjusted_prices": "Yahoo Finance Close ajustado", "trade_quotes": "Yahoo Finance Close bruto (últimos 14 dias)", "selic_source": rf_source, "selic_daily": daily_rf, "selic_annual": rf}, "trade_suggestions": purchases, "trade_totals": totals, "metrics": metrics, "metric_status": metric_status, "monthly_returns": years, "benchmark_available": available, "charts": charts, "warnings": warnings, "health": None, "stress": None, "regime": None, "concentration": None, "asset_drawdowns": []}
+    result = {"strategy": payload.strategy, "mode": MODES[payload.strategy], "allocation_label": label, "capital": payload.capital, "lookback_days": payload.lookback_days, "tickers": payload.tickers, "weights": [{"ticker": ticker.removesuffix('.SA'), "weight": weight} for ticker, weight in weights.items()], "sample": {**sample_info(returns), "selected_count": len(payload.tickers), "zero_excluded": payload.strategy == "manual" and len(returns.columns) < len(payload.tickers)}, "comparison_sample": sample_info(daily) if available else None, "source": {"adjusted_prices": "Yahoo Finance Close ajustado", "trade_quotes": "Yahoo Finance Close bruto (últimos 14 dias)", "selic_source": rf_source, "selic_daily": daily_rf, "selic_annual": rf, "historical_rf": historical_rf_source}, "trade_suggestions": purchases, "trade_totals": totals, "metrics": metrics, "metric_status": metric_status, "monthly_returns": years, "benchmark_available": available, "charts": charts, "warnings": warnings, "health": None, "stress": None, "regime": None, "concentration": None, "asset_drawdowns": []}
     if not available:
         return result
     cov = np.cov(daily.squeeze(), benchmark.squeeze())
     variance = float(cov[1, 1])
     relative_valid = np.isfinite(variance) and variance > 1e-12
     beta = finite_or_none(cov[0, 1] / variance) if relative_valid else None
-    alpha = finite_or_none((daily.mean() - daily_rf) - beta * (benchmark.mean() - daily_rf)) if beta is not None else None
+    alpha = finite_or_none(excess.mean() - beta * (benchmark - historical_rf).mean()) if beta is not None else None
     r2, ir = None, None
     if relative_valid:
         try:
             r2 = finite_or_none(qs.stats.r_squared(daily, benchmark))
-            ir = finite_or_none(qs.stats.information_ratio(daily, benchmark))
+            # qs.information_ratio is daily mean/std; annualize with the same 252-day basis as the other ratios.
+            ir = finite_or_none(qs.stats.information_ratio(daily, benchmark) * np.sqrt(252))
         except Exception:
             pass
     else:
         warnings.append("A variação do IBOVESPA é insuficiente; beta, alfa, R² e information ratio ficaram indisponíveis.")
     elapsed = (value.index[-1] - value.index[0]).days
-    metrics.update({"annual_return": finite_or_none(((value.iloc[-1] / payload.capital) ** (365.25 / elapsed) - 1) * 100) if elapsed > 0 else None, "beta": beta, "daily_alpha": alpha, "annual_alpha": finite_or_none(alpha * 252 * 100) if alpha is not None else None, "r_squared": r2, "information_ratio": ir, "daily_var": finite_or_none(qs.stats.var(daily) * 100)})
+    historical_var, expected_shortfall = historical_var_cvar(daily)
+    metrics.update({"annual_return": finite_or_none(((value.iloc[-1] / payload.capital) ** (365.25 / elapsed) - 1) * 100) if elapsed > 0 else None, "beta": beta, "daily_alpha": alpha, "annual_alpha": finite_or_none(alpha * 252 * 100) if alpha is not None else None, "r_squared": r2, "information_ratio": ir, "daily_var": finite_or_none(qs.stats.var(daily) * 100), "historical_var_95": finite_or_none(historical_var * 100), "cvar_95": finite_or_none(expected_shortfall * 100)})
     max_weight = max(weights.values()) * 100
     result["health"] = health_result(metrics, max_weight)
     active = [ticker for ticker, weight in weights.items() if weight > 0]
@@ -296,17 +317,16 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     regime, advice = ("Alta", "Manter exposição. Ativos com momentum positivo podem ser aumentados.") if recent > .03 else ("Queda", "Revise os pesos. Considere reduzir exposição ou adicionar proteção (ex: BOVA11 put).") if recent < -.03 else ("Lateral", "Consolidação. Bom momento para revisar correlações e rebalancear.")
     result["regime"] = {"label": regime, "portfolio": recent * 100, "benchmark": recent_bench * 100, "difference_pp": (recent - recent_bench) * 100, "volatility": daily.tail(21).std() * np.sqrt(252) * 100, "advice": advice}
     squares = sum(weight ** 2 for weight in weights.values())
-    hhi, effective = squares * 10000, int(1 / squares)
-    diagnosis = "Alta Concentração: Portfólio fortemente concentrado. Adicione ativos ou redistribua os pesos." if hhi > 5000 else f"Concentração Moderada: Apenas {effective} ativos efetivos de {len(weights)}." if hhi > 2500 else f"Boa Diversificação: {effective} ativos efetivos — distribuição equilibrada."
+    hhi, effective = squares * 10000, round(1 / squares, 1)
+    diagnosis = "Alta Concentração: Portfólio fortemente concentrado. Adicione ativos ou redistribua os pesos." if hhi > 5000 else f"Concentração Moderada: Apenas {effective:.1f} ativos efetivos de {len(weights)}." if hhi > 2500 else f"Boa Diversificação: {effective:.1f} ativos efetivos — distribuição equilibrada."
     result["concentration"] = {"hhi": hhi, "effective_assets": effective, "selected_assets": len(weights), "largest_weight": max_weight, "level": "Baixo" if hhi < 2500 else "Moderado" if hhi < 5000 else "Alto", "diagnosis": diagnosis, "diagnostic_status": "negative" if hhi > 5000 else "warning" if hhi > 2500 else "positive", "largest_status": "OK" if max_weight <= 35 else "Concentrado"}
-    drawdown = (cumulative - cumulative.cummax()) / cumulative.cummax()
     charts["drawdown"] = figure(line_chart(drawdown, "Evolução do Drawdown do Portfólio", "Drawdown", CHART_DANGER, percent=True, fill=True))
-    asset_cum = (1 + returns).cumprod()
-    asset_dd = (asset_cum - asset_cum.cummax()) / asset_cum.cummax()
+    asset_dd = returns.apply(drawdown_from_returns)
     result["asset_drawdowns"] = sorted([{"ticker": ticker.removesuffix('.SA'), "max_drawdown": asset_dd[ticker].min() * 100, "date": asset_dd[ticker].idxmin().date().isoformat()} for ticker in returns.columns], key=lambda row: row["max_drawdown"])
     rolling_var = benchmark.rolling(60).var()
     rolling_beta = daily.rolling(60).cov(benchmark) / rolling_var.where(rolling_var.abs() > 1e-12)
-    rolling_sharpe = ((daily.rolling(60).mean() - daily_rf) / daily.rolling(60).std()) * np.sqrt(252)
+    rolling_excess = excess.rolling(60)
+    rolling_sharpe = (rolling_excess.mean() / rolling_excess.std()) * np.sqrt(252)
     charts["rolling_beta"] = figure(line_chart(rolling_beta, "Beta Móvel (60 dias) vs IBOVESPA", "Beta Móvel", CHART_SECONDARY, reference=1))
     charts["rolling_sharpe"] = figure(line_chart(rolling_sharpe, "Índice de Sharpe Móvel Anualizado (60 dias)", "Sharpe anualizado", reference=0))
     return result
@@ -404,8 +424,10 @@ def restore_portfolio(ctx, target, revision):
     prices, returns = pd.DataFrame(), pd.DataFrame()
     if target == "simulation":
         prices, returns = history([f"{ticker}.SA" for ticker in tickers], date.today() - timedelta(days=730))
+    # The saved record stores only tickers and weights, so the original strategy and lookback are unknown.
+    mode = "Carteira restaurada (janela padrão de 730 dias)" if target == "simulation" else "Carteira restaurada"
     identifier = uuid.uuid4().hex
-    result = {"id": identifier, "portfolio_id": identifier, "revision": revision, "restored": True, "target": target, "mode": "Otimização de Markowitz (restaurada)", "weights": [{"ticker": ticker, "weight": weight} for ticker, weight in weights.items()], "sample": sample_info(returns) if not returns.empty else None, "warnings": ["Carteira salva restaurada. Confira os ativos e pesos antes de continuar."]}
+    result = {"id": identifier, "portfolio_id": identifier, "revision": revision, "restored": True, "target": target, "mode": mode, "weights": [{"ticker": ticker, "weight": weight} for ticker, weight in weights.items()], "sample": sample_info(returns) if not returns.empty else None, "warnings": ["Carteira salva restaurada. Confira os ativos e pesos antes de continuar."]}
     snapshot = PortfolioSnapshot(id=identifier, revision=revision, tickers=tickers, weights=weights, mode=result["mode"], returns=returns, prices=prices, lookback_days=730, result=result)
     publish(ctx, "portfolio", revision, generation, snapshot)
     return snapshot
@@ -422,7 +444,7 @@ def refresh(payload: RefreshRequest, request: Request):
     with ctx.lock:
         begin(ctx, "portfolio", ctx.revision)
         ctx.restored = False
-    for provider in (get_portfolio_prices, get_portfolio_trade_prices, get_benchmark_prices, get_selic_rate):
+    for provider in (get_portfolio_prices, get_portfolio_trade_prices, get_benchmark_prices, get_selic_rate, get_cdi_daily_rates):
         provider.clear()
     return {"message": "Cotações atualizadas. Clique em Carregar portfólio para recalcular a análise."}
 

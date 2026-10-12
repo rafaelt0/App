@@ -202,7 +202,18 @@ def test_fresh_calibration_sensitivity_same_endpoint_and_independent_horizon(mon
         assert row["iid_standard_error"] == pytest.approx(252 * daily_log.std(ddof=1) / np.sqrt(len(returns)))
 
 
-@pytest.mark.parametrize("changes", [{"simulations": 9}, {"simulations": 3001}, {"simulations": 10.5}, {"years": 0}, {"years": 11}, {"years": 1.5}, {"initial_capital": 99}, {"initial_capital": np.inf}, {"calibration": 4}, {"display_count": 10}])
+def test_fresh_calibration_bridges_interior_gap_of_positive_weight_asset(monkeypatch):
+    x = np.arange(60)
+    prices = pd.DataFrame({"AAA3.SA": 100 * 1.001 ** x, "BBB4.SA": 100 * np.linspace(1, .8, 60)},
+                          index=pd.bdate_range(end="2025-12-31", periods=60))
+    prices.iloc[30, 1] = np.nan
+    monkeypatch.setattr(simulation, "get_portfolio_prices", lambda *args: prices)
+    aligned, _, _ = calibration_sample(snapshot(weights={"AAA3": .5, "BBB4": .5}), 5, TODAY)
+    assert len(aligned) == 59
+    assert (1 + aligned["BBB4.SA"]).prod() - 1 == pytest.approx(-0.20)
+
+
+@pytest.mark.parametrize("changes", [{"simulations": 9},{"simulations": 3001}, {"simulations": 10.5}, {"years": 0}, {"years": 11}, {"years": 1.5}, {"initial_capital": 99}, {"initial_capital": np.inf}, {"calibration": 4}, {"display_count": 10}])
 def test_request_boundaries_and_display_not_a_randomness_input(changes):
     with pytest.raises(ValidationError):
         params(**changes)

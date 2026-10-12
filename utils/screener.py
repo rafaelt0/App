@@ -12,7 +12,7 @@ PRESET_FILTERS = {
         "roe_min": 0.12,
         "liq2m_min": 1_000_000,
     },
-    "Dividendos sustentáveis": {
+    "Renda atual (12m)": {
         "dy_min": 0.06,
         "pl_min": 0,
         "pl_min_exclusive": True,

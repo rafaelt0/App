@@ -1,11 +1,14 @@
 import datetime
 import email.utils
 
+import pytest
+
 from utils.news import (
     TICKER_TO_COMPANY,
     aggregate_ticker_sentiment,
     analise_sentimento_pln,
     build_news_query,
+    has_scoring_evidence,
     merge_shared_articles,
     parse_rss_items,
     rank_news_importance,
@@ -310,3 +313,65 @@ def test_tone_rows_distinguish_failed_and_empty_feeds_without_neutral_score():
     assert rows[0]["state"] == "Feed indisponível"
     assert rows[1]["contribution"] == 50
     assert aggregate_ticker_sentiment([{"ticker": "BBB", "score": 1}], weights) == (1, .6)
+
+
+@pytest.mark.parametrize(("headline", "sentiment", "score"), [
+    ("Lucro da Petrobras cai 30% no trimestre", "Pessimista", -1.0),
+    ("Lucro do Itaú fica abaixo do esperado", "Pessimista", -1.0),
+    ("Vale corta dividendos", "Pessimista", -1.0),
+    ("Banco do Brasil eleva provisões e lucro encolhe", "Pessimista", -1.0),
+    ("Dólar em alta pressiona custos da Embraer", "Pessimista", -1.0),
+    ("Prejuízo da Azul diminui 80%", "Otimista", 1.0),
+    ("Ação da Magalu dispara 15% após balanço", "Otimista", 1.0),
+])
+def test_lexicon_scores_headline_direction_not_topic_alone(headline, sentiment, score):
+    result = analise_sentimento_pln(headline, "")
+    assert (result["sentiment"], result["score"]) == (sentiment, score)
+
+
+@pytest.mark.parametrize(("headline", "sentiment"), [
+    ("Lucro acima das estimativas do consenso", "Otimista"),
+    ("Lucro abaixo das expectativas", "Pessimista"),
+    ("Queda da inadimplência segue no trimestre", "Otimista"),
+    ("Alta da inadimplência preocupa", "Pessimista"),
+    ("Lucro não cai no trimestre", "Otimista"),
+    ("Sem queda do lucro no trimestre", "Otimista"),
+    ("Lucro sobe e dívida cai", "Otimista"),
+    ("Lucro forte, dividendos recordes", "Otimista"),
+    ("Vendas fracas pesam sobre a ação", "Pessimista"),
+])
+def test_lexicon_pairs_topic_with_direction_and_flips_negated_direction(headline, sentiment):
+    assert analise_sentimento_pln(headline, "")["sentiment"] == sentiment
+
+
+def test_lexicon_ignores_market_moves_without_a_stock_topic():
+    result = analise_sentimento_pln("Dólar sobe e bolsa fecha em alta", "")
+
+    assert result["sentiment"] == "Neutro"
+    assert result["evidence_count"] == 0
+    assert sentiment_intensity(result["score"], result["evidence_count"]) == "Evidência limitada"
+
+
+def test_lexicon_title_and_summary_never_pair_across_the_boundary():
+    result = analise_sentimento_pln("Lucro", "cai")
+
+    assert result["pos_terms"] == ["lucro"]
+    assert result["neg_terms"] == ["cai"]
+    assert result["sentiment"] == "Neutro"
+
+
+def test_limited_evidence_items_stay_visible_but_do_not_drive_tone_rows():
+    articles = [
+        {"tickers": ["AAA"], "score": 1, "sentiment": "Otimista", "intensity": "Evidência limitada"},
+        {"tickers": ["BBB"], "score": -1, "sentiment": "Pessimista", "intensity": "Médio"},
+    ]
+    assert has_scoring_evidence(articles[0]) is False
+    assert has_scoring_evidence(articles[1]) is True
+
+    rows = ticker_tone_rows(articles, ["AAA", "BBB"], {"AAA": .5, "BBB": .5}, {"AAA": True, "BBB": True})
+
+    assert rows[0]["state"] == "Evidência limitada"
+    assert (rows[0]["count"], rows[0]["positive"], rows[0]["mean"]) == (1, 1, None)
+    assert (rows[0]["covered_share"], rows[0]["contribution"]) == (None, None)
+    assert rows[1]["covered_share"] == 1
+    assert rows[1]["contribution"] == -50

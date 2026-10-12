@@ -23,7 +23,7 @@ export interface PortfolioResult {
   weights: { ticker: string; weight: number }[];
   sample: Sample & { selected_count: number; zero_excluded: boolean };
   comparison_sample: Sample | null;
-  source: { adjusted_prices: string; trade_quotes: string; selic_source: string; selic_daily: number; selic_annual: number };
+  source: { adjusted_prices: string; trade_quotes: string; selic_source: string; selic_daily: number; selic_annual: number; historical_rf: string };
   trade_suggestions: { ticker: string; price: number | null; quote_date: string | null; shares: number | null; effective_value: number | null; suggested_value: number; suggested_weight: number; effective_weight: number | null }[];
   trade_totals: { allocated: number; cash: number; efficiency: number } | null;
   metrics: Record<string, number | null>; metric_status: Record<string, string>;

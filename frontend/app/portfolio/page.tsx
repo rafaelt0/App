@@ -184,7 +184,7 @@ export default function PortfolioPage() {
   const manualValid = inputs.strategy !== "manual" || session.selection.some(ticker => inputs.manual_shares[ticker] > 0);
   const validInputs = inputs.capital >= 100 && inputs.capital <= 1000000 && inputs.lookback_days >= 60 && inputs.lookback_days <= 5000 && inputs.gamma >= 0 && inputs.gamma <= 3 && Object.values(inputs.manual_shares).every(value => Number.isInteger(value) && value >= 0);
   const core = [["total_return", "Retorno Total", "percent"], ["volatility", "Volatilidade Anual", "percent"], ["sharpe", "Índice Sharpe", "ratio"], ["sortino", "Índice Sortino", "ratio"], ["max_drawdown", "Max Drawdown", "percent"]] as const;
-  const extra = [["annual_return", "Retorno Anualizado", "percent"], ["beta", "Beta vs IBOV", "ratio"], ["annual_alpha", "Alpha Anual", "percent"], ["daily_var", "VaR Diário (95%)", "percent"], ["information_ratio", "Information Ratio", "ratio"]] as const;
+  const extra = [["annual_return", "Retorno Anualizado", "percent"], ["beta", "Beta vs IBOV", "ratio"], ["annual_alpha", "Alpha Anual", "percent"], ["daily_var", "VaR Diário 95% (paramétrico normal)", "percent"], ["historical_var_95", "VaR Histórico 95% (diário)", "percent"], ["cvar_95", "CVaR 95% (diário)", "percent"], ["information_ratio", "Information Ratio (anualizado)", "ratio"]] as const;
 
   return <>
     <PageHeader title="Otimização de portfólio" description="Monte uma carteira, compare risco e retorno e revise os pesos antes de investir." icon="portfolio" />
@@ -290,7 +290,7 @@ export default function PortfolioPage() {
       {activeResult.charts.rolling_beta && <Section title="Beta Móvel (60 dias) vs IBOVESPA"><Chart figure={activeResult.charts.rolling_beta} /></Section>}
       {activeResult.charts.rolling_sharpe && <Section title="Índice de Sharpe Móvel Anualizado (60 dias)"><Chart figure={activeResult.charts.rolling_sharpe} /></Section>}
       </div>
-      <p className="discreet-status">Fontes: {activeResult.source.adjusted_prices}; {activeResult.source.trade_quotes}; Selic: {activeResult.source.selic_source} ({(activeResult.source.selic_annual * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% a.a.).</p>
+      <p className="discreet-status">Fontes: {activeResult.source.adjusted_prices}; {activeResult.source.trade_quotes}; Selic: {activeResult.source.selic_source} ({(activeResult.source.selic_annual * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% a.a.); taxa livre de risco histórica: {activeResult.source.historical_rf}.</p>
       <div className="next-step-card"><h3>Portfólio configurado</h3><p>Projete trajetórias com Monte Carlo.</p><Link className="button-link" href="/simulacao">Abrir Simulação</Link></div>
     </div>}
   </>;

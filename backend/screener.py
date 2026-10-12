@@ -23,11 +23,13 @@ COLUMN_MAP = {"cotacao": "Cotação (R$)", "pl": "P/L", "pvp": "P/VP", "dy": "Di
               "mrgliq": "Mrg. Líq. (%)", "liqc": "Liq. Corrente", "liq2m": "Liq. 2m (R$)",
               "divbpatr": "Dív. Líq./Patrim.", "c5y": "Cresc. Rec. 5a (%)", "patrliq": "Patrim. Líq. (R$)", "setor": "Setor"}
 PERCENT_FIELDS = {"dy", "roe", "roic", "mrgebit", "mrgliq", "c5y"}
+# Fundamentus prints 0.00 for these when a bank or insurer has no applicable value; a real 0 is not expected here.
+ZERO_MEANS_MISSING = ("psr", "evebit", "evebitda", "mrgebit", "mrgliq", "roic", "liqc", "divbpatr")
 DEFAULT_COLUMNS = ["cotacao", "pl", "pvp", "dy", "roe", "roic", "evebitda", "liq2m"]
 DESCRIPTIONS = {
     "Explorar B3": "Liquidez média em 2 meses de pelo menos R$ 1 milhão.",
     "Lucro a preço moderado": "P/L > 0 e ≤ 15, ROE ≥ 12% e liquidez ≥ R$ 1 milhão.",
-    "Dividendos sustentáveis": "DY ≥ 6%, 0 < P/L ≤ 15, ROE ≥ 10% e liquidez ≥ R$ 1 milhão. O teto de P/L e o ROE evitam yield inflado por queda de preço ou lucro fraco; DY passado não garante dividendos futuros.",
+    "Renda atual (12m)": "DY dos últimos 12 meses ≥ 6%, 0 < P/L ≤ 15, ROE ≥ 10% e liquidez ≥ R$ 1 milhão. O DY pode incluir proventos extraordinários; o filtro não verifica payout, fluxo de caixa, dívida nem histórico de dividendos. O teto de P/L e o ROE evitam yield inflado por queda de preço ou lucro fraco; DY passado não garante dividendos futuros.",
     "Valor descontado": "0 < P/L ≤ 8, ROE ≥ 12% e liquidez ≥ R$ 2 milhões. Empresas cíclicas costumam aparecer com P/L baixo no pico do ciclo; confira a sustentabilidade do lucro.",
     "Qualidade rentável": "ROE ≥ 18%, 0 < P/L ≤ 20 e liquidez ≥ R$ 2 milhões. ROE alto pode refletir alavancagem.",
     "Crescimento a preço razoável": "Receita em 5 anos ≥ 10%, ROE ≥ 15%, 0 < P/L ≤ 20 e liquidez ≥ R$ 2 milhões. Mede crescimento de receita, não de lucro.",
@@ -95,6 +97,15 @@ def normalize_market(raw):
     result = raw.rename(columns=renames).copy()
     for column in result.columns:
         result[column] = clean_numeric_column(result[column])
+    for column in ZERO_MEANS_MISSING:
+        if column in result:
+            result[column] = result[column].mask(result[column] == 0)
+    # Negative book equity makes P/VP and ROE meaningless (a loss can show as a positive ROE).
+    if "pvp" in result:
+        negative_equity = result["pvp"] < 0
+        result["pvp"] = result["pvp"].mask(negative_equity)
+        if "roe" in result:
+            result["roe"] = result["roe"].mask(negative_equity)
     result.attrs.update(raw.attrs)
     return result
 

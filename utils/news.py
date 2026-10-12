@@ -180,68 +180,150 @@ def recent_rss_sample(items, now):
     return [item for item in items if cutoff <= item["published"] <= now][:10]
 
 
-def analise_sentimento_pln(title, summary):
-    """Estimate Portuguese financial-news sentiment from a small lexicon."""
-    text = unicodedata.normalize("NFD", f"{title} {summary}".lower())
-    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
-    positive = {
-        "alta", "lucro", "lucros", "recorde", "recordes", "crescimento", "crescimentos",
-        "descoberta", "descobertas", "acordo", "acordos", "aprova", "aprovou", "aprovado",
-        "aprovados", "aprovacao", "expande", "expandiu", "expansao", "lider", "lidera", "lideranca",
-        "recuperacao", "recuperou", "forte", "fortes", "positivo", "positiva", "positivos",
-        "ganho", "ganhos", "ganhou", "compra", "compras", "dividendos", "dividendo", "jcp",
-        "eficiencia", "eficiente", "modernizacao", "parceria", "parcerias", "valorizacao",
-        "valorizou", "descarbonizacao", "melhora", "melhorou", "subiu", "subiram", "superou",
-        "superaram", "estabilizou", "estabilidade", "confortavel",
-    }
-    negative = {
-        "queda", "quedas", "prejuizo", "prejuizos", "greve", "greves", "suspende", "suspendeu",
-        "inadimplencia", "atraso", "atrasos", "pressao", "pressoes", "perda", "perdas", "reducao",
-        "rebaixado", "rebaixada", "rebaixamento", "concorrencia", "fraca", "fraco", "sofre",
-        "sofreu", "paralisacao", "divida", "dividas", "pessimista", "crise", "risco", "riscos",
-        "cair", "caiu", "recua", "recuou", "despenca", "despencam", "despencou",
-        "despencaram", "despencando", "defasagem", "alavancagem",
-    }
-    positive_phrases = (
+_NEGATIONS = {"nao", "nunca", "jamais", "sem"}
+# Clause boundaries stop a direction verb from pairing with a topic in another clause.
+_CLAUSE_BREAK = r"[.!?;:,()]+|\b(?:e|mas|porem|enquanto|com|apos|ao|quando|pois)\b"
+# Topic polarity: the subject matter itself is good or bad news ("lucro" good, "prejuizo" bad).
+_TOPIC_POLARITY = {
+    "lucro": 1, "lucros": 1, "receita": 1, "receitas": 1, "dividendo": 1, "dividendos": 1,
+    "jcp": 1, "ebitda": 1, "ganho": 1, "ganhos": 1, "faturamento": 1,
+    "prejuizo": -1, "prejuizos": -1, "divida": -1, "dividas": -1, "provisao": -1, "provisoes": -1,
+    "custo": -1, "custos": -1, "despesa": -1, "despesas": -1, "inadimplencia": -1, "multa": -1,
+    "multas": -1, "alavancagem": -1, "defasagem": -1, "risco": -1, "riscos": -1, "crise": -1,
+}
+# Direction words move a paired topic up or down; alone they describe the stock's own move.
+_DIRECTION_POLARITY = {
+    **dict.fromkeys((
+        "alta", "altas", "sobe", "subir", "subiu", "subiram", "sobem", "cresce", "crescem",
+        "cresceu", "crescimento", "crescimentos", "avanca", "avancam", "avancou", "avanco",
+        "dispara", "disparam", "disparou", "salta", "saltam", "saltou", "eleva", "elevam", "elevou",
+        "aumenta", "aumentam", "aumentou", "aumento", "aumentos", "supera", "superam", "superou",
+        "superaram", "recupera", "recuperam", "recuperou", "recuperacao", "melhora", "melhorou",
+        "valoriza", "valorizam", "valorizou", "valorizacao", "ganhou", "forte", "fortes",
+    ), 1),
+    **dict.fromkeys((
+        "cai", "caem", "caiu", "cair", "queda", "quedas", "recua", "recuam", "recuou", "despenca",
+        "despencam", "despencou", "despencaram", "despencando", "tomba", "tombam", "tombou",
+        "encolhe", "encolhem", "encolheu", "corta", "cortam", "cortou", "reduz", "reduzem", "reduziu",
+        "reducao", "reducoes", "diminui", "diminuem", "diminuiu", "perda", "perdas", "perdeu",
+        "fraco", "fraca", "fracos", "fracas",
+    ), -1),
+}
+# Terms that carry their own polarity and never pair with a topic or direction.
+_STANDALONE_POLARITY = {
+    **dict.fromkeys((
+        "acordo", "acordos", "aprova", "aprovou", "aprovado", "aprovados", "aprovacao", "expande",
+        "expandiu", "expansao", "lider", "lidera", "lideranca", "positivo", "positiva", "positivos",
+        "compra", "compras", "eficiencia", "eficiente", "modernizacao", "parceria", "parcerias",
+        "descoberta", "descobertas", "recorde", "recordes", "estabilizou", "estabilidade",
+        "confortavel", "descarbonizacao",
+    ), 1),
+    **dict.fromkeys((
+        "greve", "greves", "suspende", "suspendeu", "atraso", "atrasos", "pressao", "pressoes",
+        "pressiona", "pressionam", "pressionou", "rebaixado", "rebaixada", "rebaixamento",
+        "concorrencia", "sofre", "sofreu", "paralisacao", "pessimista",
+    ), -1),
+}
+# A news item about a currency, index, or commodity says nothing about a stock's own move.
+_MARKET_TERMS = {
+    "dolar", "euro", "cambio", "juros", "selic", "ibovespa", "ibov", "bolsa", "mercado",
+    "petroleo", "minerio", "inflacao", "indice", "indices",
+}
+_OUTCOME_PHRASES = (
+    *((phrase, 1) for phrase in (
         "reduz divida", "reduz dividas", "reduz custo", "reduz custos", "reduz inadimplencia",
         "reducao de divida", "reducao de dividas", "reducao de custos", "reducao de custo",
         "queda da inadimplencia", "queda de inadimplencia", "reduzindo divida", "reduz alavancagem",
         "reduzir divida", "reducao de alavancagem", "renegociacao de dividas",
-    )
-    negative_phrases = (
+    )),
+    *((phrase, -1) for phrase in (
         "aumento de custos", "aumento de despesas", "alta da inadimplencia", "aumento de divida",
-        "aumento de dividas", "aumento da inadimplencia",
-    )
-    negations = {"nao", "nunca", "jamais", "sem"}
+        "aumento de dividas", "aumento da inadimplencia", "recuperacao judicial",
+    )),
+)
+_EXPECTATION_NOUNS = (
+    "esperado", "esperada", "esperados", "esperadas", "estimativa", "estimativas", "consenso",
+    "previsto", "previstos", "previsao", "previsoes", "expectativa", "expectativas",
+)
+# Longest phrases first so "abaixo do esperado" is consumed before any single word.
+_PHRASES = sorted(
+    [(tuple(phrase.split()), "standalone", sign) for phrase, sign in _OUTCOME_PHRASES]
+    + [((side, prep, noun), "direction", sign)
+       for side, sign in (("abaixo", -1), ("aquem", -1), ("acima", 1))
+       for prep in ("do", "da", "de", "dos", "das")
+       for noun in _EXPECTATION_NOUNS],
+    key=lambda entry: -len(entry[0]),
+)
+
+
+def _word_entry(word):
+    if word in _TOPIC_POLARITY:
+        return "topic", _TOPIC_POLARITY[word]
+    if word in _DIRECTION_POLARITY:
+        return "direction", _DIRECTION_POLARITY[word]
+    if word in _STANDALONE_POLARITY:
+        return "standalone", _STANDALONE_POLARITY[word]
+    return None, 0
+
+
+def _negated(words, index):
+    """A negation within three words flips the term, unless another term sits between them."""
+    for previous in reversed(words[max(0, index - 3):index]):
+        if previous in _NEGATIONS:
+            return True
+        if _word_entry(previous)[0]:
+            return False
+    return False
+
+
+def _clause_units(words, market):
+    """Return (position, polarity, label) units for one clause, in text order."""
+    elements = []
+    index = 0
+    while index < len(words):
+        phrase = next((entry for entry in _PHRASES
+                       if tuple(words[index:index + len(entry[0])]) == entry[0]), None)
+        if phrase:
+            tokens, kind, sign = phrase
+            step, label = len(tokens), " ".join(tokens)
+        else:
+            step, label = 1, words[index]
+            kind, sign = _word_entry(label)
+            if kind is None:
+                index += 1
+                continue
+        elements.append((index, kind, -sign if _negated(words, index) else sign, label))
+        index += step
+
+    # Each direction pairs with its nearest unpaired topic; the pair scores topic x direction.
+    topics = [element for element in elements if element[1] == "topic"]
+    paired, units = set(), []
+    for direction in (element for element in elements if element[1] == "direction"):
+        free = [topic for topic in topics if topic[0] not in paired]
+        if free:
+            topic = min(free, key=lambda element: abs(element[0] - direction[0]))
+            paired.update((topic[0], direction[0]))
+            first, second = sorted((topic, direction))
+            units.append((first[0], topic[2] * direction[2], f"{first[3]} {second[3]}"))
+    for position, kind, polarity, label in elements:
+        if position in paired or (kind == "direction" and market):
+            continue
+        units.append((position, polarity, label))
+    return sorted(units)
+
+
+def analise_sentimento_pln(title, summary):
+    """Estimate Portuguese financial-news polarity from topics, direction words, and standalone terms."""
+    # The title and summary are separate sentences, so they never pair across the boundary.
+    text = unicodedata.normalize("NFD", f"{title}. {summary}".lower())
+    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
     matched_positive, matched_negative = [], []
     word_count = len(re.findall(r"[a-z0-9_]+", text))
-    # Sentence boundaries reset negation; phrase matches consume tokens once.
-    phrases = sorted(((p, True) for p in positive_phrases), key=lambda x: -len(x[0])) + sorted(
-        ((p, False) for p in negative_phrases), key=lambda x: -len(x[0]))
-    for sentence in re.split(r"[.!?;:]+", text):
-        words = re.findall(r"[a-z0-9_]+", sentence)
-        index = 0
-        while index < len(words):
-            match = next(((p, sign, p.split()) for p, sign in phrases
-                          if words[index:index + len(p.split())] == p.split()), None)
-            if match:
-                phrase, is_positive, tokens = match
-                step = len(tokens)
-                evidence = phrase
-            else:
-                evidence, step = words[index], 1
-                is_positive = evidence in positive
-            if match or evidence in positive or evidence in negative:
-                negated = False
-                for previous in reversed(words[max(0, index - 3):index]):
-                    if previous in negations:
-                        negated = True
-                        break
-                    if previous in positive or previous in negative:
-                        break
-                target = matched_negative if is_positive == negated else matched_positive
-                target.append(evidence)
-            index += step
+    for clause in re.split(_CLAUSE_BREAK, text):
+        words = re.findall(r"[a-z0-9_]+", clause)
+        market = any(word in _MARKET_TERMS for word in words)
+        for _, polarity, label in _clause_units(words, market):
+            (matched_positive if polarity > 0 else matched_negative).append(label)
 
     positive_count, negative_count = len(matched_positive), len(matched_negative)
     evidence_count = positive_count + negative_count
@@ -274,6 +356,15 @@ def sentiment_intensity(score, evidence_count=None):
     if intensity >= 0.1:
         return "Baixo-Médio"
     return "Baixo"
+
+
+def has_scoring_evidence(article):
+    """Lexicon items with fewer than two evidence terms stay visible but never move the aggregate.
+
+    A single term would otherwise set the 0-100 note alone, because the per-ticker mean
+    normalizes away any fractional weight given to the item.
+    """
+    return article.get("intensity") != "Evidência limitada"
 
 
 def merge_shared_articles(items):
@@ -319,21 +410,24 @@ def ticker_tone_rows(articles, tickers, weights, feed_status):
         for ticker in article["tickers"]:
             if ticker in by_ticker:
                 by_ticker[ticker].append(article)
-    covered_weight = sum(float(weights[t]) for t, items in by_ticker.items() if items)
+    scored = {ticker: [item for item in items if has_scoring_evidence(item)] for ticker, items in by_ticker.items()}
+    covered_weight = sum(float(weights[t]) for t, usable in scored.items() if usable)
     rows = []
     for ticker, items in by_ticker.items():
-        mean = sum(item["score"] for item in items) / len(items) if items else None
+        usable = scored[ticker]
+        mean = sum(item["score"] for item in usable) / len(usable) if usable else None
         rows.append({
             "ticker": ticker,
             "state": "Feed indisponível" if not feed_status.get(ticker) else
-                     "Sem notícias nos últimos 7 dias" if not items else "Com notícias",
+                     "Sem notícias nos últimos 7 dias" if not items else
+                     "Evidência limitada" if not usable else "Com notícias",
             "count": len(items),
             "positive": sum(item["sentiment"] == "Otimista" for item in items),
             "neutral": sum(item["sentiment"] == "Neutro" for item in items),
             "negative": sum(item["sentiment"] == "Pessimista" for item in items),
             "mean": mean,
-            "covered_share": float(weights[ticker]) / covered_weight if covered_weight and items else None,
-            "contribution": 50 * float(weights[ticker]) / covered_weight * mean if covered_weight and items else None,
+            "covered_share": float(weights[ticker]) / covered_weight if covered_weight and usable else None,
+            "contribution": 50 * float(weights[ticker]) / covered_weight * mean if covered_weight and usable else None,
         })
     return rows
 

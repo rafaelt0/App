@@ -4,7 +4,7 @@ The screener filters the full Fundamentus market with seven starting presets and
 
 ## Sub-features
 
-- `scr-preset` uses the `Ponto de partida` select: `Explorar B3` (default), `Lucro a preço moderado`, `Dividendos sustentáveis`, `Valor descontado`, `Qualidade rentável`, `Crescimento a preço razoável`, `Grandes e líquidas`, `Personalizado`.
+- `scr-preset` uses the `Ponto de partida` select: `Explorar B3` (default), `Lucro a preço moderado`, `Renda atual (12m)`, `Valor descontado`, `Qualidade rentável`, `Crescimento a preço razoável`, `Grandes e líquidas`, `Personalizado`.
 - `scr-criteria` toggles checkboxes `Aplicar faixa de P/L`, `Aplicar ROE mínimo`, `Aplicar crescimento da receita (5 anos)`, `Aplicar dividend yield mínimo`, `Aplicar liquidez mínima`, with their numeric inputs and the liquidity slider.
 - `scr-sort` uses the `Ordenar resultados` select.
 - `scr-columns` uses the `Colunas exibidas` checkbox chips (one checkbox per column, named by its label). It changes only the visible table, not the selection or the CSV.
@@ -27,7 +27,7 @@ Preconditions:
 - Fundamentus reachable.
 
 - **Open page.** Run `$V browser click "Screener" --role link` (or `browser open /screener` for the first page) and `$V browser wait-text "ativos correspondem aos filtros" --timeout 180`. The default line reads like `N de M ativos correspondem aos filtros · Liquidez 2m ≥ R$ 1.000.000`.
-- **Preset.** Run `$V browser select "Ponto de partida" "Dividendos sustentáveis"` and `$V browser wait-text "DY ≥ 6%"`. The summary lists the DY, P/L, ROE and liquidity criteria and the match count drops. Capture to `$EV/screener/`.
+- **Preset.** Run `$V browser select "Ponto de partida" "Renda atual (12m)"` and `$V browser wait-text "DY ≥ 6%"`. The summary lists the DY, P/L, ROE and liquidity criteria and the match count drops. Capture to `$EV/screener/`.
 - **Criterion.** Run `$V browser click "Aplicar faixa de P/L" --role checkbox`, `$V browser fill "P/L máximo" 10`, and `$V browser wait-text "P/L"`. The active-filter line gains a P/L entry. If the minimum is above the maximum, the alert `O P/L mínimo não pode ser maior que o P/L máximo.` shows.
 - **Select row.** Run `$V browser click "Selecionar PETR4"` (or `--contains --nth 0` on `Selecionar`) and `$V browser wait-text "Ação selecionada:"`. The panel shows `Ação selecionada: <T>`.
 - **Favorite.** Run `$V browser click "☆ Favoritar"` then `$V browser wait-text "★ Favoritado"`. Second view: `$V db "select ticker from watchlist"`.
