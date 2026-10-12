@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
-import { formatValue } from "./ui";
+import { useEffect, useState, type CSSProperties } from "react";
+import { formatValue, Loading } from "./ui";
 import type { PortfolioResult } from "../lib/portfolio";
 import { period } from "../lib/portfolio";
 
@@ -44,4 +44,15 @@ export function MonthlyReturns({ rows }: { rows: PortfolioResult["monthly_return
       })}</tr>)}</tbody>
     </table>
   </div>;
+}
+
+/** Loading with the run time in a hidden span, so the live region is not re-announced every second. */
+export function ElapsedLoading({ children }: { children: string }) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = window.setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return <Loading>{children} <span aria-hidden="true">Rodando há {seconds} s.</span></Loading>;
 }

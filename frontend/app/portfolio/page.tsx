@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
 import { EmptyState, ExportButton, Loading, Metrics, Notice, PageHeader, Section, Table, TickerPicker } from "../../components/ui";
-import { MonthlyReturns, ResultSummary, WeightList } from "../../components/PortfolioParts";
+import { ElapsedLoading, MonthlyReturns, ResultSummary, WeightList } from "../../components/PortfolioParts";
 import { api } from "../../lib/api";
 import { handoffTickers, metricSignal, period, strategies } from "../../lib/portfolio";
 import "./portfolio.css";
@@ -218,22 +218,22 @@ export default function PortfolioPage() {
           <div className="pf-group">
             <h3 className="pf-step">2. Defina os parâmetros</h3>
             <div className="controls-grid">
-              <label>Período de análise<select value={windowChoice} onChange={event => { const value = event.target.value; setWindowChoice(value); setInputs(previous => ({ ...previous, lookback_days: value === "custom" ? customDays : Number(value) })); }}>
+              <label>Período de análise<select disabled={busy} value={windowChoice} onChange={event => { const value = event.target.value; setWindowChoice(value); setInputs(previous => ({ ...previous, lookback_days: value === "custom" ? customDays : Number(value) })); }}>
                 <option value="730">2 Anos (Padrão)</option><option value="365">1 Ano</option><option value="1095">3 Anos</option><option value="1825">5 Anos</option><option value="180">6 Meses</option><option value="custom">Personalizado (Dias)</option>
               </select></label>
-              {windowChoice === "custom" && <label>Dias de lookback<input type="number" min={60} max={5000} step={10} value={customDays} onChange={event => { const days = Number(event.target.value); setCustomDays(days); setInputs(previous => ({ ...previous, lookback_days: days })); }} /></label>}
-              <label>Capital disponível (R$)<input type="number" min={100} max={1000000} step={100} value={inputs.capital} onChange={event => setInputs(previous => ({ ...previous, capital: Number(event.target.value) }))} /></label>
-              <label className="pf-wide">Estratégia de alocação<select value={inputs.strategy} onChange={event => setInputs(previous => ({ ...previous, strategy: event.target.value as Strategy }))}>{strategies.map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}</select></label>
+              {windowChoice === "custom" && <label>Dias de lookback<input type="number" disabled={busy} min={60} max={5000} step={10} value={customDays} onChange={event => { const days = Number(event.target.value); setCustomDays(days); setInputs(previous => ({ ...previous, lookback_days: days })); }} /></label>}
+              <label>Capital disponível (R$)<input type="number" disabled={busy} min={100} max={1000000} step={100} value={inputs.capital} onChange={event => setInputs(previous => ({ ...previous, capital: Number(event.target.value) }))} /></label>
+              <label className="pf-wide">Estratégia de alocação<select disabled={busy} value={inputs.strategy} onChange={event => setInputs(previous => ({ ...previous, strategy: event.target.value as Strategy }))}>{strategies.map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}</select></label>
             </div>
             <p className="caption">Dados a partir de {new Date(Date.now() - inputs.lookback_days * 86400000).toLocaleDateString("pt-BR")} · dias corridos.</p>
             {inputs.strategy === "manual" && <div className="pf-settings">
               <h3 className="pf-step">Cotas por ativo</h3><p className="pf-hint">Os pesos serão calculados pelo valor de mercado das cotas informadas; o capital disponível é usado só no histórico de valor do Portfólio. A Simulação tem capital inicial próprio.</p>
-              <div className="controls-grid">{session.selection.map(ticker => <label key={ticker}>Cotas de {ticker}<input type="number" min={0} step={1} value={inputs.manual_shares[ticker] ?? 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>)}</div>
+              <div className="controls-grid">{session.selection.map(ticker => <label key={ticker}>Cotas de {ticker}<input type="number" disabled={busy} min={0} step={1} value={inputs.manual_shares[ticker] ?? 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>)}</div>
             </div>}
             {inputs.strategy === "markowitz" && <div className="pf-settings">
               <h3 className="pf-step">Diversificação</h3><p className="pf-hint">Controle quanto a otimização evita concentrar o capital.</p>
-              <div className="button-row pf-presets">{[{ label: "Concentrada", gamma: 0 }, { label: "Equilibrada", gamma: 1 }, { label: "Diversificada", gamma: 2 }].map(preset => <button type="button" key={preset.label} aria-pressed={inputs.gamma === preset.gamma} className={inputs.gamma === preset.gamma ? "is-active" : undefined} onClick={() => setInputs(previous => ({ ...previous, gamma: preset.gamma }))}>{preset.label}</button>)}</div>
-              <label className="pf-gamma">Diversificação (regularização L2, de 0 a 3)<input type="number" min={0} max={3} step={.1} value={inputs.gamma} onChange={event => setInputs(previous => ({ ...previous, gamma: Number(event.target.value) }))} /></label>
+              <div className="button-row pf-presets">{[{ label: "Concentrada", gamma: 0 }, { label: "Equilibrada", gamma: 1 }, { label: "Diversificada", gamma: 2 }].map(preset => <button type="button" key={preset.label} disabled={busy} aria-pressed={inputs.gamma === preset.gamma} className={inputs.gamma === preset.gamma ? "is-active" : undefined} onClick={() => setInputs(previous => ({ ...previous, gamma: preset.gamma }))}>{preset.label}</button>)}</div>
+              <label className="pf-gamma">Diversificação (regularização L2, de 0 a 3)<input type="number" disabled={busy} min={0} max={3} step={.1} value={inputs.gamma} onChange={event => setInputs(previous => ({ ...previous, gamma: Number(event.target.value) }))} /></label>
             </div>}
           </div>
         </div>
@@ -248,7 +248,7 @@ export default function PortfolioPage() {
       </div>
     </Section>
     {count < 2 && <EmptyState icon="portfolio" title={count === 0 ? "Monte seu portfólio" : "Adicione mais um ativo"}>Selecione pelo menos duas ações para comparar risco, retorno e diversificação.</EmptyState>}
-    {busy && <Loading>Baixando cotações e calculando alocação, risco e retorno…</Loading>}
+    {busy && <ElapsedLoading>Baixando cotações e calculando alocação, risco e retorno…</ElapsedLoading>}
     {activeResult && <div className="pf-results">
       {activeResult.warnings.map((warning, index) => <Notice tone="warning" key={index}>{warning}</Notice>)}
       <ResultSummary result={activeResult} />
