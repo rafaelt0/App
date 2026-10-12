@@ -171,7 +171,6 @@ export default function HomePage() {
       </section>
       {!selection.length && <SectorMap stocks={stocks} busy={busy || sectorBusy} onSector={sector=>void changeSectors([sector])}/>}
     </div>
-    {!selection.length && <HomeTools/>}
     <details className="home-tools">
       <summary>Setores e favoritos</summary>
       <div className="home-tools-grid">
@@ -202,11 +201,12 @@ export default function HomePage() {
         </div>
       </div>
     </details>
+    {!selection.length && <HomeTools/>}
     <details className="home-guide method-disclosure">
       <summary>Como funciona</summary>
       <div className="home-guide-content">
         <ol>
-          <li><strong>Escolha</strong> Pesquise pelo ticker ou escolha um setor em “Setores e favoritos”, abaixo.</li>
+          <li><strong>Escolha</strong> Pesquise pelo ticker ou escolha um setor em “Setores e favoritos”, acima.</li>
           <li><strong>Compare</strong> Compare fundamentos, rentabilidade e crescimento lado a lado; o endividamento fica na aba Saúde financeira.</li>
           <li><strong>Aprofunde</strong> Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
         </ol>
