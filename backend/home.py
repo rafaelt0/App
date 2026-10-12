@@ -288,6 +288,16 @@ def refresh_consensus(body: HomeRequest, request: Request):
     return clean_json(result)
 
 
+@router.get("/current")
+def current_analysis(request: Request):
+    ctx = session(request)
+    with ctx.lock:
+        saved = ctx.artifacts.get("home")
+        if not saved or saved["result"]["revision"] != ctx.revision or saved["result"]["requested_tickers"] != ctx.selection:
+            return None
+        return clean_json(saved["result"])
+
+
 @router.get("/{id}/fundamentals.csv")
 def fundamentals_csv(id: str, request: Request):
     saved = artifact(session(request), "home", id)
