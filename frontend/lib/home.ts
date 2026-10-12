@@ -16,7 +16,8 @@ export type Company = {
 export type HomeResult = {id:string;revision:number;requested_tickers:string[];missing_tickers:string[];companies:Company[];consensus:Consensus;comparison_indicators:{key:string;label:string;unit:"multiple"|"percent"}[]};
 export type Suggestions = {tickers:string[];count:number;autopick:string[];source:string};
 export const analyzeHome = (tickers:string[], revision:number) => api<HomeResult>("/api/home/analyze",{tickers,revision});
-export const refreshConsensus = (tickers:string[], revision:number) => api<Consensus>("/api/home/consensus/refresh",{tickers,revision});
+export const currentAnalysis = () => api<HomeResult|null>("/api/home/current");
+export const refreshConsensus =(tickers:string[], revision:number) => api<Consensus>("/api/home/consensus/refresh",{tickers,revision});
 export const suggestions = (sectors:string[]) => api<Suggestions>("/api/universe/suggestions",{sectors});
 export const refreshFundamentus = () => api<{removed:number;scope:string}>("/api/fundamentus/refresh",{});
 export const marketColumns:Column[] = [{key:"ticker",label:"Ticker"},{key:"price",label:"Cotação",unit:"money"},{key:"low_52w",label:"Mín. 52 semanas",unit:"money"},{key:"high_52w",label:"Máx. 52 semanas",unit:"money"},{key:"volume_2m",label:"Vol. médio 2m",unit:"money",digits:0},{key:"market_cap",label:"Valor de mercado",unit:"money",digits:0},{key:"last_quote_date",label:"Última cotação"}];

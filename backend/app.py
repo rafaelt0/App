@@ -5,6 +5,7 @@ import sqlite3
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import Field, field_validator
 
@@ -63,6 +64,32 @@ async def owned_requests(request: Request, call_next):
             _capacity.release()
         if ctx is not None:
             release_session(ctx)
+
+
+VALIDATION_MESSAGES = {
+    "missing": "Campo obrigatório ausente.",
+    "too_long": "A lista excede o limite de itens permitido.",
+    "string_too_long": "Texto longo demais.",
+    "string_too_short": "Texto curto demais.",
+    "greater_than_equal": "O valor informado está abaixo do mínimo permitido.",
+    "int_parsing": "Informe um número inteiro válido.",
+    "int_type": "Informe um número inteiro válido.",
+    "list_type": "Envie uma lista de ativos.",
+    "json_invalid": "Corpo da solicitação inválido.",
+}
+
+
+def portuguese_validation_message(error: dict) -> str:
+    context = error.get("ctx") or {}
+    if error.get("type") == "value_error":
+        return str(context.get("error", "Confira os dados informados."))
+    return VALIDATION_MESSAGES.get(error.get("type"), "Confira os dados informados.")
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request: Request, exc: RequestValidationError):
+    messages = dict.fromkeys(portuguese_validation_message(error) for error in exc.errors())
+    return JSONResponse({"detail": " ".join(messages)}, status_code=422)
 
 
 @app.get("/health")

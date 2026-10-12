@@ -32,7 +32,7 @@ async function request<T>(path: string, body?: unknown, method?: string): Promis
     try {
       const problem: { detail?: string | { msg: string }[]; message?: string } = await response.json();
       if (typeof problem.detail === "string") message = problem.detail;
-      else if (Array.isArray(problem.detail)) message = problem.detail.map(item => item.msg).join(" ");
+      else if (Array.isArray(problem.detail)) message = "Confira os dados informados e tente novamente.";
       else if (problem.message) message = problem.message;
     } catch {}
     throw new Error(message);

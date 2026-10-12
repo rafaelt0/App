@@ -7,7 +7,7 @@ import type { SelectionUpdate } from "../components/AppProvider";
 import SelectionSummary from "./SelectionSummary";
 import HomeResults from "../components/HomeResults";
 import { Loading, Notice, PageHeader, TickerPicker } from "../components/ui";
-import { analyzeHome, quickSectors, quickTickers, refreshConsensus, refreshFundamentus, suggestions } from "../lib/home";
+import { analyzeHome, currentAnalysis, quickSectors, quickTickers, refreshConsensus, refreshFundamentus, suggestions } from "../lib/home";
 import type { HomeResult, Suggestions } from "../lib/home";
 
 export default function HomePage() {
@@ -21,6 +21,7 @@ export default function HomePage() {
   const [notice,setNotice] = useState<string|null>(null);
   const [retryAction,setRetryAction] = useState<"analyze"|"consensus"|"source">("analyze");
   const [editRequested,setEditRequested] = useState(false);
+  const [stale,setStale] = useState(false);
   const panel = useRef<HTMLElement>(null);
   const pendingAnalysis = useRef<string[]|null>(null);
   const generation = useRef(0);
@@ -44,9 +45,17 @@ export default function HomePage() {
     suggestions([]).then(value => {if(active && request===sectorGeneration.current)setSuggested(value);}).catch(exc => {if(active && request===sectorGeneration.current)setError(String(exc.message));});
     return () => {active=false;generation.current++;sectorGeneration.current++;};
   },[]);
+  useEffect(() => {
+    const request=generation.current;
+    let active=true;
+    currentAnalysis().then(saved => {
+      if(active && saved && request===generation.current && saved.revision===session?.revision && JSON.stringify(saved.requested_tickers)===JSON.stringify(session?.selection ?? []))setResult(saved);
+    }).catch(() => {});
+    return () => {active=false;};
+  },[]);
 
   async function changeSelection(tickers:SelectionUpdate) {
-    generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);
+    if(result)setStale(true);generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);
     try {await setSelection(tickers);} catch(exc) {setError((exc as Error).message);}
   }
   async function startQuickAnalysis(ticker:string) {
@@ -73,7 +82,7 @@ export default function HomePage() {
     const gen=++generation.current;
     const rev=session.revision;
     const tickers=[...session.selection];
-    setRetryAction(action);setBusy(true);setError(null);
+    setRetryAction(action);setBusy(true);setError(null);setStale(false);
     if(action!=="consensus")setEditRequested(false);
     if(action==="analyze")analyzedRevision.current=rev;
     if(action!=="consensus")setResult(null);
@@ -124,7 +133,7 @@ export default function HomePage() {
         {!!selection.length && <>
           <div className="actions"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button><button disabled={busy} onClick={()=>void changeSelection([])}>Limpar seleção</button></div>
           <p className="caption">A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
-          {!ready && !busy && <Notice>Clique em Analisar para buscar os indicadores das ações selecionadas.</Notice>}
+          {!ready && !busy && <Notice>{stale ? "A seleção mudou. Clique em Analisar para atualizar os indicadores." : "Clique em Analisar para buscar os indicadores das ações selecionadas."}</Notice>}
         </>}
         {sectorBusy && <Loading>Ordenando ações por liquidez…</Loading>}
         {!selection.length && <div className="home-quick">
@@ -162,10 +171,10 @@ export default function HomePage() {
         <div>
           <h3>Favoritos</h3>
           {!session.watchlist.length && <p>Nenhum favorito ainda. Depois de analisar, use Favoritar para guardar ativos aqui.</p>}
-          {session.watchlist.map(ticker=><div className="home-favorite-row" key={ticker}>
-            {stockMap.has(ticker) ? <button disabled={selection.length>=20 && !selection.includes(ticker)} onClick={()=>void changeSelection(current=>Array.from(new Set([...current,ticker])))}>{ticker}</button>:<span>{ticker} · fora da lista B3</span>}
+          {session.watchlist.map(ticker=>{const full=selection.length>=20 && !selection.includes(ticker);return <div className="home-favorite-row" key={ticker}>
+            {stockMap.has(ticker) ? <><button aria-disabled={full} onClick={()=>{if(!full)void changeSelection(current=>Array.from(new Set([...current,ticker])))}}>{ticker}</button>{full && <span>Seleção cheia</span>}</>:<span>{ticker} · fora da lista B3</span>}
             <button aria-label={`Remover ${ticker} dos favoritos`} onClick={()=>void favorite(ticker)}>Remover favorito</button>
-          </div>)}
+          </div>;})}
         </div>
       </div>
     </details>

@@ -2,9 +2,10 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Stock } from "./AppProvider";
-import { Icon } from "./ui";
+import { Icon, Notice } from "./ui";
 
-export type PaletteAction = { id: string; group: string; label: string; detail?: string; icon?: string; ticker?: string; hint?: string; run: () => void };
+export const SELECTION_FULL_MESSAGE = "Seleção cheia: remova um ativo para adicionar outro.";
+export type PaletteAction = { id: string; group: string; label: string; detail?: string; icon?: string; ticker?: string; hint?: string; blocked?: string; run: () => void };
 
 type Props = {
   open: boolean;
@@ -25,11 +26,12 @@ export default function CommandPalette({ open, onClose, pages, stocks, watchlist
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const node = dialog.current;
     if (!node) return;
-    if (open && !node.open) { setQuery(""); setActive(0); node.showModal(); input.current?.focus(); }
+    if (open && !node.open) { setQuery(""); setActive(0); setMessage(null); node.showModal(); input.current?.focus(); }
     if (!open && node.open) node.close();
   }, [open]);
 
@@ -40,6 +42,7 @@ export default function CommandPalette({ open, onClose, pages, stocks, watchlist
       id: `${group}-${stock.ticker}`, group, ticker: stock.ticker, label: stock.company || stock.ticker,
       detail: stock.sector || "Setor não informado",
       hint: selection.includes(stock.ticker) ? "Na seleção" : full ? "Seleção cheia" : "Adicionar",
+      blocked: full && !selection.includes(stock.ticker) ? SELECTION_FULL_MESSAGE : undefined,
       run: () => onTicker(stock.ticker),
     });
     const pageActions = pages.filter(page => !needle || normalize(page.label).includes(needle)).map(page => ({
@@ -63,6 +66,7 @@ export default function CommandPalette({ open, onClose, pages, stocks, watchlist
   const current = Math.min(active, Math.max(actions.length - 1, 0));
   function choose(action: PaletteAction | undefined) {
     if (!action) return;
+    if (action.blocked) { setMessage(action.blocked); return; }
     onClose();
     action.run();
   }
@@ -74,7 +78,7 @@ export default function CommandPalette({ open, onClose, pages, stocks, watchlist
   return <dialog ref={dialog} className="palette" aria-label="Busca rápida" onClose={onClose} onClick={event => { if (event.target === dialog.current) onClose(); }}>
     <div className="palette-search">
       <Icon name="search" />
-      <input ref={input} type="text" role="combobox" aria-expanded={actions.length > 0} aria-controls={`${id}-list`} aria-activedescendant={actions.length ? `${id}-option-${current}` : undefined} aria-autocomplete="list" autoComplete="off" spellCheck={false}
+      <input ref={input} type="text" aria-label="Buscar ativo ou página" role="combobox" aria-expanded={actions.length > 0} aria-controls={`${id}-list`} aria-activedescendant={actions.length ? `${id}-option-${current}` : undefined} aria-autocomplete="list" autoComplete="off" spellCheck={false}
         placeholder="Buscar ticker, empresa ou página…" value={query}
         onChange={event => { setQuery(event.target.value); setActive(0); }}
         onKeyDown={event => {
@@ -89,7 +93,7 @@ export default function CommandPalette({ open, onClose, pages, stocks, watchlist
         const heading = action.group !== lastGroup ? action.group : null;
         lastGroup = action.group;
         return <li key={action.id} role="presentation">
-          {heading && <p className="palette-group" aria-hidden="true">{heading}</p>}
+          {heading && <p className="palette-group">{heading}</p>}
           <div id={`${id}-option-${index}`} role="option" aria-selected={index === current} aria-label={`${action.ticker ? `${action.ticker}, ` : ""}${action.label}${action.hint ? `, ${action.hint}` : ""}`} className="palette-option"
             onMouseMove={() => { if (index !== current) setActive(index); }} onMouseDown={event => event.preventDefault()} onClick={() => choose(action)}>
             {action.ticker ? <span className="palette-ticker">{action.ticker}</span> : <span className="palette-icon"><Icon name={action.icon} /></span>}
@@ -100,6 +104,8 @@ export default function CommandPalette({ open, onClose, pages, stocks, watchlist
       })}
       {!actions.length && <li className="palette-empty" role="presentation">Nenhum ativo ou página para “{query}”.</li>}
     </ul>
-    <p className="palette-footer" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> navegar</span><span><kbd>Enter</kbd> abrir</span><span>Ativos entram na seleção de Fundamentos</span></p>
+    <div className="visually-hidden" aria-live="polite">{actions.length === 1 ? "1 resultado" : `${actions.length} resultados`}</div>
+    {message && <div role="status"><Notice tone="warning">{message}</Notice></div>}
+    <p className="palette-footer" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> navegar</span><span><kbd>Enter</kbd> abrir</span><span><kbd>/</kbd> abre a busca</span><span>Ativos entram na seleção de Fundamentos</span></p>
   </dialog>;
 }
