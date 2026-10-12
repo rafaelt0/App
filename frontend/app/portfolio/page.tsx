@@ -31,6 +31,7 @@ function hasManualShares(inputs: PortfolioInputs, selection: readonly string[]):
 
 /** Pause after the last edit before recalculating, so typing a value does not send one request per keystroke. */
 const AUTO_RECALC_DELAY_MS = 500;
+const presetWindows = ["730", "365", "1095", "1825", "180"];
 
 export default function PortfolioPage() {
   const { session, stocks, loading, error: appError, setSelection, refreshSession } = useApp();
@@ -135,6 +136,29 @@ export default function PortfolioPage() {
   const runAnalysisRef = useRef(runAnalysis);
   runAnalysisRef.current = runAnalysis;
   useEffect(() => {
+    if (!session?.portfolio_ready || session.restored || result || busy || selectionBusy) return;
+    const requested = fingerprint;
+    let cancelled = false;
+    api<PortfolioResult | null>("/api/portfolio/current").then(value => {
+      // Only the owner's analysis for this selection is shown; edits made while loading win over the stored parameters.
+      if (cancelled || !value || value.restored || requested !== currentFingerprint.current) return;
+      const restored: PortfolioInputs = { strategy: value.inputs.strategy, capital: value.inputs.capital, lookback_days: value.inputs.lookback_days, manual_shares: value.inputs.manual_shares, gamma: value.inputs.gamma };
+      const key = JSON.stringify([selectionKey, restored]);
+      const preset = presetWindows.includes(String(restored.lookback_days));
+      lastSubmitted.current = key;
+      setInputs(restored);
+      setWindowChoice(preset ? String(restored.lookback_days) : "custom");
+      setCustomDays(restored.lookback_days);
+      setLoadedSelection(selectionKey);
+      setResult(value);
+      setResultKey(key);
+      setStressResult(value.stress);
+      setNotice("Resultado desta sessão restaurado. Os parâmetros foram preenchidos com os da última análise.");
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // Runs once per session revision: the restored analysis is the one the server already holds.
+  }, [session?.revision, session?.portfolio_ready, session?.restored]);
+  useEffect(() => {
     if (busy || !session || loadedSelection !== selectionKey || lastSubmitted.current === fingerprint || !validInputs || !manualValid) return;
     const timer = window.setTimeout(() => void runAnalysisRef.current(), AUTO_RECALC_DELAY_MS);
     return () => window.clearTimeout(timer);
@@ -198,6 +222,7 @@ export default function PortfolioPage() {
 
   if (loading || !session) return appError ? <Notice tone="negative">{appError}</Notice> : <Loading>Carregando lista de ações e seleção…</Loading>;
   const activeResult = resultKey === fingerprint ? result : null;
+  const staleResult = !!result && resultKey !== fingerprint && !busy;
   const count = session.selection.length;
   const core = [["total_return", "Retorno Total", "percent"], ["volatility", "Volatilidade Anual", "percent"], ["sharpe", "Índice Sharpe", "ratio"], ["sortino", "Índice Sortino", "ratio"], ["max_drawdown", "Max Drawdown", "percent"]] as const;
   const extra = [["annual_return", "Retorno Anualizado", "percent"], ["beta", "Beta vs IBOV", "ratio"], ["annual_alpha", "Alpha Anual", "percent"], ["daily_var", "VaR Diário 95% (paramétrico normal)", "percent"], ["historical_var_95", "VaR Histórico 95% (diário)", "percent"], ["cvar_95", "CVaR 95% (diário)", "percent"], ["information_ratio", "Information Ratio (anualizado)", "ratio"]] as const;
@@ -248,6 +273,7 @@ export default function PortfolioPage() {
       </div>
     </Section>
     {count < 2 && <EmptyState icon="portfolio" title={count === 0 ? "Monte seu portfólio" : "Adicione mais um ativo"}>Selecione pelo menos duas ações para comparar risco, retorno e diversificação.</EmptyState>}
+    {staleResult && <Notice>{validInputs && manualValid ? "Parâmetros alterados. A análise será atualizada em instantes." : "Parâmetros fora dos limites. O resultado anterior fica oculto até que sejam corrigidos."}</Notice>}
     {busy && <ElapsedLoading>Baixando cotações e calculando alocação, risco e retorno…</ElapsedLoading>}
     {activeResult && <div className="pf-results">
       {activeResult.warnings.map((warning, index) => <Notice tone="warning" key={index}>{warning}</Notice>)}
