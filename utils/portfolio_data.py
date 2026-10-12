@@ -151,6 +151,20 @@ def estimate_markowitz_inputs(returns):
     )
 
 
+def daily_returns(prices):
+    """Return simple daily returns without erasing other assets' moves over a missing price.
+
+    Interior gaps are forward-filled per series, so the move across a gap is kept on the
+    day the price reappears. Leading and trailing gaps stay missing, and only the rows
+    left incomplete by them are dropped.
+    """
+    filled = prices.ffill().where(prices.bfill().notna())
+    gaps = int((prices.isna() & filled.notna()).sum().sum())
+    if gaps:
+        logger.info("Filled %d interior missing price(s) before computing returns.", gaps)
+    return filled.pct_change(fill_method=None).dropna()
+
+
 def align_weights_to_columns(weights, columns):
     """Return weights in column order, failing when a required ticker is absent."""
     missing = [column for column in columns if column not in weights]
@@ -182,7 +196,7 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
         period_prices = portfolio_prices.loc[
             (portfolio_prices.index >= start) & (portfolio_prices.index <= end)
         ]
-        period_returns = period_prices.pct_change(fill_method=None).dropna()
+        period_returns = daily_returns(period_prices)
         if len(period_returns) < 5:
             continue
 

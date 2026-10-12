@@ -1,7 +1,12 @@
+import numpy as np
+import pandas as pd
+import pytest
+
 from utils.portfolio_data import (
     align_benchmark_returns,
     align_weights_to_columns,
     bound_efficient_return,
+    daily_returns,
     estimate_markowitz_inputs,
     evaluate_portfolio_health,
     finite_or_none,
@@ -213,5 +218,42 @@ def test_missing_stress_price_does_not_bridge_gap():
     )
 
     assert len(result) == 1
-    assert result[0]["Portfólio"] == 0
+    # 100 -> 110 across the missing close is a real +10% move; it must not be erased.
+    assert result[0]["Portfólio"] == pytest.approx(0.10)
     assert result[0]["IBOV"] is None
+
+
+def test_daily_returns_keeps_move_across_interior_missing_price():
+    dates = pd.bdate_range("2025-01-01", periods=6)
+    prices = pd.DataFrame(
+        {
+            "AAA.SA": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
+            "BBB.SA": [100.0, 90.0, np.nan, 80.0, 80.0, 80.0],
+        },
+        index=dates,
+    )
+
+    returns = daily_returns(prices)
+
+    assert len(returns) == 5
+    assert (1 + returns["BBB.SA"]).prod() - 1 == pytest.approx(-0.20)
+    assert (1 + returns["AAA.SA"]).prod() - 1 == pytest.approx(105 / 100 - 1)
+    assert returns.loc[dates[2], "BBB.SA"] == 0.0
+    assert returns.loc[dates[3], "BBB.SA"] == pytest.approx(80 / 90 - 1)
+
+
+def test_daily_returns_drops_only_rows_before_every_series_has_history():
+    dates = pd.bdate_range("2025-01-01", periods=6)
+    prices = pd.DataFrame(
+        {
+            "AAA.SA": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
+            "NEW.SA": [np.nan, np.nan, np.nan, 50.0, 55.0, 60.0],
+        },
+        index=dates,
+    )
+
+    returns = daily_returns(prices)
+
+    assert list(returns.index) == list(dates[4:])
+    assert returns.loc[dates[4], "NEW.SA"] == pytest.approx(0.10)
+    assert not returns.isna().any().any()

@@ -113,6 +113,23 @@ def test_markowitz_l2_target_return_and_full_frontier(market):
     assert any(trace["name"] == "Linha de alocação (carteira selecionada)" for trace in frontier)
 
 
+def test_diversification_level_strictly_lowers_hhi_when_max_sharpe_is_a_corner():
+    mu = np.array([.60, .03, .05, .00, .04])
+    vols = np.sqrt([.09, .04, .05, .03, .04])
+    correlation = np.eye(5)
+    correlation[0, 1:] = correlation[1:, 0] = .1
+    covariance = np.diag(vols) @ correlation @ np.diag(vols)
+    daily = np.random.default_rng(3).multivariate_normal(mu / 252, covariance / 252, size=2000)
+    returns = pd.DataFrame(daily, columns=[f"A{i}.SA" for i in range(5)], index=pd.bdate_range("2018-01-01", periods=2000))
+    hhi = []
+    for gamma in (0, 1, 2, 3):
+        weights, _, _, _ = api.optimize("markowitz", returns, {}, .10, gamma, [])
+        hhi.append(float(np.square(list(weights.values())).sum()))
+    assert hhi[0] > .95  # Max Sharpe is a corner: almost all capital in one asset.
+    assert hhi[0] > hhi[1] > hhi[2] > hhi[3]
+    assert hhi[3] >= 1 / 5 - 1e-9
+
+
 def test_markowitz_negative_excess_returns_falls_back_with_warning(market, monkeypatch):
     monkeypatch.setattr(api, "get_selic_rate", lambda: .01)
     result = api.analyze(payload(market, strategy="markowitz", gamma=1), request(market.ctx))
@@ -225,20 +242,33 @@ def test_restore_cannot_override_edited_selection(market, monkeypatch):
     assert market.ctx.portfolio is None
 
 
-def test_history_does_not_bridge_gaps_and_reports_short_symbol(market, monkeypatch):
+def test_history_reports_short_symbol_and_bridges_interior_gap(market, monkeypatch):
     prices = market.prices.copy()
     prices.loc[prices.index[:-20], "BBB4.SA"] = np.nan
     monkeypatch.setattr(api, "get_portfolio_prices", lambda *args: prices)
     with pytest.raises(HTTPException, match="BBB4") as error:
         api.history(["AAA3.SA", "BBB4.SA"], date.today() - timedelta(days=730))
     assert error.value.status_code == 422
-    prices = market.prices.copy()
+    original = market.prices.copy()
+    prices = original.copy()
     prices.iloc[90, 0] = np.nan
     monkeypatch.setattr(api, "get_portfolio_prices", lambda *args: prices)
     _, returns = api.history(["AAA3.SA", "BBB4.SA"], date.today() - timedelta(days=730))
-    assert prices.index[90] not in returns.index
-    assert prices.index[91] not in returns.index
-    assert len(returns) == 178
+    # The missing close no longer erases the days around it: the move is carried by the day the price returns.
+    assert len(returns) == 180
+    assert returns.loc[prices.index[90], "AAA3.SA"] == 0.0
+    assert returns.loc[prices.index[91], "AAA3.SA"] == pytest.approx(original.iloc[91, 0] / original.iloc[89, 0] - 1)
+    assert returns.loc[prices.index[91], "BBB4.SA"] == pytest.approx(original.iloc[91, 1] / original.iloc[90, 1] - 1)
+
+
+def test_history_one_missing_price_keeps_a_20_percent_drop(market, monkeypatch):
+    dates = pd.bdate_range(end=pd.Timestamp(date.today()) - pd.Timedelta(days=1), periods=41)
+    prices = pd.DataFrame({"AAA3.SA": np.full(41, 100.0), "BBB4.SA": np.linspace(100.0, 80.0, 41)}, index=dates)
+    prices.iloc[20, 1] = np.nan
+    monkeypatch.setattr(api, "get_portfolio_prices", lambda *args: prices)
+    _, returns = api.history(["AAA3.SA", "BBB4.SA"], date.today() - timedelta(days=730))
+    assert (1 + returns["BBB4.SA"]).prod() - 1 == pytest.approx(-0.20)
+    assert returns["AAA3.SA"].abs().max() == 0.0
 
 
 def test_csv_preserves_bare_tickers_percentage_units_bom_and_owner(market):

@@ -19,7 +19,7 @@ from utils import db
 from utils.market_data import get_listed_stocks
 from utils.portfolio_data import (
     align_benchmark_returns, align_weights_to_columns, bound_efficient_return,
-    calculate_historical_stress, estimate_markowitz_inputs, evaluate_portfolio_health,
+    calculate_historical_stress, daily_returns, estimate_markowitz_inputs, evaluate_portfolio_health,
     find_crisis_history_gaps, finite_or_none, get_benchmark_prices,
     get_portfolio_prices, get_portfolio_trade_prices, get_selic_rate,
 )
@@ -91,7 +91,7 @@ def history(tickers, start):
     if missing:
         raise HTTPException(422, f"Não foi possível obter cotações para: {', '.join(missing)}. Remova esses ativos ou tente novamente mais tarde.")
     prices = prices.loc[:, tickers]
-    returns = prices.pct_change(fill_method=None).dropna()
+    returns = daily_returns(prices)
     if len(returns) < 30:
         first = prices.apply(lambda column: column.first_valid_index())
         suspects = [f"{ticker.removesuffix('.SA')} (sem cotações)" for ticker in first[first.isna()].index]
@@ -154,7 +154,13 @@ def optimize(strategy, returns, manual_weights, rf, gamma, warnings):
             frontier.max_sharpe(risk_free_rate=rf)
             label = "Max Sharpe (Markowitz)"
             if gamma > 0:
-                target = bound_efficient_return(frontier.portfolio_performance(risk_free_rate=rf)[0], float(mu.min()), float(mu.max()))
+                max_return = frontier.portfolio_performance(risk_free_rate=rf)[0]
+                floor = EfficientFrontier(mu, covariance)
+                floor.min_volatility()
+                min_return = floor.portfolio_performance()[0]
+                # Level 0 targets the Max Sharpe return; level 3 targets the Min Volatility return.
+                level = min(gamma / 3, 1.0)
+                target = bound_efficient_return(min_return + (1 - level) * (max_return - min_return), min_return, max_return)
                 frontier = EfficientFrontier(mu, covariance)
                 if target is None:
                     frontier.min_volatility()
