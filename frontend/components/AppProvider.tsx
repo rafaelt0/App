@@ -66,18 +66,28 @@ function Shell({ children }: { children: ReactNode }) {
   const [palette, setPalette] = useState(false);
   const [busy, setBusy] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
-  const [shortcut, setShortcut] = useState("Ctrl K");
+  const [modifier, setModifier] = useState("Ctrl ");
+  const shortcut = `${modifier}K`;
+  const sidebarShortcut = `${modifier}B`;
   useEffect(() => subscribeActivity(setBusy), []);
+  const toggleCollapsed = useCallback(() => {
+    const next = document.documentElement.dataset.sidebar !== "collapsed";
+    setCollapsed(next);
+    if (next) document.documentElement.dataset.sidebar = "collapsed";
+    else delete document.documentElement.dataset.sidebar;
+    localStorage.setItem("b3lab-sidebar", next ? "collapsed" : "expanded");
+  }, []);
   useEffect(() => {
-    if (/Mac|iPhone|iPad/.test(navigator.platform)) setShortcut("⌘K");
+    if (/Mac|iPhone|iPad/.test(navigator.platform)) setModifier("⌘");
     const onKey = (event: KeyboardEvent) => {
       const typing = event.target instanceof Element && !!event.target.closest("input, textarea, select, [contenteditable='true']");
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPalette(value => !value); }
+      else if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "b") { event.preventDefault(); toggleCollapsed(); }
       else if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); setPalette(true); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [toggleCollapsed]);
   const selection = session?.selection ?? [];
   const watchlist = session?.watchlist ?? [];
   const known = new Set(stocks.map(stock => stock.ticker));
@@ -100,13 +110,6 @@ function Shell({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     setCollapsed(document.documentElement.dataset.sidebar === "collapsed");
   }, []);
-  const toggleCollapsed = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    if (next) document.documentElement.dataset.sidebar = "collapsed";
-    else delete document.documentElement.dataset.sidebar;
-    localStorage.setItem("b3lab-sidebar", next ? "collapsed" : "expanded");
-  };
   useEffect(() => {
     setOpen(false);
     setShellError(null);
@@ -126,7 +129,7 @@ function Shell({ children }: { children: ReactNode }) {
     <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
     <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><div className="mobile-actions"><button type="button" aria-label="Buscar ativo ou página" onClick={() => setPalette(true)}><Icon name="search" /></button><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></div></header>
     <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
-      <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}</button>
+      <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-keyshortcuts="Control+B Meta+B" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={`${collapsed ? "Expandir" : "Recolher"} barra lateral (${sidebarShortcut})`} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}{!collapsed && <kbd>{sidebarShortcut}</kbd>}</button>
       <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
       <button type="button" className="sidebar-search" aria-label="Buscar ativo ou página" aria-keyshortcuts="Control+K Meta+K /" title={collapsed ? "Buscar" : undefined} onClick={() => setPalette(true)}><Icon name="search" /><span>Buscar</span><kbd>{shortcut}</kbd></button>
       <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} aria-label={item.label} title={collapsed ? item.label : undefined} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>

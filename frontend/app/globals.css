@@ -103,6 +103,7 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--surfac
 .sidebar-toggle { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; margin: 0 0 16px; padding: 0 10px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-canvas); box-shadow: var(--highlight); color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
 .sidebar-toggle:hover:not(:disabled) { background: var(--surface-panel); border-color: var(--border-hover); color: var(--text-primary); }
 .sidebar-toggle svg { width: 18px; height: 18px; flex: none; }
+.sidebar-toggle kbd { margin-left: auto; }
 [data-sidebar="collapsed"] .sidebar { padding-inline: 8px; }
 [data-sidebar="collapsed"] .sidebar .brand, [data-sidebar="collapsed"] .sidebar-note, [data-sidebar="collapsed"] .sidebar nav a span:not(.app-icon), [data-sidebar="collapsed"] .sidebar-search > span, [data-sidebar="collapsed"] .sidebar-search kbd, [data-sidebar="collapsed"] .sidebar-watchlist { display: none; }
 [data-sidebar="collapsed"] .sidebar nav a, [data-sidebar="collapsed"] .sidebar-toggle, [data-sidebar="collapsed"] .sidebar-search { justify-content: center; padding-inline: 0; }
