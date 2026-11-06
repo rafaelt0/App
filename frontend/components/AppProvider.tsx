@@ -126,6 +126,7 @@ function Shell({ children }: { children: ReactNode }) {
     <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
     <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><div className="mobile-actions"><button type="button" aria-label="Buscar ativo ou página" onClick={() => setPalette(true)}><Icon name="search" /></button><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></div></header>
     <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
+      <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}</button>
       <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
       <button type="button" className="sidebar-search" aria-label="Buscar ativo ou página" aria-keyshortcuts="Control+K Meta+K /" title={collapsed ? "Buscar" : undefined} onClick={() => setPalette(true)}><Icon name="search" /><span>Buscar</span><kbd>{shortcut}</kbd></button>
       <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} aria-label={item.label} title={collapsed ? item.label : undefined} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>
@@ -136,7 +137,6 @@ function Shell({ children }: { children: ReactNode }) {
       </section>}
       <div className="sidebar-footer">
         <p className="sidebar-note"><strong>Análise quantitativa da B3</strong><span>Dados para pesquisa, não recomendações de investimento.</span></p>
-        <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}</button>
       </div>
     </aside>
     <main id="conteudo" className="main-frame" tabIndex={-1} aria-busy={busy}>
