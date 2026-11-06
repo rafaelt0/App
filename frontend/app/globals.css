@@ -181,9 +181,6 @@ kbd { display: inline-flex; align-items: center; gap: 2px; min-width: 20px; heig
 .palette-option { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 10px; border-radius: var(--radius-md); cursor: pointer; }
 .palette-option[aria-selected="true"] { background: rgb(255 255 255 / .07); box-shadow: inset 2px 0 0 var(--brand-primary); }
 .palette-ticker { flex: 0 0 64px; font: 600 12.5px/1 var(--font-mono); letter-spacing: .02em; color: var(--text-primary); }
-.palette-icon { display: flex; flex: 0 0 64px; color: var(--text-muted); }
-.palette-option[aria-selected="true"] .palette-icon { color: var(--brand-primary); }
-.palette-icon .app-icon, .palette-icon svg { width: 18px; height: 18px; }
 .palette-label { display: flex; flex-direction: column; min-width: 0; flex: 1; font-size: 14px; overflow: hidden; }
 .palette-label small { overflow: hidden; color: var(--text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .palette-hint { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
