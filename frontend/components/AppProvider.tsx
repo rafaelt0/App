@@ -99,7 +99,6 @@ function Shell({ children }: { children: ReactNode }) {
       .then(() => router.push("/"))
       .catch(exc => setShellError(exc instanceof Error ? exc.message : String(exc)));
   }, [router, selection, setSelection]);
-  const openPage = useCallback((href: string) => { setOpen(false); router.push(href); }, [router]);
   const menuRef = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const closeMenu = () => {
@@ -126,7 +125,7 @@ function Shell({ children }: { children: ReactNode }) {
   }, [open]);
   return <div className="app-shell">
     <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
-    <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><div className="mobile-actions"><button type="button" aria-label="Buscar ativo ou página" onClick={() => setPalette(true)}><Icon name="search" /></button><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></div></header>
+    <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><div className="mobile-actions"><button type="button" aria-label="Buscar ativo" onClick={() => setPalette(true)}><Icon name="search" /></button><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></div></header>
     <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
       <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-keyshortcuts="Control+B Meta+B" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={`${collapsed ? "Expandir" : "Recolher"} barra lateral (${sidebarShortcut})`} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}{!collapsed && <kbd>{sidebarShortcut}</kbd>}</button>
       <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
@@ -148,7 +147,7 @@ function Shell({ children }: { children: ReactNode }) {
       <MarketStrip />
       <div className="main-content">{shellError && <Notice tone="negative">{shellError}</Notice>}{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></div>
     </main>
-    <CommandPalette open={palette} onClose={() => setPalette(false)} pages={navigation} stocks={stocks} watchlist={watchlist} selection={selection} onPage={openPage} onTicker={openTicker} />
+    <CommandPalette open={palette} onClose={() => setPalette(false)} stocks={stocks} watchlist={watchlist} selection={selection} onTicker={openTicker} />
     <MarketNewsPanel />
   </div>;
 }
