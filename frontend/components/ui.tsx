@@ -263,7 +263,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
     }
   }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); closePicker(true); } }}>
     <label htmlFor={id}>{label}</label>
-    <div className="ticker-search"><Icon name="search" /><input ref={inputRef} id={id} type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa..." value={query} aria-busy={busy} aria-label={`${label}: buscar ticker ou empresa`} onFocus={() => { if (dismissed.current) dismissed.current = false; else setOpen(true); }} onClick={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
+    <div className="ticker-search"><Icon name="search" /><input ref={inputRef} id={id} type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa (atalho: / ou Ctrl+K)" value={query} aria-busy={busy} aria-label={`${label}: buscar ticker ou empresa`} onFocus={() => { if (dismissed.current) dismissed.current = false; else setOpen(true); }} onClick={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); closePicker(false); }
       if (event.key === "ArrowDown" && options.length) {
         event.preventDefault();

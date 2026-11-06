@@ -67,7 +67,6 @@ function Shell({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
   const [modifier, setModifier] = useState("Ctrl ");
-  const shortcut = `${modifier}K`;
   const sidebarShortcut = `${modifier}B`;
   useEffect(() => subscribeActivity(setBusy), []);
   const toggleCollapsed = useCallback(() => {
@@ -131,7 +130,6 @@ function Shell({ children }: { children: ReactNode }) {
     <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
       <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-keyshortcuts="Control+B Meta+B" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={`${collapsed ? "Expandir" : "Recolher"} barra lateral (${sidebarShortcut})`} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}{!collapsed && <kbd>{sidebarShortcut}</kbd>}</button>
       <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
-      <button type="button" className="sidebar-search" aria-label="Buscar ativo ou página" aria-keyshortcuts="Control+K Meta+K /" title={collapsed ? "Buscar" : undefined} onClick={() => setPalette(true)}><Icon name="search" /><span>Buscar</span><kbd>{shortcut}</kbd></button>
       <nav aria-label="Navegação principal">{navigation.map(item => <Link key={item.href} href={item.href} aria-label={item.label} title={collapsed ? item.label : undefined} aria-current={pathname === item.href ? "page" : undefined} onClick={() => { if (open) closeMenu(); }}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>
       {session && <section className="sidebar-watchlist" aria-labelledby="sidebar-watchlist-title">
         <h2 className="sidebar-section-label" id="sidebar-watchlist-title">Favoritos</h2>
