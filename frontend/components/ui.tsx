@@ -190,6 +190,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
     return rankStocks([...pool.filter(stock => first.has(stock.ticker)), ...pool.filter(stock => !first.has(stock.ticker))], query, 40);
   }, [filter, priority, query, sort, stocks, watchlist]);
   const options = results.items;
+  const companies = useMemo(() => new Map(stocks.map(stock => [stock.ticker, stock.company])), [stocks]);
   useEffect(() => {
     setActive(current => Math.min(current, Math.max(0, options.length - 1)));
     const target = pendingFocus.current;
@@ -272,7 +273,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
       }
       if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); void toggleTicker(options[active].ticker); }
     }} /></div>
-    <div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}><strong>{ticker}</strong>{onFavorite && <button type="button" className="ticker-chip-favorite" disabled={favoriteBusy} aria-pressed={watchlist.includes(ticker)} aria-label={watchlist.includes(ticker) ? `Remover ${ticker} dos favoritos` : `Adicionar ${ticker} aos favoritos`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => void toggleFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => void toggleTicker(ticker)}>×</button></span>)}</div>
+    <div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}><StockLogo ticker={ticker} company={companies.get(ticker) ?? ""} size={24} /><strong>{ticker}</strong>{onFavorite && <button type="button" className="ticker-chip-favorite" disabled={favoriteBusy} aria-pressed={watchlist.includes(ticker)} aria-label={watchlist.includes(ticker) ? `Remover ${ticker} dos favoritos` : `Adicionar ${ticker} aos favoritos`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => void toggleFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => void toggleTicker(ticker)}>×</button></span>)}</div>
     {open && <div className="ticker-picker-controls">
       <div className="ticker-controls-row">
         {(onFavorite || watchlist.length > 0) && <div className="ticker-filter" role="group" aria-label="Filtrar ações">
