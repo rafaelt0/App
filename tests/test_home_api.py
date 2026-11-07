@@ -347,3 +347,27 @@ def test_universe_changes_route_reports_fractions_and_fails_with_503(home_api, m
     monkeypatch.setattr(home, "get_universe_changes", unavailable)
     response = client.get("/api/universe/changes")
     assert response.status_code == 503 and "Yahoo Finance não retornou cotações" in response.json()["detail"]
+
+
+def test_universe_changes_rate_limited_download_is_503_and_not_cached(home_api, monkeypatch):
+    client, _, _ = home_api
+    nan = float("nan")
+    limited = adjusted_closes().assign(**{"BBB4.SA": nan, "CCC3.SA": nan})
+    downloads = [pd.concat({"Adj Close": limited}, axis=1), pd.concat({"Adj Close": adjusted_closes()}, axis=1)]
+    calls = []
+
+    def download(symbols, **kwargs):
+        calls.append(symbols)
+        return downloads[min(len(calls), len(downloads)) - 1]
+
+    monkeypatch.setattr(market_data.yf, "download", download)
+    market_data.get_universe_changes.clear()
+    try:
+        response = client.get("/api/universe/changes")
+        assert response.status_code == 503 and "poucas ações" in response.json()["detail"]
+        recovered = client.get("/api/universe/changes")
+        assert recovered.status_code == 200 and recovered.json()["session"] == "2026-11-07"
+        assert client.get("/api/universe/changes").json()["changes"] == recovered.json()["changes"]
+        assert len(calls) == 2
+    finally:
+        market_data.get_universe_changes.clear()
