@@ -59,7 +59,17 @@ O `render.yaml` cria um serviço web Docker no plano gratuito. O contêiner usa 
 
 Configure `TYPESAFE_API_KEY` como segredo no Render para classificar notícias com Jev. O contêiner não carrega modelos locais. Sem a chave ou quando a API falha, as notícias usam o fallback léxico identificado. O disco é efêmero: favoritos e seleções em SQLite se perdem a cada deploy ou reinício.
 
-O plano gratuito suspende o serviço após 15 minutos sem tráfego. Para evitar a suspensão, o launcher acessa a própria URL pública (`RENDER_EXTERNAL_URL`) a cada 10 minutos. O workflow `keep-render-awake.yml` acessa a URL da variável de repositório `B3LAB_URL` como reserva, mas o GitHub executa agendamentos com atraso e pode passar horas sem rodar. As 750 horas mensais do plano gratuito cobrem um serviço ativo o mês inteiro.
+O plano gratuito suspende o serviço após 15 minutos sem tráfego. Para evitar a suspensão, o launcher acessa a própria URL pública (`RENDER_EXTERNAL_URL`) a cada 10 minutos. As 750 horas mensais do plano gratuito cobrem um serviço ativo o mês inteiro.
+
+O mapa de calor da página inicial mostra na hora as últimas variações conhecidas, com o horário da busca, e troca sozinho quando chega uma busca nova do Yahoo. Esse snapshot fica só na memória do processo: depois de um deploy, reinício ou suspensão, a primeira visita espera a busca normal. Durante o pregão, o workflow `refresh-heatmap.yml` acorda o serviço e chama `POST /api/universe/changes/refresh` a cada 10 minutos, das 10:00 às 17:00 de Brasília em dias úteis, e de novo às 17:05 e 17:20. O GitHub executa agendamentos com atraso e pode pular execuções; nesse caso a página mostra os dados antigos com o horário e atualiza em segundo plano.
+
+Para ativar a atualização agendada:
+
+1. Gere um token aleatório, por exemplo com `openssl rand -hex 32`.
+2. No Render, em Environment do serviço `b3lab`, crie `B3LAB_REFRESH_TOKEN` com esse valor.
+3. No GitHub, em Settings → Secrets and variables → Actions, crie o segredo `B3LAB_REFRESH_TOKEN` com o mesmo valor e a variável `B3LAB_URL` com a URL pública (`https://b3lab-y4ha.onrender.com`).
+
+Sem o token no servidor, o endpoint responde 503; com token ausente ou diferente, 401. Sem a variável ou o segredo, o workflow só emite um aviso.
 
 ## Configuração
 
@@ -73,6 +83,7 @@ O plano gratuito suspende o serviço após 15 minutos sem tráfego. Para evitar 
 | `B3LAB_DB` | `b3_data.db` na raiz | Arquivo SQLite gravável e persistente |
 | `B3LAB_ENV` | Não definido | `production` exige cookie Secure e a origem configurada |
 | `B3LAB_HOST` | `127.0.0.1` | Endereço de escuta do Next.js no launcher |
+| `B3LAB_REFRESH_TOKEN` | Não definido | Token exigido por `POST /api/universe/changes/refresh`; vazio desativa a rota |
 | `B3LAB_KEEPALIVE_URL` | `RENDER_EXTERNAL_URL` no contêiner | URL acessada pelo launcher a cada 10 minutos; vazio desativa |
 
 O launcher configura `B3LAB_API_URL` a partir de `B3LAB_API_PORT` quando não há endereço explícito. Portas personalizadas devem usar uma origem correspondente; `localhost` e `127.0.0.1` são origens distintas.

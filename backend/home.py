@@ -1,11 +1,13 @@
 """Home fundamentals, consensus and source catalog. Detail units deliberately differ from peers."""
 import datetime as dt
+import hmac
 import logging
 import math
+import os
 import uuid
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import Field
 
 from backend.serialization import StrictModel, clean_json, csv_response
@@ -13,6 +15,7 @@ from backend.state import artifact, begin, publish, session
 from utils.formatting import extract_debt_metric, get_ev_ebitda_context
 from utils.home_data import (build_analyst_synthesis, clear_fundamentus_cache,
                              compute_sector_ranking, get_fundamentus_data, get_sector_peers)
+from utils.snapshot import Snapshot
 from utils.market_data import (clean_numeric_column, compute_target_upside, get_liquidity_by_ticker,
                                get_listed_stocks, get_universe_changes, get_market_target_data, get_sorted_tickers_by_liquidity)
 
@@ -244,14 +247,35 @@ def universe_liquidity():
     return clean_json({"source": "Fundamentus · liquidez média diária em 2 meses (R$)", "fetched_at": series.attrs.get("fetched_at"), "liquidity": liquidity.to_dict()})
 
 
+UNIVERSE_CHANGES_TTL_SECONDS = 600
+REFRESH_TOKEN_ENV = "B3LAB_REFRESH_TOKEN"
+changes_snapshot = Snapshot(lambda: get_universe_changes(tuple(get_listed_stocks()["Ticker"])), UNIVERSE_CHANGES_TTL_SECONDS)
+
+
 @catalog_router.get("/universe/changes")
-def universe_changes():
-    tickers = tuple(get_listed_stocks()["Ticker"])
+def universe_changes(wait: bool = False):
+    """Latest known heatmap changes at once; a stale snapshot says so and is replaced in the background."""
     try:
-        result = get_universe_changes(tickers)
+        result = changes_snapshot.read(wait)
     except Exception as exc:
         raise HTTPException(503, f"Não foi possível carregar as variações do Yahoo Finance: {exc}") from exc
     return clean_json({"source": "Yahoo Finance · fechamento ajustado, com atraso", "unit": "fraction", **result})
+
+
+@catalog_router.post("/universe/changes/refresh")
+def refresh_universe_changes(authorization: str | None = Header(default=None)):
+    expected = os.environ.get(REFRESH_TOKEN_ENV, "")
+    if not expected:
+        raise HTTPException(503, f"Atualização agendada desativada: defina {REFRESH_TOKEN_ENV} no servidor.")
+    if not hmac.compare_digest((authorization or "").encode(), f"Bearer {expected}".encode()):
+        raise HTTPException(401, "Token de atualização ausente ou inválido.")
+    try:
+        result = changes_snapshot.refresh()
+    except ValueError as exc:
+        raise HTTPException(503, f"Não foi possível atualizar as variações do Yahoo Finance: {exc}") from exc
+    if result["refresh_error"]:
+        raise HTTPException(503, f"Não foi possível atualizar as variações do Yahoo Finance: {result['refresh_error']}")
+    return {"session": result["session"], "fetched_at": result["fetched_at"]}
 
 
 @catalog_router.post("/universe/suggestions")

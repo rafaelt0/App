@@ -114,6 +114,12 @@ const colorOptions: Record<ColorBy, { label: string; short: string; step: number
   week: { label: "Variação em 5 pregões", short: "Var. 5 pregões", step: 0.02 },
 };
 const headerHeight = 15;
+const stampFormat = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+/** "06/11, 17:10" in Brasília time: when the shown changes were fetched, independent of the viewer's clock. */
+function fetchedStamp(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "horário desconhecido" : stampFormat.format(date);
+}
 
 /** Diverging bucket of a change: -4…-1 red, 0 flat, 1…4 green; each step is `step` wide and the last one is open-ended. */
 function tone(change: number | null, step: number): number | null {
@@ -133,7 +139,12 @@ export function SectorMap({ stocks, selection, busy, active, available, onSector
   const [changes, setChanges] = useState<Changes>({ kind: "loading" });
   useEffect(() => {
     let live = true;
-    universeChanges().then(data => { if (live) setChanges({ kind: "ready", data }); }, error => { if (live) setChanges({ kind: "error", message: error instanceof Error ? error.message : "Variações indisponíveis." }); });
+    const failed = (error: unknown) => { if (live) setChanges({ kind: "error", message: error instanceof Error ? error.message : "Variações indisponíveis." }); };
+    universeChanges().then(data => {
+      if (!live) return;
+      setChanges({ kind: "ready", data });
+      if (data.refreshing) universeChanges(true).then(fresh => { if (live) setChanges({ kind: "ready", data: fresh }); }, () => { if (live) setChanges({ kind: "ready", data: { ...data, refreshing: false, refresh_error: "atualização indisponível" } }); });
+    }, failed);
     return () => { live = false; };
   }, []);
   useEffect(() => {
@@ -211,7 +222,7 @@ export function SectorMap({ stocks, selection, busy, active, available, onSector
       </span>
       <span className="hm-nodata"><i data-tone="none" aria-hidden="true" />sem dado{missing ? ` (${missing})` : ""}</span>
     </div>
-    <p className="pane-foot">{changes.kind === "loading" ? "Carregando variações do Yahoo Finance…" : changes.kind === "error" ? `Variações indisponíveis: ${changes.message}` : `${color.label}: ${changes.data.source}, pregão de ${shortDate(changes.data.session)}.`}
+    <p className="pane-foot">{changes.kind === "loading" ? "Carregando variações do Yahoo Finance…" : changes.kind === "error" ? `Variações indisponíveis: ${changes.message}` : `${color.label}: ${changes.data.source}, pregão de ${shortDate(changes.data.session)} · variação de ${fetchedStamp(changes.data.fetched_at)}${changes.data.refreshing ? " · atualizando…" : changes.data.refresh_error ? " · atualização falhou, exibindo os últimos dados" : ""}.`}
       {" "}Tamanho: Fundamentus, liquidez média diária em 2 meses.{unsized > 0 && sizeBy === "liquidity" ? ` ${unsized} ações sem liquidez ficam fora do mapa.` : ""}</p>
     {note}
   </Pane>;

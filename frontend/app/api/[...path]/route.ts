@@ -14,7 +14,7 @@ async function forward(request: NextRequest, context: Context) {
   const upstream = new URL(`/api/${path.map(encodeURIComponent).join("/")}`, process.env.B3LAB_API_URL ?? "http://127.0.0.1:8000");
   upstream.search = request.nextUrl.search;
   const headers = new Headers();
-  for (const name of ["content-type", "cookie", "origin", "x-b3lab-request", "accept"]) {
+  for (const name of ["content-type", "cookie", "origin", "x-b3lab-request", "accept", "authorization"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
