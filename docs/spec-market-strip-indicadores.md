@@ -32,7 +32,7 @@ Minério de ferro fica de fora: o Yahoo não tem série confiável.
 
 ### Decisões
 
-1. **Juro real ex-ante pela fórmula de Fisher**, `(1 + Selic)/(1 + π) − 1`. É a mesma convenção da taxa real do Tesouro IPCA+, então os dois juros reais da faixa ficam comparáveis. A diferença simples superestimaria o juro real em ~0,7 p.p. com Selic de 13,75% e inflação de 5%.
+1. **Juro real ex-ante pela fórmula de Fisher**, `(1 + Selic)/(1 + π) − 1`. É a mesma convenção da taxa real do Tesouro IPCA+, então os dois juros reais da faixa ficam comparáveis. A diferença simples superestimaria o juro real em ~0,4 p.p. com Selic de 13,75% e inflação de 5% (8,75% contra 8,33%).
 2. **Inflação usada no juro real: Focus IPCA 12 meses à frente (suavizada)**, não o IPCA do fim do ano. Em novembro, o IPCA do ano corrente é quase todo inflação já realizada; o juro real ex-ante precisa da inflação esperada para o horizonte à frente. A série suavizada é a que o BCB usa para essa medida. O item mostra a data do Focus usado.
 3. **Variação dos macro em p.p.** Cada item ganha `change_unit` (`"fraction"` nas cotações, `"pp"` nos macro) e `change_note` (texto curto em PT-BR que diz contra o quê a variação foi medida). O frontend formata conforme a unidade.
 4. **Tesouro: só o início do CSV.** O arquivo tem ~14 MB e vem ordenado da data-base mais recente para a mais antiga (verificado em 07/11/2026: nenhuma inversão em 178 mil linhas). O servidor responde a um `Range` com o arquivo inteiro (206 com `Content-Range: bytes 0-14667959`), levando de 2 a 20 s. Por isso a busca lê o corpo em streaming e fecha a conexão depois de 128 KB (~1.800 linhas, várias semanas), descartando a última linha cortada. Leva ~0,2 s.
