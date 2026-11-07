@@ -215,7 +215,7 @@ export default function SimulationPage() {
               </label>
             </div>
             <p className="discreet-status sim-submit-note">Os parâmetros só são aplicados ao clicar em Rodar Simulação; se mudarem depois, o resultado anterior fica marcado como desatualizado.</p>
-            <div className="actions">
+            <div className="actions dock-mobile">
               <button type="submit" className="primary" disabled={running || !inputsValid}>{running ? "Rodando simulação…" : "Rodar Simulação"}</button>
             </div>
             <details className="method-disclosure sim-method"><summary>Premissas e calibração</summary><div><p>A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos.</p><p>O horizonte é independente da janela: são 252 dias úteis por ano, com limite de 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p></div></details>

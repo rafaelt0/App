@@ -91,6 +91,7 @@ const paths: Record<string, string> = {
   info: "M12 11v6m0-10h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
   alert: "M12 8v5m0 4h.01M10 3 2 18a2 2 0 0 0 2 3h16a2 2 0 0 0 2-3L14 3a2 2 0 0 0-4 0",
   check: "M8 12l3 3 5-6M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
+  "chevron-down": "m6 9 6 6 6-6",
 };
 const noticeIcons: Record<Signal, string> = { positive: "check", negative: "alert", warning: "alert", neutral: "info", info: "info" };
 export function Icon({ name = "chart" }: { name?: string }) {
@@ -183,6 +184,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
   const [filter, setFilter] = useState<"all" | "favorites">("all");
   const [sort, setSort] = useState<StockSort>("liquidity");
   const [announcement, setAnnouncement] = useState("");
+  const [compact, setCompact] = useState(false);
   const [undo, setUndo] = useState<{ before: string[]; after: string[] } | null>(null);
   const results = useMemo(() => {
     const pool = sortStocks(filter === "favorites" ? stocks.filter(stock => watchlist.includes(stock.ticker)) : stocks, sort);
@@ -199,6 +201,13 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
       resultRefs.current[Math.min(target, options.length - 1)]?.focus();
     }
   }, [open, options.length]);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 640px)");
+    const sync = () => setCompact(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
   const isSelected = (ticker: string) => value.includes(ticker);
   async function change(next: string[], message: string, saveUndo = true) {
     if (changeLock.current) return false;
@@ -231,7 +240,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
       setAnnouncement(`Limite de ${max} ativos atingido.`);
       return;
     }
-    await change([...value, ticker], `${ticker} adicionada à seleção.`);
+    if (await change([...value, ticker], `${ticker} adicionada à seleção.`)) { setQuery(""); setActive(0); setOpen(false); }
   }
   async function toggleFavorite(ticker: string) {
     if (!onFavorite || favoriteLock.current) return;
@@ -264,7 +273,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
     }
   }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); closePicker(true); } }}>
     <label htmlFor={id}>{label}</label>
-    <div className="ticker-search"><Icon name="search" /><input ref={inputRef} id={id} type="search" autoComplete="off" placeholder="Digite ticker ou nome da empresa (atalho: / ou Ctrl+K)" value={query} aria-busy={busy} aria-label={`${label}: buscar ticker ou empresa`} onFocus={() => { if (dismissed.current) dismissed.current = false; else setOpen(true); }} onClick={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
+    <div className="ticker-search"><Icon name="search" /><input ref={inputRef} id={id} type="search" autoComplete="off" placeholder={compact ? "Ticker ou empresa" : "Digite ticker ou nome da empresa (atalho: / ou Ctrl+K)"} value={query} aria-busy={busy} aria-label={`${label}: buscar ticker ou empresa`} onFocus={() => { if (dismissed.current) dismissed.current = false; else setOpen(true); }} onClick={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); closePicker(false); }
       if (event.key === "ArrowDown" && options.length) {
         event.preventDefault();
@@ -291,7 +300,7 @@ export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escol
           <button ref={node => { resultRefs.current[index] = node; }} type="button" className="ticker-option-select" aria-pressed={selected} aria-disabled={busy} onFocus={() => setActive(index)} onKeyDown={event => {
             if (event.key === "ArrowDown") { event.preventDefault(); moveFocus(index + 1); }
             if (event.key === "ArrowUp") { event.preventDefault(); if (index === 0) inputRef.current?.focus(); else moveFocus(index - 1); }
-          }} onClick={event => { void toggleTicker(stock.ticker); if (event.detail !== 0) inputRef.current?.focus(); }}>
+          }} onClick={event => { const adding = !selected; void toggleTicker(stock.ticker); if (event.detail !== 0) { if (adding) dismissed.current = true; inputRef.current?.focus(); window.setTimeout(() => { dismissed.current = false; }, 0); } }}>
             <span className="ticker-option-check" aria-hidden="true">{selected ? "✓" : "+"}</span>
             <StockLogo ticker={stock.ticker} company={stock.company} />
             <span className="ticker-option-copy"><strong>{stock.ticker}</strong><span>{stock.company || "Empresa não informada"}</span><small>{stock.sector || "Setor não informado"}</small></span>

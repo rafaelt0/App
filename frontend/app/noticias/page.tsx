@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import Chart from "../../components/Chart";
 import { useApp } from "../../components/AppProvider";
 import { EmptyState, formatBrasilia, formatPercent, formatValue, Loading, Metrics, Notice, PageHeader, relativeAge, Section, Table } from "../../components/ui";
+import { ElapsedLoading } from "../../components/PortfolioParts";
 import "./news.css";
 import { api } from "../../lib/api";
 import { filterArticles, initialFilters, intensityLevels, safeNewsLink, sortModes } from "../../lib/news";
@@ -156,7 +157,7 @@ export default function NewsPage() {
           <button className="primary" onClick={() => void execute(true)} disabled={busy}>{busy ? "Atualizando…" : "Atualizar notícias"}</button>
         </div>
       </section>}
-      {busy && <Loading>Buscando feeds e textos; classificando com Jev ou léxico quando indisponível…</Loading>}
+      {busy && <ElapsedLoading>Buscando as notícias dos seus ativos e avaliando o tom de cada uma. Isso pode levar até um minuto.</ElapsedLoading>}
       {snapshot && <>
         <div className="news-feed-status">{snapshot.feeds.map(feed => !feed.ok ? <Notice key={feed.ticker} tone="warning">Feed de notícias indisponível para {feed.ticker}; nenhum item foi usado na análise.</Notice> : !feed.recent_count ? <Notice key={feed.ticker}>Nenhuma notícia recente (últimos 7 dias) encontrada para {feed.ticker}.</Notice> : null)}
           {jevPaused && <Notice>Análise avançada indisponível; nova tentativa após {formatBrasilia(new Date(retryAt).toISOString(), false)}.</Notice>}

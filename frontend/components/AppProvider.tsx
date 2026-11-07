@@ -6,7 +6,8 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { api, subscribeActivity } from "../lib/api";
 import CommandPalette, { SELECTION_FULL_MESSAGE } from "./CommandPalette";
 import MarketStrip from "./MarketStrip";
-import MarketNewsPanel from "./MarketNewsPanel";
+import MarketNewsPanel, { NewsLauncher } from "./MarketNewsPanel";
+import SelectionMenu from "./SelectionMenu";
 import { Icon, Loading, Notice } from "./ui";
 
 export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null };
@@ -66,6 +67,7 @@ function Shell({ children }: { children: ReactNode }) {
   const [palette, setPalette] = useState(false);
   const [busy, setBusy] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
+  const [shellNote, setShellNote] = useState<string | null>(null);
   const [modifier, setModifier] = useState("Ctrl ");
   const sidebarShortcut = `${modifier}B`;
   useEffect(() => subscribeActivity(setBusy), []);
@@ -90,15 +92,21 @@ function Shell({ children }: { children: ReactNode }) {
   const selection = session?.selection ?? [];
   const watchlist = session?.watchlist ?? [];
   const known = new Set(stocks.map(stock => stock.ticker));
+  const staysInPlace = pathname === "/portfolio" || pathname === "/simulacao";
   const openTicker = useCallback((ticker: string) => {
     setOpen(false);
-    if (selection.includes(ticker)) { router.push("/"); return; }
+    if (selection.includes(ticker)) { if (staysInPlace) setShellNote(`${ticker} já está na seleção.`); else router.push("/"); return; }
     if (selection.length >= 20) { setShellError(SELECTION_FULL_MESSAGE); return; }
     setShellError(null);
     void setSelection(current => current.includes(ticker) ? [...current] : [...current, ticker])
-      .then(() => router.push("/"))
+      .then(() => { if (staysInPlace) setShellNote(`${ticker} adicionada à seleção.`); else router.push("/"); })
       .catch(exc => setShellError(exc instanceof Error ? exc.message : String(exc)));
-  }, [router, selection, setSelection]);
+  }, [router, selection, setSelection, staysInPlace]);
+  useEffect(() => {
+    if (!shellNote) return;
+    const timer = window.setTimeout(() => setShellNote(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [shellNote]);
   const menuRef = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const closeMenu = () => {
@@ -111,6 +119,7 @@ function Shell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setOpen(false);
     setShellError(null);
+    setShellNote(null);
     if (navRef.current?.contains(document.activeElement) && window.matchMedia("(max-width: 1023px)").matches) menuRef.current?.focus();
   }, [pathname]);
   useEffect(() => {
@@ -125,7 +134,7 @@ function Shell({ children }: { children: ReactNode }) {
   }, [open]);
   return <div className="app-shell">
     <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
-    <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><div className="mobile-actions"><button type="button" aria-label="Buscar ativo" onClick={() => setPalette(true)}><Icon name="search" /></button><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></div></header>
+    <header className="mobile-header"><Link href="/" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="142" height="44" /></Link><div className="mobile-actions"><span className="mobile-news"><NewsLauncher /></span><button type="button" aria-label="Buscar ativo" onClick={() => setPalette(true)}><Icon name="search" /></button><button ref={menuRef} aria-expanded={open} aria-controls="navegacao" onClick={() => setOpen(!open)}><Icon name="menu" />Menu</button></div></header>
     <aside ref={navRef} className={`sidebar${open ? " is-open" : ""}`} id="navegacao">
       <button type="button" className="sidebar-toggle" aria-expanded={!collapsed} aria-controls="navegacao" aria-keyshortcuts="Control+B Meta+B" aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"} title={`${collapsed ? "Expandir" : "Recolher"} barra lateral (${sidebarShortcut})`} onClick={toggleCollapsed}><Icon name={collapsed ? "panel-open" : "panel-close"} />{!collapsed && <span>Recolher</span>}{!collapsed && <kbd>{sidebarShortcut}</kbd>}</button>
       <Link href="/" className="brand" aria-label="B3Lab, página inicial" onClick={closeMenu}><img src="/logo.svg" alt="B3Lab" width="180" height="56" /></Link>
@@ -141,13 +150,13 @@ function Shell({ children }: { children: ReactNode }) {
     </aside>
     <main id="conteudo" className="main-frame" tabIndex={-1} aria-busy={busy}>
       <div className="workspace-bar"><div className="workspace-location"><span>B3Lab</span><span aria-hidden="true">/</span><span>{currentPage?.label ?? "Pesquisa de ações"}</span></div>
-        <div className="workspace-tools">{session && <span className="workspace-selection" data-empty={!selection.length}>{selection.length ? `${selection.length} ${selection.length === 1 ? "ativo selecionado" : "ativos selecionados"}` : "Nenhum ativo selecionado"}</span>}<span className="workspace-market">Mercado brasileiro <span>B3</span></span></div>
+        <div className="workspace-tools"><SelectionMenu /><span className="workspace-market">Mercado brasileiro <span>B3</span></span><NewsLauncher docked /></div>
         <span className="activity-line" data-active={busy} aria-hidden="true" />
       </div>
       <MarketStrip />
-      <div className="main-content">{shellError && <Notice tone="negative">{shellError}</Notice>}{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></div>
+      <div className="main-content">{shellError && <Notice tone="negative">{shellError}</Notice>}{shellNote && <Notice tone="positive">{shellNote}</Notice>}{children}<footer className="mobile-disclaimer">Análise quantitativa da B3.<br />Dados para pesquisa, não recomendações de investimento.</footer></div>
     </main>
-    <CommandPalette open={palette} onClose={() => setPalette(false)} stocks={stocks} watchlist={watchlist} selection={selection} onTicker={openTicker} />
+    <CommandPalette open={palette} onClose={() => setPalette(false)} stocks={stocks} watchlist={watchlist} selection={selection} onTicker={openTicker} staysInPlace={staysInPlace} />
     <MarketNewsPanel />
   </div>;
 }

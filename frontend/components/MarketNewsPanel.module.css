@@ -1,26 +1,24 @@
 .launcher {
-  position: fixed;
-  right: max(24px, env(safe-area-inset-right));
-  bottom: max(24px, env(safe-area-inset-bottom));
-  z-index: 30;
-  display: grid;
+  display: inline-grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 30px;
+  height: 30px;
+  min-height: 0;
   padding: 0;
-  border: 1px solid var(--brand-primary);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-pill);
-  background: var(--surface-raised);
+  background: var(--surface-panel);
   color: var(--brand-primary);
   box-shadow: none;
 }
-.launcher > span { width: 24px; height: 24px; }
+.launcher:hover { border-color: var(--brand-primary); }
+.launcher > span { width: 18px; height: 18px; }
 .panel {
   position: fixed;
-  inset: auto max(24px, env(safe-area-inset-right)) max(88px, calc(env(safe-area-inset-bottom) + 64px)) auto;
+  inset: 56px max(24px, env(safe-area-inset-right)) auto auto;
   width: min(420px, calc(100vw - 32px));
   max-width: none;
-  max-height: min(640px, calc(100dvh - 112px));
+  max-height: min(640px, calc(100dvh - 72px));
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -58,8 +56,7 @@
 .footer p { margin: 0; }
 .footer p + p { margin-top: 4px; }
 @media (max-width: 480px) {
-  .launcher { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
-  .panel { right: max(16px, env(safe-area-inset-right)); bottom: max(80px, calc(env(safe-area-inset-bottom) + 64px)); max-height: calc(100dvh - 96px); }
+  .panel { top: 60px; right: max(16px, env(safe-area-inset-right)); bottom: auto; max-height: calc(100dvh - 76px); }
   .header { gap: 8px; padding: 12px; }
   .header h2 { font-size: 17px; }
 }

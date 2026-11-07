@@ -7,6 +7,14 @@ import styles from "./MarketNewsPanel.module.css";
 
 type FeedState = { kind: "loading" } | { kind: "ready"; data: MarketNews } | { kind: "error"; message: string };
 
+const openEvent = "b3lab:open-market-news";
+
+/** The panel is a single dialog; launchers in the workspace bar and the mobile header open it by event. */
+export function NewsLauncher({ docked = false }: { docked?: boolean }) {
+  return <button type="button" className={docked ? styles.launcher : undefined} aria-label="Abrir notícias do mercado" title="Notícias do mercado" aria-haspopup="dialog"
+    onClick={() => window.dispatchEvent(new Event(openEvent))}><Icon name="news" /></button>;
+}
+
 export default function MarketNewsPanel() {
   const id = useId();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -15,6 +23,11 @@ export default function MarketNewsPanel() {
   const [feed, setFeed] = useState<FeedState>({ kind: "loading" });
 
   useEffect(() => () => { request.current += 1; }, []);
+  useEffect(() => {
+    const show = () => { dialog.current?.showModal(); setOpen(true); void load(); };
+    window.addEventListener(openEvent, show);
+    return () => window.removeEventListener(openEvent, show);
+  });
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
@@ -34,10 +47,6 @@ export default function MarketNewsPanel() {
   }
 
   return <>
-    <button type="button" className={styles.launcher} aria-label="Abrir notícias do mercado" title="Notícias do mercado"
-      aria-haspopup="dialog" aria-expanded={open} aria-controls={id} onClick={() => {
-        dialog.current?.showModal(); setOpen(true); void load();
-      }}><Icon name="news" /></button>
     <dialog ref={dialog} id={id} className={styles.panel} aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}
       onClose={() => setOpen(false)} onClick={event => {
         if (event.target !== dialog.current) return;

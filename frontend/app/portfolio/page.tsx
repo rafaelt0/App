@@ -177,20 +177,6 @@ export default function PortfolioPage() {
     finally { setSelectionBusy(false); }
   }
 
-  async function clearPortfolio() {
-    requestGeneration.current += 1;
-    stressGeneration.current += 1;
-    setLoadedSelection(null);
-    setResult(null);
-    setStressResult(null);
-    if (!analysisPending.current) setBusy(false);
-    setStressBusy(false);
-    setSelectionBusy(true);
-    try { await api("/api/portfolio", undefined, "DELETE"); await refreshSession(); setNotice("Carteira e seleção removidas."); }
-    catch (exc) { setError(exc instanceof Error ? exc.message : String(exc)); }
-    finally { setSelectionBusy(false); }
-  }
-
   async function refreshQuotes() {
     requestGeneration.current += 1;
     stressGeneration.current += 1;
@@ -262,10 +248,9 @@ export default function PortfolioPage() {
         </div>
         {!manualValid && <Notice tone="warning">A alocação manual precisa ter ao menos uma cota positiva.</Notice>}
         {!validInputs && <Notice tone="warning">Confira os limites de capital, histórico, cotas inteiras e diversificação.</Notice>}
-        <div className="actions">
+        <div className="actions dock-mobile">
           <button type="button" className="primary pf-actions-primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => void runAnalysis()}>Carregar portfólio</button>
           <button type="button" disabled={selectionBusy} onClick={() => void refreshQuotes()}>Atualizar cotações</button>
-          <button type="button" onClick={() => void clearPortfolio()} disabled={selectionBusy || (count === 0 && !session.portfolio_ready)}>Limpar carteira</button>
         </div>
         {loadedSelection === selectionKey && <p className="pf-actions-note">Mudanças nos parâmetros recalculam a análise sozinhas, após meio segundo sem edições e com valores válidos. Trocar os ativos exige clicar em Carregar portfólio.</p>}
       </div>

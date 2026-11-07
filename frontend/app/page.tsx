@@ -153,7 +153,7 @@ export default function HomePage() {
         </div>
         <TickerPicker value={selection} onChange={updateSelection} stocks={stocks} max={20} label="Buscar ações" watchlist={session.watchlist} onFavorite={toggleFavorite} priority={!!sectors.length && !sectors.includes("Todos") ? suggested?.tickers : undefined}/>
         {!!selection.length && <>
-          <div className="actions"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button></div>
+          <div className="actions dock-mobile"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button></div>
           <p className="caption">A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
           {!ready && !busy && <Notice>{stale ? "A seleção mudou. Clique em Analisar para atualizar os indicadores." : "Clique em Analisar para buscar os indicadores das ações selecionadas."}</Notice>}
         </>}

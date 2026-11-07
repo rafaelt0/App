@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import "./screener.css";
 import { useApp } from "../../components/AppProvider";
+import { SELECTION_FULL_MESSAGE } from "../../components/CommandPalette";
 import { ExportButton, formatCompactValue, Icon, Loading, Metrics, Notice, PageHeader, Section } from "../../components/ui";
 import { refreshFundamentus } from "../../lib/home";
 import { activeCriteria, applyPreset, canonicalCriteria, criterionDefs, defaults, editControl, queryScreener, screenerConfig, sortKey } from "../../lib/screener";
@@ -27,6 +29,7 @@ export default function ScreenerPage() {
   const [actionBusy,setActionBusy]=useState(false);
   const [error,setError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
+  const [undoSelection,setUndoSelection]=useState<{before:string[];ticker:string}|null>(null);
   const [reload,setReload]=useState(0);
   const barRef=useRef<HTMLDivElement>(null);
   const generation=useRef(0);
@@ -68,14 +71,24 @@ export default function ScreenerPage() {
     catch(exc){setError((exc as Error).message);}
     finally{setActionBusy(false);}
   }
-  async function handoff() {
+  async function handoff(mode: "add" | "only") {
     if(!selected)return;
-    setActionBusy(true);setError(null);
+    setActionBusy(true);setError(null);setUndoSelection(null);
     try {
       const known=stocks.some(stock=>stock.ticker===selected);
-      await setSelection(known ? [selected]:[]);
-      router.push(known ? "/":`/?unavailable=${encodeURIComponent(selected)}`);
+      if(!known){router.push(`/?unavailable=${encodeURIComponent(selected)}`);return;}
+      const before=[...session!.selection];
+      if(mode==="add" && !before.includes(selected) && before.length>=20){setError(SELECTION_FULL_MESSAGE);return;}
+      await setSelection(mode==="only" ? [selected]:current=>current.includes(selected) ? [...current]:[...current,selected]);
+      if(mode==="only" && before.some(ticker=>ticker!==selected)){setUndoSelection({before,ticker:selected});return;}
+      router.push("/");
     } catch(exc){setError((exc as Error).message);}finally{setActionBusy(false);}
+  }
+  async function undoOnly() {
+    if(!undoSelection)return;
+    setActionBusy(true);setError(null);
+    try {await setSelection(undoSelection.before);setUndoSelection(null);}
+    catch(exc){setError((exc as Error).message);}finally{setActionBusy(false);}
   }
   function sortBy(field:string) {
     setSort(current => current.field===field ? {field,direction:current.direction==="asc" ? "desc":"asc"} : {field,direction:"desc"});
@@ -128,6 +141,7 @@ export default function ScreenerPage() {
   return <div className="screener-page">
     <PageHeader title="Screener de ações" description="Explore ações listadas na B3 com critérios claros e ajustáveis. Dados da Fundamentus; consulte a coleta exibida abaixo." icon="filter"/>
     {notice && <Notice tone="positive">{notice}</Notice>}
+    {undoSelection && <Notice tone="positive"><div className="scr-undo"><span>Seleção substituída por {undoSelection.ticker} (eram {undoSelection.before.length} ativos).</span><button disabled={actionBusy} onClick={()=>void undoOnly()}>Desfazer</button><Link className="button-link primary" href="/">Abrir Fundamentos</Link></div></Notice>}
     <div className="scr-workspace">
     <section className="task-panel scr-filters" aria-labelledby="scr-filters-title">
       <div className="task-heading"><span className="task-step" aria-hidden="true">01</span><div className="task-heading-content"><h2 id="scr-filters-title">Defina os critérios</h2><p>Escolha um ponto de partida e ajuste os limites da busca.</p></div></div>
@@ -172,8 +186,8 @@ export default function ScreenerPage() {
           <div className="scr-selection" data-selected={selectedCurrent ? "true":"false"} role="region" aria-label="Ação selecionada" aria-live="polite">
             {selectedCurrent ? <>
               <strong>Ação selecionada: {selectedCurrent}</strong>
-              <div className="actions"><button className="primary" disabled={actionBusy} onClick={()=>void handoff()}>Analisar em Fundamentos</button><button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favoritado":"☆ Favoritar"}</button><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
-              <p className="caption">Abrir Fundamentos substitui a seleção atual; clique em Analisar para buscar indicadores, preço-alvo e consenso.</p>
+              <div className="actions"><button className="primary" disabled={actionBusy} onClick={()=>void handoff("add")}>Adicionar à seleção</button><button disabled={actionBusy} onClick={()=>void handoff("only")}>Ver só este</button><button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favoritado":"☆ Favoritar"}</button><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
+              <p className="caption">Adicionar mantém os ativos já selecionados e abre Fundamentos; Ver só este substitui a seleção. Em Fundamentos, clique em Analisar para buscar indicadores, preço-alvo e consenso.</p>
             </>:<>
               <p className="caption">Selecione uma linha para abrir a análise de preço-alvo ou gerenciar favoritos. As colunas exibidas não alteram a seleção nem o CSV.</p>
               <div className="actions"><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>

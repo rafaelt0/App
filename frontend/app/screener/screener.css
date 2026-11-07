@@ -117,3 +117,8 @@
 @media (max-width: 480px) {
   .screener-page .scr-quick-amounts button { flex: 1 1 auto; }
 }
+.scr-row { cursor: pointer; }
+.scr-row:hover:not(.selected-row) td { background: var(--hover-tint); }
+.scr-table .scr-row-select { display: flex; justify-content: flex-start; width: 100%; min-height: 0; padding: 4px 0; border: 0; border-radius: var(--radius-sm); background: transparent; box-shadow: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.scr-table .scr-row-select:hover:not(:disabled) { background: transparent; }
+.scr-undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }

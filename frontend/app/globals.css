@@ -524,3 +524,22 @@ hr { border: 0; border-top: 1px solid var(--border-default); margin: 24px 0; }
   .strip-viewport { overflow-x: auto; }
   .strip-list[aria-hidden="true"], .strip-toggle { display: none; }
 }
+.mobile-news { display: none; }
+.selection-menu { position: relative; }
+button.workspace-selection { cursor: pointer; font-family: inherit; }
+button.workspace-selection:hover { border-color: var(--border-hover); color: var(--text-primary); }
+button.workspace-selection .app-icon, button.workspace-selection svg { width: 14px; height: 14px; }
+.selection-popover { position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; width: min(320px, 90vw); padding: 12px; border: 1px solid var(--border-hover); border-radius: var(--radius-lg); background: var(--surface-raised); white-space: normal; }
+.selection-popover ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.selection-popover li { display: flex; align-items: center; gap: 6px; min-width: 0; padding-left: 8px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-muted); font: 500 12.5px/1 var(--font-mono); }
+.selection-popover li strong { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.selection-popover li button { min-width: 32px; min-height: 32px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--text-muted); }
+.selection-popover li button:hover:not(:disabled) { background: transparent; color: var(--brand-danger); }
+.selection-popover .caption { margin: 0; }
+.selection-popover-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.selection-popover-footer button { min-height: 32px; border: 0; background: transparent; box-shadow: none; color: var(--text-muted); font-size: 12px; }
+@media (max-width: 768px) { .mobile-news { display: contents; } }
+@media (max-width: 768px) {
+  .actions.dock-mobile { position: sticky; bottom: 0; z-index: 15; margin-inline: -16px; padding: 10px 16px; border-top: 1px solid var(--border-default); background: var(--surface-canvas); }
+  .actions.dock-mobile > .primary { flex: 1 1 auto; }
+}

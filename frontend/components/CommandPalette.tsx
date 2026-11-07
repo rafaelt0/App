@@ -14,11 +14,12 @@ type Props = {
   watchlist: string[];
   selection: string[];
   onTicker: (ticker: string) => void;
+  staysInPlace?: boolean;
 };
 
 const normalize = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("pt-BR");
 
-export default function CommandPalette({ open, onClose, stocks, watchlist, selection, onTicker }: Props) {
+export default function CommandPalette({ open, onClose, stocks, watchlist, selection, onTicker, staysInPlace = false }: Props) {
   const id = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -100,6 +101,6 @@ export default function CommandPalette({ open, onClose, stocks, watchlist, selec
     </ul>
     <div className="visually-hidden" aria-live="polite">{actions.length === 1 ? "1 resultado" : `${actions.length} resultados`}</div>
     {message && <div role="status"><Notice tone="warning">{message}</Notice></div>}
-    <p className="palette-footer" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> navegar</span><span><kbd>Enter</kbd> adicionar</span><span><kbd>/</kbd> abre a busca</span><span>Ativos entram na seleção de Fundamentos</span></p>
+    <p className="palette-footer" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> navegar</span><span><kbd>Enter</kbd> adicionar</span><span><kbd>/</kbd> abre a busca</span><span>{staysInPlace ? "Ativos entram na seleção desta página" : "Ativos entram na seleção de Fundamentos"}</span></p>
   </dialog>;
 }

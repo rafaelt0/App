@@ -17,7 +17,6 @@ type Props = {
 /** Same markup as the shared Table, with sortable column headers. Missing values stay "—" via formatValue. */
 export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey, onSelect }: Props) {
   return <div className="table-scroll" tabIndex={0} aria-label="Tabela de dados"><table><thead><tr>
-    <th scope="col">Selecionar</th>
     <th scope="col">Papel</th>
     {columns.map(column => {
       const active = sort.field === column.key;
@@ -28,9 +27,8 @@ export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey
     })}
   </tr></thead><tbody>{rows.map(row => {
     const ticker = String(row.ticker);
-    return <tr key={ticker} className={selectedKey === ticker ? "selected-row" : undefined}>
-      <td><button aria-label={`Selecionar ${ticker}`} aria-pressed={selectedKey === ticker} onClick={() => onSelect(ticker)}>{selectedKey === ticker ? "Selecionado" : "Selecionar"}</button></td>
-      <td><span className="scr-ticker"><StockLogo ticker={ticker} company={typeof row.company === "string" ? row.company : ticker} size={24}/>{ticker}</span></td>
+    return <tr key={ticker} className={`scr-row${selectedKey === ticker ? " selected-row" : ""}`} onClick={() => onSelect(ticker)}>
+      <td><button type="button" className="scr-row-select" aria-label={`Selecionar ${ticker}`} aria-pressed={selectedKey === ticker}><span className="scr-ticker"><StockLogo ticker={ticker} company={typeof row.company === "string" ? row.company : ticker} size={24}/>{ticker}</span></button></td>
       {columns.map(column => {
         const currency=column.currency ?? (typeof row.currency === "string" ? row.currency : "BRL");
         const isCompactMoney=column.unit === "money" && compactMoneyColumns.has(column.key);
