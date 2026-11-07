@@ -9,7 +9,9 @@ import { rankStocks, sortStocks } from "../lib/tickerSearch";
 import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp, type Session, type Stock } from "./AppProvider";
 import { formatBrasilia, formatCompactValue, formatValue, type Unit } from "./ui";
 
-export type StripItem = { key: string; group: "macro" | "market" | "stock"; label: string; symbol: string | null; value: number; unit: Unit; currency: string | null; digits: number; change: number | null; note: string | null; as_of: string; source: string };
+export type StripItem = { key: string; group: "macro" | "market" | "stock"; label: string; symbol: string | null; value: number; unit: Unit; currency: string | null; digits: number; change: number | null; change_unit: ChangeUnit | null; change_note: string | null; note: string | null; as_of: string; source: string };
+/** Quote changes are daily fractions; macro changes are percentage-point differences. */
+export type ChangeUnit = "fraction" | "pp";
 export type Strip = { items: StripItem[]; missing: string[]; updated_at: string };
 type Market = { strip: Strip | null; failed: boolean };
 
@@ -42,10 +44,11 @@ function sessionOpen(now: Date): boolean {
   return !["Sat", "Sun"].includes(parts.weekday) && minutes >= 600 && minutes < 1020;
 }
 
-function Change({ value }: { value: number | null }) {
+function Change({ value, unit = "fraction", tone: toned = true }: { value: number | null; unit?: ChangeUnit | null; tone?: boolean }) {
   if (value === null) return null;
-  const tone = value > 0 ? "positive" : value < 0 ? "negative" : "neutral";
-  return <span className={`chg is-${tone}`}><span aria-hidden="true">{value > 0 ? "▲" : value < 0 ? "▼" : "■"}</span>{formatValue(value, "fraction", 2, "BRL", true)}</span>;
+  const tone = !toned ? "neutral" : value > 0 ? "positive" : value < 0 ? "negative" : "neutral";
+  const text = unit === "pp" ? `${formatValue(value, "number", 2, "BRL", true)} p.p.` : formatValue(value, "fraction", 2, "BRL", true);
+  return <span className={`chg is-${tone}`}><span aria-hidden="true">{value > 0 ? "▲" : value < 0 ? "▼" : "■"}</span>{text}</span>;
 }
 export { Change };
 
@@ -55,7 +58,7 @@ function Tape() {
   if (!strip?.items.length) return <div className="tape is-empty" role="status">{failed || strip ? "Cotações e indicadores indisponíveis no momento." : "Carregando cotações…"}</div>;
   const items = strip.items.filter(item => item.group !== "macro");
   const list = (hidden?: boolean) => <ul className="tape-list" aria-hidden={hidden || undefined}>{items.map(item => <li key={item.key} title={`${item.label}: ${item.source}, referência ${item.as_of.split("-").reverse().join("/")}`}>
-    <b>{item.label}</b><span>{formatValue(item.value, item.unit, item.digits, item.currency ?? "BRL")}</span><Change value={item.change} />
+    <b>{item.label}</b><span>{formatValue(item.value, item.unit, item.digits, item.currency ?? "BRL")}</span><Change value={item.change} unit={item.change_unit} />
   </li>)}</ul>;
   return <section className="tape" aria-label="Cotações com atraso" data-paused={paused}>
     <div className="tape-viewport"><div className="tape-track" style={{ animationDuration: `${items.length * 5}s` }}>{list()}{list(true)}</div></div>
@@ -254,9 +257,11 @@ export default function Shell({ children }: { children: ReactNode }) {
         if (active) setMarket(current => ({ ...current, failed: true }));
       }
     };
+    const onVisible = () => { if (document.visibilityState === "visible") void load(); };
     void load();
     const timer = setInterval(load, refreshMs);
-    return () => { active = false; clearInterval(timer); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { active = false; clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

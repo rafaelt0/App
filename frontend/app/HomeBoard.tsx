@@ -224,15 +224,15 @@ export function Macro() {
   return <Pane title="Macro e índices" area="mac" className="pane-macro" meta={strip ? `atualizado ${formatBrasilia(strip.updated_at, false).replace(" (horário de Brasília)", "")}` : undefined} flush>
     {!strip ? failed ? <Notice tone="warning">Indicadores indisponíveis no momento.</Notice> : <Loading>Carregando indicadores…</Loading> : <ScrollX label="Macro e índices"><table className="grid macro">
       <thead><tr><th scope="col">Série</th><th scope="col" className="num">Valor</th><th scope="col" className="num">Var.</th><th scope="col" className="num">Ref.</th></tr></thead>
-      <tbody>{rows.map(item => <tr key={item.key} title={`${item.source}${item.note ? ` · ${item.note}` : ""}`}>
+      <tbody>{rows.map(item => <tr key={item.key} title={`${item.source}${item.note ? ` · ${item.note}` : ""}${item.change_note ? ` · variação ${item.change_note}` : ""}`}>
         <th scope="row">{item.label}{item.note && <small>{item.note}</small>}</th>
         <td className="num">{formatValue(item.value, item.unit, item.digits, item.currency ?? "BRL")}</td>
-        <td className="num">{item.change === null ? <span className="muted">—</span> : <Change value={item.change} />}</td>
+        <td className="num">{item.change === null ? <span className="muted">—</span> : <Change value={item.change} unit={item.change_unit} tone={item.group !== "macro"} />}</td>
         <td className="num muted">{shortDate(item.as_of)}</td>
       </tr>)}</tbody>
     </table></ScrollX>}
     {strip && strip.missing.length > 0 && <p className="pane-foot">Indisponível: {strip.missing.join(", ")}.</p>}
-    {strip && <p className="pane-foot">BCB SGS (Selic, CDI, IPCA, desemprego) · Yahoo Finance com atraso.</p>}
+    {strip && <p className="pane-foot">BCB SGS (Selic, IPCA) e Focus (medianas) · Tesouro Transparente · Yahoo Finance com atraso. Variação dos juros e da inflação em p.p.</p>}
   </Pane>;
 }
 
