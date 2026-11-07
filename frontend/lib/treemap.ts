@@ -37,37 +37,18 @@ export function squarify<T extends { value: number }>(items: readonly T[], box: 
   return placed;
 }
 
+export type Group<T> = { key: string; items: (T & { value: number })[] };
+export type LaidGroup<T> = Rect & { key: string; header: boolean; items: (T & { value: number } & Rect)[] };
+
 /**
- * Wraps `text` into at most `maxLines` lines of `width` px without breaking inside a word. When the words run out of
- * room, the last line ends with an ellipsis; when not even three characters fit, the label is empty and the caller hides it.
+ * Two-level treemap: groups are squarified by their summed values, then each group's items inside its own rect. A group
+ * gets a `headerHeight` strip on top when it is tall and wide enough to hold a label above at least one row of items.
  */
-export function fitLabel(text: string, width: number, maxLines: number, measure: (value: string) => number): string[] {
-  if (maxLines < 1 || width <= 0) return [];
-  const fits = (value: string) => measure(value) <= width;
-  const ellipsize = (value: string) => {
-    let cut = value;
-    while (cut.length > 3 && !fits(`${cut.replace(/[\s,.;:–-]+$/, "")}…`)) cut = cut.slice(0, -1);
-    // A stub of one or two letters before the ellipsis reads as noise; end on the previous whole word instead.
-    const space = cut.lastIndexOf(" ");
-    if (space > 0 && cut.length < value.length && cut.length - space - 1 < 4) cut = cut.slice(0, space);
-    cut = cut.replace(/\s+(e|de|do|da|dos|das)$/, "");
-    const shown = `${cut.replace(/[\s,.;:–-]+$/, "")}…`;
-    return cut.length > 3 || fits(shown) ? shown : null;
-  };
-  // Abbreviations such as "Serv.Méd.Hospit." may wrap after each period.
-  const words = text.replace(/\.(?=\S)/g, ". ").split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (fits(candidate)) { line = candidate; continue; }
-    if (line && lines.length + 1 < maxLines && fits(word)) { lines.push(line); line = word; continue; }
-    const last = line && lines.length + 1 < maxLines ? (lines.push(line), word) : candidate;
-    const closed = ellipsize(last);
-    if (closed) lines.push(closed);
-    else if (lines.length) lines[lines.length - 1] = ellipsize(`${lines[lines.length - 1]} ${word}`) ?? lines[lines.length - 1];
-    return lines;
-  }
-  if (line) lines.push(line);
-  return lines;
+export function nestedSquarify<T>(groups: readonly Group<T>[], box: Rect, headerHeight: number, gap = 1): LaidGroup<T>[] {
+  const totals = groups.map(group => ({ group, value: group.items.reduce((sum, item) => sum + Math.max(0, item.value), 0) }));
+  return squarify(totals, box).map(({ group, x, y, w, h }) => {
+    const header = h >= headerHeight * 2.5 && w >= 48;
+    const inner = { x: x + gap, y: y + (header ? headerHeight : gap), w: Math.max(0, w - 2 * gap), h: Math.max(0, h - gap - (header ? headerHeight : gap)) };
+    return { key: group.key, x, y, w, h, header, items: squarify(group.items, inner) };
+  });
 }

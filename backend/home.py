@@ -14,7 +14,7 @@ from utils.formatting import extract_debt_metric, get_ev_ebitda_context
 from utils.home_data import (build_analyst_synthesis, clear_fundamentus_cache,
                              compute_sector_ranking, get_fundamentus_data, get_sector_peers)
 from utils.market_data import (clean_numeric_column, compute_target_upside, get_liquidity_by_ticker,
-                               get_listed_stocks, get_market_target_data, get_sorted_tickers_by_liquidity)
+                               get_listed_stocks, get_universe_changes, get_market_target_data, get_sorted_tickers_by_liquidity)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/home", tags=["home"])
@@ -242,6 +242,16 @@ def universe_liquidity():
     except Exception as exc:
         raise HTTPException(503, f"Não foi possível carregar a liquidez da Fundamentus: {exc}") from exc
     return clean_json({"source": "Fundamentus · liquidez média diária em 2 meses (R$)", "fetched_at": series.attrs.get("fetched_at"), "liquidity": liquidity.to_dict()})
+
+
+@catalog_router.get("/universe/changes")
+def universe_changes():
+    tickers = tuple(get_listed_stocks()["Ticker"])
+    try:
+        result = get_universe_changes(tickers)
+    except Exception as exc:
+        raise HTTPException(503, f"Não foi possível carregar as variações do Yahoo Finance: {exc}") from exc
+    return clean_json({"source": "Yahoo Finance · fechamento ajustado, com atraso", "unit": "fraction", **result})
 
 
 @catalog_router.post("/universe/suggestions")

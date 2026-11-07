@@ -144,7 +144,7 @@ export default function HomePage() {
         {ready && !!ready.missing_tickers.length && <Notice tone="warning">Fundamentus indisponível para {ready.missing_tickers.join(", ")}.</Notice>}
       </>}/>
     {resultSlot}
-    <SectorMap stocks={stocks} busy={busy || sectorBusy} active={sectors} available={suggested?.count ?? stocks.length} onSector={sector=>void changeSectors([sector])} onReset={()=>void changeSectors([])}
+    <SectorMap stocks={stocks} selection={selection} busy={busy || sectorBusy} active={sectors} available={suggested?.count ?? stocks.length} onSector={sector=>void changeSectors([sector])} onAdd={ticker=>{if(selection.length<MAX_SELECTION)void changeSelection(current=>Array.from(new Set([...current,ticker])));}} onReset={()=>void changeSectors([])}
       onRefresh={()=>void run("source")}
       note={notice ? <Notice tone="positive">{notice}{sectorUndo && <> <button type="button" onClick={()=>void undoSectorChange()}>Desfazer</button></>}</Notice> : sectorBusy ? <Loading>Ordenando ações do setor por liquidez…</Loading> : null}/>
     <Macro/>
