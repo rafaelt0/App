@@ -3,7 +3,6 @@ import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import AppProvider from "../components/AppProvider";
 import "./globals.css";
-import "./motion.css";
 
 const ibmPlexSans = localFont({
   src: "./fonts/ibm-plex-sans-latin.woff2",
@@ -23,8 +22,6 @@ const ibmPlexMono = localFont({
   variable: "--font-ibm-plex-mono",
 });
 
-const sidebarScript = "try{if(localStorage.getItem('b3lab-sidebar')==='collapsed')document.documentElement.dataset.sidebar='collapsed'}catch{}";
-
 export const metadata: Metadata = {
   title: { default: "B3Lab | Análise quantitativa de ações", template: "%s | B3Lab" },
   description: "Fundamentos, portfólio, simulação, notícias e screener da B3.",
@@ -32,5 +29,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="pt-BR" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable}`}><body><script dangerouslySetInnerHTML={{ __html: sidebarScript }} /><AppProvider>{children}</AppProvider></body></html>;
+  return <html lang="pt-BR" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable}`}><body><AppProvider>{children}</AppProvider></body></html>;
 }

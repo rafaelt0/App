@@ -1,130 +1,154 @@
 "use client";
-import Link from "next/link";
 import { useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import Chart from "./Chart";
-import { ExportButton, formatValue, Metrics, Notice, Table, ValueText } from "./ui";
-import StockLogo from "./StockLogo";
-import { PriceRange, TargetRange } from "./RangeBar";
+import { Diagnostics, ExportButton, formatValue, Metrics, Notice, Pane, ScrollX, Table } from "./ui";
+import { TargetRange } from "./RangeBar";
+import { tickerColor } from "./Shell";
 import type { Column } from "./ui";
-import { comparisonColors, consensusColumns, marketColumns } from "../lib/home";
+import { consensusColumns, marketColumns } from "../lib/home";
 import type { Company, HomeResult } from "../lib/home";
 
-type Props = {
-  ready: HomeResult;
-  selection: string[];
-  watchlist: string[];
-  busy: boolean;
-  onFavorite: (ticker: string) => void;
-  onRefreshConsensus: () => void;
-};
-
-type TabContext = {
-  ready: HomeResult;
-  companies: Company[];
-  single: boolean;
-  busy: boolean;
-  comparison: string;
-  setComparison: (key: string) => void;
-  onRefreshConsensus: () => void;
-};
-
-type ResultTab = {
-  id: string;
-  label: string;
-  available: (ready: HomeResult, single: boolean) => boolean;
-  render: (context: TabContext) => ReactNode;
-};
+type Props = { ready: HomeResult; selection: string[]; busy: boolean; onRefreshConsensus: () => void };
+type TabContext = { ready: HomeResult; companies: Company[]; single: boolean; busy: boolean; comparison: string; setComparison: (key: string) => void; onRefreshConsensus: () => void; color: (ticker: string) => string | undefined };
+type ResultTab = { id: string; label: string; available: (ready: HomeResult, single: boolean) => boolean; render: (context: TabContext) => ReactNode };
 
 const always = () => true;
+const median = (values: number[]) => { const sorted = [...values].sort((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2; };
+
+type Bar = { ticker: string; value: number | null };
+/**
+ * Sorted horizontal bars with a dashed median. When the largest value is far above the rest, the scale follows the
+ * second largest and that bar is drawn broken with its value spelled out, so it does not flatten the others.
+ */
+function ComparisonBars({ companies, indicator, color }: { companies: Company[]; indicator: { key: string; label: string; unit: "multiple" | "percent" }; color: (ticker: string) => string | undefined }) {
+  const bars: Bar[] = companies.map(company => {
+    const raw = company.indicators_available ? company.indicators[indicator.key] : null;
+    return { ticker: company.ticker, value: typeof raw === "number" && Number.isFinite(raw) ? raw : null };
+  });
+  const known = bars.filter((bar): bar is { ticker: string; value: number } => bar.value !== null).sort((a, b) => b.value - a.value);
+  const missing = bars.filter(bar => bar.value === null);
+  const values = known.map(bar => bar.value);
+  const text = (value: number) => formatValue(value, indicator.unit, 2);
+  const outlier = known.length >= 3 && known[1].value > 0 && known[0].value > 2.5 * known[1].value;
+  const high = Math.max(0, outlier ? known[1].value * 1.2 : Math.max(...values, 0));
+  const low = Math.min(0, ...values);
+  const span = high - low || 1;
+  const at = (value: number) => (Math.min(Math.max(value, low), high) - low) / span * 100;
+  const mid = values.length >= 2 ? median(values) : null;
+  return <div className="cmp">
+    <ul className="cmp-rows" aria-label={`${indicator.label} por ativo, do maior para o menor`}>
+      {known.map((bar, index) => {
+        const clipped = outlier && index === 0;
+        const left = at(Math.min(0, bar.value)), right = at(Math.max(0, bar.value));
+        return <li key={bar.ticker} className={clipped ? "is-clipped" : undefined}>
+          <span className="cmp-tk"><i className="swatch" style={{ background: color(bar.ticker) ?? "#9aa2b4" }} aria-hidden="true" />{bar.ticker}</span>
+          <span className="cmp-track" aria-hidden="true">
+            {low < 0 && <span className="cmp-zero" style={{ left: `${at(0)}%` }} />}
+            <span className="cmp-bar" style={{ left: `${left}%`, width: `${Math.max(right - left, .4)}%`, background: color(bar.ticker) ?? "#9aa2b4" }} />
+            {clipped && <span className="cmp-break" />}
+            {mid !== null && <span className="cmp-mid" style={{ left: `${at(mid)}%` }} />}
+          </span>
+          <span className="cmp-val">{text(bar.value)}{clipped && <small>fora da escala</small>}</span>
+        </li>;
+      })}
+      {missing.map(bar => <li key={bar.ticker} className="is-missing"><span className="cmp-tk"><i className="swatch" style={{ background: color(bar.ticker) ?? "#9aa2b4" }} aria-hidden="true" />{bar.ticker}</span><span className="cmp-track" aria-hidden="true" /><span className="cmp-val muted">sem dado</span></li>)}
+    </ul>
+    <p className="cmp-scale" aria-hidden="true"><span>{low === 0 ? "0" : text(low)}</span>{mid !== null && <span className="cmp-scale-mid" style={{ left: `${at(mid)}%` }}>mediana {text(mid)}</span>}<span>{text(high)}</span></p>
+    {outlier && <p className="tab-foot">Escala até {text(high)}, pelo segundo maior valor; a barra de {known[0].ticker} ({text(known[0].value)}) aparece cortada.</p>}
+  </div>;
+}
 
 const resultTabs: ResultTab[] = [
-  {id:"visao-geral",label:"Visão geral",available:always,render:({ready,companies,single})=><>
-    <section className="analysis-section home-panel-section" aria-labelledby="home-mercado-title"><h3 id="home-mercado-title">Informações de Mercado</h3>
-      {single ? companies.map(company=>company.available ? <div key={company.ticker}><Metrics items={marketColumns.filter(column=>column.unit).map(column=>({label:column.label,value:company.market[column.key as keyof typeof company.market],unit:column.unit,digits:column.digits,compact:column.compact}))}/><p>Última cotação registrada: {company.market.last_quote_date ?? "—"} para {company.ticker}</p></div>:<Notice key={company.ticker}>Sem dados de mercado para {company.ticker}.</Notice>):<Table columns={marketColumns} rows={companies.map(company=>({ticker:company.ticker,...company.market}))} rowKey="ticker"/>}
-    </section>
-    <section className="analysis-section home-panel-section" aria-labelledby="home-indicadores-title"><h3 id="home-indicadores-title">Indicadores Financeiros</h3>
-      {single ? companies.map(company=>company.indicators_available ? <div key={company.ticker}>{Object.entries(company.metric_groups).map(([group,metrics])=><div className="home-group" key={group}><h4>{group}</h4><Metrics items={metrics}/><div className="actions">{metrics.filter(metric=>metric.classification).map(metric=><span key={metric.label} className={`home-signal signal-${metric.status}`}>{metric.label}: {metric.classification}</span>)}</div></div>)}</div>:<Notice key={company.ticker}>Sem indicadores para {company.ticker}.</Notice>):<><p>Rentabilidade, margens e crescimento em % · múltiplos em × · dados ausentes: —.</p><Table columns={[{key:"ticker",label:"Ticker"},...ready.comparison_indicators.map(item=>({key:item.key,label:item.label,unit:item.unit,digits:2} as Column))]} rows={companies.map(company=>({ticker:company.ticker,...company.indicators}))} rowKey="ticker"/></>}
-    </section>
-  </>},
-  {id:"saude",label:"Saúde financeira",available:always,render:({ready,companies})=><>
-    <p>{ready.health_summary}</p>
-    {companies.map(company=><div className="home-company-block" key={company.ticker}><h3>{company.ticker}{company.identity.company ? <> · {company.identity.company}</>:null}</h3>{company.health.metrics.length ? <><Metrics items={company.health.metrics}/>{company.health.diagnostics.map(diag=><Notice key={diag.text} tone={diag.status}>{diag.text}</Notice>)}</>:<Notice>Dados de endividamento não disponíveis via Fundamentus para este ticker.</Notice>}</div>)}
-  </>},
-  {id:"comparacao",label:"Comparação",available:(_,single)=>!single,render:({ready,companies,comparison,setComparison})=>{
-    const choice=ready.comparison_indicators.find(item=>item.key===comparison);
-    const chartCompanies=companies.filter(company=>company.indicators_available);
+  { id: "visao-geral", label: "Visão geral", available: always, render: ({ ready, companies, single, color }) => <>
+    {single ? companies.map(company => company.indicators_available ? <div key={company.ticker} className="groups">{Object.entries(company.metric_groups).map(([group, metrics]) => <section className="group" key={group}><h4>{group}</h4><Metrics items={metrics} /></section>)}</div> : <Notice key={company.ticker}>Sem indicadores para {company.ticker}.</Notice>)
+      : <><h4 className="tab-sub">Indicadores <small>% para rentabilidade, margens e crescimento · × para múltiplos · negrito ▴▾ maior e menor da coluna</small></h4>
+        <Table caption="Indicadores financeiros" extremes swatch={row => color((row as { ticker: string }).ticker)} columns={[{ key: "ticker", label: "Ticker" }, ...ready.comparison_indicators.map(item => ({ key: item.key, label: item.label, unit: item.unit, digits: 2 } as Column))]} rows={companies.map(company => ({ ticker: company.ticker, ...company.indicators }))} /></>}
+    <h4 className="tab-sub">Mercado <small>Fundamentus</small></h4>
+    <Table caption="Informações de mercado" swatch={row => color((row as { ticker: string }).ticker)} columns={marketColumns} rows={companies.map(company => ({ ticker: company.ticker, ...company.market }))} />
+  </> },
+  { id: "saude", label: "Saúde financeira", available: always, render: ({ ready, companies }) => <>
+    <p className="tab-lead">{ready.health_summary}</p>
+    <div className="health">{companies.map(company => <section key={company.ticker} className="health-row"><h4>{company.ticker}<small>{company.identity.company}</small></h4>
+      {company.health.metrics.length ? <><Metrics items={company.health.metrics} /><Diagnostics items={company.health.diagnostics} /></> : <Notice>Dados de endividamento não disponíveis via Fundamentus para este ticker.</Notice>}
+    </section>)}</div>
+  </> },
+  { id: "comparacao", label: "Comparação", available: (_, single) => !single, render: ({ ready, companies, comparison, setComparison, color }) => {
+    const choice = ready.comparison_indicators.find(item => item.key === comparison) ?? ready.comparison_indicators[0];
     return <>
-      <label>Indicador comparativo<select value={comparison} onChange={event=>setComparison(event.target.value)}>{ready.comparison_indicators.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}</select></label>
-      <Chart figure={{data:[{type:"bar",x:chartCompanies.map(company=>company.ticker),y:chartCompanies.map(company=>company.indicators[comparison]),text:chartCompanies.map(company=>{const value=company.indicators[comparison];return value===null ? "—":`${value.toFixed(2)}${choice?.unit==="percent" ? "%":""}`;}),textposition:"outside",cliponaxis:false,marker:{color:chartCompanies.map((_,index)=>comparisonColors[index%comparisonColors.length])}}],layout:{height:350,title:{text:`Comparativo de ${choice?.label}`},yaxis:{title:{text:choice?.unit==="percent" ? `${choice.label} (%)`:choice?.label}}}}}/>
+      <div className="tab-tools"><label>Indicador<select value={choice.key} onChange={event => setComparison(event.target.value)}>{ready.comparison_indicators.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></label>
+        <span className="muted">Do maior para o menor · tracejado âmbar: mediana da seleção</span></div>
+      <ComparisonBars companies={companies} indicator={choice} color={color} />
     </>;
-  }},
-  {id:"preco-alvo",label:"Preço-alvo",available:always,render:({ready,busy,onRefreshConsensus})=><>
-    <div className="actions"><button type="button" disabled={busy} onClick={onRefreshConsensus}>Atualizar consensos</button></div>
-    {ready.consensus.has_targets && <ul className="target-ladder" aria-label="Faixas de preço-alvo por ativo">{ready.consensus.rows.map(row=>{
-      const upside=typeof row.upside==="number" && Number.isFinite(row.upside) ? row.upside:null;
-      const tone=upside===null ? "neutral":upside>=0 ? "positive":"negative";
+  } },
+  { id: "preco-alvo", label: "Preço-alvo", available: always, render: ({ ready, busy, onRefreshConsensus }) => <>
+    <div className="tab-tools"><button type="button" disabled={busy} onClick={onRefreshConsensus}>Atualizar consensos</button><span className="muted">Yahoo Finance · potencial sobre o alvo médio</span></div>
+    {ready.consensus.has_targets && <ul className="ladder" aria-label="Faixas de preço-alvo por ativo">{ready.consensus.rows.map(row => {
+      const upside = typeof row.upside === "number" && Number.isFinite(row.upside) ? row.upside : null;
+      const tone = upside === null ? "neutral" : upside >= 0 ? "positive" : "negative";
       return <li key={String(row.ticker)}>
-        <span className="ticker-badge">{String(row.ticker)}</span>
-        <TargetRange row={row}/>
-        <span className={`delta-chip is-${tone}`}>{upside===null ? "—":<><span aria-hidden="true">{upside>=0 ? "▲":"▼"}</span>{upside>0 ? "+":""}{formatValue(upside,"percent",1)}</>}</span>
-        <span className="target-ladder-meta">{typeof row.analyst_count==="number" ? `${row.analyst_count} ${row.analyst_count===1 ? "opinião":"opiniões"}`:"Opiniões —"}{typeof row.recommendation==="string" && row.recommendation ? ` · ${row.recommendation}`:""}</span>
+        <b>{String(row.ticker)}</b>
+        <TargetRange row={row} />
+        <span className={`chg is-${tone}`}>{upside === null ? "—" : <><span aria-hidden="true">{upside >= 0 ? "▲" : "▼"}</span>{upside > 0 ? "+" : ""}{formatValue(upside, "percent", 1)}</>}</span>
+        <span className="muted">{typeof row.analyst_count === "number" ? `${row.analyst_count} ${row.analyst_count === 1 ? "opinião" : "opiniões"}` : "Opiniões —"}{typeof row.recommendation === "string" && row.recommendation ? ` · ${row.recommendation}` : ""}</span>
       </li>;
     })}</ul>}
-    {ready.consensus.has_targets && <p className="caption target-ladder-legend"><span className="legend-band" aria-hidden="true"/>Faixa entre alvo mínimo e máximo <span className="legend-mean" aria-hidden="true"/>Alvo médio <span className="legend-price" aria-hidden="true"/>Cotação de referência do Yahoo · potencial sobre o alvo médio</p>}
-    <Table columns={consensusColumns} rows={ready.consensus.rows} rowKey="ticker"/>
-    {ready.consensus.failed_tickers.length ? <Notice tone="warning">Consenso indisponível para: {ready.consensus.failed_tickers.join(", ")}.</Notice>:!ready.consensus.has_targets && <Notice>O Yahoo Finance não informa preços-alvo para as ações selecionadas.</Notice>}
-    <p>Fonte: Yahoo Finance. Potencial calculado sobre o alvo médio; opiniões e recomendações são agregadas pela fonte e não constituem recomendação de investimento.</p>
-  </>},
-  {id:"sintese",label:"Síntese",available:always,render:({companies})=><>{companies.map(company=><article className="analyst-synthesis-card" key={company.ticker}>
-    <h3>{company.ticker} · {company.identity.company ?? "—"}</h3><span className="analyst-synthesis-sector">{company.synthesis.sector ?? "Setor indisponível"}</span>
-    <p>{company.synthesis.favorable_categories}/{company.synthesis.categorias_validas} áreas favoráveis · {company.synthesis.indicadores_validos} indicadores elegíveis</p>
-    {company.synthesis.categorias_validas<2 && <Notice>Dados insuficientes para uma conclusão setorial: são necessárias pelo menos duas áreas com indicadores e no mínimo três observações.</Notice>}
-    <div className="mcard-grid">{Object.entries(company.synthesis.categorias).map(([name,category])=><div className={`analyst-category ${category.veredicto==="Favorável" ? "is-positive":category.veredicto==="Desfavorável" ? "is-negative":"is-neutral"}`} key={name}><h4>{name==="Yield" ? "Dividendos":name}</h4><span className="analyst-category-status">{category.veredicto}</span><div className="analyst-synthesis-meter" role="meter" aria-label={`Percentil de ${name==="Yield" ? "Dividendos":name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={category.percentil}><span style={{width:`${category.percentil}%`}}/></div><p>Percentil {category.percentil.toFixed(1)} · {category.indicadores_validos} indicadores</p></div>)}</div>
-    {["Favorável","Neutro","Desfavorável"].map(verdict=>{const details=company.synthesis.details.filter(detail=>detail.verdict===verdict);return details.length ? <details className="analyst-synthesis-details" key={verdict}><summary>{verdict} · {details.length} indicadores</summary><Table columns={[{key:"label",label:"Indicador"},{key:"value",label:"Valor"},{key:"unit",label:"Unidade"},{key:"median",label:"Mediana do setor"},{key:"mean",label:"Média aparada do setor"},{key:"percentile",label:"Percentil",unit:"number",digits:1},{key:"observations",label:"Observações",unit:"integer"}]} rows={details.map(detail=>({...detail,unit:detail.unit==="percent" ? "%":"×"}))} rowKey="label"/><p>Percentil é a proporção de empresas do setor superadas, sem contar a própria empresa; empates contam pela metade. Cada empresa entra uma vez, pela classe de ação mais líquida. A média do setor é aparada em 10% em cada ponta.</p></details>:null;})}
-    <p>Fonte: Fundamentus · comparação setorial. Áreas e percentis não constituem recomendação de investimento.</p>
-  </article>)}</>},
+    {ready.consensus.has_targets && <p className="legend"><i className="lg-band" aria-hidden="true" />Faixa alvo mínimo a máximo <i className="lg-mean" aria-hidden="true" />Alvo médio <i className="lg-price" aria-hidden="true" />Cotação de referência</p>}
+    <Table caption="Consenso de preço-alvo" columns={consensusColumns} rows={ready.consensus.rows} />
+    {ready.consensus.failed_tickers.length ? <Notice tone="warning">Consenso indisponível para: {ready.consensus.failed_tickers.join(", ")}.</Notice> : !ready.consensus.has_targets && <Notice>O Yahoo Finance não informa preços-alvo para as ações selecionadas.</Notice>}
+    <p className="tab-foot">Opiniões e recomendações são agregadas pela fonte e não constituem recomendação de investimento.</p>
+  </> },
+  { id: "sintese", label: "Síntese", available: always, render: ({ companies }) => {
+    const categories = Array.from(new Set(companies.flatMap(company => Object.keys(company.synthesis.categorias))));
+    const name = (category: string) => category === "Yield" ? "Dividendos" : category;
+    return <>
+      <ScrollX label="Síntese setorial por ativo"><table className="grid synth-table">
+        <thead><tr><th scope="col">Ativo</th><th scope="col">Setor</th><th scope="col" className="num">Áreas fav.</th>{categories.map(category => <th scope="col" key={category}>{name(category)}</th>)}</tr></thead>
+        <tbody>{companies.map(company => <tr key={company.ticker}>
+          <th scope="row">{company.ticker}</th>
+          <td className="ell">{company.synthesis.sector ?? "Setor indisponível"}</td>
+          <td className="num">{company.synthesis.favorable_categories}/{company.synthesis.categorias_validas}</td>
+          {categories.map(category => {
+            const entry = company.synthesis.categorias[category];
+            if (!entry) return <td key={category} className="muted">—</td>;
+            const tone = entry.veredicto === "Favorável" ? "fav" : entry.veredicto === "Desfavorável" ? "unfav" : "neutral";
+            return <td key={category}><span className={`pctl is-${tone}`} role="meter" aria-label={`Percentil de ${name(category)}: ${entry.veredicto}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={entry.percentil}><span className="pctl-track"><span style={{ width: `${entry.percentil}%` }} /></span><span className="pctl-text">{entry.percentil.toFixed(0)}</span><span className="pctl-verdict">{tone === "fav" ? "fav." : tone === "unfav" ? "desf." : "neutro"}</span></span></td>;
+          })}
+        </tr>)}</tbody>
+      </table></ScrollX>
+      <p className="legend">Percentil no setor (0 a 100) e leitura da síntese: fav. favorável · neutro · desf. desfavorável, em âmbar</p>
+      {companies.filter(company => company.synthesis.categorias_validas < 2).map(company => <Notice key={company.ticker}>{company.ticker}: dados insuficientes para uma conclusão setorial (são necessárias ao menos duas áreas com indicadores e três observações).</Notice>)}
+      {companies.map(company => company.synthesis.details.length ? <details className="disclosure" key={company.ticker}><summary>{company.ticker} · {company.synthesis.details.length} indicadores frente ao setor</summary>
+        <Table caption={`Indicadores de ${company.ticker} frente ao setor`} rowKey="label" columns={[{ key: "label", label: "Indicador" }, { key: "verdict", label: "Leitura" }, { key: "value", label: "Valor", unit: "number" }, { key: "unit", label: "Unid." }, { key: "median", label: "Mediana setor", unit: "number" }, { key: "mean", label: "Média aparada", unit: "number" }, { key: "percentile", label: "Percentil", unit: "number", digits: 1 }, { key: "observations", label: "Obs.", unit: "integer" }]} rows={company.synthesis.details.map(detail => ({ ...detail, unit: detail.unit === "percent" ? "%" : "×" }))} />
+      </details> : null)}
+      <p className="tab-foot">Percentil é a proporção de empresas do setor superadas, sem contar a própria; empates contam pela metade. Cada empresa entra uma vez, pela classe mais líquida. Média do setor aparada em 10% em cada ponta. Fonte: Fundamentus. Não constitui recomendação de investimento.</p>
+    </>;
+  } },
 ];
 
-const tabKeys = ["ArrowLeft","ArrowRight","Home","End"];
-const summaryIndicatorKeys = ["pl","roe","dy"];
+const tabKeys = ["ArrowLeft", "ArrowRight", "Home", "End"];
 
-export default function HomeResults({ ready, selection, watchlist, busy, onFavorite, onRefreshConsensus }: Props) {
-  const [comparison,setComparison] = useState("pl");
-  const [selectedTab,setSelectedTab] = useState(resultTabs[0].id);
-  const single=selection.length===1;
-  const companies=ready.companies;
-  const summaryIndicators=ready.comparison_indicators.filter(item=>summaryIndicatorKeys.includes(item.key));
-  const tabs=resultTabs.filter(tab=>tab.available(ready,single));
-  const activeTab=tabs.find(tab=>tab.id===selectedTab) ?? tabs[0];
-  function moveFocus(event:KeyboardEvent<HTMLButtonElement>, index:number) {
-    if(!tabKeys.includes(event.key))return;
+export default function HomeResults({ ready, selection, busy, onRefreshConsensus }: Props) {
+  const [comparison, setComparison] = useState("pl");
+  const [selectedTab, setSelectedTab] = useState(resultTabs[0].id);
+  const single = selection.length === 1;
+  const companies = ready.companies;
+  const tabs = resultTabs.filter(tab => tab.available(ready, single));
+  const activeTab = tabs.find(tab => tab.id === selectedTab) ?? tabs[0];
+  const color = (ticker: string) => { const index = selection.indexOf(ticker); return index < 0 ? undefined : tickerColor(index); };
+  function moveFocus(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (!tabKeys.includes(event.key)) return;
     event.preventDefault();
-    const next=event.key==="Home" ? 0:event.key==="End" ? tabs.length-1:(index+(event.key==="ArrowRight" ? 1:-1)+tabs.length)%tabs.length;
+    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
     setSelectedTab(tabs[next].id);
     document.getElementById(`home-tab-${tabs[next].id}`)?.focus();
   }
-  return <>
-      {!!ready.missing_tickers.length && <Notice tone="warning">Dados Fundamentus indisponíveis para {ready.missing_tickers.join(", ")}. Os dados disponíveis foram preservados e os caches da fonte invalidados.</Notice>}
-      <div className="home-results-bar result-lead section-toolbar">
-        <div className="home-results-heading"><h2>Resultado da análise</h2><p className="caption">{companies.length} {companies.length===1 ? "ativo analisado":"ativos analisados"}: {ready.requested_tickers.join(", ")}</p></div>
-        <div className="home-results-actions section-actions"><ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>Exportar CSV bruto</ExportButton></div>
-      </div>
-      <ul className="home-summary" aria-label="Resumo dos ativos analisados">{companies.map(company=>{const saved=watchlist.includes(company.ticker);const favorable=company.synthesis.favorable_categories;const valid=company.synthesis.categorias_validas;return <li className="home-summary-card" key={company.ticker}>
-        <div className="home-summary-head"><span className="home-summary-identity"><StockLogo ticker={company.ticker} company={company.identity.company ?? company.ticker} size={32}/><strong className="home-summary-ticker ticker-badge">{company.ticker}</strong></span><button type="button" className="home-favorite-toggle" aria-pressed={saved} aria-label={`Favoritar ${company.ticker}`} title={saved ? `${company.ticker} está nos favoritos`:`Adicionar ${company.ticker} aos favoritos`} onClick={()=>onFavorite(company.ticker)}><svg width="20" height="20" viewBox="0 0 24 24" fill={saved ? "currentColor":"none"} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></button></div>
-        <p className="home-summary-company">{company.identity.company ?? "Empresa não informada"}</p>
-        <p className="home-summary-sector">{[company.identity.sector ?? "Setor indisponível",company.identity.subsector].filter(Boolean).join(" · ")}</p>
-        <dl className="home-summary-facts">
-          <div className="home-summary-quote"><dt>Cotação</dt><dd><ValueText value={company.market.price} unit="money" currency={company.market.currency}/></dd></div>
-          {summaryIndicators.map(item=><div className="home-summary-indicator" key={item.key}><dt>{item.label}</dt><dd><ValueText value={company.indicators[item.key]} unit={item.unit} digits={2}/></dd></div>)}
-          <div className="home-summary-row home-summary-synthesis"><dt>Síntese setorial</dt><dd>{valid ? <><span className="home-summary-meter" aria-hidden="true">{Array.from({length:valid},(_,index)=><span key={index} data-on={index<favorable}/>)}</span>{favorable}/{valid} áreas favoráveis</>:"Sem áreas avaliadas"}</dd></div>
-        </dl>
-        <PriceRange low={company.market.low_52w} high={company.market.high_52w} price={company.market.price} currency={company.market.currency} date={company.market.last_quote_date}/>
-      </li>;})}</ul>
-      <div className="home-tabs" role="tablist" aria-label="Seções da análise">{tabs.map((tab,index)=>{const selected=tab.id===activeTab.id;return <button type="button" role="tab" key={tab.id} id={`home-tab-${tab.id}`} aria-controls={`home-panel-${tab.id}`} aria-selected={selected} tabIndex={selected ? 0:-1} onClick={()=>setSelectedTab(tab.id)} onKeyDown={event=>moveFocus(event,index)}>{tab.label}</button>;})}</div>
-      {tabs.map(tab=><div className="home-tab-panel" role="tabpanel" key={tab.id} id={`home-panel-${tab.id}`} aria-labelledby={`home-tab-${tab.id}`} tabIndex={0} hidden={tab.id!==activeTab.id}>
-        {tab.id===activeTab.id && tab.render({ready,companies,single,busy,comparison,setComparison,onRefreshConsensus})}
-      </div>)}
-      <div className="next-step-card"><div className="next-step-eyebrow">Próximo passo</div><h2>Analise sua carteira</h2><p>Monte e otimize a carteira com {selection.slice(0,3).join(", ")}{selection.length>3 ? "…":""}.</p><Link className="button-link" href="/portfolio">Abrir Portfólio</Link></div>
-  </>;
+  return <Pane title="Resultado da análise" area="res" className="pane-result" meta={`${companies.length} ${companies.length === 1 ? "ativo" : "ativos"} · Fundamentus`} actions={<ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>CSV</ExportButton>} flush>
+    <div className="tabs" role="tablist" aria-label="Seções da análise">{tabs.map((tab, index) => {
+      const selected = tab.id === activeTab.id;
+      return <button type="button" role="tab" key={tab.id} id={`home-tab-${tab.id}`} aria-controls={`home-panel-${tab.id}`} aria-selected={selected} tabIndex={selected ? 0 : -1} onClick={() => setSelectedTab(tab.id)} onKeyDown={event => moveFocus(event, index)}>{tab.label}</button>;
+    })}</div>
+    {tabs.map(tab => <div className="tab-panel" role="tabpanel" key={tab.id} id={`home-panel-${tab.id}`} aria-labelledby={`home-tab-${tab.id}`} tabIndex={0} hidden={tab.id !== activeTab.id}>
+      {tab.id === activeTab.id && tab.render({ ready, companies, single, busy, comparison, setComparison, onRefreshConsensus, color })}
+    </div>)}
+  </Pane>;
 }

@@ -12,13 +12,13 @@ function loadPlotly() {
 }
 
 /* Presentation-only theme shared by every server figure; keep in sync with the tokens in globals.css. */
-const ink = { text: "#f3f5f9", secondary: "#c5cad6", muted: "#9aa2b4", canvas: "#0e1015", raised: "#23262f" };
+const ink = { text: "#e8eaed", secondary: "#b4bac4", muted: "#8a929e", canvas: "#0c0e11", raised: "#171a20" };
 const axisStyle: Partial<Plotly.LayoutAxis> = {
-  gridcolor: "rgba(255, 255, 255, 0.06)", griddash: "solid", gridwidth: 1, zerolinecolor: "rgba(197, 202, 214, 0.3)", zerolinewidth: 1,
-  linecolor: "rgba(255, 255, 255, 0.12)", ticks: "", automargin: true, tickfont: { size: 11, color: ink.muted },
+  gridcolor: "rgba(255, 255, 255, 0.09)", griddash: "solid", gridwidth: 1, zerolinecolor: "rgba(197, 202, 214, 0.3)", zerolinewidth: 1,
+  linecolor: "rgba(255, 255, 255, 0.12)", ticks: "", automargin: true, tickfont: { size: 10.5, color: ink.muted },
 };
 const spikes: Partial<Plotly.LayoutAxis> = {
-  showspikes: true, spikemode: "across", spikesnap: "cursor", spikethickness: 1, spikedash: "solid", spikecolor: "rgba(197, 202, 214, 0.35)",
+  showspikes: true, spikemode: "across", spikesnap: "cursor", spikethickness: 1, spikedash: "solid", spikecolor: "rgba(255, 178, 36, 0.45)",
 };
 const dateLike = /^\d{4}-\d{2}-\d{2}/;
 type Trace = Plotly.Data & { x?: unknown[]; y?: unknown[]; mode?: string; fill?: string; name?: string; showlegend?: boolean; visible?: unknown; line?: { color?: string }; marker?: { color?: unknown }; hovertemplate?: string; yaxis?: string };
@@ -57,9 +57,9 @@ function lastValueTags(data: Trace[], layout: Partial<Plotly.Layout>): Partial<P
     const last = [...values].reverse().find(value => typeof value === "number" && Number.isFinite(value)) as number | undefined;
     if (last === undefined) return [];
     const percent = String(yaxis.tickformat ?? "").includes("%") || /:[^}]*%}/.test(trace.hovertemplate ?? "");
-    const color = trace.line?.color ?? (typeof trace.marker?.color === "string" ? trace.marker.color : "#8b93ff");
+    const color = trace.line?.color ?? (typeof trace.marker?.color === "string" ? trace.marker.color : "#ffb224");
     return [{ xref: "paper", x: 1, xanchor: "left", xshift: 6, yref: "y", y: last, text: tagText(last, percent), showarrow: false,
-      bgcolor: color, borderpad: 3, font: { family: "var(--font-mono), monospace", size: 11, color: ink.canvas } } as Partial<Plotly.Annotations>];
+      bgcolor: color, borderpad: 3, font: { family: "var(--font-mono), monospace", size: 10.5, color: ink.canvas } } as Partial<Plotly.Annotations>];
   });
 }
 
@@ -76,14 +76,15 @@ function themed(figure: PlotFigure, family: string, hasCaption: boolean, coarse:
       ...axis, ...axisStyle, ...(horizontal ? { ...spikes, showgrid: false, showline: true } : { showline: false }),
       ...(!horizontal && series && key === "yaxis" ? { side: "right" as const } : {}),
       tickfont: { ...axis.tickfont, ...axisStyle.tickfont },
-      title: axisTitle ? { ...axisTitle, font: { size: 11.5, color: ink.muted }, standoff: 10 } : undefined,
+      // A right-hand series axis carries last-value tags where its title would sit; the pane title names the series instead.
+      title: axisTitle && !(!horizontal && series && key === "yaxis") ? { ...axisTitle, font: { size: 10.5, color: ink.muted }, standoff: 8 } : undefined,
     }];
   }));
   if (!("xaxis" in axes)) axes.xaxis = { ...axisStyle, ...spikes, showgrid: false, showline: true };
   if (!("yaxis" in axes)) axes.yaxis = { ...axisStyle, showline: false, ...(series ? { side: "right" as const } : {}) };
   const legendShown = layout.showlegend !== false && data.filter(trace => trace.showlegend !== false).length > 1;
   const tags = series ? lastValueTags(data, layout) : [];
-  const top = Math.max(legendShown ? 36 : 12, (layout.margin?.t ?? 0) - 50);
+  const top = Math.max(legendShown ? 30 : 10, (layout.margin?.t ?? 0) - 56);
   return {
     ...layout,
     ...axes,
@@ -93,20 +94,21 @@ function themed(figure: PlotFigure, family: string, hasCaption: boolean, coarse:
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
     separators: ",.",
-    font: { ...layout.font, family, size: 12, color: ink.secondary },
+    font: { ...layout.font, family, size: 11, color: ink.secondary },
     // Touch screens get no drag-zoom and nearest-point hover; values stay readable from the tap target.
     dragmode: coarse ? false : layout.dragmode,
     hovermode: coarse ? "closest" : layout.hovermode ?? (series ? "x unified" : "closest"),
-    hoverlabel: { bgcolor: ink.raised, bordercolor: "rgba(255, 255, 255, 0.16)", align: "left", namelength: -1, font: { family, size: 12.5, color: ink.text } },
-    legend: { ...layout.legend, orientation: "h", x: 0, xanchor: "left", y: 1, yanchor: "bottom", bgcolor: "rgba(0,0,0,0)", borderwidth: 0, font: { size: 12, color: ink.secondary }, itemsizing: "constant" },
+    hoverlabel: { bgcolor: ink.raised, bordercolor: "rgba(255, 178, 36, 0.5)", align: "left", namelength: -1, font: { family, size: 11.5, color: ink.text } },
+    legend: { ...layout.legend, orientation: "h", x: 0, xanchor: "left", y: 1, yanchor: "bottom", bgcolor: "rgba(0,0,0,0)", borderwidth: 0, font: { size: 11, color: ink.secondary }, itemsizing: "constant" },
     bargap: layout.bargap ?? .3,
     annotations: [...(layout.annotations ?? []), ...tags],
-    margin: { l: 12, r: tags.length ? 72 : 12, b: 44, pad: 4, t: top },
+    margin: { l: 8, r: tags.length ? 68 : 8, b: 36, pad: 2, t: top },
     ...(hasCaption ? { title: { text: "" } } : { title: { ...(typeof layout.title === "object" ? layout.title : {}), text: titleText(layout.title), font: { size: 14, color: ink.text }, x: 0, xanchor: "left" } }),
   };
 }
 
-export default function Chart({ figure, title }: { figure: PlotFigure; title?: string }) {
+/** `height` overrides the server layout height so a chart fits its pane; data and axes are untouched. */
+export default function Chart({ figure, title, height: fixedHeight }: { figure: PlotFigure; title?: string; height?: number }) {
   const node = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
   const caption = title ?? titleText(figure.layout?.title);
@@ -123,7 +125,7 @@ export default function Chart({ figure, title }: { figure: PlotFigure; title?: s
       await document.fonts.ready;
       if (disposed) return;
       const coarse = window.matchMedia("(pointer: coarse)").matches;
-      let height = responsiveHeight(figure, element.clientWidth);
+      let height = fixedHeight ?? responsiveHeight(figure, element.clientWidth);
       const layout = themed(figure, getComputedStyle(element).fontFamily, !!caption, coarse, height);
       await plotly.react(element, figure.data.map(trace => ({ ...trace })), layout, {
         responsive: true, displaylogo: false, scrollZoom: false,
@@ -137,7 +139,7 @@ export default function Chart({ figure, title }: { figure: PlotFigure; title?: s
       setError(false);
       observer = new ResizeObserver(() => {
         if (!element.isConnected) return;
-        const next = responsiveHeight(figure, element.clientWidth);
+        const next = fixedHeight ?? responsiveHeight(figure, element.clientWidth);
         if (next !== undefined && next !== height) { height = next; void plotly.relayout(element, { height: next }); }
         void plotly.Plots.resize(element);
       });
@@ -148,6 +150,6 @@ export default function Chart({ figure, title }: { figure: PlotFigure; title?: s
       if (!disposed) setError(true);
     });
     return () => { disposed = true; observer?.disconnect(); if (loaded) loaded.purge(element); };
-  }, [figure, caption]);
-  return <figure className="plotly-panel">{caption && <figcaption>{caption}</figcaption>}{error ? <Notice tone="negative">Não foi possível renderizar o gráfico.</Notice> : <div ref={node} className="plotly-chart" role="img" aria-label={label} />}</figure>;
+  }, [figure, caption, fixedHeight]);
+  return <figure className="chart">{caption && <figcaption>{caption}</figcaption>}{error ? <Notice tone="negative">Não foi possível renderizar o gráfico.</Notice> : <div ref={node} className="plotly-chart" role="img" aria-label={label} />}</figure>;
 }

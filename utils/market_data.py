@@ -140,3 +140,50 @@ def get_sorted_tickers_by_liquidity(tickers_list):
     except Exception:
         logger.warning("get_sorted_tickers_by_liquidity failed, returning unsorted list", exc_info=True)
         return tickers_list
+
+
+_YF_UNIVERSE_TIMEOUT_SECONDS = 30
+
+
+def _change(last, previous):
+    try:
+        last, previous = float(last), float(previous)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(last) or not math.isfinite(previous) or previous <= 0:
+        return None
+    return last / previous - 1
+
+
+def universe_changes(adjusted: pd.DataFrame, tickers) -> dict:
+    """Daily and five-session changes, as fractions, from Yahoo adjusted closes.
+
+    `adjusted` has one column per Yahoo symbol and one row per session. Every
+    change is measured on the download's own latest sessions, so a stock that
+    did not trade on one of them gets None instead of a change over a longer span.
+    """
+    adjusted = adjusted.dropna(how="all")
+    if adjusted.empty:
+        raise ValueError("Yahoo Finance não retornou cotações.")
+
+    def between(column, back):
+        return _change(column.iloc[-1], column.iloc[-1 - back]) if len(column) > back else None
+
+    changes = {}
+    for ticker in tickers:
+        symbol = f"{ticker}.SA"
+        column = adjusted[symbol] if symbol in adjusted else None
+        changes[ticker] = {"day": None, "week": None} if column is None else {"day": between(column, 1), "week": between(column, 5)}
+    return {"session": adjusted.index[-1].date().isoformat(), "changes": changes}
+
+
+@cache_data(ttl=600)
+def get_universe_changes(tickers: tuple) -> dict:
+    """Fetch one Yahoo download for the whole universe and return its latest-session changes."""
+    downloaded = yf.download([f"{ticker}.SA" for ticker in tickers], period="15d", interval="1d", auto_adjust=False,
+                             progress=False, timeout=_YF_UNIVERSE_TIMEOUT_SECONDS)
+    if downloaded.empty or "Adj Close" not in downloaded:
+        raise ValueError("Yahoo Finance não retornou cotações.")
+    result = universe_changes(downloaded["Adj Close"], tickers)
+    result["fetched_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return result
