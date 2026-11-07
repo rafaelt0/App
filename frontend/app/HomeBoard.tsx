@@ -204,7 +204,7 @@ export function SectorMap({ stocks, selection, busy, active, available, onSector
       }))}
     </div>
     <div className="hm-legend">
-      <span className="hm-readout" aria-live="polite">{focus ?? <>Área: {sizeOptions[sizeBy].toLocaleLowerCase("pt-BR")} · clique adiciona à seleção, o nome do setor pega os mais líquidos</>}</span>
+      <span className="hm-readout" aria-hidden="true">{focus ?? <>Área: {sizeOptions[sizeBy].toLocaleLowerCase("pt-BR")} · clique adiciona à seleção, o nome do setor pega os mais líquidos</>}</span>
       <span className="hm-scale" role="img" aria-label={`Escala de ${color.label.toLocaleLowerCase("pt-BR")}: vermelho para queda, cinza para zero, verde para alta, mais forte a cada ${formatValue(color.step, "fraction", 0)}; hachurado sem dado`}>
         <span className="hm-swatches">{[-4, -3, -2, -1, 0, 1, 2, 3, 4].map(level => <i key={level} data-tone={level} />)}</span>
         <span className="hm-ticks" aria-hidden="true">{[[1, -3], [2, -2], [3, -1], [4.5, 0], [6, 1], [7, 2], [8, 3]].map(([at, n]) => <span key={n} style={{ left: at * 24 }}>{n === 0 ? "0" : `${n < 0 ? "−" : "+"}${formatValue(Math.abs(n) * color.step, "fraction", 0)}`}</span>)}</span>
