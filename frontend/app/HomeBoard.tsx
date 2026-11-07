@@ -104,7 +104,8 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
   </Pane>;
 }
 
-type Tile = { sector: string; value: number; liquidity: number | null; known: boolean };
+type Tile = { sector: string; value: number; liquidity: number | null; known: boolean; leaders: Stock[] };
+const logoSize = 20, logoGap = 3;
 const liquiditySteps = 5;
 
 /** Treemap of the local B3 list: area is the number of listed stocks, shade the summed 2-month liquidity. */
@@ -142,15 +143,17 @@ export function SectorMap({ stocks, busy, active, available, onSector, onReset, 
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const groups = new Map<string, { count: number; liquidity: number; priced: number }>();
+  const groups = new Map<string, { count: number; liquidity: number; priced: number; members: Stock[] }>();
   for (const stock of stocks) {
     const key = stock.sector || "";
-    const entry = groups.get(key) ?? { count: 0, liquidity: 0, priced: 0 };
+    const entry = groups.get(key) ?? { count: 0, liquidity: 0, priced: 0, members: [] };
     entry.count++;
+    entry.members.push(stock);
     if (stock.liquidity !== null) { entry.liquidity += stock.liquidity; entry.priced++; }
     groups.set(key, entry);
   }
-  const tiles: Tile[] = [...groups].map(([sector, entry]) => ({ sector: sector || "Setor não informado", value: entry.count, liquidity: entry.priced ? entry.liquidity : null, known: !!sector }));
+  const tiles: Tile[] = [...groups].map(([sector, entry]) => ({ sector: sector || "Setor não informado", value: entry.count, liquidity: entry.priced ? entry.liquidity : null, known: !!sector,
+    leaders: entry.members.filter(stock => stock.liquidity !== null && stock.liquidity > 0).sort((a, b) => b.liquidity! - a.liquidity!) }));
   const logs = tiles.map(tile => tile.liquidity).filter((value): value is number => value !== null && value > 0).map(Math.log10);
   const low = Math.min(...logs), high = Math.max(...logs);
   const step = (liquidity: number | null) => liquidity === null || liquidity <= 0 || !logs.length ? -1 : high === low ? liquiditySteps - 1 : Math.min(liquiditySteps - 1, Math.floor((Math.log10(liquidity) - low) / (high - low) * liquiditySteps));
@@ -169,10 +172,16 @@ export function SectorMap({ stocks, busy, active, available, onSector, onReset, 
         const showData = tile.w >= 22 && tile.h >= 18;
         const showLiquidity = tile.w >= 84 && tile.h > 34 && tile.liquidity !== null;
         const lines = measure && tile.w >= 30 ? fitLabel(tile.sector, tile.w - 12, Math.floor((tile.h - 8 - (showData ? 16 : 0)) / (size * 1.2)), measure(size)) : [];
+        // Logos of the sector's most liquid stocks fill whatever room the label and counts leave, at most two rows.
+        const logoRoom = tile.h - 16 - lines.length * size * 1.2 - (showData ? 16 : 0);
+        const perRow = Math.floor((tile.w - 10 + logoGap) / (logoSize + logoGap));
+        const rows = Math.min(2, Math.floor((logoRoom + logoGap) / (logoSize + logoGap)));
+        const leaders = lines.length > 0 && perRow > 0 && rows > 0 ? tile.leaders.slice(0, perRow * rows) : [];
         return <button type="button" key={tile.sector} className={`tile${tile.known ? "" : " is-unknown"}${active.includes(tile.sector) ? " is-active" : ""}`} style={style}
           disabled={busy || !tile.known} title={tile.known ? `${label}. Selecionar os mais líquidos.` : `${label}. Sem setor informado; não pode ser escolhido por setor.`} aria-label={tile.known ? `Selecionar os mais líquidos de ${label}` : label}
           onClick={() => onSector(tile.sector)} onMouseEnter={() => setFocus(label)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(label)} onBlur={() => setFocus(null)}>
           {lines.length > 0 && <span className="tile-name" style={{ fontSize: size }} aria-hidden="true">{lines.map((line, index) => <span key={index}>{line}</span>)}</span>}
+          {leaders.length > 0 && <span className="tile-logos" aria-hidden="true">{leaders.map(stock => <span key={stock.ticker} title={`${stock.ticker} · ${stock.company}`}><StockLogo ticker={stock.ticker} company={stock.company} size={logoSize} /></span>)}</span>}
           {showData && <span className="tile-data" aria-hidden="true"><b>{tile.value}</b>{showLiquidity && <span>{formatCompactValue(tile.liquidity, "money", 0)}</span>}</span>}
         </button>;
       })}

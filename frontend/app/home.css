@@ -45,6 +45,9 @@
 .tile.is-unknown { background: repeating-linear-gradient(135deg, var(--raise) 0 4px, var(--pane) 4px 8px); color: var(--text-3); }
 .tile-name { display: grid; min-width: 0; max-width: 100%; overflow: hidden; line-height: 1.2; }
 .tile-name > span { overflow: hidden; white-space: nowrap; }
+.tile-logos { display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; max-width: 100%; }
+.tile-logos img { padding: 2px; }
+.tile-logos + .tile-data { margin-top: 0; }
 .tile-data { display: flex; gap: 6px; font: 10.5px var(--mono); }
 .tile-data b { color: var(--amber-2); font-weight: 600; }
 .tile-data span { color: var(--text-2); }
