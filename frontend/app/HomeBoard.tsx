@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { MAX_SELECTION, type Stock } from "../components/AppProvider";
 import { Change, stripQuote, tickerColor, useMarket } from "../components/Shell";
 import StockLogo from "../components/StockLogo";
-import { formatBrasilia, formatCompactValue, formatValue, Loading, Notice, Pane, relativeAge, ValueText } from "../components/ui";
+import { formatBrasilia, formatCompactValue, formatValue, Loading, Notice, Pane, relativeAge, ScrollX, useMedia, ValueText } from "../components/ui";
 import { quickTickers, type HomeResult } from "../lib/home";
 import { loadMarketNews, type MarketNews } from "../lib/marketNews";
-import { squarify } from "../lib/treemap";
+import { fitLabel, squarify } from "../lib/treemap";
 
 const brasiliaTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 const shortDate = (value: string) => value.split("-").reverse().slice(0, 2).join("/");
@@ -32,6 +32,10 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
   const units = new Map(ready?.comparison_indicators.map(item => [item.key, item.unit]) ?? []);
   const liquid = stocks.filter(stock => stock.liquidity !== null).sort((a, b) => (b.liquidity ?? 0) - (a.liquidity ?? 0));
   const starters = liquid.length ? liquid.slice(0, 14) : quickTickers.map(ticker => byTicker.get(ticker)).filter((stock): stock is Stock => !!stock);
+  const narrow = useMedia("(max-width: 900px)");
+  const [showAll, setShowAll] = useState(false);
+  // On phones the starter list stops at six rows so the explanation and the sector map stay within reach.
+  const shownStarters = narrow && !showAll ? starters.slice(0, 6) : starters;
   const quote = (ticker: string) => {
     const item = stripQuote(strip, ticker);
     const company = companies.get(ticker);
@@ -40,7 +44,7 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
   };
   return <Pane title="Monitor" area="mon" className="pane-monitor" meta={`${selection.length}/${MAX_SELECTION}`} actions={analyze} flush>
     {notices}
-    {selection.length ? <div className="grid-scroll" role="region" aria-label="Ativos selecionados" tabIndex={0}><table className="grid monitor">
+    {selection.length ? <ScrollX label="Ativos selecionados"><table className="grid monitor">
       <thead><tr><th scope="col">Ativo</th><th scope="col">Empresa</th><th scope="col" className="num">Últ. R$</th><th scope="col" className="num">Var.</th>
         {ready ? <><th scope="col" className="num">P/L</th><th scope="col" className="num">ROE</th><th scope="col" className="num">DY</th><th scope="col" className="num">52 sem.</th><th scope="col" className="num" title="Áreas favoráveis na síntese setorial">Sínt.</th><th scope="col">Setor</th></>
           : <th scope="col" className="num" title="Volume financeiro médio diário em 2 meses">Liq. 2m</th>}
@@ -67,11 +71,11 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
           </td>
         </tr>;
       })}</tbody>
-    </table></div> : <>
+    </table></ScrollX> : <>
       <p className="pane-lead">Seleção vazia. Busque com <kbd>Ctrl K</kbd> ou clique em um dos mais líquidos para analisar:</p>
-      <div className="grid-scroll" role="region" aria-label="Ativos mais líquidos" tabIndex={0}><table className="grid monitor is-quick"><caption className="visually-hidden">Ativos mais líquidos da lista B3</caption>
+      <ScrollX label="Ativos mais líquidos"><table className="grid monitor is-quick"><caption className="visually-hidden">Ativos mais líquidos da lista B3</caption>
         <thead><tr><th scope="col">Ativo</th><th scope="col">Empresa</th><th scope="col" className="num" title="Volume financeiro médio diário em 2 meses">Liq. 2m</th><th scope="col" className="num">Últ.</th><th scope="col" className="num">Var.</th></tr></thead>
-        <tbody>{starters.map(stock => {
+        <tbody>{shownStarters.map(stock => {
           const item = stripQuote(strip, stock.ticker);
           return <tr key={stock.ticker} className="is-clickable" onClick={() => onQuick(stock.ticker)}>
             <th scope="row"><button type="button" className="row-btn" disabled={busy} aria-label={`Analisar ${stock.ticker} agora`}><span className="tk"><StockLogo ticker={stock.ticker} company={stock.company} size={16} />{stock.ticker}</span></button></th>
@@ -81,7 +85,8 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
             <td className="num">{item ? <Change value={item.change} /> : <span className="muted">—</span>}</td>
           </tr>;
         })}</tbody>
-      </table></div>
+      </table></ScrollX>
+      {narrow && starters.length > 6 && <button type="button" className="more-rows" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? "Ver menos" : `Ver mais ${starters.length - 6} ativos líquidos`}</button>}
     </>}
     {watchlist.length > 0 && <>
       <h3 className="pane-sub">Favoritos</h3>
@@ -106,6 +111,26 @@ const liquiditySteps = 5;
 export function SectorMap({ stocks, busy, active, available, onSector, onReset, onRefresh, note }: { stocks: Stock[]; busy: boolean; active: string[]; available: number; onSector: (sector: string) => void; onReset: () => void; onRefresh: () => void; note: ReactNode }) {
   const map = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 200, h: 100 });
+  const [family, setFamily] = useState<string | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    // Labels are fitted with the real font, so wait for it before measuring.
+    void document.fonts.ready.then(() => { if (active && map.current) setFamily(getComputedStyle(map.current).fontFamily); });
+    return () => { active = false; };
+  }, []);
+  const measure = useMemo(() => {
+    if (!family) return null;
+    const context = document.createElement("canvas").getContext("2d");
+    if (!context) return null;
+    const cache = new Map<string, number>();
+    return (size: number) => (value: string) => {
+      const key = `${size}|${value}`;
+      let width = cache.get(key);
+      if (width === undefined) { context.font = `${size}px ${family}`; width = context.measureText(value).width; cache.set(key, width); }
+      return width;
+    };
+  }, [family]);
   useEffect(() => {
     const element = map.current;
     if (!element) return;
@@ -139,15 +164,20 @@ export function SectorMap({ stocks, busy, active, available, onSector, onReset, 
         const style = { left: `${tile.x / box.w * 100}%`, top: `${tile.y / box.h * 100}%`, width: `${tile.w / box.w * 100}%`, height: `${tile.h / box.h * 100}%`, "--shade": shade < 0 ? 0 : (shade + 1) / liquiditySteps } as CSSProperties;
         const liquidity = tile.liquidity === null ? "liquidez indisponível" : `liquidez 2m somada ${formatCompactValue(tile.liquidity, "money", 1)}`;
         const label = `${tile.sector}: ${tile.value} ${tile.value === 1 ? "ação" : "ações"}, ${liquidity}`;
+        // Tile layout in px: 5px side padding, 4px top and bottom, a 14px data row when it fits; names wrap only between words.
+        const size = tile.w < 84 ? 9.5 : 11;
+        const showData = tile.w >= 22 && tile.h >= 18;
+        const showLiquidity = tile.w >= 84 && tile.h > 34 && tile.liquidity !== null;
+        const lines = measure && tile.w >= 30 ? fitLabel(tile.sector, tile.w - 12, Math.floor((tile.h - 8 - (showData ? 16 : 0)) / (size * 1.2)), measure(size)) : [];
         return <button type="button" key={tile.sector} className={`tile${tile.known ? "" : " is-unknown"}${active.includes(tile.sector) ? " is-active" : ""}`} style={style}
           disabled={busy || !tile.known} title={tile.known ? `${label}. Selecionar os mais líquidos.` : `${label}. Sem setor informado; não pode ser escolhido por setor.`} aria-label={tile.known ? `Selecionar os mais líquidos de ${label}` : label}
-          onClick={() => onSector(tile.sector)}>
-          <span className="tile-name">{tile.sector}</span>
-          <span className="tile-data"><b>{tile.value}</b>{tile.liquidity !== null && <span>{formatCompactValue(tile.liquidity, "money", 0)}</span>}</span>
+          onClick={() => onSector(tile.sector)} onMouseEnter={() => setFocus(label)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(label)} onBlur={() => setFocus(null)}>
+          {lines.length > 0 && <span className="tile-name" style={{ fontSize: size }} aria-hidden="true">{lines.map((line, index) => <span key={index}>{line}</span>)}</span>}
+          {showData && <span className="tile-data" aria-hidden="true"><b>{tile.value}</b>{showLiquidity && <span>{formatCompactValue(tile.liquidity, "money", 0)}</span>}</span>}
         </button>;
       })}
     </div>
-    <div className="tmap-legend" aria-hidden="true"><span>Área: nº de ações</span><span className="tmap-scale">Liquidez 2m {Array.from({ length: liquiditySteps }, (_, index) => <i key={index} style={{ "--shade": (index + 1) / liquiditySteps } as CSSProperties} />)} maior</span><span>Clique: seleciona os mais líquidos</span></div>
+    <div className="tmap-legend" aria-hidden="true">{focus ? <span className="tmap-readout">{focus}</span> : <span>Área: nº de ações<span className="fine-only"> · passe o cursor para ler o setor</span></span>}<span className="tmap-scale">Liquidez 2m {Array.from({ length: liquiditySteps }, (_, index) => <i key={index} style={{ "--shade": (index + 1) / liquiditySteps } as CSSProperties} />)} maior</span><span>Clique: seleciona os mais líquidos</span></div>
     {note}
   </Pane>;
 }
@@ -157,7 +187,7 @@ export function Macro() {
   const { strip, failed } = useMarket();
   const rows = strip ? [...strip.items.filter(item => item.group === "macro"), ...strip.items.filter(item => item.group === "market")] : [];
   return <Pane title="Macro e índices" area="mac" className="pane-macro" meta={strip ? `atualizado ${formatBrasilia(strip.updated_at, false).replace(" (horário de Brasília)", "")}` : undefined} flush>
-    {!strip ? failed ? <Notice tone="warning">Indicadores indisponíveis no momento.</Notice> : <Loading>Carregando indicadores…</Loading> : <div className="grid-scroll"><table className="grid macro">
+    {!strip ? failed ? <Notice tone="warning">Indicadores indisponíveis no momento.</Notice> : <Loading>Carregando indicadores…</Loading> : <ScrollX label="Macro e índices"><table className="grid macro">
       <thead><tr><th scope="col">Série</th><th scope="col" className="num">Valor</th><th scope="col" className="num">Var.</th><th scope="col" className="num">Ref.</th></tr></thead>
       <tbody>{rows.map(item => <tr key={item.key} title={`${item.source}${item.note ? ` · ${item.note}` : ""}`}>
         <th scope="row">{item.label}{item.note && <small>{item.note}</small>}</th>
@@ -165,7 +195,7 @@ export function Macro() {
         <td className="num">{item.change === null ? <span className="muted">—</span> : <Change value={item.change} />}</td>
         <td className="num muted">{shortDate(item.as_of)}</td>
       </tr>)}</tbody>
-    </table></div>}
+    </table></ScrollX>}
     {strip && strip.missing.length > 0 && <p className="pane-foot">Indisponível: {strip.missing.join(", ")}.</p>}
     {strip && <p className="pane-foot">BCB SGS (Selic, CDI, IPCA, desemprego) · Yahoo Finance com atraso.</p>}
   </Pane>;

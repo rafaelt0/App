@@ -5,7 +5,8 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
-import { ExportButton, Idle, Loading, Metrics, Notice, Pane, Table } from "../../components/ui";
+import { Diagnostics, ExportButton, formatValue, Idle, Loading, Metrics, Notice, Pane, Table, useMedia } from "../../components/ui";
+import { PortfolioPreview } from "../../components/Examples";
 import { tickerColor } from "../../components/Shell";
 import { ElapsedLoading, MonthlyReturns, runFacts, WeightList } from "../../components/PortfolioParts";
 import { api } from "../../lib/api";
@@ -33,6 +34,8 @@ function hasManualShares(inputs: PortfolioInputs, selection: readonly string[]):
 /** Pause after the last edit before recalculating, so typing a value does not send one request per keystroke. */
 const AUTO_RECALC_DELAY_MS = 500;
 const presetWindows = ["730", "365", "1095", "1825", "180"];
+const windowLabels: Record<string, string> = { "730": "2 anos", "365": "1 ano", "1095": "3 anos", "1825": "5 anos", "180": "6 meses" };
+const strategyShort: Record<Strategy, string> = { min_volatility: "Mín. volatilidade", markowitz: "Markowitz", hrp: "HRP", manual: "Alocação manual" };
 
 export default function PortfolioPage() {
   const { session, stocks, loading, error: appError, setSelection, refreshSession } = useApp();
@@ -49,6 +52,8 @@ export default function PortfolioPage() {
   const [longHistory, setLongHistory] = useState(false);
   const [stressResult, setStressResult] = useState<StressResult | null>(null);
   const [stressBusy, setStressBusy] = useState(false);
+  const [foldParams, setFoldParams] = useState(false);
+  const narrow = useMedia("(max-width: 900px)");
   const requestGeneration = useRef(0);
   const analysisPending = useRef(false);
   const stressGeneration = useRef(0);
@@ -154,6 +159,7 @@ export default function PortfolioPage() {
       setResult(value);
       setResultKey(key);
       setStressResult(value.stress);
+      setFoldParams(true);
       setNotice("Resultado desta sessão restaurado. Os parâmetros foram preenchidos com os da última análise.");
     }).catch(() => {});
     return () => { cancelled = true; };
@@ -214,11 +220,14 @@ export default function PortfolioPage() {
   const core = [["total_return", "Retorno Total", "percent"], ["volatility", "Volatilidade Anual", "percent"], ["sharpe", "Índice Sharpe", "ratio"], ["sortino", "Índice Sortino", "ratio"], ["max_drawdown", "Queda máxima (Max Drawdown)", "percent"]] as const;
   const extra = [["annual_return", "Retorno Anualizado", "percent"], ["beta", "Beta vs IBOV", "ratio"], ["annual_alpha", "Alpha Anual", "percent"], ["daily_var", "VaR Diário 95% (paramétrico normal)", "percent"], ["historical_var_95", "VaR Histórico 95% (diário)", "percent"], ["cvar_95", "CVaR 95% (diário)", "percent"], ["information_ratio", "Information Ratio (anualizado)", "ratio"]] as const;
   const sections: [string, string][] = activeResult ? [["pf-resumo", "Resumo"], ["pf-pesos", "Pesos"], ["pf-valor", "Valor"], ["pf-compra", "Compra"], ...(activeResult.charts.frontier ? [["pf-fronteira", "Fronteira"]] as [string, string][] : []), ...(activeResult.charts.drawdown ? [["pf-drawdown", "Drawdown"]] as [string, string][] : []), ["pf-mensal", "Mensal"], ...(activeResult.stress ? [["pf-stress", "Stress"]] as [string, string][] : []), ["pf-risco", "Risco"], ...(activeResult.charts.rolling_beta || activeResult.charts.rolling_sharpe ? [["pf-moveis", "Móveis"]] as [string, string][] : [])] : [];
+  // On narrow screens a run moves results above the parameters, which fold to a one-line recap.
+  const folded = foldParams && (!!activeResult || busy || staleResult);
+  const recap = [windowLabels[windowChoice] ?? `${inputs.lookback_days} dias`, strategyShort[inputs.strategy], formatValue(inputs.capital, "money", 0)].join(" · ");
   const idle = (text: ReactNode) => <Idle>{text}</Idle>;
   const waiting = count < 2 ? `Selecione ao menos 2 ativos (${count}/2) pela busca, Ctrl+K.` : busy ? "Calculando…" : "Pressione Carregar portfólio para calcular pesos, risco e retorno.";
 
-  return <div className="desk desk-split">
-    <Pane title="Parâmetros" className="pane-params" meta={`${count}/20 ativos`}>
+  return <div className={`desk desk-split${folded ? " is-folded" : ""}`}>
+    <Pane title="Parâmetros" className="pane-params" meta={folded && narrow ? recap : `${count}/20 ativos`} narrowCollapsed={folded}>
       <div className="param-group">
         <h3 className="pane-sub">Ativos da carteira</h3>
         {count ? <ol className="asset-list">{session.selection.map((ticker, index) => <li key={ticker}>
@@ -249,35 +258,26 @@ export default function PortfolioPage() {
       {!manualValid && <Notice tone="warning">A alocação manual precisa ter ao menos uma cota positiva.</Notice>}
       {!validInputs && <Notice tone="warning">Confira os limites de capital, histórico, cotas inteiras e diversificação.</Notice>}
       <div className="param-run">
-        <button type="button" className="primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => void runAnalysis()}>{busy ? "Calculando…" : "Carregar portfólio"}</button>
+        <button type="button" className="primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => { setFoldParams(true); void runAnalysis(); }}>{busy ? "Calculando…" : "Carregar portfólio"}</button>
         <button type="button" disabled={selectionBusy} title="Limpa o cache de preços desta sessão e baixa as cotações de novo" onClick={() => void refreshQuotes()}>Rebaixar preços</button>
       </div>
       <p className="param-hint">{loadedSelection === selectionKey ? "Parâmetros recalculam sozinhos após meio segundo sem edições. Trocar ativos exige Carregar portfólio." : "Trocar ativos ou parâmetros exige Carregar portfólio uma vez; depois, parâmetros recalculam sozinhos."}</p>
       {sections.length > 0 && <nav className="jump" aria-label="Seções do resultado"><h3 className="pane-sub">Ir para</h3><ul>{sections.map(([id, label]) => <li key={id}><a href={`#${id}`}>{label}</a></li>)}</ul></nav>}
     </Pane>
-    <div className="board">
+    <div className={`board${activeResult ? "" : " is-preview"}`}>
       {(appError || notice || error || staleResult) && <div className="span-12 board-notes">
         {appError && <Notice tone="negative">{appError}</Notice>}
         {notice && <Notice>{notice}</Notice>}
         {error && <Notice tone="negative">{error}</Notice>}
         {staleResult && <Notice>{validInputs && manualValid ? "Parâmetros alterados. A análise será atualizada em instantes." : "Parâmetros fora dos limites. O resultado anterior fica oculto até que sejam corrigidos."}</Notice>}
       </div>}
-      {!activeResult && <>
-        <Pane title="Resumo de desempenho" className="span-12" meta={busy ? undefined : "aguardando cálculo"}>
-          {busy ? <ElapsedLoading>Baixando cotações e calculando alocação, risco e retorno…</ElapsedLoading> : idle(waiting)}
-          <Metrics size="lg" items={core.map(([, label, unit]) => ({ label, value: null, unit }))} />
-        </Pane>
-        <Pane title="Pesos do portfólio" className="span-4">{idle("Pesos por ativo e barra de composição.")}</Pane>
-        <Pane title="Evolução do valor" className="span-8">{idle("Valor histórico da carteira contra o IBOVESPA, rebalanceado diariamente.")}</Pane>
-        <Pane title="Sugestão de compra" className="span-8">{idle("Cotas a comprar com o capital informado, pelo último fechamento bruto.")}</Pane>
-        <Pane title="Fronteira eficiente" className="span-4">{idle("Disponível nas estratégias otimizadas.")}</Pane>
-
-      </>}
+      {!activeResult && <PortfolioPreview status={busy ? <ElapsedLoading>Baixando cotações e calculando alocação, risco e retorno…</ElapsedLoading> : idle(waiting)} />}
       {activeResult && <>
+        {narrow && <nav className="span-12" aria-label="Seções do resultado"><ul className="jump-strip">{sections.map(([id, label]) => <li key={id}><a href={`#${id}`}>{label}</a></li>)}</ul></nav>}
         {activeResult.warnings.length > 0 && <div className="span-12 board-notes">{activeResult.warnings.map((warning, index) => <Notice tone="warning" key={index}>{warning}</Notice>)}</div>}
         <Pane id="pf-resumo" title="Resumo de desempenho" className="span-12" meta={runFacts(activeResult).join(" · ")}>
-          <Metrics size="lg" items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, status: activeResult.metric_signal[key], help: `${activeResult.metric_status[key]}. ${activeResult.metric_help[key]}`, trend: key === "total_return" ? valueTrend(activeResult) : undefined }))} />
-          {activeResult.benchmark_available ? <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, help: activeResult.metric_help[key] }))} />
+          <Metrics size="lg" items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, signed: key === "total_return", ...(key === "total_return" ? {} : { status: activeResult.metric_signal[key], classification: activeResult.metric_status[key] }), help: activeResult.metric_help[key], trend: key === "total_return" ? valueTrend(activeResult) : undefined }))} />
+          {activeResult.benchmark_available ? <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, signed: key === "annual_return" || key === "annual_alpha", help: activeResult.metric_help[key] }))} />
             : <Notice>Comparações que dependem do IBOVESPA ficam indisponíveis; as métricas próprias do portfólio continuam válidas. Rebaixe os preços quando o benchmark responder.</Notice>}
           <p className="pane-foot">{activeResult.saved ? "Carteira salva para esta sessão anônima; não é uma conta." : "A carteira não foi salva para esta sessão anônima."}{activeResult.sample.zero_excluded ? " Ativos com peso zero foram excluídos da amostra." : ""}</p>
         </Pane>
@@ -313,17 +313,17 @@ export default function PortfolioPage() {
           </div>}
         </Pane>}
         {activeResult.regime && <Pane id="pf-risco" title="Regime · 21 pregões" className="span-4">
-          <Metrics items={[{ label: "Regime", value: activeResult.regime.label }, { label: "Portfólio 21d", value: activeResult.regime.portfolio, unit: "percent" }, { label: "vs IBOV 21d (p.p.)", value: activeResult.regime.difference_pp, unit: "number" }, { label: "Volatilidade 21d a.a.", value: activeResult.regime.volatility, unit: "percent" }]} />
+          <Metrics items={[{ label: "Regime", value: activeResult.regime.label }, { label: "Portfólio 21d", value: activeResult.regime.portfolio, unit: "percent", signed: true }, { label: "vs IBOV 21d (p.p.)", value: activeResult.regime.difference_pp, unit: "number", signed: true }, { label: "Volatilidade 21d a.a.", value: activeResult.regime.volatility, unit: "percent" }]} />
           <Notice tone="warning">Sugestão heurística: {activeResult.regime.advice}</Notice>
           <p className="pane-foot">Regra simples sobre os últimos 21 pregões, sem previsão e sem recomendação.</p>
         </Pane>}
         {activeResult.concentration && <Pane id={activeResult.regime ? undefined : "pf-risco"} title="Concentração" className="span-4">
-          <Metrics items={[{ label: "HHI", value: activeResult.concentration.hhi, unit: "integer", help: activeResult.concentration.level }, { label: "Ativos efetivos", value: `${activeResult.concentration.effective_assets}/${activeResult.concentration.selected_assets}` }, { label: "Maior peso", value: activeResult.concentration.largest_weight, unit: "percent", status: activeResult.concentration.largest_signal, help: activeResult.concentration.largest_status }]} />
-          <Notice tone={activeResult.concentration.diagnostic_status}>{activeResult.concentration.diagnosis}</Notice>
+          <Metrics items={[{ label: "HHI", value: activeResult.concentration.hhi, unit: "integer", classification: activeResult.concentration.level, status: activeResult.concentration.diagnostic_status }, { label: "Ativos efetivos", value: `${activeResult.concentration.effective_assets}/${activeResult.concentration.selected_assets}` }, { label: "Maior peso", value: activeResult.concentration.largest_weight, unit: "percent", status: activeResult.concentration.largest_signal, classification: activeResult.concentration.largest_status }]} />
+          <Diagnostics items={[{ text: activeResult.concentration.diagnosis, status: activeResult.concentration.diagnostic_status }]} />
         </Pane>}
         {activeResult.health && <Pane title="Diagnóstico heurístico" className="span-4">
           <Metrics items={[{ label: "Indicador heurístico", value: activeResult.health.score == null ? null : `${activeResult.health.score}/100` }, { label: "Diagnóstico", value: activeResult.health.label }, { label: "Cobertura", value: activeResult.health.coverage, unit: "percent" }]} />
-          {activeResult.health.diagnostics.map((row, index) => <Notice key={index} tone={row.status}>{row.text}</Notice>)}
+          <Diagnostics items={activeResult.health.diagnostics} />
         </Pane>}
         {activeResult.charts.rolling_beta && <Pane id="pf-moveis" title="Beta móvel 60d vs IBOV" className="span-6"><Chart figure={activeResult.charts.rolling_beta} height={240} /></Pane>}
         {activeResult.charts.rolling_sharpe && <Pane id={activeResult.charts.rolling_beta ? undefined : "pf-moveis"} title="Sharpe móvel 60d anualizado" className="span-6"><Chart figure={activeResult.charts.rolling_sharpe} height={240} /></Pane>}

@@ -77,6 +77,8 @@ export function polishFigure(figure: PlotFigure, kind: "individual" | "fan" | "h
       ...(kind === "histogram" ? { xaxis: base({ ...layout.xaxis, tickprefix: "R$ ", tickformat: ",.0f" }) } : {}),
       legend: { ...layout.legend, orientation: "h", yanchor: "top", y: -0.22, x: 0 },
       hovermode: kind === "fan" ? "x unified" : "closest",
+      // Quartile labels sit close together; alternate their height so Q1, mediana and Q3 never overprint.
+      ...(kind === "histogram" && layout.annotations ? { annotations: [...layout.annotations].sort((a, b) => Number(a.x ?? 0) - Number(b.x ?? 0)).map((note, index) => ({ ...note, yshift: (note.yshift ?? 0) - (index % 2) * 15 })) } : {}),
       title: { ...(typeof layout.title === "object" ? layout.title : { text: layout.title as string | undefined }), font: { size: 15 }, x: 0.01, xanchor: "left" },
     },
   };

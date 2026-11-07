@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
 import { ElapsedLoading } from "../../components/PortfolioParts";
-import { ExportButton, formatValue, Idle, Loading, Metrics, Notice, Pane, Table } from "../../components/ui";
+import { ExportButton, formatValue, Idle, Loading, Metrics, Notice, Pane, Table, useMedia } from "../../components/ui";
+import { SimulationPreview } from "../../components/Examples";
 import { tickerColor } from "../../components/Shell";
 import { api } from "../../lib/api";
 import type { PortfolioResult, Sample } from "../../lib/portfolio";
@@ -33,6 +34,8 @@ export default function SimulationPage() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [portfolioChanged, setPortfolioChanged] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [foldParams, setFoldParams] = useState(false);
+  const narrow = useMedia("(max-width: 900px)");
   const generation = useRef(0);
   const restoreRequest = useRef<{ revision: number; promise: Promise<unknown> } | null>(null);
   const activeRevision = useRef(session?.revision);
@@ -79,6 +82,7 @@ export default function SimulationPage() {
           const { calibration, simulations, initial_capital, years } = run.inputs;
           setInputs({ calibration, simulations, initial_capital, years });
           setResult(run);
+          setFoldParams(true);
           setDisplayCount(Math.min(10, run.inputs.simulations));
           setDisplayDraft(String(Math.min(10, run.inputs.simulations)));
         }
@@ -104,6 +108,7 @@ export default function SimulationPage() {
     const portfolioId = portfolio.id;
     const submitted = { ...inputs, revision, portfolio_id: portfolioId };
     setRunning(true);
+    setFoldParams(true);
     setError(null);
     setPortfolioChanged(false);
     setResult(null);
@@ -183,28 +188,16 @@ export default function SimulationPage() {
         <li>Calibração histórica e comparação entre modelo normal e reamostragem.</li>
       </ul>
     </Pane>
-    <div className="board">
-      <Pane title="Faixas de percentis" className="span-8" meta="aguardando carteira">
-        <div className="example">
-          <svg viewBox="0 0 600 220" role="img" aria-label="Ilustração de exemplo de faixas de percentis, sem dados">
-            {[60, 110, 160].map(y => <line key={y} x1="0" x2="600" y1={y} y2={y} stroke="#1d2229" />)}
-            <path d="M0 120 C150 100 300 60 600 20 L600 210 C300 175 150 150 0 120 Z" fill="rgb(255 178 36 / .08)" />
-            <path d="M0 120 C150 110 300 90 600 70 L600 160 C300 150 150 135 0 120 Z" fill="rgb(255 178 36 / .18)" />
-            <path d="M0 120 C150 116 300 112 600 108" stroke="#ffb224" strokeWidth="1.5" fill="none" />
-            <line x1="0" x2="600" y1="120" y2="120" stroke="#8a929e" strokeDasharray="4 4" />
-          </svg>
-          <p>Faixa escura P25 a P75, clara P5 a P95, linha central a mediana, tracejado o capital inicial. Os números reais aparecem após rodar a simulação da sua carteira.</p>
-        </div>
-      </Pane>
-      <Pane title="Estatísticas" className="span-4" meta="aguardando carteira">
-        <Metrics items={["Valor esperado final", "CAGR do valor final médio", "Probabilidade de ganho", "Retorno final P5", "Valor final P5", "Média dos 5% menores"].map(label => ({ label, value: null }))} />
-      </Pane>
-
+    <div className="board is-preview">
+      <SimulationPreview meta="aguardando carteira" status={<Idle>{prerequisite.title}: carregue a carteira em <kbd>F2</kbd> Carteira para liberar a simulação.</Idle>} />
     </div>
   </div>;
 
-  return <div className="desk desk-split">
-    <Pane title="Parâmetros" className="pane-params" meta={portfolio?.mode ?? undefined}>
+  // On narrow screens a run moves results above the parameters, which fold to a one-line recap.
+  const folded = foldParams && (!!visible || running);
+  const recap = `${yearsLabel(inputs.years)} · ${number.format(inputs.simulations)} trajetórias · ${formatValue(inputs.initial_capital, "money", 0)}`;
+  return <div className={`desk desk-split${folded ? " is-folded" : ""}`}>
+    <Pane title="Parâmetros" className="pane-params" meta={folded && narrow ? recap : portfolio?.mode ?? undefined} narrowCollapsed={folded}>
       {notes}
       {restoredNotice && <Notice>Carteira salva restaurada. Confira ativos e pesos antes de rodar.</Notice>}
       <form className="param-group param-fields" onSubmit={submit} aria-busy={running} noValidate>
@@ -234,33 +227,25 @@ export default function SimulationPage() {
       <p className="param-hint">Pesos normalizados da carteira carregada; peso zero permanece zerado.</p>
       <details className="disclosure"><summary>Premissas e calibração</summary><div><p>A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos.</p><p>O horizonte é independente da janela: 252 dias úteis por ano, até 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p></div></details>
     </Pane>
-    <div className="board">
+    <div className={`board${visible ? "" : " is-preview"}`}>
       {(stale || (visible && visible.warnings.length > 0)) && <div className="span-12 board-notes">
         {stale && <div role="status"><Notice tone="warning">Parâmetros alterados desde a última simulação. Os resultados abaixo são da anterior; clique em Rodar Simulação para atualizá-los.</Notice></div>}
         {visible?.warnings.map(warning => <Notice key={warning} tone="warning"><strong>Atenção: </strong>{warning}</Notice>)}
       </div>}
-      {!visible && <>
-        <Pane title="Estatísticas da simulação" className="span-12" meta={running ? undefined : "aguardando execução"}>
-          {running ? <ElapsedLoading>Rodando simulações Monte Carlo multivariadas…</ElapsedLoading> : <Idle>Ajuste os parâmetros e pressione Rodar Simulação.</Idle>}
-          <Metrics size="lg" items={["Valor esperado final", "CAGR do valor final médio (a.a.)", "Probabilidade de ganho"].map(label => ({ label, value: null }))} />
-        </Pane>
-        <Pane title="Faixas de percentis" className="span-8"><Idle>Evolução do valor da carteira por percentil.</Idle></Pane>
-        <Pane title="Distribuição do valor final" className="span-4"><Idle>Histograma dos valores finais com quartis.</Idle></Pane>
-
-      </>}
+      {!visible && <SimulationPreview meta={running ? "rodando" : "aguardando execução"} status={running ? <ElapsedLoading>Rodando simulações Monte Carlo multivariadas…</ElapsedLoading> : <Idle>Ajuste os parâmetros e pressione Rodar Simulação.</Idle>} />}
       {visible && <>
         <Pane id="sim-stats" title="Estatísticas da simulação" className="span-12" meta={`${yearsLabel(visible.inputs.years)} · ${number.format(visible.inputs.simulations)} trajetórias · capital ${formatValue(visible.inputs.initial_capital, "money")} · calibração ${visible.inputs.calibration === "portfolio" ? "histórico do portfólio" : `${visible.inputs.calibration} anos`}`}>
           <Metrics size="lg" items={[
             { label: "Valor esperado final", value: visible.stats.mean_terminal, unit: "money" },
-            { label: "CAGR do valor final médio (a.a.)", value: visible.stats.mean_implied_cagr, unit: "fraction", digits: 1, help: "Crescimento anual implícito no valor final médio; não é a média dos CAGRs das trajetórias." },
+            { label: "CAGR do valor final médio (a.a.)", value: visible.stats.mean_implied_cagr, unit: "fraction", digits: 1, signed: true, help: "Crescimento anual implícito no valor final médio; não é a média dos CAGRs das trajetórias." },
             { label: "Probabilidade de ganho", value: visible.stats.gain_probability, unit: "fraction", digits: 1, meter: visible.stats.gain_probability, help: `Simulações acima do capital inicial no modelo normal. Erro Monte Carlo até ±${number.format(visible.monte_carlo_error_pp)} p.p. (95% aprox., pior caso); não inclui incerteza dos parâmetros.` },
-            { label: "Retorno final P5", value: visible.stats.p5_return, unit: "fraction", digits: 1, help: "Percentil 5 dos valores finais; não é VaR nem perda máxima." },
+            { label: "Retorno final P5", value: visible.stats.p5_return, unit: "fraction", digits: 1, signed: true, help: "Percentil 5 dos valores finais; não é VaR nem perda máxima." },
           ]} />
           <Metrics items={[
             { label: "Valor final P5", value: visible.stats.p5_terminal, unit: "money" },
             { label: "Média dos 5% menores", value: visible.stats.lower_tail_mean, unit: "money", help: "Média dos finais ≤ P5, com empates." },
             { label: "Menor valor simulado", value: visible.stats.minimum, unit: "money" },
-            { label: "CAGR do valor final P75 (a.a.)", value: visible.stats.p75_implied_cagr, unit: "fraction", digits: 1 },
+            { label: "CAGR do valor final P75 (a.a.)", value: visible.stats.p75_implied_cagr, unit: "fraction", digits: 1, signed: true },
             { label: "Maior valor simulado", value: visible.stats.maximum, unit: "money" },
           ]} />
         </Pane>

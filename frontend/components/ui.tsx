@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { download } from "../lib/api";
 import { formatCompactValue, formatPercent, formatValue, missingValue } from "../lib/formatting";
 import type { Unit } from "../lib/formatting";
@@ -9,8 +9,13 @@ export { formatCompactValue, formatPercent, formatValue, missingValue };
 export type { Unit };
 
 export type Signal = "positive" | "negative" | "warning" | "neutral" | "info";
-export type Metric = { label: string; value: number | string | null; unit?: Unit; currency?: string; digits?: number; compact?: boolean; status?: Signal; help?: string; trend?: number[]; meter?: number };
-export type Column = { key: string; label: string; unit?: Unit; currency?: string; digits?: number; signed?: boolean; compact?: boolean };
+/**
+ * `signed` marks a change or return: only then do ▲▼ and red/green appear, from the sign of the value.
+ * `status` and `classification` are the qualitative reading Python supplies; they render as a text tag, never as direction.
+ */
+export type Metric = { label: string; value: number | string | null; unit?: Unit; currency?: string; digits?: number; compact?: boolean; signed?: boolean; status?: Signal; classification?: string | null; help?: string; trend?: number[]; meter?: number };
+/** `signed` colours a change or return by its sign; `plus` only writes the + of a signed score that is not a price move. */
+export type Column = { key: string; label: string; unit?: Unit; currency?: string; digits?: number; signed?: boolean; plus?: boolean; compact?: boolean };
 
 const minus = "−";
 
@@ -86,6 +91,7 @@ export function Pane({ title, meta, actions, children, className, area, id, flus
   const titleId = useId();
   const narrow = useMedia("(max-width: 900px)");
   const [collapsed, setCollapsed] = useState(narrowCollapsed);
+  useEffect(() => setCollapsed(narrowCollapsed), [narrowCollapsed]);
   const hidden = narrow && collapsed;
   return <section id={id} className={`pane${className ? ` ${className}` : ""}`} style={area ? { gridArea: area } : undefined} aria-labelledby={titleId} data-collapsed={hidden || undefined}>
     <header className="pane-bar">
@@ -97,24 +103,54 @@ export function Pane({ title, meta, actions, children, className, area, id, flus
   </section>;
 }
 
-const statusGlyphs: Record<Signal, string> = { positive: "▲", negative: "▼", warning: "!", neutral: "■", info: "i" };
+/** Words for a qualitative status when Python gives no label of its own. */
+const statusWords: Partial<Record<Signal, string>> = { positive: "Favorável", warning: "Atenção", negative: "Alerta" };
+/** Qualitative tags stay off the direction palette: neutral when fine, amber outline for attention, amber fill for alert. */
+const verdictTone = (status?: Signal) => status === "negative" ? "alert" : status === "warning" ? "attention" : "plain";
+export function Verdict({ status, children }: { status?: Signal; children?: ReactNode }) {
+  const text = children ?? (status ? statusWords[status] : undefined);
+  return text ? <span className={`verdict is-${verdictTone(status)}`}>{text}</span> : null;
+}
+/** Python's heuristic diagnostics as tagged lines: the tag names the severity in words, the text explains it. */
+export function Diagnostics({ items }: { items: { text: string; status: Signal }[] }) {
+  if (!items.length) return null;
+  return <ul className="diagnostics">{items.map((item, index) => <li key={`${index}-${item.text}`}><Verdict status={item.status}>{statusWords[item.status] ?? "Info"}</Verdict><span>{item.text}</span></li>)}</ul>;
+}
 export function Metrics({ items, size = "md" }: { items: Metric[]; size?: "lg" | "md" }) {
   return <dl className={`kv-grid is-${size}`}>{items.map((item, index) => {
-    const pill = !!item.status && !!item.help && item.help.length <= 24 && !item.help.includes(".");
+    const direction = item.signed && typeof item.value === "number" && Number.isFinite(item.value) && item.value !== 0 ? item.value > 0 ? "positive" : "negative" : null;
+    const verdict = item.classification || (item.status ? statusWords[item.status] : undefined);
     return <div className="kv" key={`${item.label}-${index}`}>
       <dt>{item.label}</dt>
-      <dd className={`kv-value${item.status ? ` is-${item.status}` : ""}`}>
-        {item.status && <span className="kv-glyph" aria-hidden="true">{statusGlyphs[item.status]}</span>}
+      <dd className={`kv-value${direction ? ` is-${direction}` : ""}`}>
+        {direction && <span className="kv-glyph" aria-hidden="true">{direction === "positive" ? "▲" : "▼"}</span>}
         <ValueText value={item.value} unit={item.unit} digits={item.digits} currency={item.currency} compact={item.compact} />
+        {verdict && <Verdict status={item.status}>{verdict}</Verdict>}
       </dd>
-      {pill && <dd className={`kv-status is-${item.status}`}>{item.help}</dd>}
-      {item.trend && <dd className="kv-spark"><Sparkline values={item.trend} tone={item.status ?? "info"} /></dd>}
+      {item.trend && <dd className="kv-spark"><Sparkline values={item.trend} tone={direction ?? "info"} /></dd>}
       {typeof item.meter === "number" && Number.isFinite(item.meter) && <dd className="kv-meter" aria-hidden="true"><span style={{ width: `${Math.min(1, Math.max(0, item.meter)) * 100}%` }} /></dd>}
-      {item.help && !pill && <dd className="kv-help" title={item.help}>{item.help}</dd>}
+      {item.help && <dd className="kv-help" title={item.help}>{item.help}</dd>}
     </div>;
   })}</dl>;
 }
-const isNumericColumn = (column: Column) => !!column.signed || (!!column.unit && column.unit !== "text");
+/** Horizontal scroller that flags when more columns sit past the right edge, so the edge can fade as a cue. */
+export function ScrollX({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const sync = () => setMore(element.scrollLeft + element.clientWidth < element.scrollWidth - 2);
+    sync();
+    element.addEventListener("scroll", sync, { passive: true });
+    const observer = new ResizeObserver(sync);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    return () => { element.removeEventListener("scroll", sync); observer.disconnect(); };
+  }, []);
+  return <div ref={ref} className={`grid-scroll${className ? ` ${className}` : ""}`} data-more={more || undefined} tabIndex={0} role="region" aria-label={label}>{children}</div>;
+}
+const isNumericColumn = (column: Column) => !!column.signed || !!column.plus || (!!column.unit && column.unit !== "text");
 const finiteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 /** Missing values sort last in both directions; numbers compare numerically, text in pt-BR order. */
 function compareRows(a: object, b: object, key: string, direction: 1 | -1): number {
@@ -139,7 +175,7 @@ export function Table<T extends object>({ columns, rows, rowKey = "ticker", capt
     return result;
   }, [columns, extremes, rows]);
   const toggle = (key: string) => setSort(current => current?.key === key ? { key, direction: current.direction === 1 ? -1 : 1 } : { key, direction: 1 });
-  return <div className="grid-scroll" tabIndex={0} role="region" aria-label={caption ?? "Tabela de dados"}><table className="grid"><thead><tr>{columns.map(column => {
+  return <ScrollX label={caption ?? "Tabela de dados"}><table className="grid"><thead><tr>{columns.map(column => {
     const numeric = isNumericColumn(column);
     const direction = sort?.key === column.key ? sort.direction : undefined;
     return <th key={column.key} scope="col" className={numeric ? "num" : undefined} aria-sort={direction === undefined ? undefined : direction === 1 ? "ascending" : "descending"}>
@@ -153,18 +189,19 @@ export function Table<T extends object>({ columns, rows, rowKey = "ticker", capt
       const value = values[column.key];
       const currency = column.currency ?? (typeof values.currency === "string" ? values.currency : "BRL");
       const exactDigits = column.compact && column.unit === "money" ? Math.max(2, column.digits ?? 2) : column.digits;
-      const exact = formatValue(value, column.unit, exactDigits, currency, column.signed);
-      const shown = column.compact ? formatCompactValue(value, column.unit, 1, currency, column.signed) : exact;
+      const exact = formatValue(value, column.unit, exactDigits, currency, column.signed || column.plus);
+      const shown = column.compact ? formatCompactValue(value, column.unit, 1, currency, column.signed || column.plus) : exact;
       const bound = bounds.get(column.key);
       const extreme = bound && finiteNumber(value) && bound.max !== bound.min ? value === bound.max ? "max" : value === bound.min ? "min" : null : null;
       const signedTone = column.signed && finiteNumber(value) ? value > 0 ? " is-pos" : value < 0 ? " is-neg" : "" : "";
-      return <td key={column.key} className={`${isNumericColumn(column) ? "num" : ""}${extreme ? ` is-${extreme}` : ""}${signedTone}`.trim() || undefined}>
+      const Cell = columnIndex === 0 ? "th" : "td";
+      return <Cell key={column.key} scope={columnIndex === 0 ? "row" : undefined} className={`${isNumericColumn(column) ? "num" : ""}${extreme ? ` is-${extreme}` : ""}${signedTone}`.trim() || undefined}>
         {columnIndex === 0 && color && <i className="swatch" style={{ background: color }} aria-hidden="true" />}
         {shown === exact ? shown : <span title={exact} aria-label={exact}>{shown}</span>}
         {extreme && <span className="extreme" title={extreme === "max" ? "Maior valor da coluna" : "Menor valor da coluna"}><span aria-hidden="true">{extreme === "max" ? "▴" : "▾"}</span><span className="visually-hidden">{extreme === "max" ? " (maior da coluna)" : " (menor da coluna)"}</span></span>}
-      </td>;
+      </Cell>;
     })}</tr>;
-  })}</tbody></table></div>;
+  })}</tbody></table></ScrollX>;
 }
 const noticeGlyphs: Record<Signal, string> = { positive: "✓", negative: "✕", warning: "!", neutral: "•", info: "i" };
 export function Notice({ children, tone = "info" }: { children: ReactNode; tone?: Signal }) {

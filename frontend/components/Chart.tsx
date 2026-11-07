@@ -76,7 +76,8 @@ function themed(figure: PlotFigure, family: string, hasCaption: boolean, coarse:
       ...axis, ...axisStyle, ...(horizontal ? { ...spikes, showgrid: false, showline: true } : { showline: false }),
       ...(!horizontal && series && key === "yaxis" ? { side: "right" as const } : {}),
       tickfont: { ...axis.tickfont, ...axisStyle.tickfont },
-      title: axisTitle ? { ...axisTitle, font: { size: 10.5, color: ink.muted }, standoff: 8 } : undefined,
+      // A right-hand series axis carries last-value tags where its title would sit; the pane title names the series instead.
+      title: axisTitle && !(!horizontal && series && key === "yaxis") ? { ...axisTitle, font: { size: 10.5, color: ink.muted }, standoff: 8 } : undefined,
     }];
   }));
   if (!("xaxis" in axes)) axes.xaxis = { ...axisStyle, ...spikes, showgrid: false, showline: true };

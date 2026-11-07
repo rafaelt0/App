@@ -292,8 +292,8 @@ export default function Shell({ children }: { children: ReactNode }) {
           <nav className="cmd-views" aria-label="Telas">{views.map(view => {
             const ready = !session || !view.ready || view.ready(session);
             return <Link key={view.href} href={view.href} aria-current={pathname === view.href ? "page" : undefined} aria-keyshortcuts={view.key} title={`${view.label} (${view.key} ou Alt+${view.key.slice(1)})${ready ? "" : ` · ${view.requirement}`}`}>
-              <kbd>{view.key}</kbd>{view.label}{view.ready && <span className={`cmd-ready${ready ? " is-ready" : ""}`} aria-hidden="true">{ready ? "●" : "○"}</span>}
-              {!ready && <span className="visually-hidden">, {view.requirement}</span>}
+              <kbd>{view.key}</kbd>{view.label}{view.ready && <span className={`cmd-ready${ready ? " is-ready" : ""}`} aria-hidden="true" />}
+              {!ready && <small className="cmd-req">{view.requirement}</small>}
             </Link>;
           })}</nav>
           <SelectionChips onFlash={showFlash} />

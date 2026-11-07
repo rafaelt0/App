@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { formatValue, Loading } from "./ui";
+import { formatValue, Loading, ScrollX } from "./ui";
 import { tickerColor } from "./Shell";
 import type { PortfolioResult } from "../lib/portfolio";
 import { period } from "../lib/portfolio";
@@ -26,7 +26,7 @@ export function runFacts(result: PortfolioResult): string[] {
 
 export function MonthlyReturns({ rows }: { rows: PortfolioResult["monthly_returns"] }) {
   const keys = [...months.map((_, index) => `m${index + 1}`), "ytd"];
-  return <div className="grid-scroll" tabIndex={0} role="region" aria-label="Retornos mensais do portfólio, em pontos percentuais por mês">
+  return <ScrollX label="Retornos mensais do portfólio, em pontos percentuais por mês">
     <table className="grid heat">
       <caption>Retorno mensal em %. + ganho; − perda; “—” mês sem dados. A intensidade do fundo acompanha o tamanho do movimento.</caption>
       <thead><tr><th scope="col">Ano</th>{[...months, "No ano"].map(label => <th scope="col" key={label} className="num">{label}</th>)}</tr></thead>
@@ -38,7 +38,7 @@ export function MonthlyReturns({ rows }: { rows: PortfolioResult["monthly_return
         return <td key={key} className={`num heat-cell ${tone}`.trim()} style={{ "--heat": heat.toFixed(3) } as CSSProperties}>{text}</td>;
       })}</tr>)}</tbody>
     </table>
-  </div>;
+  </ScrollX>;
 }
 
 /** Loading with the run time in a hidden span, so the live region is not re-announced every second. */

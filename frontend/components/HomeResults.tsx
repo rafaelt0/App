@@ -1,8 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import Chart, { type PlotFigure } from "./Chart";
-import { ExportButton, formatValue, Metrics, Notice, Pane, Table } from "./ui";
+import { Diagnostics, ExportButton, formatValue, Metrics, Notice, Pane, ScrollX, Table } from "./ui";
 import { TargetRange } from "./RangeBar";
 import { tickerColor } from "./Shell";
 import type { Column } from "./ui";
@@ -16,27 +15,47 @@ type ResultTab = { id: string; label: string; available: (ready: HomeResult, sin
 const always = () => true;
 const median = (values: number[]) => { const sorted = [...values].sort((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2; };
 
-/** Sorted bars with a dashed median; a bar far above the rest is clipped and labelled so it does not flatten the others. */
-function comparisonFigure(companies: Company[], key: string, label: string, unit: "multiple" | "percent", color: (ticker: string) => string | undefined): { figure: PlotFigure; clipped: string | null } {
-  const rows = companies.filter(company => company.indicators_available && typeof company.indicators[key] === "number" && Number.isFinite(company.indicators[key])).map(company => ({ ticker: company.ticker, value: company.indicators[key] as number })).sort((a, b) => b.value - a.value);
-  const text = (value: number) => formatValue(value, unit, 2);
-  const values = rows.map(row => row.value);
-  const mid = values.length ? median(values) : 0;
-  const outlier = rows.length >= 3 && rows[0].value > 0 && rows[0].value > 2.5 * Math.max(rows[1].value, 0) && rows[1].value > 0;
-  const top = outlier ? rows[1].value * 1.45 : undefined;
-  const bottom = Math.min(0, ...values) * 1.15;
-  return {
-    clipped: outlier ? `${rows[0].ticker} ${text(rows[0].value)} fora da escala; barra cortada no topo.` : null,
-    figure: {
-      data: [{ type: "bar", x: rows.map(row => row.ticker), y: rows.map(row => row.value), text: rows.map((row, index) => outlier && index === 0 ? `${text(row.value)} ▲` : text(row.value)), textposition: rows.map((_, index) => outlier && index === 0 ? "inside" : "outside") as unknown as "outside", insidetextanchor: "end", cliponaxis: true, marker: { color: rows.map(row => color(row.ticker) ?? "#9aa2b4") }, hovertemplate: `%{x}: %{y:.2f}${unit === "percent" ? "%" : "×"}<extra></extra>` } as PlotFigure["data"][number]],
-      layout: {
-        height: 300, showlegend: false,
-        yaxis: { title: { text: unit === "percent" ? `${label} (%)` : `${label} (×)` }, ...(outlier ? { range: [bottom, top] } : {}) },
-        shapes: values.length >= 2 ? [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: mid, y1: mid, line: { color: "#ffb224", width: 1, dash: "dash" } }] : [],
-        annotations: values.length >= 2 ? [{ xref: "paper", x: 1, xanchor: "right", y: mid, yanchor: "bottom", text: `mediana ${text(mid)}`, showarrow: false, font: { size: 11, color: "#ffb224" } }] : [],
-      },
-    },
-  };
+type Bar = { ticker: string; value: number | null };
+/**
+ * Sorted horizontal bars with a dashed median. When the largest value is far above the rest, the scale follows the
+ * second largest and that bar is drawn broken with its value spelled out, so it does not flatten the others.
+ */
+function ComparisonBars({ companies, indicator, color }: { companies: Company[]; indicator: { key: string; label: string; unit: "multiple" | "percent" }; color: (ticker: string) => string | undefined }) {
+  const bars: Bar[] = companies.map(company => {
+    const raw = company.indicators_available ? company.indicators[indicator.key] : null;
+    return { ticker: company.ticker, value: typeof raw === "number" && Number.isFinite(raw) ? raw : null };
+  });
+  const known = bars.filter((bar): bar is { ticker: string; value: number } => bar.value !== null).sort((a, b) => b.value - a.value);
+  const missing = bars.filter(bar => bar.value === null);
+  const values = known.map(bar => bar.value);
+  const text = (value: number) => formatValue(value, indicator.unit, 2);
+  const outlier = known.length >= 3 && known[1].value > 0 && known[0].value > 2.5 * known[1].value;
+  const high = Math.max(0, outlier ? known[1].value * 1.2 : Math.max(...values, 0));
+  const low = Math.min(0, ...values);
+  const span = high - low || 1;
+  const at = (value: number) => (Math.min(Math.max(value, low), high) - low) / span * 100;
+  const mid = values.length >= 2 ? median(values) : null;
+  return <div className="cmp">
+    <ul className="cmp-rows" aria-label={`${indicator.label} por ativo, do maior para o menor`}>
+      {known.map((bar, index) => {
+        const clipped = outlier && index === 0;
+        const left = at(Math.min(0, bar.value)), right = at(Math.max(0, bar.value));
+        return <li key={bar.ticker} className={clipped ? "is-clipped" : undefined}>
+          <span className="cmp-tk"><i className="swatch" style={{ background: color(bar.ticker) ?? "#9aa2b4" }} aria-hidden="true" />{bar.ticker}</span>
+          <span className="cmp-track" aria-hidden="true">
+            {low < 0 && <span className="cmp-zero" style={{ left: `${at(0)}%` }} />}
+            <span className="cmp-bar" style={{ left: `${left}%`, width: `${Math.max(right - left, .4)}%`, background: color(bar.ticker) ?? "#9aa2b4" }} />
+            {clipped && <span className="cmp-break" />}
+            {mid !== null && <span className="cmp-mid" style={{ left: `${at(mid)}%` }} />}
+          </span>
+          <span className="cmp-val">{text(bar.value)}{clipped && <small>fora da escala</small>}</span>
+        </li>;
+      })}
+      {missing.map(bar => <li key={bar.ticker} className="is-missing"><span className="cmp-tk"><i className="swatch" style={{ background: color(bar.ticker) ?? "#9aa2b4" }} aria-hidden="true" />{bar.ticker}</span><span className="cmp-track" aria-hidden="true" /><span className="cmp-val muted">sem dado</span></li>)}
+    </ul>
+    <p className="cmp-scale" aria-hidden="true"><span>{low === 0 ? "0" : text(low)}</span>{mid !== null && <span className="cmp-scale-mid" style={{ left: `${at(mid)}%` }}>mediana {text(mid)}</span>}<span>{text(high)}</span></p>
+    {outlier && <p className="tab-foot">Escala até {text(high)}, pelo segundo maior valor; a barra de {known[0].ticker} ({text(known[0].value)}) aparece cortada.</p>}
+  </div>;
 }
 
 const resultTabs: ResultTab[] = [
@@ -50,17 +69,15 @@ const resultTabs: ResultTab[] = [
   { id: "saude", label: "Saúde financeira", available: always, render: ({ ready, companies }) => <>
     <p className="tab-lead">{ready.health_summary}</p>
     <div className="health">{companies.map(company => <section key={company.ticker} className="health-row"><h4>{company.ticker}<small>{company.identity.company}</small></h4>
-      {company.health.metrics.length ? <><Metrics items={company.health.metrics} />{company.health.diagnostics.map(diag => <Notice key={diag.text} tone={diag.status}>{diag.text}</Notice>)}</> : <Notice>Dados de endividamento não disponíveis via Fundamentus para este ticker.</Notice>}
+      {company.health.metrics.length ? <><Metrics items={company.health.metrics} /><Diagnostics items={company.health.diagnostics} /></> : <Notice>Dados de endividamento não disponíveis via Fundamentus para este ticker.</Notice>}
     </section>)}</div>
   </> },
   { id: "comparacao", label: "Comparação", available: (_, single) => !single, render: ({ ready, companies, comparison, setComparison, color }) => {
     const choice = ready.comparison_indicators.find(item => item.key === comparison) ?? ready.comparison_indicators[0];
-    const { figure, clipped } = comparisonFigure(companies, choice.key, choice.label, choice.unit, color);
     return <>
       <div className="tab-tools"><label>Indicador<select value={choice.key} onChange={event => setComparison(event.target.value)}>{ready.comparison_indicators.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></label>
-        <span className="muted">Ordenado do maior para o menor · linha tracejada: mediana da seleção</span></div>
-      {clipped && <Notice tone="warning">{clipped}</Notice>}
-      <Chart figure={figure} title={`Comparativo de ${choice.label}`} />
+        <span className="muted">Do maior para o menor · tracejado âmbar: mediana da seleção</span></div>
+      <ComparisonBars companies={companies} indicator={choice} color={color} />
     </>;
   } },
   { id: "preco-alvo", label: "Preço-alvo", available: always, render: ({ ready, busy, onRefreshConsensus }) => <>
@@ -84,7 +101,7 @@ const resultTabs: ResultTab[] = [
     const categories = Array.from(new Set(companies.flatMap(company => Object.keys(company.synthesis.categorias))));
     const name = (category: string) => category === "Yield" ? "Dividendos" : category;
     return <>
-      <div className="grid-scroll" role="region" aria-label="Síntese setorial por ativo" tabIndex={0}><table className="grid synth-table">
+      <ScrollX label="Síntese setorial por ativo"><table className="grid synth-table">
         <thead><tr><th scope="col">Ativo</th><th scope="col">Setor</th><th scope="col" className="num">Áreas fav.</th>{categories.map(category => <th scope="col" key={category}>{name(category)}</th>)}</tr></thead>
         <tbody>{companies.map(company => <tr key={company.ticker}>
           <th scope="row">{company.ticker}</th>
@@ -93,12 +110,12 @@ const resultTabs: ResultTab[] = [
           {categories.map(category => {
             const entry = company.synthesis.categorias[category];
             if (!entry) return <td key={category} className="muted">—</td>;
-            const tone = entry.veredicto === "Favorável" ? "positive" : entry.veredicto === "Desfavorável" ? "negative" : "neutral";
-            return <td key={category}><span className={`pctl is-${tone}`} role="meter" aria-label={`Percentil de ${name(category)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={entry.percentil}><span className="pctl-track"><span style={{ width: `${entry.percentil}%` }} /></span><span className="pctl-text"><span aria-hidden="true">{tone === "positive" ? "▲" : tone === "negative" ? "▼" : "■"}</span>{entry.percentil.toFixed(0)}</span></span><span className="visually-hidden">{entry.veredicto}</span></td>;
+            const tone = entry.veredicto === "Favorável" ? "fav" : entry.veredicto === "Desfavorável" ? "unfav" : "neutral";
+            return <td key={category}><span className={`pctl is-${tone}`} role="meter" aria-label={`Percentil de ${name(category)}: ${entry.veredicto}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={entry.percentil}><span className="pctl-track"><span style={{ width: `${entry.percentil}%` }} /></span><span className="pctl-text">{entry.percentil.toFixed(0)}</span><span className="pctl-verdict">{tone === "fav" ? "fav." : tone === "unfav" ? "desf." : "neutro"}</span></span></td>;
           })}
         </tr>)}</tbody>
-      </table></div>
-      <p className="legend">Percentil no setor (0 a 100) · ▲ favorável · ■ neutro · ▼ desfavorável</p>
+      </table></ScrollX>
+      <p className="legend">Percentil no setor (0 a 100) e leitura da síntese: fav. favorável · neutro · desf. desfavorável, em âmbar</p>
       {companies.filter(company => company.synthesis.categorias_validas < 2).map(company => <Notice key={company.ticker}>{company.ticker}: dados insuficientes para uma conclusão setorial (são necessárias ao menos duas áreas com indicadores e três observações).</Notice>)}
       {companies.map(company => company.synthesis.details.length ? <details className="disclosure" key={company.ticker}><summary>{company.ticker} · {company.synthesis.details.length} indicadores frente ao setor</summary>
         <Table caption={`Indicadores de ${company.ticker} frente ao setor`} rowKey="label" columns={[{ key: "label", label: "Indicador" }, { key: "verdict", label: "Leitura" }, { key: "value", label: "Valor", unit: "number" }, { key: "unit", label: "Unid." }, { key: "median", label: "Mediana setor", unit: "number" }, { key: "mean", label: "Média aparada", unit: "number" }, { key: "percentile", label: "Percentil", unit: "number", digits: 1 }, { key: "observations", label: "Obs.", unit: "integer" }]} rows={company.synthesis.details.map(detail => ({ ...detail, unit: detail.unit === "percent" ? "%" : "×" }))} />

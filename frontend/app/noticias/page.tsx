@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import Chart from "../../components/Chart";
+import Chart, { type PlotFigure } from "../../components/Chart";
 import { useApp } from "../../components/AppProvider";
 import Link from "next/link";
 import { formatBrasilia, formatPercent, formatValue, Loading, Metrics, Notice, Pane, relativeAge, Table } from "../../components/ui";
@@ -15,9 +15,15 @@ import type { NewsArticle, NewsFilters, NewsSnapshot } from "../../lib/news";
 /** Sample and article timestamps older than this ask the reader to refresh. */
 const staleAfterMs = 15 * 60000;
 
-const sentimentPaths = {positive: "M12 5l7 12H5z", negative: "M12 19L5 7h14z", neutral: "M6 12h12"} as const;
-function SentimentIcon({tone}: {tone: keyof typeof sentimentPaths}) {
-  return <svg width="12" height="12" viewBox="0 0 24 24" fill={tone === "neutral" ? "none" : "currentColor"} stroke="currentColor" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true"><path d={sentimentPaths[tone]} /></svg>;
+/* Sentiment is a reading of the text, not a price move: it gets words and amber for pessimism, never ▲▼ or red/green. */
+const sentimentColors: Record<string, string> = { Otimista: "#b4bac4", Neutro: "#3d4652", Pessimista: "#ffb224" };
+/** Recolours the server's sentiment bars by series name; data and layout stay untouched. */
+function sentimentFigure(figure: PlotFigure): PlotFigure {
+  return { ...figure, data: figure.data.map(trace => {
+    const name = (trace as { name?: string }).name ?? "";
+    const color = sentimentColors[name];
+    return color ? { ...trace, marker: { ...(trace as { marker?: object }).marker, color }, textfont: { color: name === "Neutro" ? "#e8eaed" : "#050607" } } as typeof trace : trace;
+  }) };
 }
 
 /** Engine wording for the chip and summary line; the counts come from the API, one per article. */
@@ -27,6 +33,27 @@ function engineSplit(model: NewsSnapshot["model"], total: number): string {
   return `Jev em ${model.jev_count} de ${total} artigos · léxico em ${model.lexicon_count}`;
 }
 const filterNames: Record<keyof NewsFilters, string> = {ticker: "Ativo", sentiment: "Sentimento", intensity: "Intensidade", sort: "Ordenação"};
+
+/** The 0–100 tone score on its own scale, and the article mix as one composition bar; both only restate API numbers. */
+function ToneScale({ score, counts }: { score: number | null; counts: { positive: number; neutral: number; negative: number } }) {
+  const total = counts.positive + counts.neutral + counts.negative;
+  const parts = [["Otimistas", counts.positive, "is-opt"], ["Neutras", counts.neutral, "is-neu"], ["Pessimistas", counts.negative, "is-pes"]] as const;
+  return <div className="tone-scale">
+    <div className="tone-row">
+      <span className="tone-label">Escala do tom</span>
+      <div className="tone-track" role="img" aria-label={score === null ? "Nota do tom indisponível" : `Nota do tom ${score} de 100`}>
+        <span className="tone-mid" />
+        {score !== null && <span className="tone-mark" style={{ left: `${Math.min(100, Math.max(0, score))}%` }}><b>{score}</b></span>}
+      </div>
+      <div className="tone-ticks" aria-hidden="true"><span>0 pessimista</span><span>50 neutro</span><span>100 otimista</span></div>
+    </div>
+    {total > 0 && <div className="tone-row">
+      <span className="tone-label">Artigos por tom</span>
+      <div className="tone-mix" aria-hidden="true">{parts.map(([label, count, tone]) => count > 0 && <span key={label} className={tone} style={{ flexGrow: count }} />)}</div>
+      <ul className="tone-legend">{parts.map(([label, count, tone]) => <li key={label}><i className={tone} aria-hidden="true" />{label} {count} · {formatPercent(count / total, 0)}</li>)}</ul>
+    </div>}
+  </div>;
+}
 
 function ExternalIcon() {
   return <svg className="news-external-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>;
@@ -40,7 +67,7 @@ function Article({article}: {article: NewsArticle}) {
   return <article className="feed-row" aria-label={article.title}>
     <time dateTime={article.published} title={formatBrasilia(article.published)}>{brasiliaTime.format(new Date(article.published))}</time>
     <span className="feed-tickers">{article.tickers.join(" ")}</span>
-    <span className={`feed-tone is-${tone}`}><SentimentIcon tone={tone} />{article.sentiment}</span>
+    <span className={`feed-tone is-${tone}`}>{article.sentiment}</span>
     <span className={`feed-score is-${tone}`} title="Score de −1 a +1">{formatValue(article.score, "number", 2, "BRL", true)}<span className="feed-bar" aria-hidden="true"><span style={{ "--magnitude": Math.min(1, Math.abs(article.score)) } as CSSProperties} /></span></span>
     <div className="feed-body">
       <h3>{link ? <a href={link} target="_blank" rel="noopener noreferrer">{article.title}<ExternalIcon /><span className="sr-only"> (abre em nova aba)</span></a> : article.title}</h3>
@@ -123,8 +150,9 @@ export default function NewsPage() {
   const stale = !!snapshot && Date.now() - Date.parse(snapshot.as_of) > staleAfterMs;
   const activeFilters = (["ticker", "sentiment", "intensity"] as const).filter(key => filters[key] !== initialFilters[key]);
   const examples = [["10:42", "Exemplo: manchete otimista sobre resultado trimestral", "positive"], ["09:15", "Exemplo: manchete neutra sobre agenda da empresa", "neutral"], ["08:03", "Exemplo: manchete pessimista sobre revisão de guidance", "negative"]] as const;
-  return <div className="desk desk-split">
-    <Pane title="Carteira e filtros" className="pane-params" meta={snapshot ? `${snapshot.tickers.length} ativos` : undefined}>
+  // Once the feed is in, phones show it first; the carteira and filters fold below with a one-line recap.
+  return <div className={`desk desk-split${snapshot ? " is-folded" : ""}`}>
+    <Pane title="Carteira e filtros" className="pane-params" narrowCollapsed={!!snapshot} meta={snapshot ? `${snapshot.tickers.length} ativos · ${activeFilters.length ? `${activeFilters.length} ${activeFilters.length === 1 ? "filtro" : "filtros"}` : "sem filtros"}` : undefined}>
       {bootstrapLoading ? <Loading>Restaurando sessão…</Loading> : <>
         {error && <Notice tone="negative">{error}</Notice>}
         {!session?.portfolio_ready && !busy && <>
@@ -173,36 +201,37 @@ export default function NewsPage() {
           <Metrics size="lg" items={["Nota do tom (/100)", "Cobertura do peso", "Otimistas", "Neutras", "Pessimistas"].map(label => ({ label, value: null }))} />
         </Pane>
         <Pane title="Feed de notícias" className="span-12" meta="aguardando carteira">
-          <div className="example">{examples.map(([time, title, tone]) => <div className="feed-row is-example" key={time}><time>{time}</time><span className="feed-tickers">ABCD3</span><span className={`feed-tone is-${tone}`}><SentimentIcon tone={tone} />{tone === "positive" ? "Otimista" : tone === "negative" ? "Pessimista" : "Neutro"}</span><span className="feed-score">—</span><div className="feed-body"><h3>{title}</h3></div></div>)}
+          <div className="example">{examples.map(([time, title, tone]) => <div className="feed-row is-example" key={time}><time>{time}</time><span className="feed-tickers">ABCD3</span><span className={`feed-tone is-${tone}`}>{tone === "positive" ? "Otimista" : tone === "negative" ? "Pessimista" : "Neutro"}</span><span className="feed-score">—</span><div className="feed-body"><h3>{title}</h3></div></div>)}
             <p>Cada linha traz horário, ativos, tom, score de −1 a +1 e o link para o publicador. As notícias reais aparecem depois de carregar a carteira.</p></div>
         </Pane>
       </>}
       {snapshot && <>
         <Pane title="Tom da carteira" className="span-8" meta={snapshot.summary.label}>
           <Metrics size="lg" items={[
-            {label: "Nota do tom (/100)", value: snapshot.summary.score100, status: snapshot.summary.status, unit: "integer", help: snapshot.summary.label},
+            {label: "Nota do tom (/100)", value: snapshot.summary.score100, status: snapshot.summary.status, unit: "integer", classification: snapshot.summary.label},
             {label: "Cobertura do peso", value: snapshot.summary.coverage, unit: "fraction", digits: 1},
             {label: "Otimistas", value: snapshot.summary.counts.positive, unit: "integer"},
             {label: "Neutras", value: snapshot.summary.counts.neutral, unit: "integer"},
             {label: "Pessimistas", value: snapshot.summary.counts.negative, unit: "integer"},
           ]} />
+          <ToneScale score={snapshot.summary.score100} counts={snapshot.summary.counts} />
           {snapshot.model.jev_count > 0 && snapshot.model.lexicon_count > 0 && <p className="pane-foot">A nota combina Jev e léxico, cujas escalas não são diretamente comparáveis.</p>}
           <p className="pane-foot">Escala 0–100 do tom textual, não previsão de retorno ou risco. Cobertura é disponibilidade de peso, não confiança. Ativos sem notícias ficam fora; sem peso coberto a nota é —, não 50. Contagens de artigos únicos antes dos filtros.</p>
         </Pane>
         <Pane title="Observações por ativo" className="span-4">
-          <Chart figure={snapshot.summary.chart} title="Observações artigo-ativo por ativo" height={220} />
+          <Chart figure={sentimentFigure(snapshot.summary.chart)} title="Observações artigo-ativo por ativo" height={220} />
           <details className="disclosure"><summary>Dados do gráfico</summary>
             <Table caption="Observações artigo-ativo por ativo" columns={[{key: "ticker", label: "Ativo"}, {key: "positive", label: "Otim.", unit: "integer"}, {key: "neutral", label: "Neutr.", unit: "integer"}, {key: "negative", label: "Pessim.", unit: "integer"}]} rows={snapshot.summary.distribution} />
           </details>
         </Pane>
-        <Pane title="Feed de notícias" className="span-12" meta={<span role="status" aria-live="polite">{visible.length} de {articles.length} após filtros · ▲ {positive} · ■ {articles.length - positive - negative} · ▼ {negative}</span>} flush>
+        <Pane title="Feed de notícias" className="span-12" meta={<span role="status" aria-live="polite">{visible.length} de {articles.length} após filtros · {positive} otimistas · {articles.length - positive - negative} neutras · {negative} pessimistas</span>} flush>
           {!articles.length && <Notice>{snapshot.articles.length ? "Nenhuma notícia corresponde aos filtros atuais." : allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : "Nenhuma notícia recente encontrada nos feeds disponíveis."}</Notice>}
           {visible.length > 0 && <ul className="feed">{visible.map(article => <li key={article.id}><Article article={article} /></li>)}</ul>}
           {articles.length > limit ? <div className="feed-more"><button onClick={() => setLimit(previous => previous + 15)}>Ver mais {Math.min(15, articles.length - limit)} notícias ({articles.length - limit} restantes)</button></div> : articles.length > 15 ? <p className="pane-foot">Todas as {articles.length} notícias carregadas.</p> : null}
         </Pane>
         <Pane title="Tom por ativo" className="span-12" meta={`nota da carteira ${snapshot.summary.score100 === null ? "— (sem peso coberto)" : `${snapshot.summary.score100}/100`} · cobertura ${formatPercent(snapshot.summary.coverage, 1)} do peso`} flush>
           {!snapshot.articles.length && <Notice>{allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : failed.length ? "Nenhuma notícia recente nos feeds acessíveis; alguns feeds falharam." : "Nenhuma notícia recente retornada pelos feeds consultados."}</Notice>}
-          <Table caption="Tom por ativo" sortable columns={[{key: "ticker", label: "Ativo"}, {key: "state", label: "Feed"}, {key: "count", label: "Artigos", unit: "integer"}, {key: "positive", label: "Otim. (+)", unit: "integer"}, {key: "neutral", label: "Neutr. (0)", unit: "integer"}, {key: "negative", label: "Pessim. (−)", unit: "integer"}, {key: "mean", label: "Média −1 a +1", digits: 2, signed: true}, {key: "covered_share", label: "% do peso coberto", unit: "fraction", digits: 1}, {key: "contribution", label: "Contribuição vs 50", digits: 2, signed: true}]}
+          <Table caption="Tom por ativo" sortable columns={[{key: "ticker", label: "Ativo"}, {key: "state", label: "Feed"}, {key: "count", label: "Artigos", unit: "integer"}, {key: "positive", label: "Otim. (+)", unit: "integer"}, {key: "neutral", label: "Neutr. (0)", unit: "integer"}, {key: "negative", label: "Pessim. (−)", unit: "integer"}, {key: "mean", label: "Média −1 a +1", unit: "number", digits: 2, plus: true}, {key: "covered_share", label: "% do peso coberto", unit: "fraction", digits: 1}, {key: "contribution", label: "Contribuição vs 50", unit: "number", digits: 2, plus: true}]}
             rows={snapshot.summary.tone} />
           <details className="disclosure flush-disclosure"><summary>Como são calculadas a nota e a cobertura</summary><div>
             <p>Cada notícia recebe score entre −1 e +1. Jev usa probabilidade POSITIVE − NEGATIVE, com as três probabilidades somando 100%. O léxico usa (termos positivos − negativos) / total de termos encontrados; sem termos, score 0. As duas rotas não são medidas diretamente comparáveis.</p>

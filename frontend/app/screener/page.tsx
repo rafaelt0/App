@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import "./screener.css";
 import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp } from "../../components/AppProvider";
-import { ExportButton, formatCompactValue, formatValue, Idle, Loading, Notice, Pane } from "../../components/ui";
+import { ExportButton, formatCompactValue, formatValue, Idle, Loading, Notice, Pane, ScrollX } from "../../components/ui";
 import { refreshFundamentus } from "../../lib/home";
 import { activeCriteria, applyPreset, canonicalCriteria, criterionDefs, defaults, editControl, queryScreener, screenerConfig, sortKey } from "../../lib/screener";
 import type { Config, Controls, CriterionDef, CriterionKey, Result, Sort } from "../../lib/screener";
@@ -177,9 +177,9 @@ export default function ScreenerPage() {
             <button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favorito":"☆ Favoritar"}</button>
           </> : <span className="muted">Clique em uma linha para adicionar à seleção · ↑↓ percorre · Enter adiciona · ✓ já está na seleção</span>}
         </div>
-        <div className={`scr-scroll${busy ? " is-stale":""}`}>
+        <ScrollX label="Ações que atendem aos critérios" className={`scr-scroll${busy ? " is-stale":""}`}>
           <ScreenerTable columns={result.available_columns.filter(column=>visible?.includes(column.key))} rows={result.rows} sort={sort} onSort={sortBy} selectedKey={selectedCurrent ?? undefined} onSelect={setSelected} onActivate={ticker=>{setSelected(ticker);void handoff("add",ticker);}} inSelection={selectionSet}/>
-        </div>
+        </ScrollX>
         <p className="pane-foot">{result.rows.length} ações · {result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")}`:"horário da coleta indisponível; a idade do dado não pode ser confirmada"}</p>
       </>)}
     </Pane>

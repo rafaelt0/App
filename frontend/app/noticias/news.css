@@ -1,5 +1,5 @@
 .engine { display: flex; align-items: center; gap: 6px; color: var(--text-2); font: 11px var(--mono); }
-.engine span { color: var(--pos); }
+.engine span { color: var(--text-2); }
 .engine.is-fallback span { color: var(--amber); }
 .engine.is-none span { color: var(--text-3); }
 .filter-chips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -10,8 +10,12 @@
 .feed-row time { color: var(--text-3); }
 .feed-tickers { overflow: hidden; color: var(--amber); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .feed-tone { display: inline-flex; align-items: center; gap: 4px; }
-.feed-tone.is-positive, .feed-score.is-positive { color: var(--pos); }
-.feed-tone.is-negative, .feed-score.is-negative { color: var(--neg); }
+.feed-tone { justify-self: start; padding: 0 5px; border: 1px solid var(--line-2); font-size: 10.5px; line-height: 16px; }
+.feed-tone.is-positive { color: var(--text); border-color: var(--line-3); }
+.feed-tone.is-negative { color: var(--amber); border-color: var(--amber-line); }
+.feed-score { color: var(--text-2); }
+.feed-score.is-positive .feed-bar span { background: var(--text-2); }
+.feed-score.is-negative .feed-bar span { background: var(--amber); }
 .feed-tone.is-neutral, .feed-score.is-neutral { color: var(--text-3); }
 .feed-score { display: grid; gap: 3px; text-align: right; }
 .feed-bar { display: block; height: 3px; background: var(--line-2); }
@@ -30,11 +34,11 @@
 .prob-row { display: grid; grid-template-columns: 70px 1fr 48px; gap: 8px; align-items: center; font: 11px var(--mono); }
 .prob-track { height: 6px; border: 1px solid var(--line-2); }
 .prob-track span { display: block; height: 100%; background: var(--text-3); }
-.prob-track.is-positive span { background: var(--pos); }
-.prob-track.is-negative span { background: var(--neg); }
+.prob-track.is-positive span { background: var(--text-2); }
+.prob-track.is-negative span { background: var(--amber); }
 .term { display: inline-block; margin: 0 4px 2px 0; padding: 0 4px; border: 1px solid var(--line-2); font: 10.5px var(--mono); }
-.term.is-positive { color: var(--pos); }
-.term.is-negative { color: var(--neg); }
+.term.is-positive { color: var(--text); }
+.term.is-negative { color: var(--amber); border-color: var(--amber-line); }
 .feed-more { padding: 8px 10px; }
 .feed-row.is-example { opacity: .7; }
 .flush-disclosure { margin: 8px 10px 10px; }
@@ -42,3 +46,19 @@
   .feed-row { grid-template-columns: auto auto 1fr auto; gap: 4px 8px; }
   .feed-row .feed-body { grid-column: 1 / -1; }
 }
+.tone-scale { display: grid; gap: 14px; padding: 6px 0 4px; }
+.tone-row { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 4px 12px; align-items: center; }
+.tone-label { grid-row: span 2; align-self: start; color: var(--text-3); font: 500 10px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+.tone-track { position: relative; height: 10px; border: 1px solid var(--line-3); background: var(--input); }
+.tone-mid { position: absolute; top: -4px; bottom: -4px; left: 50%; border-left: 1px dashed var(--text-3); }
+.tone-mark { position: absolute; top: -6px; bottom: -6px; width: 3px; margin-left: -1px; background: var(--amber); }
+.tone-mark b { position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); color: var(--amber); font: 600 11px var(--mono); }
+.tone-ticks { display: flex; justify-content: space-between; color: var(--text-3); font: 10px var(--mono); }
+.tone-mix { display: flex; gap: 1px; height: 10px; }
+.tone-mix span, .tone-legend i { background: var(--line-3); }
+.tone-mix .is-opt, .tone-legend .is-opt { background: var(--text-2); }
+.tone-mix .is-pes, .tone-legend .is-pes { background: var(--amber); }
+.tone-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; color: var(--text-2); font: 11px var(--mono); list-style: none; }
+.tone-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; }
+.tone-row:first-child { margin-top: 12px; }
+@media (max-width: 900px) { .tone-row { grid-template-columns: minmax(0, 1fr); } .tone-label { grid-row: auto; } }
