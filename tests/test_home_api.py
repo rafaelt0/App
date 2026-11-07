@@ -290,3 +290,42 @@ def test_universe_liquidity_fetch_failure_is_503_not_empty_success(home_api, mon
     response = client.get("/api/universe/liquidity")
     assert response.status_code == 503
     assert response.json()["detail"] == "Não foi possível carregar a liquidez da Fundamentus: fonte indisponível"
+
+
+def adjusted_closes():
+    sessions = pd.to_datetime([f"2026-11-0{day}" for day in range(1, 8)])
+    nan = float("nan")
+    return pd.DataFrame({"AAA3.SA": [100, 101, 102, 103, 104, 110, 99],
+                         "BBB4.SA": [10, 10, 10, 10, 10, nan, 10],
+                         "CCC3.SA": [5, 5, 5, 5, 5, 5, nan]}, index=sessions)
+
+
+def test_universe_changes_use_the_latest_common_sessions_and_never_span_a_gap():
+    result = market_data.universe_changes(adjusted_closes(), ["AAA3", "BBB4", "CCC3", "DDD3"])
+    assert result["session"] == "2026-11-07"
+    assert result["changes"]["AAA3"] == {"day": pytest.approx(99 / 110 - 1), "week": pytest.approx(99 / 101 - 1)}
+    # BBB4 missed the previous session, CCC3 the latest one, DDD3 is absent from the download.
+    assert result["changes"]["BBB4"] == {"day": None, "week": pytest.approx(0.0)}
+    assert result["changes"]["CCC3"] == {"day": None, "week": None}
+    assert result["changes"]["DDD3"] == {"day": None, "week": None}
+
+
+def test_universe_changes_route_reports_fractions_and_fails_with_503(home_api, monkeypatch):
+    client, _, _ = home_api
+    seen = []
+
+    def fetch(tickers):
+        seen.append(tickers)
+        return {**market_data.universe_changes(adjusted_closes(), tickers), "fetched_at": "2026-11-07T18:00:00+00:00"}
+
+    monkeypatch.setattr(home, "get_universe_changes", fetch)
+    body = client.get("/api/universe/changes").json()
+    assert seen == [("AAA3", "BBB4", "CCC3", "DDD3")]
+    assert body["unit"] == "fraction" and body["session"] == "2026-11-07" and body["changes"]["DDD3"] == {"day": None, "week": None}
+
+    def unavailable(tickers):
+        raise ValueError("Yahoo Finance não retornou cotações.")
+
+    monkeypatch.setattr(home, "get_universe_changes", unavailable)
+    response = client.get("/api/universe/changes")
+    assert response.status_code == 503 and "Yahoo Finance não retornou cotações" in response.json()["detail"]

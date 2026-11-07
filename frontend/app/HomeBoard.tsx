@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MAX_SELECTION, type Stock } from "../components/AppProvider";
 import { Change, stripQuote, tickerColor, useMarket } from "../components/Shell";
 import StockLogo from "../components/StockLogo";
 import { formatBrasilia, formatCompactValue, formatValue, Loading, Notice, Pane, relativeAge, ScrollX, useMedia, ValueText } from "../components/ui";
-import { quickTickers, type HomeResult } from "../lib/home";
+import { quickTickers, universeChanges, type HomeResult, type UniverseChanges } from "../lib/home";
 import { loadMarketNews, type MarketNews } from "../lib/marketNews";
-import { fitLabel, squarify } from "../lib/treemap";
+import { nestedSquarify } from "../lib/treemap";
 
 const brasiliaTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 const shortDate = (value: string) => value.split("-").reverse().slice(0, 2).join("/");
@@ -104,38 +104,42 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
   </Pane>;
 }
 
-type Tile = { sector: string; value: number; liquidity: number | null; known: boolean; leaders: Stock[] };
-const logoSize = 20, logoGap = 3;
-const liquiditySteps = 5;
+type SizeBy = "liquidity" | "equal";
+type ColorBy = "day" | "week";
+type Block = Stock & { value: number; change: number | null };
+type Changes = { kind: "loading" } | { kind: "ready"; data: UniverseChanges } | { kind: "error"; message: string };
+const sizeOptions: Record<SizeBy, string> = { liquidity: "Liquidez 2m", equal: "Igual" };
+const colorOptions: Record<ColorBy, { label: string; short: string; step: number }> = {
+  day: { label: "Variação do dia", short: "Var. dia", step: 0.01 },
+  week: { label: "Variação em 5 pregões", short: "Var. 5 pregões", step: 0.02 },
+};
+const headerHeight = 15;
 
-/** Treemap of the local B3 list: area is the number of listed stocks, shade the summed 2-month liquidity. */
-export function SectorMap({ stocks, busy, active, available, onSector, onReset, onRefresh, note }: { stocks: Stock[]; busy: boolean; active: string[]; available: number; onSector: (sector: string) => void; onReset: () => void; onRefresh: () => void; note: ReactNode }) {
+/** Diverging bucket of a change: -4…-1 red, 0 flat, 1…4 green; each step is `step` wide and the last one is open-ended. */
+function tone(change: number | null, step: number): number | null {
+  if (change === null) return null;
+  if (change === 0) return 0;
+  return Math.sign(change) * Math.min(4, Math.floor(Math.abs(change) / step) + 1);
+}
+
+/** Stock heatmap of the local B3 list, nested by sector: area is the size metric, colour the sign and size of the change. */
+export function SectorMap({ stocks, selection, busy, active, available, onSector, onAdd, onReset, onRefresh, note }: { stocks: Stock[]; selection: string[]; busy: boolean; active: string[]; available: number; onSector: (sector: string) => void; onAdd: (ticker: string) => void; onReset: () => void; onRefresh: () => void; note: ReactNode }) {
   const map = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 200, h: 100 });
-  const [family, setFamily] = useState<string | null>(null);
+  const [sizeBy, setSizeBy] = useState<SizeBy>("liquidity");
+  const [colorBy, setColorBy] = useState<ColorBy>("day");
+  const [only, setOnly] = useState("");
   const [focus, setFocus] = useState<string | null>(null);
+  const [changes, setChanges] = useState<Changes>({ kind: "loading" });
   useEffect(() => {
-    let active = true;
-    // Labels are fitted with the real font, so wait for it before measuring.
-    void document.fonts.ready.then(() => { if (active && map.current) setFamily(getComputedStyle(map.current).fontFamily); });
-    return () => { active = false; };
+    let live = true;
+    universeChanges().then(data => { if (live) setChanges({ kind: "ready", data }); }, error => { if (live) setChanges({ kind: "error", message: error instanceof Error ? error.message : "Variações indisponíveis." }); });
+    return () => { live = false; };
   }, []);
-  const measure = useMemo(() => {
-    if (!family) return null;
-    const context = document.createElement("canvas").getContext("2d");
-    if (!context) return null;
-    const cache = new Map<string, number>();
-    return (size: number) => (value: string) => {
-      const key = `${size}|${value}`;
-      let width = cache.get(key);
-      if (width === undefined) { context.font = `${size}px ${family}`; width = context.measureText(value).width; cache.set(key, width); }
-      return width;
-    };
-  }, [family]);
   useEffect(() => {
     const element = map.current;
     if (!element) return;
-    // Lay tiles out in the pane's real aspect ratio so they stay close to square.
+    // Lay blocks out in the pane's real aspect ratio so they stay close to square.
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) setBox(current => Math.abs(current.w - width) < 2 && Math.abs(current.h - height) < 2 ? current : { w: width, h: height });
@@ -143,50 +147,72 @@ export function SectorMap({ stocks, busy, active, available, onSector, onReset, 
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const groups = new Map<string, { count: number; liquidity: number; priced: number; members: Stock[] }>();
+  const color = colorOptions[colorBy];
+  const changeOf = (ticker: string) => changes.kind === "ready" ? changes.data.changes[ticker]?.[colorBy] ?? null : null;
+  const sectors = new Map<string, Block[]>();
+  let unsized = 0;
   for (const stock of stocks) {
-    const key = stock.sector || "";
-    const entry = groups.get(key) ?? { count: 0, liquidity: 0, priced: 0, members: [] };
-    entry.count++;
-    entry.members.push(stock);
-    if (stock.liquidity !== null) { entry.liquidity += stock.liquidity; entry.priced++; }
-    groups.set(key, entry);
+    const value = sizeBy === "equal" ? 1 : stock.liquidity ?? 0;
+    if (!(value > 0)) { unsized++; continue; }
+    const key = stock.sector || "Setor não informado";
+    sectors.set(key, [...sectors.get(key) ?? [], { ...stock, value, change: changeOf(stock.ticker) }]);
   }
-  const tiles: Tile[] = [...groups].map(([sector, entry]) => ({ sector: sector || "Setor não informado", value: entry.count, liquidity: entry.priced ? entry.liquidity : null, known: !!sector,
-    leaders: entry.members.filter(stock => stock.liquidity !== null && stock.liquidity > 0).sort((a, b) => b.liquidity! - a.liquidity!) }));
-  const logs = tiles.map(tile => tile.liquidity).filter((value): value is number => value !== null && value > 0).map(Math.log10);
-  const low = Math.min(...logs), high = Math.max(...logs);
-  const step = (liquidity: number | null) => liquidity === null || liquidity <= 0 || !logs.length ? -1 : high === low ? liquiditySteps - 1 : Math.min(liquiditySteps - 1, Math.floor((Math.log10(liquidity) - low) / (high - low) * liquiditySteps));
-  const laid = squarify(tiles, { x: 0, y: 0, w: box.w, h: box.h });
+  const names = [...sectors.keys()].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const shown = only && sectors.has(only) ? [[only, sectors.get(only)!] as const] : [...sectors];
+  const laid = nestedSquarify(shown.map(([key, items]) => ({ key, items })), { x: 0, y: 0, w: box.w, h: box.h }, headerHeight);
+  const missing = changes.kind === "ready" ? stocks.filter(stock => changeOf(stock.ticker) === null).length : 0;
   const filtered = active.length > 0 && !active.includes("Todos");
-  return <Pane title="Setores" area="sec" className="pane-sectors" meta={`${stocks.length} ações · ${groups.size} setores${filtered ? ` · ${active.join(", ")}: ${available}` : ""}`}
+  const pct = (x: number) => `${x / box.w * 100}%`, pctY = (y: number) => `${y / box.h * 100}%`;
+  const describe = (block: Block, sector: string) => [`${block.ticker} · ${block.company || "empresa não informada"}`, sector,
+    `Liquidez 2m ${block.liquidity === null ? "indisponível" : formatCompactValue(block.liquidity, "money", 1)}`,
+    `${color.short} ${changes.kind === "loading" ? "carregando" : block.change === null ? "sem dado" : formatValue(block.change, "fraction", 2, "BRL", true)}`].join(" · ");
+  const full = selection.length >= MAX_SELECTION;
+  return <Pane title="Mapa de calor" area="sec" className="pane-sectors" meta={`${stocks.length} ações · ${sectors.size} setores${filtered ? ` · ${active.join(", ")}: ${available}` : ""}`}
     actions={<>{filtered && <button type="button" disabled={busy} onClick={onReset}>Todos</button>}<button type="button" disabled={busy} onClick={onRefresh} title="Limpa o cache Fundamentus e busca os dados de novo">Atualizar Fundamentus</button></>}>
-    <div className="tmap" ref={map} role="group" aria-label="Mapa de setores da lista local B3">
-      {laid.map(tile => {
-        const shade = step(tile.liquidity);
-        const style = { left: `${tile.x / box.w * 100}%`, top: `${tile.y / box.h * 100}%`, width: `${tile.w / box.w * 100}%`, height: `${tile.h / box.h * 100}%`, "--shade": shade < 0 ? 0 : (shade + 1) / liquiditySteps } as CSSProperties;
-        const liquidity = tile.liquidity === null ? "liquidez indisponível" : `liquidez 2m somada ${formatCompactValue(tile.liquidity, "money", 1)}`;
-        const label = `${tile.sector}: ${tile.value} ${tile.value === 1 ? "ação" : "ações"}, ${liquidity}`;
-        // Tile layout in px: 5px side padding, 4px top and bottom, a 14px data row when it fits; names wrap only between words.
-        const size = tile.w < 84 ? 9.5 : 11;
-        const showData = tile.w >= 22 && tile.h >= 18;
-        const showLiquidity = tile.w >= 84 && tile.h > 34 && tile.liquidity !== null;
-        const lines = measure && tile.w >= 30 ? fitLabel(tile.sector, tile.w - 12, Math.floor((tile.h - 8 - (showData ? 16 : 0)) / (size * 1.2)), measure(size)) : [];
-        // Logos of the sector's most liquid stocks fill whatever room the label and counts leave, at most two rows.
-        const logoRoom = tile.h - 16 - lines.length * size * 1.2 - (showData ? 16 : 0);
-        const perRow = Math.floor((tile.w - 10 + logoGap) / (logoSize + logoGap));
-        const rows = Math.min(2, Math.floor((logoRoom + logoGap) / (logoSize + logoGap)));
-        const leaders = lines.length > 0 && perRow > 0 && rows > 0 ? tile.leaders.slice(0, perRow * rows) : [];
-        return <button type="button" key={tile.sector} className={`tile${tile.known ? "" : " is-unknown"}${active.includes(tile.sector) ? " is-active" : ""}`} style={style}
-          disabled={busy || !tile.known} title={tile.known ? `${label}. Selecionar os mais líquidos.` : `${label}. Sem setor informado; não pode ser escolhido por setor.`} aria-label={tile.known ? `Selecionar os mais líquidos de ${label}` : label}
-          onClick={() => onSector(tile.sector)} onMouseEnter={() => setFocus(label)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(label)} onBlur={() => setFocus(null)}>
-          {lines.length > 0 && <span className="tile-name" style={{ fontSize: size }} aria-hidden="true">{lines.map((line, index) => <span key={index}>{line}</span>)}</span>}
-          {leaders.length > 0 && <span className="tile-logos" aria-hidden="true">{leaders.map(stock => <span key={stock.ticker} title={`${stock.ticker} · ${stock.company}`}><StockLogo ticker={stock.ticker} company={stock.company} size={logoSize} /></span>)}</span>}
-          {showData && <span className="tile-data" aria-hidden="true"><b>{tile.value}</b>{showLiquidity && <span>{formatCompactValue(tile.liquidity, "money", 0)}</span>}</span>}
-        </button>;
-      })}
+    <div className="hm-controls">
+      <label>Tamanho<select aria-label="Tamanho" value={sizeBy} onChange={event => setSizeBy(event.target.value as SizeBy)}>{Object.entries(sizeOptions).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+      <label>Cor<select aria-label="Cor" value={colorBy} onChange={event => setColorBy(event.target.value as ColorBy)}>{Object.entries(colorOptions).map(([key, option]) => <option key={key} value={key}>{option.label}</option>)}</select></label>
+      <label>Setor<select aria-label="Setor" value={only} onChange={event => setOnly(event.target.value)}><option value="">Todos os setores</option>{names.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
     </div>
-    <div className="tmap-legend" aria-hidden="true">{focus ? <span className="tmap-readout">{focus}</span> : <span>Área: nº de ações<span className="fine-only"> · passe o cursor para ler o setor</span></span>}<span className="tmap-scale">Liquidez 2m {Array.from({ length: liquiditySteps }, (_, index) => <i key={index} style={{ "--shade": (index + 1) / liquiditySteps } as CSSProperties} />)} maior</span><span>Clique: seleciona os mais líquidos</span></div>
+    <div className="hmap" ref={map} role="group" aria-label={`Mapa de calor: área por ${sizeOptions[sizeBy].toLocaleLowerCase("pt-BR")}, cor por ${color.label.toLocaleLowerCase("pt-BR")}`}>
+      {laid.map(sector => {
+        const known = sector.key !== "Setor não informado";
+        return <div key={sector.key} className="hm-sector" style={{ left: pct(sector.x), top: pctY(sector.y), width: pct(sector.w), height: pctY(sector.h) }}>
+          {sector.header && (known
+            ? <button type="button" className="hm-head" disabled={busy} title={`${sector.key}: selecionar os mais líquidos`} aria-label={`Selecionar os mais líquidos de ${sector.key}`} onClick={() => onSector(sector.key)}>{sector.key} <span aria-hidden="true">›</span></button>
+            : <span className="hm-head">{sector.key}</span>)}
+        </div>;
+      })}
+      {laid.flatMap(sector => sector.items.map(block => {
+        const level = tone(block.change, color.step);
+        const big = block.w >= 64 && block.h >= 52, medium = !big && block.w >= 34 && block.h >= 30;
+        const font = big ? Math.round(Math.min(22, Math.max(11, Math.min(block.w / 5.5, block.h / 4.5)))) : 10;
+        const logo = big ? Math.round(Math.min(32, Math.max(16, block.h / 4))) : 14;
+        const inside = selection.includes(block.ticker);
+        const label = describe(block, sector.key);
+        const value = changes.kind === "loading" ? "…" : block.change === null ? "s/d" : formatValue(block.change, "fraction", big ? 2 : 1, "BRL", true);
+        return <button type="button" key={block.ticker} className={`hm-block${inside ? " is-selected" : ""}`} data-ticker={block.ticker} data-sector={sector.key} data-tone={level ?? "none"} data-change={block.change ?? ""} data-size={block.value}
+          style={{ left: pct(block.x), top: pctY(block.y), width: pct(block.w), height: pctY(block.h) }}
+          disabled={busy || (!inside && full)} aria-label={inside ? `${label}. Já está na seleção.` : full ? `${label}. Seleção cheia.` : `Adicionar à seleção: ${label}`}
+          onClick={() => { if (!inside) onAdd(block.ticker); }} onMouseEnter={() => setFocus(label)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(label)} onBlur={() => setFocus(null)}>
+          {(big || medium) && <span className="hm-body" aria-hidden="true">
+            <StockLogo ticker={block.ticker} company={block.company} size={logo} />
+            {big && <b style={{ fontSize: font }}>{block.ticker}</b>}
+            <span style={{ fontSize: big ? Math.max(10, Math.round(font * .72)) : 10 }}>{value}</span>
+          </span>}
+        </button>;
+      }))}
+    </div>
+    <div className="hm-legend">
+      <span className="hm-readout" aria-live="polite">{focus ?? <>Área: {sizeOptions[sizeBy].toLocaleLowerCase("pt-BR")} · clique adiciona à seleção, o nome do setor pega os mais líquidos</>}</span>
+      <span className="hm-scale" role="img" aria-label={`Escala de ${color.label.toLocaleLowerCase("pt-BR")}: vermelho para queda, cinza para zero, verde para alta, mais forte a cada ${formatValue(color.step, "fraction", 0)}; hachurado sem dado`}>
+        <span className="hm-swatches">{[-4, -3, -2, -1, 0, 1, 2, 3, 4].map(level => <i key={level} data-tone={level} />)}</span>
+        <span className="hm-ticks" aria-hidden="true">{[[1, -3], [2, -2], [3, -1], [4.5, 0], [6, 1], [7, 2], [8, 3]].map(([at, n]) => <span key={n} style={{ left: at * 24 }}>{n === 0 ? "0" : `${n < 0 ? "−" : "+"}${formatValue(Math.abs(n) * color.step, "fraction", 0)}`}</span>)}</span>
+      </span>
+      <span className="hm-nodata"><i data-tone="none" aria-hidden="true" />sem dado{missing ? ` (${missing})` : ""}</span>
+    </div>
+    <p className="pane-foot">{changes.kind === "loading" ? "Carregando variações do Yahoo Finance…" : changes.kind === "error" ? `Variações indisponíveis: ${changes.message}` : `${color.label}: ${changes.data.source}, pregão de ${shortDate(changes.data.session)}.`}
+      {" "}Tamanho: Fundamentus, liquidez média diária em 2 meses.{unsized > 0 && sizeBy === "liquidity" ? ` ${unsized} ações sem liquidez ficam fora do mapa.` : ""}</p>
     {note}
   </Pane>;
 }

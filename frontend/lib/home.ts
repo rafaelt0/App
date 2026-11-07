@@ -27,3 +27,6 @@ export const quickTickers = ["WEGE3","PETR4","VALE3","ITUB4","RENT3","ABEV3","EG
 /** Series colors from the brand chart palette; mirrors the CHART_* constants in utils/charts.py. */
 export const comparisonColors = ["#8b93ff","#4cc9f0","#f5b544","#e879c6","#3ecf8e","#f2757a","#9aa2b4"];
 export const quickSectors = [["Bancos","Intermediários Financeiros"],["Petróleo e Gás","Petróleo, Gás e Biocombustíveis"],["Mineração","Mineração"],["Energia Elétrica","Energia Elétrica"],["Tecnologia","Programas e Serviços"],["Bebidas","Bebidas"],["Saúde","Serv.Méd.Hospit. Análises e Diagnósticos"],["Varejo","Comércio"]];
+/** Yahoo adjusted-close changes for the whole list, as fractions; null where a stock missed one of the sessions. */
+export type UniverseChanges = {source:string;unit:"fraction";session:string;fetched_at:string;changes:Record<string,{day:number|null;week:number|null}>};
+export const universeChanges = () => api<UniverseChanges>("/api/universe/changes");
