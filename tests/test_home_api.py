@@ -1,4 +1,5 @@
 import io
+import threading
 
 import pandas as pd
 import pytest
@@ -7,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from backend import home
 from backend.state import SessionState, replace_selection
-from utils import market_data
+from utils import market_data, snapshot
 
 
 @pytest.fixture
@@ -15,6 +16,7 @@ def home_api(monkeypatch):
     ctx = SessionState(uid="home-test", selection=["AAA3", "BBB4"])
     universe = pd.DataFrame({"Ticker": ["AAA3", "BBB4", "CCC3", "DDD3"], "Setor": ["Banco"] * 4})
     monkeypatch.setattr(home, "get_listed_stocks", lambda: universe)
+    home.changes_snapshot.clear()
     app = FastAPI()
 
     @app.middleware("http")
@@ -328,22 +330,117 @@ def test_universe_changes_fail_when_most_symbols_came_back_empty():
         market_data.universe_changes(adjusted, ["AAA3", "BBB4", "CCC3", "DDD3"])
 
 
-def test_universe_changes_route_reports_fractions_and_fails_with_503(home_api, monkeypatch):
+def changes_at(fetched_at, day_close=99):
+    closes = adjusted_closes()
+    closes.iloc[-1, 0] = day_close
+    return {**market_data.universe_changes(closes, ("AAA3", "BBB4", "CCC3", "DDD3")), "fetched_at": fetched_at}
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(snapshot.time, "monotonic", lambda: now[0])
+    return now
+
+
+def test_universe_changes_route_reports_fractions_with_their_fetch_time(home_api, monkeypatch):
     client, _, _ = home_api
     seen = []
 
     def fetch(tickers):
         seen.append(tickers)
-        return {**market_data.universe_changes(adjusted_closes(), tickers), "fetched_at": "2026-11-07T18:00:00+00:00"}
+        return changes_at("2026-11-07T18:00:00+00:00")
 
     monkeypatch.setattr(home, "get_universe_changes", fetch)
     body = client.get("/api/universe/changes").json()
     assert seen == [("AAA3", "BBB4", "CCC3", "DDD3")]
     assert body["unit"] == "fraction" and body["session"] == "2026-11-07" and body["changes"]["DDD3"] == {"day": None, "week": None}
+    assert (body["fetched_at"], body["stale"], body["refreshing"], body["refresh_error"]) == ("2026-11-07T18:00:00+00:00", False, False, None)
+    assert client.get("/api/universe/changes").json()["fetched_at"] == "2026-11-07T18:00:00+00:00"
+    assert len(seen) == 1
+
+
+def test_universe_changes_without_any_snapshot_fail_with_503_instead_of_inventing_data(home_api, monkeypatch):
+    client, _, _ = home_api
 
     def unavailable(tickers):
         raise ValueError("Yahoo Finance não retornou cotações.")
 
     monkeypatch.setattr(home, "get_universe_changes", unavailable)
     response = client.get("/api/universe/changes")
-    assert response.status_code == 503 and "Yahoo Finance não retornou cotações" in response.json()["detail"]
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Não foi possível carregar as variações do Yahoo Finance: Yahoo Finance não retornou cotações."
+
+
+def test_stale_universe_changes_are_served_at_once_and_revalidated_in_the_background(home_api, monkeypatch, clock):
+    client, _, _ = home_api
+    release = threading.Event()
+    results = iter([changes_at("2026-11-06T20:10:00+00:00", day_close=110), changes_at("2026-11-07T14:00:00+00:00", day_close=99)])
+
+    def fetch(tickers):
+        value = next(results)
+        if value["fetched_at"].startswith("2026-11-07"):
+            assert release.wait(5), "background refresh never released"
+        return value
+
+    monkeypatch.setattr(home, "get_universe_changes", fetch)
+    assert client.get("/api/universe/changes").json()["fetched_at"] == "2026-11-06T20:10:00+00:00"
+    clock[0] += home.UNIVERSE_CHANGES_TTL_SECONDS
+
+    stale = client.get("/api/universe/changes").json()
+    assert (stale["fetched_at"], stale["stale"], stale["refreshing"]) == ("2026-11-06T20:10:00+00:00", True, True)
+    assert stale["changes"]["AAA3"]["day"] == pytest.approx(0.0)
+
+    release.set()
+    fresh = client.get("/api/universe/changes", params={"wait": "true"}).json()
+    assert (fresh["fetched_at"], fresh["stale"], fresh["refreshing"], fresh["refresh_error"]) == ("2026-11-07T14:00:00+00:00", False, False, None)
+    assert fresh["changes"]["AAA3"]["day"] == pytest.approx(99 / 110 - 1)
+
+
+def test_a_rejected_partial_download_keeps_the_last_snapshot_and_reports_the_failure(home_api, monkeypatch, clock):
+    client, _, _ = home_api
+    monkeypatch.setattr(home, "get_universe_changes", lambda tickers: changes_at("2026-11-06T20:10:00+00:00"))
+    client.get("/api/universe/changes")
+    clock[0] += home.UNIVERSE_CHANGES_TTL_SECONDS
+    nan = float("nan")
+
+    def partial(tickers):
+        return market_data.universe_changes(adjusted_closes().assign(**{"BBB4.SA": nan, "CCC3.SA": nan}), tickers)
+
+    monkeypatch.setattr(home, "get_universe_changes", partial)
+    body = client.get("/api/universe/changes", params={"wait": "true"}).json()
+    assert (body["fetched_at"], body["stale"], body["refreshing"]) == ("2026-11-06T20:10:00+00:00", True, False)
+    assert body["refresh_error"] == "Yahoo Finance devolveu cotações para poucas ações."
+
+
+def test_scheduled_refresh_requires_the_configured_token(home_api, monkeypatch):
+    client, _, _ = home_api
+    calls = []
+    monkeypatch.setattr(home, "get_universe_changes", lambda tickers: calls.append(tickers) or changes_at("2026-11-07T14:00:00+00:00"))
+
+    monkeypatch.delenv(home.REFRESH_TOKEN_ENV, raising=False)
+    assert client.post("/api/universe/changes/refresh", headers={"Authorization": "Bearer "}).status_code == 503
+
+    monkeypatch.setenv(home.REFRESH_TOKEN_ENV, "s3cret")
+    assert client.post("/api/universe/changes/refresh").status_code == 401
+    assert client.post("/api/universe/changes/refresh", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert calls == []
+
+    response = client.post("/api/universe/changes/refresh", headers={"Authorization": "Bearer s3cret"})
+    assert response.status_code == 200
+    assert response.json() == {"session": "2026-11-07", "fetched_at": "2026-11-07T14:00:00+00:00"}
+    assert len(calls) == 1
+    assert client.get("/api/universe/changes").json()["stale"] is False and len(calls) == 1
+
+
+def test_scheduled_refresh_reports_a_failed_first_fetch_as_503(home_api, monkeypatch):
+    client, _, _ = home_api
+    monkeypatch.setenv(home.REFRESH_TOKEN_ENV, "s3cret")
+
+    def unavailable(tickers):
+        raise ValueError("Yahoo Finance não retornou cotações.")
+
+    monkeypatch.setattr(home, "get_universe_changes", unavailable)
+    response = client.post("/api/universe/changes/refresh", headers={"Authorization": "Bearer s3cret"})
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Não foi possível atualizar as variações do Yahoo Finance: Yahoo Finance não retornou cotações."

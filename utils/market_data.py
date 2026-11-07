@@ -185,7 +185,6 @@ def universe_changes(adjusted: pd.DataFrame, tickers) -> dict:
     return {"session": adjusted.index[-1].date().isoformat(), "changes": changes}
 
 
-@cache_data(ttl=600)
 def get_universe_changes(tickers: tuple) -> dict:
     """Fetch one Yahoo download for the whole universe and return its latest-session changes."""
     downloaded = yf.download([f"{ticker}.SA" for ticker in tickers], period="15d", interval="1d", auto_adjust=False,
