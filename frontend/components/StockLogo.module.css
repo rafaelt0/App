@@ -4,8 +4,8 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 2px;
   background: #f4f4f2;
 }
 

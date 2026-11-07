@@ -2,14 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import "./screener.css";
-import { useApp } from "../../components/AppProvider";
-import { SELECTION_FULL_MESSAGE } from "../../components/CommandPalette";
-import { ExportButton, formatCompactValue, Icon, Loading, Metrics, Notice, PageHeader, Section } from "../../components/ui";
+import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp } from "../../components/AppProvider";
+import { ExportButton, formatCompactValue, formatValue, Idle, Loading, Notice, Pane } from "../../components/ui";
 import { refreshFundamentus } from "../../lib/home";
 import { activeCriteria, applyPreset, canonicalCriteria, criterionDefs, defaults, editControl, queryScreener, screenerConfig, sortKey } from "../../lib/screener";
-import type { Config, Controls, CriterionDef, CriterionKey, Result, ScreenerColumn, Sort } from "../../lib/screener";
+import type { Config, Controls, CriterionDef, CriterionKey, Result, Sort } from "../../lib/screener";
 import ScreenerTable from "./ScreenerTable";
 
 const liquidityShortcuts = [1_000_000, 2_000_000, 5_000_000, 20_000_000];
@@ -17,19 +15,17 @@ const liquidityMax = 100_000_000;
 
 export default function ScreenerPage() {
   const {session,stocks,loading,error:appError,setSelection,toggleFavorite,refreshSession} = useApp();
-  const router=useRouter();
   const [config,setConfig]=useState<Config|null>(null);
   const [controls,setControls]=useState<Controls>(defaults);
   const [sort,setSort]=useState<Sort>({field:"liq2m",direction:"desc"});
   const [result,setResult]=useState<Result|null>(null);
-  const [limit,setLimit]=useState(25);
   const [visible,setVisible]=useState<string[]|null>(null);
   const [selected,setSelected]=useState<string|null>(null);
   const [busy,setBusy]=useState(false);
   const [actionBusy,setActionBusy]=useState(false);
   const [error,setError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
-  const [undoSelection,setUndoSelection]=useState<{before:string[];ticker:string}|null>(null);
+  const [undoSelection,setUndoSelection]=useState<{before:string[];ticker:string;mode:"add"|"only"}|null>(null);
   const [reload,setReload]=useState(0);
   const barRef=useRef<HTMLDivElement>(null);
   const generation=useRef(0);
@@ -59,7 +55,6 @@ export default function ScreenerPage() {
         if(identity!==orderedTickers.current)setSelected(null);
         orderedTickers.current=identity;
         setResult(value);
-        setLimit(25);
         setVisible(current=>current===null ? value.default_columns:current.filter(key=>value.available_columns.some(column=>column.key===key)));
       }).catch(exc=>{if(gen===generation.current && revision.current===rev){setResult(null);setError(exc.message);}}).finally(()=>{if(gen===generation.current)setBusy(false);});
     },200);
@@ -71,17 +66,18 @@ export default function ScreenerPage() {
     catch(exc){setError((exc as Error).message);}
     finally{setActionBusy(false);}
   }
-  async function handoff(mode: "add" | "only") {
-    if(!selected)return;
+  async function handoff(mode: "add" | "only", ticker = selected) {
+    if(!ticker)return;
     setActionBusy(true);setError(null);setUndoSelection(null);
     try {
-      const known=stocks.some(stock=>stock.ticker===selected);
-      if(!known){router.push(`/?unavailable=${encodeURIComponent(selected)}`);return;}
+      const known=stocks.some(stock=>stock.ticker===ticker);
+      if(!known){setError(`${ticker} está fora da lista local B3 e não pode entrar na seleção.`);return;}
       const before=[...session!.selection];
-      if(mode==="add" && !before.includes(selected) && before.length>=20){setError(SELECTION_FULL_MESSAGE);return;}
-      await setSelection(mode==="only" ? [selected]:current=>current.includes(selected) ? [...current]:[...current,selected]);
-      if(mode==="only" && before.some(ticker=>ticker!==selected)){setUndoSelection({before,ticker:selected});return;}
-      router.push("/");
+      if(mode==="add" && before.includes(ticker)){setUndoSelection(null);setNotice(`${ticker} já está na seleção.`);return;}
+      if(mode==="add" && before.length>=MAX_SELECTION){setError(SELECTION_FULL_MESSAGE);return;}
+      await setSelection(mode==="only" ? [ticker]:current=>current.includes(ticker) ? [...current]:[...current,ticker]);
+      setNotice(null);
+      setUndoSelection({before,ticker,mode});
     } catch(exc){setError((exc as Error).message);}finally{setActionBusy(false);}
   }
   async function undoOnly() {
@@ -106,7 +102,7 @@ export default function ScreenerPage() {
   }
   function removeCriterion(key:CriterionDef["enabled"]) {edit(key,false);barRef.current?.focus();}
   function edit<K extends keyof Controls>(key:K,value:Controls[K]) {setControls(current=>editControl(current,key,value));}
-  if(loading || !session)return <div className="screener-page"><PageHeader title="Screener de ações" description="Explore ações da B3 com critérios claros e ajustáveis." icon="filter"/>{appError ? <Notice tone="negative">{appError}<button onClick={()=>void refreshSession()}>Tentar novamente</button></Notice>:<Loading/>}</div>;
+  if(loading || !session)return <div className="desk">{appError ? <Notice tone="negative">{appError}<button onClick={()=>void refreshSession()}>Tentar novamente</button></Notice>:<Loading/>}</div>;
   const selectedCurrent=selected && result?.rows.some(row=>row.ticker===selected) ? selected:null;
   const preset=config?.presets.find(item=>item.name===controls.preset);
   const plInvalid=controls.pl_enabled && controls.pl_min>controls.pl_max;
@@ -138,70 +134,54 @@ export default function ScreenerPage() {
   const presetSortKeys=new Set((config?.sorts ?? []).map(sortKey));
   const sortOptions:Sort[]=config ? [...config.sorts,...(presetSortKeys.has(sortKey(sort)) ? []:[sort])]:[];
   const columnCount=visible?.length ?? 0;
-  return <div className="screener-page">
-    <PageHeader title="Screener de ações" description="Explore ações listadas na B3 com critérios claros e ajustáveis. Dados da Fundamentus; consulte a coleta exibida abaixo." icon="filter"/>
-    {notice && <Notice tone="positive">{notice}</Notice>}
-    {undoSelection && <Notice tone="positive"><div className="scr-undo"><span>Seleção substituída por {undoSelection.ticker} (eram {undoSelection.before.length} ativos).</span><button disabled={actionBusy} onClick={()=>void undoOnly()}>Desfazer</button><Link className="button-link primary" href="/">Abrir Fundamentos</Link></div></Notice>}
-    <div className="scr-workspace">
-    <section className="task-panel scr-filters" aria-labelledby="scr-filters-title">
-      <div className="task-heading"><span className="task-step" aria-hidden="true">01</span><div className="task-heading-content"><h2 id="scr-filters-title">Defina os critérios</h2><p>Escolha um ponto de partida e ajuste os limites da busca.</p></div></div>
-      <div className="scr-setup">
-        <label>Ponto de partida<select value={config ? controls.preset:""} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config ? config.presets.map(item=><option key={item.name}>{item.name}</option>):<option value="">Carregando…</option>}</select></label>
-        <label>Ordenar resultados<select value={config ? sortKey(sort):""} disabled={!config} onChange={event=>{const [field,direction]=event.target.value.split(":");setSort({field,direction:direction as Sort["direction"]});}}>{config ? sortOptions.map(option=><option key={sortKey(option)} value={sortKey(option)}>{sortLabel(option)}</option>):<option value="">Carregando…</option>}</select></label>
-      </div>
-      {preset?.description && <p className="caption scr-preset-note">{preset.description}</p>}
-      <div className="scr-criteria">
-        {criterionDefs.map(def=>{
-          const enabled=controls[def.enabled];
-          return <fieldset className="scr-criterion" data-active={enabled} key={def.key}><legend>{def.group}{enabled && <span className="scr-state">Ativo</span>}</legend>
-            <label><input type="checkbox" checked={enabled} onChange={event=>edit(def.enabled,event.target.checked)}/>{def.toggle}</label>
-            {enabled && inputs[def.key]}
-          </fieldset>;
-        })}
-      </div>
-      <div className="actions scr-filters-actions">
+  const selectionSet=new Set(session.selection);
+  return <div className="desk desk-split desk-screener">
+    <Pane title="Filtros" className="pane-params" narrowCollapsed meta={chips.length ? `${chips.length} ${chips.length===1 ? "critério ativo":"critérios ativos"}` : "nenhum critério"}>
+      <label>Ponto de partida<select value={config ? controls.preset:""} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config ? config.presets.map(item=><option key={item.name}>{item.name}</option>):<option value="">Carregando…</option>}</select></label>
+      {preset?.description && <p className="param-hint">{preset.description}</p>}
+      <label>Ordenar resultados<select value={config ? sortKey(sort):""} disabled={!config} onChange={event=>{const [field,direction]=event.target.value.split(":");setSort({field,direction:direction as Sort["direction"]});}}>{config ? sortOptions.map(option=><option key={sortKey(option)} value={sortKey(option)}>{sortLabel(option)}</option>):<option value="">Carregando…</option>}</select></label>
+      <h3 className="pane-sub">Critérios</h3>
+      <ul className="criteria">{criterionDefs.map(def=>{
+        const enabled=controls[def.enabled];
+        return <li key={def.key} data-active={enabled}>
+          <label><input type="checkbox" checked={enabled} onChange={event=>edit(def.enabled,event.target.checked)}/><span>{def.group}</span>{enabled && <small>{def.chip(controls)}</small>}<span className="visually-hidden">{def.toggle}</span></label>
+          {enabled && <div className="criteria-fields">{inputs[def.key]}</div>}
+        </li>;
+      })}</ul>
+      <div className="param-run">
         <button disabled={actionBusy} onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button>
-        <button disabled={actionBusy} onClick={()=>void sourceRefresh()}>{actionBusy ? "Atualizando…":"Atualizar dados Fundamentus"}</button>
-        <span className="caption">Os resultados são atualizados automaticamente ao alterar os critérios.</span>
+        <button disabled={actionBusy} title="Limpa o cache Fundamentus e busca os dados de novo" onClick={()=>void sourceRefresh()}>{actionBusy ? "Atualizando…":"Atualizar dados Fundamentus"}</button>
       </div>
-    </section>
-    <div className="scr-results" aria-busy={busy || actionBusy}>
-      <div className="scr-active context-strip" tabIndex={-1} ref={barRef}>
-        <p className="scr-chips-label" id="scr-active-label">Critérios ativos</p>
-        {chips.length ? <ul className="scr-chips" aria-labelledby="scr-active-label">{chips.map(chip=><li key={chip.key}><span title={chip.title}>{chip.label}</span><button type="button" aria-label={`Remover critério ${chip.label}`} onClick={()=>removeCriterion(chip.enabled)}><span aria-hidden="true">×</span></button></li>)}</ul>:<span className="caption">Nenhum critério ativo; todos os ativos são exibidos.</span>}
-        <p className="scr-count" role="status">{result && !busy && !invalidCriteria ? <><strong>{result.matched_count}</strong> de {result.total_count} ações correspondem</>:error || invalidCriteria ? "Resultado indisponível":"Atualizando resultado…"}</p>
+      {result && <>
+        <details className="disclosure"><summary>Colunas ({columnCount} de {result.available_columns.length})</summary><fieldset className="column-picker"><legend className="visually-hidden">Indicadores na tabela</legend>{result.available_columns.map(column=><label key={column.key}><input type="checkbox" checked={visible?.includes(column.key) ?? false} onChange={event=>setVisible(current=>{const next=new Set(current ?? []);if(event.target.checked)next.add(column.key);else next.delete(column.key);return result.available_columns.map(item=>item.key).filter(key=>next.has(key));})}/>{column.label}</label>)}</fieldset></details>
+        <details className="disclosure"><summary>Entenda os indicadores</summary><dl className="glossary">{result.available_columns.filter(column=>visible?.includes(column.key) && column.help).map(column=><div key={column.key}><dt>{column.label}</dt><dd>{column.help}</dd></div>)}</dl></details>
+      </>}
+      <p className="param-hint">Resultados atualizam ao alterar os critérios. Fonte: Fundamentus, com atraso. Triagem, não recomendação de investimento.</p>
+    </Pane>
+    <Pane title="Resultados" className="pane-screener" flush
+      meta={result && !busy && !invalidCriteria ? <span role="status"><b className="scr-count">{result.matched_count}</b> de {result.total_count} · DY médio {formatValue(result.metrics.mean_dy,"percent",2)} · ROE médio {formatValue(result.metrics.mean_roe,"percent",2)}{result.fetched_at ? ` · coleta há ${result.age_minutes} min`:" · horário da coleta indisponível"}</span> : <span role="status">{error || invalidCriteria ? "Resultado indisponível":"Atualizando…"}</span>}
+      actions={result ? <ExportButton path={`/api/screener/${result.id}/results.csv`}>CSV {result.matched_count}</ExportButton> : undefined}>
+      <div className="scr-active" tabIndex={-1} ref={barRef} aria-label="Critérios ativos">
+        {chips.length ? <ul className="scr-chips">{chips.map(chip=><li key={chip.key} className="chip"><span title={chip.title}>{chip.label}</span><button type="button" aria-label={`Remover critério ${chip.label}`} onClick={()=>removeCriterion(chip.enabled)}>×</button></li>)}</ul>:<span className="muted">Nenhum critério ativo; todos os ativos são exibidos.</span>}
       </div>
+      {notice && <Notice tone="positive">{notice}</Notice>}
+      {undoSelection && <Notice tone="positive"><span className="scr-undo">{undoSelection.mode==="only" ? `Seleção substituída por ${undoSelection.ticker} (eram ${undoSelection.before.length} ativos).` : `${undoSelection.ticker} adicionada à seleção (${undoSelection.before.length+1}/${MAX_SELECTION}).`}</span><button disabled={actionBusy} onClick={()=>void undoOnly()}>Desfazer</button><Link className="button-link" href="/"><kbd>F1</kbd> Analisar no Início</Link></Notice>}
       {(busy || actionBusy || !config) && !error && <Loading>{actionBusy ? "Atualizando dados da Fundamentus…":"Carregando dados da B3…"}</Loading>}
       {error && <Notice tone="negative"><strong>Não foi possível exibir os resultados.</strong> {error}{!invalidCriteria && <button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button>}</Notice>}
-      {result && !invalidCriteria && <Section title="Resultados" description="Ajuste as colunas, selecione um ativo ou exporte a lista completa."><div className={busy ? "scr-stale":undefined}>
-        <Metrics items={[{label:"Ações correspondentes",value:result.matched_count,unit:"integer",help:`de ${result.total_count} ativos analisados`},{label:"DY médio",value:result.metrics.mean_dy,unit:"percent",digits:2},{label:"ROE médio",value:result.metrics.mean_roe,unit:"percent",digits:2}]}/>
-        <div className="scr-context context-strip">
-          <p className="caption">{result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")} · há ${result.age_minutes} min`:"Horário da coleta indisponível; a idade deste dado não pode ser confirmada."}</p>
+      {result && !invalidCriteria && (!result.matched_count ? <Idle action={<button className="primary" onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button>}>Nenhuma ação encontrada. Reduza os limites ou desative critérios; dados ausentes não contam como aprovação.</Idle> : <>
+        <div className="scr-actionbar" data-selected={selectedCurrent ? "true":"false"} role="region" aria-label="Ação selecionada" aria-live="polite">
+          {selectedCurrent ? <>
+            <b>{selectedCurrent}</b><span className="muted ell">{stocks.find(stock=>stock.ticker===selectedCurrent)?.company ?? ""}</span>
+            <button className="primary" disabled={actionBusy || selectionSet.has(selectedCurrent)} onClick={()=>void handoff("add")}>{selectionSet.has(selectedCurrent) ? "Já na seleção":"Adicionar à seleção"}</button>
+            <button disabled={actionBusy} onClick={()=>void handoff("only")}>Ver só este</button>
+            <button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favorito":"☆ Favoritar"}</button>
+          </> : <span className="muted">Clique em uma linha para adicionar à seleção · ↑↓ percorre · Enter adiciona · ✓ já está na seleção</span>}
         </div>
-        {!result.matched_count ? <div className="empty-state-card"><span className="empty-state-icon"><Icon name="filter"/></span><h3 className="empty-state-title">Nenhuma ação encontrada</h3><div className="empty-state-message">Reduza os limites ou desative critérios. Dados ausentes não são considerados aprovação.</div><button className="primary" onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button></div>:<>
-          <details className="scr-columns"><summary>Colunas exibidas ({columnCount} de {result.available_columns.length})</summary><fieldset className="checkbox-group"><legend>Indicadores na tabela</legend><div className="checkbox-group-options">{result.available_columns.map(column=><label key={column.key}><input type="checkbox" checked={visible?.includes(column.key) ?? false} onChange={event=>setVisible(current=>{const next=new Set(current ?? []);if(event.target.checked)next.add(column.key);else next.delete(column.key);return result.available_columns.map(item=>item.key).filter(key=>next.has(key));})}/>{column.label}</label>)}</div></fieldset></details>
-          <details className="scr-columns scr-glossary"><summary>Entenda os indicadores exibidos</summary>
-            <dl>{result.available_columns.filter(column=>visible?.includes(column.key) && column.help).map(column=><div key={column.key}><dt>{column.label}</dt><dd>{column.help}</dd></div>)}</dl>
-          </details>
-          <div className="scr-selection" data-selected={selectedCurrent ? "true":"false"} role="region" aria-label="Ação selecionada" aria-live="polite">
-            {selectedCurrent ? <>
-              <strong>Ação selecionada: {selectedCurrent}</strong>
-              <div className="actions"><button className="primary" disabled={actionBusy} onClick={()=>void handoff("add")}>Adicionar à seleção</button><button disabled={actionBusy} onClick={()=>void handoff("only")}>Ver só este</button><button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favoritado":"☆ Favoritar"}</button><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
-              <p className="caption">Adicionar mantém os ativos já selecionados e abre Fundamentos; Ver só este substitui a seleção. Em Fundamentos, clique em Analisar para buscar indicadores, preço-alvo e consenso.</p>
-            </>:<>
-              <p className="caption">Selecione uma linha para abrir a análise de preço-alvo ou gerenciar favoritos. As colunas exibidas não alteram a seleção nem o CSV.</p>
-              <div className="actions"><ExportButton path={`/api/screener/${result.id}/results.csv`}>Exportar todos os {result.matched_count} resultados (CSV)</ExportButton></div>
-            </>}
-          </div>
-          <div className="scr-table">
-            <ScreenerTable columns={result.available_columns.filter(column=>visible?.includes(column.key))} rows={result.rows.slice(0,limit)} sort={sort} onSort={sortBy} selectedKey={selectedCurrent ?? undefined} onSelect={setSelected}/>
-          </div>
-          <p className="caption" role="status">Exibindo {Math.min(limit,result.rows.length)} de {result.rows.length} ações.</p>
-          {result.rows.length>limit && <button className="scr-more" onClick={()=>setLimit(previous=>previous+25)}>Ver mais {Math.min(25,result.rows.length-limit)} ações ({result.rows.length-limit} restantes)</button>}
-        </>}
-      </div></Section>}
-    </div>
-    </div>
-    <hr/><p className="caption">Fonte: Fundamentus (fundamentus.com.br). Dados com atraso. Esta triagem não é recomendação de investimento; verifique os indicadores e faça sua própria análise.</p>
+        <div className={`scr-scroll${busy ? " is-stale":""}`}>
+          <ScreenerTable columns={result.available_columns.filter(column=>visible?.includes(column.key))} rows={result.rows} sort={sort} onSort={sortBy} selectedKey={selectedCurrent ?? undefined} onSelect={setSelected} onActivate={ticker=>{setSelected(ticker);void handoff("add",ticker);}} inSelection={selectionSet}/>
+        </div>
+        <p className="pane-foot">{result.rows.length} ações · {result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")}`:"horário da coleta indisponível; a idade do dado não pode ser confirmada"}</p>
+      </>)}
+    </Pane>
   </div>;
 }

@@ -1,11 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { download } from "../lib/api";
-import { rankStocks, sortStocks, stockSorts, type StockSort } from "../lib/tickerSearch";
-import type { Stock } from "./AppProvider";
-import StockLogo from "./StockLogo";
 import { formatCompactValue, formatPercent, formatValue, missingValue } from "../lib/formatting";
 import type { Unit } from "../lib/formatting";
 
@@ -57,7 +53,6 @@ export function ValueText({ value, unit = "number", digits = 2, currency = "BRL"
   return <>{text.slice(0, -suffix.length).trim()}<span className="value-unit is-suffix">{suffix}</span></>;
 }
 
-const statusGlyphs: Record<Signal, string> = { positive: "✓", negative: "✕", warning: "!", neutral: "•", info: "i" };
 /** Decorative trend line for a value already shown as text; the series comes from the API unchanged. */
 export function Sparkline({ values, tone = "info" }: { values: number[]; tone?: Signal }) {
   const points = values.filter(Number.isFinite);
@@ -66,66 +61,61 @@ export function Sparkline({ values, tone = "info" }: { values: number[]; tone?: 
   const coords = points.map((point, index) => [index / (points.length - 1) * 100, 34 - (point - min) / span * 30]);
   const line = coords.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
   const [lastX, lastY] = coords[coords.length - 1];
-  return <svg className={`mcard-spark is-${tone}`} viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+  return <svg className={`spark is-${tone}`} viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true" focusable="false">
     <polygon className="spark-area" points={`0,36 ${line} 100,36`} />
     <polyline className="spark-line" points={line} vectorEffect="non-scaling-stroke" />
     <line className="spark-end" x1={lastX} x2={lastX} y1={lastY} y2={lastY} vectorEffect="non-scaling-stroke" />
   </svg>;
 }
 
-const iconAssets: Record<string, string> = {
-  home: "/icons/home.svg",
-  portfolio: "/icons/portfolio.svg",
-  simulation: "/icons/simulation.svg",
-  news: "/icons/news.svg",
-  filter: "/icons/screener.svg",
-  valuation: "/icons/valuation.svg",
-};
-const paths: Record<string, string> = {
-  chart: "M3 20V4m0 16h18M6 16V9m6 7V5m6 11v-6",
-  menu: "M3 6h18M3 12h18M3 18h18",
-  "panel-close": "M4 5h16v14H4zM9 5v14m7-9-2 2 2 2",
-  "panel-open": "M4 5h16v14H4zM9 5v14m5-9 2 2-2 2",
-  "arrow-right": "M5 12h14m-5-5 5 5-5 5",
-  search: "M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
-  info: "M12 11v6m0-10h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
-  alert: "M12 8v5m0 4h.01M10 3 2 18a2 2 0 0 0 2 3h16a2 2 0 0 0 2-3L14 3a2 2 0 0 0-4 0",
-  check: "M8 12l3 3 5-6M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
-  "chevron-down": "m6 9 6 6 6-6",
-};
-const noticeIcons: Record<Signal, string> = { positive: "check", negative: "alert", warning: "alert", neutral: "info", info: "info" };
-export function Icon({ name = "chart" }: { name?: string }) {
-  if (Object.hasOwn(iconAssets, name)) return <span className="app-icon" aria-hidden="true" style={{ maskImage: `url("${iconAssets[name]}")` }} />;
-  return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] ?? paths.chart} /></svg>;
+/** Matches a media query after mount; server render and first paint assume false. */
+export function useMedia(query: string): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const sync = () => setMatches(list.matches);
+    sync();
+    list.addEventListener("change", sync);
+    return () => list.removeEventListener("change", sync);
+  }, [query]);
+  return matches;
 }
-export function PageHeader({ title, description, icon = "chart" }: { title: string; description: string; icon?: string }) {
-  return <header className="page-hero"><span className="page-hero-icon"><Icon name={icon} /></span><div className="page-hero-content"><h1 className="page-hero-title">{title}</h1><p className="page-hero-subtitle">{description}</p></div></header>;
-}
-export function Section({ title, children, description, actions, className }: { title: string; children: ReactNode; description?: string; actions?: ReactNode; className?: string }) {
-  return <section className={`analysis-section${className ? ` ${className}` : ""}`}>
-    <div className="section-toolbar">
-      <div className="section-heading-group">
-        <h2 className="ui-section-heading">{title}</h2>
-        {description && <p className="section-description">{description}</p>}
-      </div>
-      {actions && <div className="section-actions">{actions}</div>}
-    </div>
-    {children}
+
+/** A titled tile of the desk grid. On narrow screens the title bar collapses and expands the body. */
+export function Pane({ title, meta, actions, children, className, area, id, flush = false, narrowCollapsed = false }: { title: ReactNode; meta?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; area?: string; id?: string; flush?: boolean; narrowCollapsed?: boolean }) {
+  const titleId = useId();
+  const narrow = useMedia("(max-width: 900px)");
+  const [collapsed, setCollapsed] = useState(narrowCollapsed);
+  const hidden = narrow && collapsed;
+  return <section id={id} className={`pane${className ? ` ${className}` : ""}`} style={area ? { gridArea: area } : undefined} aria-labelledby={titleId} data-collapsed={hidden || undefined}>
+    <header className="pane-bar">
+      <h2 id={titleId}>{narrow ? <button type="button" aria-expanded={!hidden} onClick={() => setCollapsed(value => !value)}><span aria-hidden="true" className="pane-caret">{hidden ? "▸" : "▾"}</span>{title}</button> : title}</h2>
+      {meta && <span className="pane-meta">{meta}</span>}
+      {actions && <div className="pane-actions">{actions}</div>}
+    </header>
+    {!hidden && <div className={`pane-body${flush ? " is-flush" : ""}`}>{children}</div>}
   </section>;
 }
-export function Metrics({ items }: { items: Metric[] }) {
-  return <div className="mcard-grid">{items.map((item, index) => {
+
+const statusGlyphs: Record<Signal, string> = { positive: "▲", negative: "▼", warning: "!", neutral: "■", info: "i" };
+export function Metrics({ items, size = "md" }: { items: Metric[]; size?: "lg" | "md" }) {
+  return <dl className={`kv-grid is-${size}`}>{items.map((item, index) => {
     const pill = !!item.status && !!item.help && item.help.length <= 24 && !item.help.includes(".");
-    return <div className={`mcard${item.unit === "money" ? " mcard-money" : ""}`} key={`${item.label}-${index}`}>
-      <div className="mcard-label"><span>{item.label}</span>{pill && <span className={`mcard-status is-${item.status}`}><span aria-hidden="true">{statusGlyphs[item.status!]}</span>{item.help}</span>}</div>
-      <div className={`mcard-value${item.status ? ` is-${item.status}` : ""}`}><ValueText value={item.value} unit={item.unit} digits={item.digits} currency={item.currency} compact={item.compact} /></div>
-      {item.trend && <Sparkline values={item.trend} tone={item.status ?? "info"} />}
-      {typeof item.meter === "number" && Number.isFinite(item.meter) && <span className="mcard-meter" aria-hidden="true"><span style={{ width: `${Math.min(1, Math.max(0, item.meter)) * 100}%` }} /></span>}
-      {item.help && !pill && <p className="metric-help">{item.help}</p>}
+    return <div className="kv" key={`${item.label}-${index}`}>
+      <dt>{item.label}</dt>
+      <dd className={`kv-value${item.status ? ` is-${item.status}` : ""}`}>
+        {item.status && <span className="kv-glyph" aria-hidden="true">{statusGlyphs[item.status]}</span>}
+        <ValueText value={item.value} unit={item.unit} digits={item.digits} currency={item.currency} compact={item.compact} />
+      </dd>
+      {pill && <dd className={`kv-status is-${item.status}`}>{item.help}</dd>}
+      {item.trend && <dd className="kv-spark"><Sparkline values={item.trend} tone={item.status ?? "info"} /></dd>}
+      {typeof item.meter === "number" && Number.isFinite(item.meter) && <dd className="kv-meter" aria-hidden="true"><span style={{ width: `${Math.min(1, Math.max(0, item.meter)) * 100}%` }} /></dd>}
+      {item.help && !pill && <dd className="kv-help" title={item.help}>{item.help}</dd>}
     </div>;
-  })}</div>;
+  })}</dl>;
 }
 const isNumericColumn = (column: Column) => !!column.signed || (!!column.unit && column.unit !== "text");
+const finiteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 /** Missing values sort last in both directions; numbers compare numerically, text in pt-BR order. */
 function compareRows(a: object, b: object, key: string, direction: 1 | -1): number {
   const x = (a as Record<string, unknown>)[key], y = (b as Record<string, unknown>)[key];
@@ -135,187 +125,57 @@ function compareRows(a: object, b: object, key: string, direction: 1 | -1): numb
   if (typeof x === "number" && typeof y === "number") return (x - y) * direction;
   return String(x).localeCompare(String(y), "pt-BR") * direction;
 }
-export function Table<T extends object>({ columns, rows, onSelect, selectedKey, rowKey = "ticker", caption, sortable = false }: { columns: Column[]; rows: T[]; onSelect?: (row: T) => void; selectedKey?: string; rowKey?: string; caption?: string; sortable?: boolean }) {
+/** Dense sortable table. `extremes` marks the largest and smallest value of each numeric column without judging direction. */
+export function Table<T extends object>({ columns, rows, rowKey = "ticker", caption, sortable = false, extremes = false, swatch }: { columns: Column[]; rows: T[]; rowKey?: string; caption?: string; sortable?: boolean; extremes?: boolean; swatch?: (row: T) => string | undefined }) {
   const [sort, setSort] = useState<{ key: string; direction: 1 | -1 } | null>(null);
   const ordered = useMemo(() => sort ? [...rows].sort((a, b) => compareRows(a, b, sort.key, sort.direction)) : rows, [rows, sort]);
+  const bounds = useMemo(() => {
+    const result = new Map<string, { max: number; min: number }>();
+    if (!extremes || rows.length < 3) return result;
+    for (const column of columns.filter(isNumericColumn)) {
+      const values = rows.map(row => (row as Record<string, unknown>)[column.key]).filter(finiteNumber);
+      if (values.length >= 3) result.set(column.key, { max: Math.max(...values), min: Math.min(...values) });
+    }
+    return result;
+  }, [columns, extremes, rows]);
   const toggle = (key: string) => setSort(current => current?.key === key ? { key, direction: current.direction === 1 ? -1 : 1 } : { key, direction: 1 });
-  return <div className="table-scroll" tabIndex={0}><table aria-label={caption ?? "Tabela de dados"}><thead><tr>{onSelect && <th scope="col">Selecionar</th>}{columns.map(column => {
+  return <div className="grid-scroll" tabIndex={0} role="region" aria-label={caption ?? "Tabela de dados"}><table className="grid"><thead><tr>{columns.map(column => {
     const numeric = isNumericColumn(column);
     const direction = sort?.key === column.key ? sort.direction : undefined;
-    return <th key={column.key} scope="col" className={numeric ? "numeric-cell" : undefined} aria-sort={direction === undefined ? undefined : direction === 1 ? "ascending" : "descending"}>
-      {sortable && numeric ? <button type="button" className="table-sort" onClick={() => toggle(column.key)}>{column.label}<span aria-hidden="true">{direction === undefined ? "↕" : direction === 1 ? "↑" : "↓"}</span></button> : column.label}
+    return <th key={column.key} scope="col" className={numeric ? "num" : undefined} aria-sort={direction === undefined ? undefined : direction === 1 ? "ascending" : "descending"}>
+      {sortable && numeric ? <button type="button" className="th-sort" onClick={() => toggle(column.key)}>{column.label}<span aria-hidden="true">{direction === undefined ? "" : direction === 1 ? " ▲" : " ▼"}</span></button> : column.label}
     </th>;
   })}</tr></thead><tbody>{ordered.map((row, index) => {
     const values = row as Record<string, unknown>;
     const key = String(values[rowKey] ?? index);
-      return <tr key={key} className={selectedKey === key ? "selected-row" : undefined}>{onSelect && <td><button aria-label={`Selecionar ${key}`} aria-pressed={selectedKey === key} onClick={() => onSelect(row)}>{selectedKey === key ? "Selecionado" : "Selecionar"}</button></td>}{columns.map(column => {
-        const value = values[column.key];
-        const currency = column.currency ?? (typeof values.currency === "string" ? values.currency : "BRL");
-        const exactDigits = column.compact && column.unit === "money" ? Math.max(2, column.digits ?? 2) : column.digits;
-        const exact = formatValue(value, column.unit, exactDigits, currency, column.signed);
-        const shown = column.compact ? formatCompactValue(value, column.unit, 1, currency, column.signed) : exact;
-        return <td key={column.key} className={isNumericColumn(column) ? "numeric-cell" : undefined}>{shown === exact ? shown : <span title={exact} aria-label={exact}>{shown}</span>}</td>;
-      })}</tr>;
+    const color = swatch?.(row);
+    return <tr key={key}>{columns.map((column, columnIndex) => {
+      const value = values[column.key];
+      const currency = column.currency ?? (typeof values.currency === "string" ? values.currency : "BRL");
+      const exactDigits = column.compact && column.unit === "money" ? Math.max(2, column.digits ?? 2) : column.digits;
+      const exact = formatValue(value, column.unit, exactDigits, currency, column.signed);
+      const shown = column.compact ? formatCompactValue(value, column.unit, 1, currency, column.signed) : exact;
+      const bound = bounds.get(column.key);
+      const extreme = bound && finiteNumber(value) && bound.max !== bound.min ? value === bound.max ? "max" : value === bound.min ? "min" : null : null;
+      const signedTone = column.signed && finiteNumber(value) ? value > 0 ? " is-pos" : value < 0 ? " is-neg" : "" : "";
+      return <td key={column.key} className={`${isNumericColumn(column) ? "num" : ""}${extreme ? ` is-${extreme}` : ""}${signedTone}`.trim() || undefined}>
+        {columnIndex === 0 && color && <i className="swatch" style={{ background: color }} aria-hidden="true" />}
+        {shown === exact ? shown : <span title={exact} aria-label={exact}>{shown}</span>}
+        {extreme && <span className="extreme" title={extreme === "max" ? "Maior valor da coluna" : "Menor valor da coluna"}><span aria-hidden="true">{extreme === "max" ? "▴" : "▾"}</span><span className="visually-hidden">{extreme === "max" ? " (maior da coluna)" : " (menor da coluna)"}</span></span>}
+      </td>;
+    })}</tr>;
   })}</tbody></table></div>;
 }
+const noticeGlyphs: Record<Signal, string> = { positive: "✓", negative: "✕", warning: "!", neutral: "•", info: "i" };
 export function Notice({ children, tone = "info" }: { children: ReactNode; tone?: Signal }) {
-  return <div className={`notice is-${tone}`} role={tone === "negative" ? "alert" : undefined}><span className="notice-icon"><Icon name={noticeIcons[tone]} /></span><div className="notice-content">{children}</div></div>;
-}
-export function EmptyState({ title, children, href, action, icon = "chart" }: { title: string; children: ReactNode; href?: string; action?: string; icon?: string }) {
-  return <section className="empty-state-card"><span className="empty-state-icon"><Icon name={icon} /></span><h2 className="empty-state-title">{title}</h2><div className="empty-state-message">{children}</div>{href && <Link className="button-link primary" href={href}>{action ?? "Configurar portfólio"}<Icon name="arrow-right" /></Link>}</section>;
+  return <div className={`note is-${tone}`} role={tone === "negative" ? "alert" : undefined}><b className="note-glyph" aria-hidden="true">{noticeGlyphs[tone]}</b><div className="note-body">{children}</div></div>;
 }
 export function Loading({ children }: { children?: ReactNode }) {
-  return <div className="loading-container" role="status" aria-live="polite"><span className="loading-spinner" aria-hidden="true" /><p>{children ?? "Carregando dados para a análise."}</p><span className="loading-track" aria-hidden="true" /></div>;
+  return <div className="load" role="status" aria-live="polite"><span className="load-bar" aria-hidden="true" /><p>{children ?? "Carregando dados para a análise."}</p></div>;
 }
-export function TickerPicker({ value, onChange, stocks, max = 20, label = "Escolha ações para analisar", watchlist = [], onFavorite, priority }: { value: string[]; onChange: (tickers: string[]) => void | Promise<void>; stocks: Stock[]; max?: number; label?: string; watchlist?: string[]; onFavorite?: (ticker: string) => void | Promise<void>; priority?: string[] }) {
-  const id = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const resultRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const changeLock = useRef(false);
-  const favoriteLock = useRef(false);
-  const dismissed = useRef(false);
-  const pendingFocus = useRef<number | null>(null);
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [favoriteBusy, setFavoriteBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "favorites">("all");
-  const [sort, setSort] = useState<StockSort>("liquidity");
-  const [announcement, setAnnouncement] = useState("");
-  const [compact, setCompact] = useState(false);
-  const [undo, setUndo] = useState<{ before: string[]; after: string[] } | null>(null);
-  const results = useMemo(() => {
-    const pool = sortStocks(filter === "favorites" ? stocks.filter(stock => watchlist.includes(stock.ticker)) : stocks, sort);
-    const first = new Set(priority);
-    return rankStocks([...pool.filter(stock => first.has(stock.ticker)), ...pool.filter(stock => !first.has(stock.ticker))], query, 40);
-  }, [filter, priority, query, sort, stocks, watchlist]);
-  const options = results.items;
-  const companies = useMemo(() => new Map(stocks.map(stock => [stock.ticker, stock.company])), [stocks]);
-  useEffect(() => {
-    setActive(current => Math.min(current, Math.max(0, options.length - 1)));
-    const target = pendingFocus.current;
-    if (target !== null && open && options.length) {
-      pendingFocus.current = null;
-      resultRefs.current[Math.min(target, options.length - 1)]?.focus();
-    }
-  }, [open, options.length]);
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 640px)");
-    const sync = () => setCompact(query.matches);
-    sync();
-    query.addEventListener("change", sync);
-    return () => query.removeEventListener("change", sync);
-  }, []);
-  const isSelected = (ticker: string) => value.includes(ticker);
-  async function change(next: string[], message: string, saveUndo = true) {
-    if (changeLock.current) return false;
-    changeLock.current = true;
-    setBusy(true); setError(null); setAnnouncement("");
-    const previous = [...value];
-    try {
-      await onChange(next);
-      setUndo(saveUndo ? { before: previous, after: next } : null);
-      setAnnouncement(message);
-      return true;
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
-      setAnnouncement("A seleção não foi alterada.");
-      return false;
-    } finally {
-      changeLock.current = false;
-      setBusy(false);
-    }
-  }
-  async function toggleTicker(ticker: string) {
-    if (changeLock.current) return;
-    if (isSelected(ticker)) {
-      const next = value.filter(item => item !== ticker);
-      await change(next, `${ticker} removida da seleção.`);
-      return;
-    }
-    if (value.length >= max) {
-      setError(`Limite de ${max} ativos. Remova um ativo antes de adicionar outro.`);
-      setAnnouncement(`Limite de ${max} ativos atingido.`);
-      return;
-    }
-    if (await change([...value, ticker], `${ticker} adicionada à seleção.`)) { setQuery(""); setActive(0); setOpen(false); }
-  }
-  async function toggleFavorite(ticker: string) {
-    if (!onFavorite || favoriteLock.current) return;
-    favoriteLock.current = true;
-    setFavoriteBusy(true); setError(null);
-    try { await onFavorite(ticker); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
-    finally { favoriteLock.current = false; setFavoriteBusy(false); }
-  }
-  function moveFocus(index: number) {
-    const next = Math.max(0, Math.min(index, options.length - 1));
-    setActive(next);
-    resultRefs.current[next]?.focus();
-  }
-  function closePicker(restoreFocus: boolean) {
-    dismissed.current = true;
-    setOpen(false);
-    if (restoreFocus) inputRef.current?.focus();
-    window.setTimeout(() => { dismissed.current = false; }, 0);
-  }
-  const expanded = open && options.length > 0;
-  const canUndo = !!undo && value.length === undo.after.length && value.every((ticker, index) => ticker === undo.after[index]);
-  return <div className="ticker-picker" onBlurCapture={event => {
-    const next = event.relatedTarget;
-    const picker = event.currentTarget;
-    if (next instanceof Node) {
-      if (!picker.contains(next)) setOpen(false);
-    } else {
-      queueMicrotask(() => { if (!picker.contains(document.activeElement)) setOpen(false); });
-    }
-  }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); closePicker(true); } }}>
-    <label htmlFor={id}>{label}</label>
-    <div className="ticker-search"><Icon name="search" /><input ref={inputRef} id={id} type="search" autoComplete="off" placeholder={compact ? "Ticker ou empresa" : "Digite ticker ou nome da empresa (atalho: / ou Ctrl+K)"} value={query} aria-busy={busy} aria-label={`${label}: buscar ticker ou empresa`} onFocus={() => { if (dismissed.current) dismissed.current = false; else setOpen(true); }} onClick={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }} onKeyDown={event => {
-      if (event.key === "Escape") { event.preventDefault(); closePicker(false); }
-      if (event.key === "ArrowDown" && options.length) {
-        event.preventDefault();
-        if (open) moveFocus(active);
-        else { pendingFocus.current = active; setOpen(true); }
-      }
-      if (event.key === "Enter" && expanded && options[active]) { event.preventDefault(); void toggleTicker(options[active].ticker); }
-    }} /></div>
-    <div className="ticker-chips">{value.map(ticker => <span className="ticker-chip" key={ticker}><StockLogo ticker={ticker} company={companies.get(ticker) ?? ""} size={24} /><strong>{ticker}</strong>{onFavorite && <button type="button" className="ticker-chip-favorite" disabled={favoriteBusy} aria-pressed={watchlist.includes(ticker)} aria-label={watchlist.includes(ticker) ? `Remover ${ticker} dos favoritos` : `Adicionar ${ticker} aos favoritos`} title={watchlist.includes(ticker) ? `${ticker} está nos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => void toggleFavorite(ticker)}>{watchlist.includes(ticker) ? "★" : "☆"}</button>}<button type="button" disabled={busy} aria-label={`Remover ${ticker}`} onClick={() => void toggleTicker(ticker)}>×</button></span>)}</div>
-    {open && <div className="ticker-picker-controls">
-      <div className="ticker-controls-row">
-        {(onFavorite || watchlist.length > 0) && <div className="ticker-filter" role="group" aria-label="Filtrar ações">
-          <button type="button" aria-pressed={filter === "all"} onClick={() => { setFilter("all"); setActive(0); setOpen(true); }}>Todas</button>
-          <button type="button" aria-pressed={filter === "favorites"} onClick={() => { setFilter("favorites"); setActive(0); setOpen(true); }}>Favoritos <span>{watchlist.length}</span></button>
-        </div>}
-        <label className="ticker-sort">Ordenar por<select value={sort} onChange={event => { setSort(event.target.value as StockSort); setActive(0); setOpen(true); }}>{stockSorts.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
-      </div>
-      {sort === "liquidity" && !stocks.some(stock => stock.liquidity !== null) && <p className="caption" role="status">Liquidez indisponível no momento. Exibindo ordem alfabética.</p>}
-      {value.length >= max && <p className="ticker-limit-message" role="status">Limite de {max} ativos atingido. Remova um ativo antes de adicionar outro.</p>}
-      {expanded && <ul className="ticker-options" aria-label={filter === "favorites" ? "Ações favoritas" : "Resultados da busca"}>{options.map((stock, index) => {
-        const selected = isSelected(stock.ticker);
-        const favorite = watchlist.includes(stock.ticker);
-        return <li className="ticker-option" key={stock.ticker}>
-          <button ref={node => { resultRefs.current[index] = node; }} type="button" className="ticker-option-select" aria-pressed={selected} aria-disabled={busy} onFocus={() => setActive(index)} onKeyDown={event => {
-            if (event.key === "ArrowDown") { event.preventDefault(); moveFocus(index + 1); }
-            if (event.key === "ArrowUp") { event.preventDefault(); if (index === 0) inputRef.current?.focus(); else moveFocus(index - 1); }
-          }} onClick={event => { const adding = !selected; void toggleTicker(stock.ticker); if (event.detail !== 0) { if (adding) dismissed.current = true; inputRef.current?.focus(); window.setTimeout(() => { dismissed.current = false; }, 0); } }}>
-            <span className="ticker-option-check" aria-hidden="true">{selected ? "✓" : "+"}</span>
-            <StockLogo ticker={stock.ticker} company={stock.company} />
-            <span className="ticker-option-copy"><strong>{stock.ticker}</strong><span>{stock.company || "Empresa não informada"}</span><small>{stock.sector || "Setor não informado"}</small></span>
-            <span className={`ticker-option-state${selected ? " is-selected" : ""}`}>{selected ? "Selecionada · remover" : "Adicionar"}</span>
-          </button>
-          {onFavorite && <button type="button" className="ticker-option-favorite" aria-disabled={favoriteBusy} aria-pressed={favorite} aria-label={favorite ? `Remover ${stock.ticker} dos favoritos` : `Adicionar ${stock.ticker} aos favoritos`} title={favorite ? `Remover ${stock.ticker} dos favoritos` : `Adicionar ${stock.ticker} aos favoritos`} onClick={() => void toggleFavorite(stock.ticker)}>{favorite ? "★" : "☆"}</button>}
-        </li>;
-      })}</ul>}
-      {query.trim() && !options.length && <p className="caption ticker-search-empty" role="status">{filter === "favorites" && !watchlist.length ? "Você ainda não tem ações favoritas." : `Nenhuma ação encontrada para “${query.trim()}”. Tente o ticker ou parte do nome.`}</p>}
-      {filter === "favorites" && !query.trim() && !options.length && <p className="caption ticker-search-empty" role="status">Você ainda não tem ações favoritas.</p>}
-    </div>}
-    {expanded && results.total > options.length && <p className="caption" role="status">Mostrando {options.length} de {results.total} resultados; refine a busca.</p>}
-    <div className="ticker-picker-footer"><p className="caption">{value.length}/{max} ativos selecionados.</p><div>{canUndo && undo && <button type="button" className="ticker-picker-text-button" disabled={busy} onClick={() => void change(undo.before, "Seleção anterior restaurada.", false)}>Desfazer</button>}{value.length > 0 && <button type="button" className="ticker-picker-text-button" disabled={busy} onClick={() => void change([], "Seleção limpa.")}>Limpar</button>}</div></div>
-    <p className="ticker-picker-announcement" role="status" aria-live="polite">{announcement}</p>{error && <Notice tone="negative">{error}</Notice>}
-  </div>;
+/** Empty slot of the desk: what will appear here and the one action that fills it. */
+export function Idle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return <div className="idle"><p>{children}</p>{action}</div>;
 }
 export function ExportButton({ path, children }: { path: string; children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);

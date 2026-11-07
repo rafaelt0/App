@@ -2,14 +2,12 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import "./home.css";
-import { useApp } from "../components/AppProvider";
+import { MAX_SELECTION, useApp } from "../components/AppProvider";
 import type { SelectionUpdate } from "../components/AppProvider";
-import SelectionSummary from "./SelectionSummary";
-import SectorIcon from "../components/SectorIcon";
 import HomeResults from "../components/HomeResults";
-import { HomeHero, HomeTools, SectorMap } from "./HomeHero";
-import { Loading, Notice, PageHeader, TickerPicker } from "../components/ui";
-import { analyzeHome, currentAnalysis, quickSectors, quickTickers, refreshConsensus, refreshFundamentus, suggestions } from "../lib/home";
+import { Headlines, Macro, Monitor, SectorMap } from "./HomeBoard";
+import { Idle, Loading, Notice, Pane } from "../components/ui";
+import { analyzeHome, currentAnalysis, refreshConsensus, refreshFundamentus, suggestions } from "../lib/home";
 import type { HomeResult, Suggestions } from "../lib/home";
 
 export default function HomePage() {
@@ -22,10 +20,8 @@ export default function HomePage() {
   const [error,setError] = useState<string|null>(null);
   const [notice,setNotice] = useState<string|null>(null);
   const [retryAction,setRetryAction] = useState<"analyze"|"consensus"|"source">("analyze");
-  const [editRequested,setEditRequested] = useState(false);
   const [stale,setStale] = useState(false);
   const [sectorUndo,setSectorUndo] = useState<string[]|null>(null);
-  const panel = useRef<HTMLElement>(null);
   const pendingAnalysis = useRef<string[]|null>(null);
   const generation = useRef(0);
   const sectorGeneration = useRef(0);
@@ -33,7 +29,6 @@ export default function HomePage() {
   const revision = useRef(session?.revision);
   revision.current = session?.revision;
   useEffect(() => {generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);},[session?.revision]);
-  useEffect(() => {if(editRequested)panel.current?.querySelector<HTMLInputElement>("input[type=search]")?.focus();},[editRequested]);
   useEffect(() => {
     // Quick-start runs after the new selection is rendered, so the revision reset above does not discard it.
     if(!pendingAnalysis.current || !session || JSON.stringify(session.selection)!==JSON.stringify(pendingAnalysis.current))return;
@@ -58,14 +53,14 @@ export default function HomePage() {
   },[]);
 
   async function updateSelection(tickers:SelectionUpdate) {
-    if(result)setStale(true);generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);setSectorUndo(null);
+    if(result)setStale(true);generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setSectorUndo(null);
     await setSelection(tickers);
   }
   async function changeSelection(tickers:SelectionUpdate) {
     try {await updateSelection(tickers);} catch(exc) {setError(exc instanceof Error ? exc.message : String(exc));}
   }
   async function startQuickAnalysis(ticker:string) {
-    generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setEditRequested(false);setSectorUndo(null);
+    generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setSectorUndo(null);
     pendingAnalysis.current=[ticker];
     try {await setSelection([ticker]);} catch(exc) {pendingAnalysis.current=null;setError((exc as Error).message);}
   }
@@ -87,8 +82,8 @@ export default function HomePage() {
       if(next.length && !next.includes("Todos")) {
         await changeSelection(value.autopick);
         setNotice(previous.length
-          ? `Substituímos sua seleção de ${previous.length} ${previous.length===1 ? "ativo":"ativos"} pelos ${value.autopick.length} ativos mais líquidos de ${value.count} disponíveis.`
-          : `Selecionamos os ${value.autopick.length} ativos mais líquidos de ${value.count} disponíveis. Você pode adicionar outros pelo campo abaixo.`);
+          ? `${next.join(", ")}: seleção de ${previous.length} ${previous.length===1 ? "ativo":"ativos"} substituída pelos ${value.autopick.length} mais líquidos de ${value.count}.`
+          : `${next.join(", ")}: ${value.autopick.length} ativos mais líquidos de ${value.count} selecionados.`);
         if(previous.length)setSectorUndo(previous);
       }
     } catch(exc) {if(gen===sectorGeneration.current)setError((exc as Error).message);}
@@ -100,7 +95,6 @@ export default function HomePage() {
     const rev=session.revision;
     const tickers=[...session.selection];
     setRetryAction(action);setBusy(true);setError(null);setStale(false);
-    if(action!=="consensus")setEditRequested(false);
     if(action==="analyze")analyzedRevision.current=rev;
     if(action!=="consensus")setResult(null);
     try {
@@ -128,92 +122,33 @@ export default function HomePage() {
   }
   const selection=session?.selection ?? [];
   const ready=session && result && result.revision===session.revision && JSON.stringify(result.requested_tickers)===JSON.stringify(selection) ? result:null;
-  if(loading || !session) return <div className="home-page"><PageHeader title="Fundamentos" description="Análise quantitativa · B3" icon="home"/>{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
-  const stockMap=new Map(stocks.map(stock => [stock.ticker,stock]));
-  const popularSectors=new Set(quickSectors.map(([,sector])=>sector));
-  const allSectors=Array.from(new Set(stocks.map(stock=>stock.sector).filter(Boolean))).sort();
-  const sectorCounts=new Map<string,number>();
-  for(const stock of stocks)if(stock.sector)sectorCounts.set(stock.sector,(sectorCounts.get(stock.sector) ?? 0)+1);
-  const sectorOptions=["Todos",...allSectors.filter(sector=>popularSectors.has(sector)),...allSectors.filter(sector=>!popularSectors.has(sector))];
-  const mode:"edit"|"collapsed"=ready && !editRequested ? "collapsed":"edit";
-  return <div className="home-page">
-    {selection.length ? <PageHeader title="Fundamentos" description="Explore fundamentos, compare empresas e aprofunde sua análise da B3." icon="home"/> : <HomeHero/>}
-    {session.restored && <Notice>Seleção da carteira salva carregada. Revise os ativos e clique em Analisar para atualizar os fundamentos.</Notice>}
-    {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ação(ões) da carteira salva não estão na lista B3 e foram removidas da seleção.</Notice>}
-    {session.restored && !!session.restoration?.truncated_count && <Notice>A seleção salva tinha {session.restoration.original_count} ações. Carregamos as primeiras 20 ações válidas para manter a análise estável.</Notice>}
-    {notice && <Notice tone="positive">{notice}{sectorUndo && <> <button type="button" onClick={()=>void undoSectorChange()}>Desfazer</button></>}</Notice>}
-    <div className={`home-desk${!selection.length ? " is-empty" : ""}`}>
-      <section ref={panel} className="task-panel home-task" {...(mode==="collapsed" ? {"aria-label":"Seleção analisada"}:{"aria-labelledby":"home-task-title"})}>
-        {mode==="collapsed" ? <SelectionSummary tickers={selection} onEdit={()=>setEditRequested(true)}/> : <>
-        <div className="task-heading">
-          <span className="task-step" aria-hidden="true">01</span>
-          <div className="task-heading-content"><h2 id="home-task-title">Selecione ativos para analisar</h2>
-            <p className="home-lead">Escolha até 20 ações da B3 para ver indicadores, saúde financeira, preço-alvo e síntese setorial.</p>
-          </div>
-        </div>
-        <TickerPicker value={selection} onChange={updateSelection} stocks={stocks} max={20} label="Buscar ações" watchlist={session.watchlist} onFavorite={toggleFavorite} priority={!!sectors.length && !sectors.includes("Todos") ? suggested?.tickers : undefined}/>
-        {!!selection.length && <>
-          <div className="actions dock-mobile"><button className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{busy ? "Analisando…":"Analisar"}</button></div>
-          <p className="caption">A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
-          {!ready && !busy && <Notice>{stale ? "A seleção mudou. Clique em Analisar para atualizar os indicadores." : "Clique em Analisar para buscar os indicadores das ações selecionadas."}</Notice>}
-        </>}
-        {sectorBusy && <Loading>Ordenando ações por liquidez…</Loading>}
-        {!selection.length && <div className="home-quick">
-          <h3>Ou escolha uma ação líquida</h3>
-          <div className="quick-start-grid">{quickTickers.map(ticker=>{const stock=stockMap.get(ticker);return <button className="quick-start-button" key={ticker} onClick={()=>void startQuickAnalysis(ticker)}>
-            <img className="quick-start-logo" src={`/logos/${ticker.slice(0,4)}.svg`} alt="" width="40" height="40"/>
-            <span className="quick-start-text"><strong>{ticker}</strong>{stock?.company && <span className="quick-start-company">{stock.company}</span>}{stock?.sector && <span className="quick-start-sector">{stock.sector}</span>}</span>
-          </button>;})}</div>
-        </div>}
-        <div className="home-source context-strip" role="status"><span><strong>{suggested?.count ?? stocks.length} ações</strong> disponíveis em {sectors.length && !sectors.includes("Todos") ? sectors.join(", "):"todos os setores"}</span><span>Lista local B3 · Fundamentus · ordenação por liquidez</span></div>
-        </>}
-      </section>
-      {!selection.length && <SectorMap stocks={stocks} busy={busy || sectorBusy} onSector={sector=>void changeSectors([sector])}/>}
-    </div>
-    {!selection.length && <HomeTools/>}
-    {busy && <Loading>Buscando indicadores, comparação setorial e consensos dos ativos selecionados…</Loading>}
+  if(loading || !session) return <div className="desk">{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
+  const analyzeLabel=busy ? "Analisando…":`Analisar ${selection.length || ""}`.trim();
+  const resultSlot = ready ? <HomeResults ready={ready} selection={selection} busy={busy} onRefreshConsensus={()=>void run("consensus")}/> : <Pane title="Análise" area="res" meta={selection.length ? `${selection.length} ${selection.length===1 ? "ativo":"ativos"} na fila`:"aguardando seleção"} className="pane-idle">
+    {busy ? <Loading>Buscando indicadores, comparação setorial e consensos de {selection.join(", ")}…</Loading>
+      : error ? null
+      : selection.length ? <Idle action={<p className="idle-keys"><kbd>Analisar</kbd> no Monitor busca indicadores, saúde financeira, preço-alvo e síntese setorial.</p>}>{stale ? "A seleção mudou desde a última análise. Analise de novo para atualizar os indicadores." : `Seleção pronta: ${selection.join(", ")}.`}</Idle>
+      : <Idle action={<ol className="idle-steps"><li><kbd>Ctrl K</kbd> ou <kbd>/</kbd> abre a busca; <kbd>Enter</kbd> adiciona o ativo.</li><li>Ou clique em um setor no mapa para pegar os mais líquidos.</li><li><kbd>Analisar</kbd> preenche este painel com indicadores e comparação.</li><li><kbd>F2</kbd> leva a seleção para a Carteira.</li></ol>}>Nenhum ativo na seleção.</Idle>}
     {error && <Notice tone="negative">{error}<button disabled={busy} onClick={()=>void (selection.length ? run(retryAction) : suggestions(sectors).then(setSuggested).catch(exc=>setError(exc.message)))}>Tentar novamente</button></Notice>}
-    {ready && <HomeResults ready={ready} selection={selection} watchlist={session.watchlist} busy={busy} onFavorite={ticker=>void favorite(ticker)} onRefreshConsensus={()=>void run("consensus")}/>}
-    <details className="home-tools">
-      <summary>Setores e favoritos</summary>
-      <div className="home-tools-grid">
-        <div>
-          <h3>Setores</h3>
-          <fieldset className="checkbox-group sector-picker">
-            <legend>Escolha um ou mais setores</legend>
-            <div className="checkbox-group-options sector-picker-options">{sectorOptions.map(sector=>{
-              const checked=sector==="Todos" ? !sectors.length || sectors.includes("Todos"):sectors.includes(sector);
-              const count=sector==="Todos" ? stocks.length:sectorCounts.get(sector) ?? 0;
-              return <label key={sector} className="sector-option"><input type="checkbox" checked={checked} onChange={()=>void changeSectors(sector==="Todos" ? []:checked ? sectors.filter(item=>item!==sector):[...sectors.filter(item=>item!=="Todos"),sector])} />
-                <span className="sector-option-icon"><SectorIcon sector={sector}/></span>
-                <span className="sector-option-text"><span className="sector-option-name">{sector==="Todos" ? "Todos os setores":sector}</span><span className="sector-option-count">{count} {count===1 ? "ação":"ações"}</span></span>
-                <svg className="sector-option-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 8.5l2.5 2.5L12 5.5"/></svg>
-              </label>;
-            })}</div>
-          </fieldset>
-          <p>Nenhum setor ou Todos inclui toda a lista B3. Os setores mais buscados aparecem primeiro.</p>
-          <button disabled={busy} onClick={()=>void run("source")}>Atualizar dados Fundamentus</button>
-        </div>
-        <div>
-          <h3>Favoritos</h3>
-          {!session.watchlist.length && <p>Nenhum favorito ainda. Use a estrela na busca de ações para guardar ativos aqui.</p>}
-          {session.watchlist.map(ticker=>{const full=selection.length>=20 && !selection.includes(ticker);return <div className="home-favorite-row" key={ticker}>
-            {stockMap.has(ticker) ? <><button aria-disabled={full} onClick={()=>{if(!full)void changeSelection(current=>Array.from(new Set([...current,ticker])))}}>{ticker}</button>{full && <span>Seleção cheia</span>}</>:<span>{ticker} · fora da lista B3</span>}
-            <button aria-label={`Remover ${ticker} dos favoritos`} onClick={()=>void favorite(ticker)}>Remover favorito</button>
-          </div>;})}
-        </div>
-      </div>
-    </details>
-    <details className="home-guide method-disclosure">
-      <summary>Como funciona</summary>
-      <div className="home-guide-content">
-        <ol>
-          <li><strong>Escolha</strong> Pesquise pelo ticker ou escolha um setor em “Setores e favoritos”, acima.</li>
-          <li><strong>Compare</strong> Compare fundamentos, rentabilidade e crescimento lado a lado; o endividamento fica na aba Saúde financeira.</li>
-          <li><strong>Aprofunde</strong> Carregue a análise para comparar os preços-alvo e o consenso dos ativos.</li>
-        </ol>
-        <p>A seleção não é uma carteira analisada. Use <Link href="/portfolio">Portfólio</Link> para analisar a carteira completa.</p>
-      </div>
-    </details>
+  </Pane>;
+  return <div className={`desk desk-home${ready ? " is-analyzed":""}`}>
+    <Monitor selection={selection} stocks={stocks} watchlist={session.watchlist} ready={ready} busy={busy || sectorBusy}
+      analyze={<button type="button" className="primary" disabled={busy || sectorBusy || !selection.length} aria-busy={busy} onClick={()=>void run()}>{analyzeLabel}</button>}
+      onQuick={ticker=>void startQuickAnalysis(ticker)} onFavorite={ticker=>void favorite(ticker)}
+      onAdd={ticker=>{if(selection.length<MAX_SELECTION)void changeSelection(current=>Array.from(new Set([...current,ticker])));}}
+      onRemove={ticker=>void changeSelection(current=>current.filter(item=>item!==ticker))}
+      notices={<>
+        {session.restored && <Notice>Seleção da carteira salva carregada. Revise e clique em Analisar.</Notice>}
+        {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ação(ões) da carteira salva não estão na lista B3 e foram removidas.</Notice>}
+        {session.restored && !!session.restoration?.truncated_count && <Notice>A seleção salva tinha {session.restoration.original_count} ações; carregamos as 20 primeiras válidas.</Notice>}
+        {ready && !!ready.missing_tickers.length && <Notice tone="warning">Fundamentus indisponível para {ready.missing_tickers.join(", ")}.</Notice>}
+      </>}/>
+    {resultSlot}
+    <SectorMap stocks={stocks} busy={busy || sectorBusy} active={sectors} available={suggested?.count ?? stocks.length} onSector={sector=>void changeSectors([sector])} onReset={()=>void changeSectors([])}
+      onRefresh={()=>void run("source")}
+      note={notice ? <Notice tone="positive">{notice}{sectorUndo && <> <button type="button" onClick={()=>void undoSectorChange()}>Desfazer</button></>}</Notice> : sectorBusy ? <Loading>Ordenando ações do setor por liquidez…</Loading> : null}/>
+    <Macro/>
+    <Headlines/>
+    {ready && <p className="desk-next">Próximo <Link href="/portfolio"><kbd>F2</kbd> Carteira</Link> com {selection.slice(0,4).join(", ")}{selection.length>4 ? "…":""} · <Link href="/screener"><kbd>F5</kbd> Screener</Link> para achar mais ativos</p>}
   </div>;
 }
