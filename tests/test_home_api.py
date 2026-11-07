@@ -310,6 +310,24 @@ def test_universe_changes_use_the_latest_common_sessions_and_never_span_a_gap():
     assert result["changes"]["DDD3"] == {"day": None, "week": None}
 
 
+def test_universe_changes_ignore_a_partial_row_that_is_not_a_session():
+    # Yahoo can return a Saturday row quoted for a single symbol; it must not become the latest session.
+    adjusted = pd.concat([adjusted_closes().iloc[:-1],
+                          pd.DataFrame({"AAA3.SA": [98.0]}, index=pd.to_datetime(["2026-11-07"]))])
+    result = market_data.universe_changes(adjusted, ["AAA3", "BBB4", "CCC3"])
+    assert result["session"] == "2026-11-06"
+    assert result["changes"]["AAA3"]["day"] == pytest.approx(110 / 104 - 1)
+    assert result["changes"]["CCC3"] == {"day": pytest.approx(0.0), "week": pytest.approx(0.0)}
+
+
+def test_universe_changes_fail_when_most_symbols_came_back_empty():
+    # A rate-limited download keeps the failed symbols as all-NaN columns instead of raising.
+    nan = float("nan")
+    adjusted = adjusted_closes().assign(**{"BBB4.SA": nan, "CCC3.SA": nan})
+    with pytest.raises(ValueError, match="poucas ações"):
+        market_data.universe_changes(adjusted, ["AAA3", "BBB4", "CCC3", "DDD3"])
+
+
 def test_universe_changes_route_reports_fractions_and_fails_with_503(home_api, monkeypatch):
     client, _, _ = home_api
     seen = []

@@ -143,6 +143,7 @@ def get_sorted_tickers_by_liquidity(tickers_list):
 
 
 _YF_UNIVERSE_TIMEOUT_SECONDS = 30
+_MIN_SESSION_COVERAGE = 0.5
 
 
 def _change(last, previous):
@@ -161,10 +162,17 @@ def universe_changes(adjusted: pd.DataFrame, tickers) -> dict:
     `adjusted` has one column per Yahoo symbol and one row per session. Every
     change is measured on the download's own latest sessions, so a stock that
     did not trade on one of them gets None instead of a change over a longer span.
+    Rows quoted for under half the symbols (a stray weekend quote) are not sessions,
+    and a latest session quoted for under half the tickers (a rate-limited download
+    keeps failed symbols as empty columns) raises instead of being cached as a result.
     """
     adjusted = adjusted.dropna(how="all")
     if adjusted.empty:
         raise ValueError("Yahoo Finance não retornou cotações.")
+    quoted = adjusted.notna().sum(axis=1)
+    adjusted = adjusted[quoted >= _MIN_SESSION_COVERAGE * quoted.max()]
+    if adjusted.iloc[-1].notna().sum() < _MIN_SESSION_COVERAGE * len(tickers):
+        raise ValueError("Yahoo Finance devolveu cotações para poucas ações.")
 
     def between(column, back):
         return _change(column.iloc[-1], column.iloc[-1 - back]) if len(column) > back else None
