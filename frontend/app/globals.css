@@ -364,7 +364,7 @@ details[open] summary { margin-bottom: 12px; }
 .ticker-search > .app-icon, .ticker-search > svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--text-muted); pointer-events: none; }
 .ticker-picker .ticker-search input { padding-left: 44px; }
 .ticker-chips:not(:empty) { margin: 12px 0 0; }
-.ticker-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 8px; }
+.ticker-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(188px, 100%), 1fr)); gap: 8px; }
 .ticker-chip { display: flex; align-items: center; gap: 2px; min-width: 0; font: 500 12.5px/1 var(--font-mono); letter-spacing: .02em; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-muted); box-shadow: var(--highlight); padding-left: 10px; }
 .ticker-chip > strong { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; }
 .ticker-chip button { border: 0; padding: 0 12px; min-width: 44px; min-height: 44px; background: transparent; box-shadow: none; color: var(--text-muted); font-family: var(--font-display); }
