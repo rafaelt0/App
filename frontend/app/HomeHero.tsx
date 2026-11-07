@@ -4,7 +4,11 @@ import type { Stock } from "../components/AppProvider";
 import { Icon } from "../components/ui";
 
 const visibleSectors = 12;
-const mapShades = ["var(--indigo-300)","var(--indigo-400)","var(--indigo-500)","var(--indigo-600)","var(--indigo-700)","var(--indigo-800)","var(--indigo-900)"];
+/** Top sectors take the full categorical hue; the long tail reuses the hues muted toward the panel. */
+const sectorColor = (index:number) => {
+  const hue=`var(--sector-${index%visibleSectors+1})`;
+  return index<visibleSectors ? hue:`color-mix(in oklch, ${hue} 45%, var(--surface-panel))`;
+};
 const tools = [
   {href:"/portfolio",label:"Portfólio",icon:"portfolio",text:"Monte uma carteira e compare risco, retorno e pesos."},
   {href:"/simulacao",label:"Simulação",icon:"simulation",text:"Projete faixas de retorno e risco a partir da carteira."},
@@ -32,14 +36,14 @@ export function SectorMap({stocks,busy,onSector}:{stocks:Stock[];busy:boolean;on
   const number=new Intl.NumberFormat("pt-BR");
   const percent=new Intl.NumberFormat("pt-BR",{style:"percent",minimumFractionDigits:1,maximumFractionDigits:1});
   const sectorRow=([sector,count]:[string,number],index:number)=><li key={sector}><button type="button" disabled={busy} onClick={()=>onSector(sector)} aria-label={`Selecionar as ações mais líquidas de ${sector}, ${count} ${count===1 ? "ação":"ações"}, ${percent.format(count/stocks.length)} da lista local B3`}>
-    <span className="home-sector-swatch" style={{background:mapShades[index%mapShades.length]}} aria-hidden="true"/>
+    <span className="home-sector-swatch" style={{background:sectorColor(index)}} aria-hidden="true"/>
     <span className="home-sector-name">{sector}</span>
     <span className="home-sector-values"><span className="home-sector-count">{number.format(count)} {count===1 ? "ação":"ações"}</span><span className="home-sector-percent">{percent.format(count/stocks.length)}</span></span>
   </button></li>;
   return <figure className="home-sector-map">
     <figcaption><strong>Explore por setor</strong><span>{number.format(stocks.length)} ações em {number.format(counts.size)} setores na lista local B3. Escolha um setor para selecionar os mais líquidos.</span></figcaption>
-    <div className="home-sector-strip" aria-hidden="true">{ranked.map(([sector,count],index)=><span key={sector} title={`${sector}: ${count} ${count===1 ? "ação":"ações"} · ${percent.format(count/stocks.length)}`} style={{flexGrow:count,background:mapShades[index%mapShades.length]}}/>)}</div>
-    <p className="home-sector-caption">{remaining.length ? `${top.length} maiores setores. Abra a lista abaixo para ver os demais.`:"Todos os setores, do maior para o menor."} Percentuais por quantidade de ações.</p>
+    <div className="home-sector-strip" aria-hidden="true">{ranked.map(([sector,count],index)=><span key={sector} title={`${sector}: ${count} ${count===1 ? "ação":"ações"} · ${percent.format(count/stocks.length)}`} style={{flexGrow:count,background:sectorColor(index)}}/>)}</div>
+    <p className="home-sector-caption">{remaining.length ? `${top.length} maiores setores em destaque. Abra a lista abaixo para ver os demais.`:"Todos os setores, do maior para o menor."} Percentuais por quantidade de ações.</p>
     <ul className="home-sector-list">
       {top.map(sectorRow)}
     </ul>

@@ -34,8 +34,23 @@
 .home-page .home-sector-map figcaption { display: flex; flex-direction: column; gap: 2px; margin: 0 0 16px; }
 .home-page .home-sector-map figcaption strong { color: var(--text-primary); font-size: 15px; font-weight: 600; }
 .home-page .home-sector-map figcaption span { color: var(--text-muted); font-size: 13px; }
-.home-page .home-sector-strip { display: flex; height: 14px; margin: 0 0 12px; overflow: hidden; border-radius: var(--radius-pill); }
-.home-page .home-sector-strip > span { flex: 1 1 0; min-width: 0; }
+/* Twelve categorical hues at matched OKLCH lightness and chroma, ordered so neighbors sit far apart on the hue wheel; smaller sectors reuse them muted. */
+.home-page .home-sector-map {
+  --sector-1: oklch(0.72 0.14 275);
+  --sector-2: oklch(0.78 0.12 190);
+  --sector-3: oklch(0.80 0.13 80);
+  --sector-4: oklch(0.70 0.15 350);
+  --sector-5: oklch(0.76 0.11 235);
+  --sector-6: oklch(0.78 0.13 140);
+  --sector-7: oklch(0.70 0.14 310);
+  --sector-8: oklch(0.74 0.13 45);
+  --sector-9: oklch(0.80 0.10 165);
+  --sector-10: oklch(0.82 0.12 105);
+  --sector-11: oklch(0.70 0.13 15);
+  --sector-12: oklch(0.72 0.12 255);
+}
+.home-page .home-sector-strip { display: flex; gap: 1px; height: 14px; margin: 0 0 12px; overflow: hidden; border-radius: var(--radius-pill); }
+.home-page .home-sector-strip > span { flex: 1 1 0; min-width: 2px; border-radius: 1px; }
 .home-page .home-sector-caption { margin: 0 0 8px; color: var(--text-muted); font-size: 12px; }
 .home-page .home-sector-list { margin: 0; padding: 0; list-style: none; }
 .home-page .home-sector-list > li { border-bottom: 1px solid var(--border-subtle); }
