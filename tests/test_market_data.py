@@ -1,5 +1,10 @@
+import contextlib
+import threading
+import time
+
 import pandas as pd
 
+from utils import market_data
 from utils.market_data import (
     _normalize_listed_stocks,
     clean_numeric_column,
@@ -112,3 +117,30 @@ def test_http_cache_clear_evicts_fundamentus_non_expiring_result(monkeypatch):
     _clear_fundamentus_http_cache()
 
     assert deleted == ["stale-response"]
+
+
+def test_yahoo_downloads_never_run_at_the_same_time(monkeypatch):
+    """The cache warm-up and a visitor can ask Yahoo together; yfinance shares one
+    process-wide state and corrupts itself when two downloads overlap."""
+    in_flight, overlaps = [], []
+
+    def fake_download(symbols, **kwargs):
+        in_flight.append(1)
+        overlaps.append(len(in_flight))
+        time.sleep(0.05)
+        in_flight.remove(1)
+        return pd.DataFrame()
+
+    def run(ticker):
+        with contextlib.suppress(ValueError):
+            market_data.get_universe_changes((ticker,))
+
+    market_data.get_universe_changes.clear()
+    monkeypatch.setattr(market_data.yf, "download", fake_download)
+    workers = [threading.Thread(target=run, args=(f"AAA{index}",)) for index in range(3)]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join(5)
+
+    assert overlaps == [1, 1, 1]

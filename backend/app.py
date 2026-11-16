@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 import os
 import sqlite3
 from urllib.parse import urlsplit
@@ -16,8 +17,26 @@ from utils.market_data import get_listed_stocks
 
 
 logger = logging.getLogger(__name__)
-app = FastAPI(title="B3Lab", version="1.0.0")
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    # run.py opts in; tests and ad-hoc imports never reach the network on startup.
+    stopping = None
+    if os.environ.get("B3LAB_WARM_CACHES") == "1":
+        from backend import warmup
+        stopping = warmup.start()
+    yield
+    if stopping is not None:
+        stopping.set()
+
+
+app = FastAPI(title="B3Lab", version="1.0.0", lifespan=lifespan)
 _capacity = asyncio.Semaphore(2)
+# Shared market data with no owner state: answering them never needs a session,
+# so a first visit's parallel requests do not each mint their own cookie.
+PUBLIC_ROUTES = {("GET", "/api/universe"), ("GET", "/api/universe/liquidity"), ("GET", "/api/universe/changes"),
+                 ("GET", "/api/market/strip"), ("POST", "/api/news/market")}
 
 
 def allowed_origin(origin: str | None) -> bool:
@@ -37,6 +56,10 @@ async def owned_requests(request: Request, call_next):
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         if request.headers.get("x-b3lab-request") != "1" or not allowed_origin(request.headers.get("origin")):
             return JSONResponse({"detail": "Origem da solicitação não autorizada."}, status_code=403)
+    if (request.method, request.url.path) in PUBLIC_ROUTES:
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        return response
     acquired = False
     ctx = None
     try:

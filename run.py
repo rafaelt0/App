@@ -32,6 +32,7 @@ def main():
     environment.setdefault("NEXT_TELEMETRY_DISABLED", "1")
     environment.setdefault("B3LAB_API_URL", f"http://127.0.0.1:{api_port}")
     environment.setdefault("B3LAB_ORIGIN", f"http://localhost:{port}")
+    environment.setdefault("B3LAB_WARM_CACHES", "1")
     if not (ROOT / "frontend/node_modules/next").exists():
         parser.error("Execute npm ci no diretório frontend antes de iniciar.")
     stopping = threading.Event()

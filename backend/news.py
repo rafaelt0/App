@@ -53,7 +53,7 @@ def _fetch_brazilian_news(ticker):
     return _fetch_news_query(build_news_query(ticker))
 
 
-@cache_data(ttl=300)
+@cache_data(ttl=300, stale=3600)
 def _market_headlines():
     items = _fetch_news_query('(Ibovespa OR "bolsa brasileira" OR "Banco Central" OR Selic OR "mercado financeiro") when:2d')
     now = dt.datetime.now(dt.timezone.utc)

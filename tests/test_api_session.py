@@ -110,3 +110,22 @@ def test_news_refresh_shares_the_two_analysis_admission_limit(isolated_api):
             for worker in workers:
                 worker.join(10)
         assert [response.status_code for response in responses] == [200, 200]
+
+
+def test_shared_market_routes_answer_without_minting_a_session(isolated_api, monkeypatch):
+    """A first visit fires these in parallel; each one used to mint its own cookie."""
+    monkeypatch.setattr(api_module, "PUBLIC_ROUTES", {("GET", "/api/universe")})
+    isolated_api.add_api_route("/api/universe", lambda: {"stocks": []}, methods=["GET"])
+    with TestClient(isolated_api) as client:
+        response = client.get("/api/universe")
+        assert response.status_code == 200 and response.json() == {"stocks": []}
+        assert "set-cookie" not in response.headers and not client.cookies
+        assert client.get("/api/session").headers["set-cookie"]
+
+
+def test_shared_post_still_requires_the_csrf_header(isolated_api, monkeypatch):
+    monkeypatch.setattr(api_module, "PUBLIC_ROUTES", {("POST", "/api/news/market")})
+    isolated_api.add_api_route("/api/news/market", lambda: {"items": []}, methods=["POST"])
+    with TestClient(isolated_api) as client:
+        assert client.post("/api/news/market").status_code == 403
+        assert client.post("/api/news/market", headers=HEADERS).json() == {"items": []}

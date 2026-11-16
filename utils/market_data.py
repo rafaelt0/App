@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__)
 # ponytail: one global lock serializes Fundamentus' requests.Session patch;
 # use private sessions instead if the shared fetch needs more concurrency.
 FUNDAMENTUS_REQUEST_LOCK = threading.Lock()
+# yfinance keeps state shared by the whole process (`shared._DFS` and the error
+# table), and two downloads in flight corrupt it — "dictionary changed size
+# during iteration" — or drop columns. Serialize every Yahoo call on this lock,
+# including the ones in market_strip and portfolio_data.
+YFINANCE_REQUEST_LOCK = threading.Lock()
+DAY_SECONDS = 86400
+# Covers a weekend plus a holiday. Within it a stale quote snapshot is served at
+# once, labelled with its fetch time, while a background refresh replaces it.
+QUOTE_STALE_SECONDS = 4 * DAY_SECONDS
 
 
 def _clear_fundamentus_http_cache() -> None:
@@ -84,7 +93,8 @@ def compute_target_upside(current_price, target_price):
 def get_market_target_data(ticker_b3):
     """Fetch Yahoo Finance's target-price and recommendation data for a B3 ticker."""
     try:
-        info = yf.Ticker(f"{ticker_b3}.SA").info or {}
+        with YFINANCE_REQUEST_LOCK:
+            info = yf.Ticker(f"{ticker_b3}.SA").info or {}
         return {
             "company_name": info.get("longName") or info.get("shortName"),
             "currency": info.get("currency") or "BRL",
@@ -104,7 +114,7 @@ def get_market_target_data(ticker_b3):
         return {"_error": str(exc)}
 
 
-@cache_data(ttl=3600)
+@cache_data(ttl=3600, stale=DAY_SECONDS)
 def get_full_market_data():
     """Fetch an hourly Fundamentus snapshot and retain its successful fetch time."""
     import fundamentus.resultado as fzr
@@ -185,11 +195,12 @@ def universe_changes(adjusted: pd.DataFrame, tickers) -> dict:
     return {"session": adjusted.index[-1].date().isoformat(), "changes": changes}
 
 
-@cache_data(ttl=600)
+@cache_data(ttl=600, stale=QUOTE_STALE_SECONDS)
 def get_universe_changes(tickers: tuple) -> dict:
     """Fetch one Yahoo download for the whole universe and return its latest-session changes."""
-    downloaded = yf.download([f"{ticker}.SA" for ticker in tickers], period="15d", interval="1d", auto_adjust=False,
-                             progress=False, timeout=_YF_UNIVERSE_TIMEOUT_SECONDS)
+    with YFINANCE_REQUEST_LOCK:
+        downloaded = yf.download([f"{ticker}.SA" for ticker in tickers], period="15d", interval="1d", auto_adjust=False,
+                                 progress=False, timeout=_YF_UNIVERSE_TIMEOUT_SECONDS)
     if downloaded.empty or "Adj Close" not in downloaded:
         raise ValueError("Yahoo Finance não retornou cotações.")
     result = universe_changes(downloaded["Adj Close"], tickers)
