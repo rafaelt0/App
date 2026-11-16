@@ -30,8 +30,20 @@ export const MAX_SELECTION = 20;
 export const SELECTION_FULL_MESSAGE = "Seleção cheia: remova um ativo para adicionar outro.";
 const Context = createContext<AppContext | null>(null);
 let bootstrap: Promise<{ session: Session; stocks: Stock[] }> | null = null;
+let liquidity: Promise<Record<string, number | null>> | null = null;
+
+function loadLiquidity() {
+  if (!liquidity) {
+    // Previewed alongside the session so the heatmap's sizes do not wait an extra round trip.
+    liquidity = api<{ liquidity: Record<string, number | null> }>("/api/universe/liquidity").then(value => value.liquidity);
+    // A failed preview must not be memoized, or the heatmap would stay size-less for the whole visit.
+    liquidity.catch(() => { liquidity = null; });
+  }
+  return liquidity;
+}
 
 function initialize() {
+  loadLiquidity();
   if (!bootstrap) {
     bootstrap = Promise.all([api<Session>("/api/session"), api<{ stocks: Omit<Stock, "liquidity">[] }>("/api/universe")]).then(([session, universe]) => {
       return { session, stocks: universe.stocks.map(stock => ({ ...stock, liquidity: null })) };
@@ -69,8 +81,8 @@ export default function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading || error) return;
     let active = true;
-    api<{ liquidity: Record<string, number | null> }>("/api/universe/liquidity").then(value => {
-      if (active) setStocks(current => current.map(stock => ({ ...stock, liquidity: value.liquidity[stock.ticker] ?? null })));
+    loadLiquidity().then(values => {
+      if (active) setStocks(current => current.map(stock => ({ ...stock, liquidity: values[stock.ticker] ?? null })));
     }).catch(() => {});
     return () => { active = false; };
   }, [loading, error]);

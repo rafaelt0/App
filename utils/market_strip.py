@@ -17,6 +17,7 @@ import requests
 import yfinance as yf
 
 from utils.cache import cache_data
+from utils.market_data import DAY_SECONDS, QUOTE_STALE_SECONDS, YFINANCE_REQUEST_LOCK
 
 logger = logging.getLogger(__name__)
 _YF_TIMEOUT_SECONDS = 15
@@ -80,12 +81,13 @@ def quote_item(key, label, symbol, unit, currency, digits, close, adjusted, note
     }
 
 
-@cache_data(ttl=300)
+@cache_data(ttl=300, stale=QUOTE_STALE_SECONDS)
 def get_market_quotes():
     """Return (items, missing labels) for the configured Yahoo symbols."""
     symbols = [quote[2] for quote in QUOTES]
-    downloaded = yf.download(symbols, period="10d", interval="1d", auto_adjust=False,
-                             progress=False, timeout=_YF_TIMEOUT_SECONDS)
+    with YFINANCE_REQUEST_LOCK:
+        downloaded = yf.download(symbols, period="10d", interval="1d", auto_adjust=False,
+                                 progress=False, timeout=_YF_TIMEOUT_SECONDS)
     if downloaded.empty or "Close" not in downloaded or "Adj Close" not in downloaded:
         raise ValueError("Yahoo Finance não retornou cotações.")
     items, missing = [], []
@@ -161,7 +163,7 @@ def ipca_item(rows, today):
     return macro_entry("ipca", "IPCA", value, date, f"BCB SGS {IPCA_SERIES}", "12 meses", change, change_note)
 
 
-@cache_data(ttl=3600)
+@cache_data(ttl=3600, stale=DAY_SECONDS)
 def get_macro_series(series, today, window_days):
     """SGS observations up to today. Selic meta (432) is published ahead through
     the next Copom meeting, so a dated window is used instead of 'ultimos'."""
@@ -213,7 +215,7 @@ def _focus_get(resource, filters, top):
     return rows
 
 
-@cache_data(ttl=3600)
+@cache_data(ttl=3600, stale=DAY_SECONDS)
 def get_focus_annual(indicator, year):
     """Daily Focus statistics for one indicator at the end of a calendar year,
     30-day respondent window (the published Focus report), about four weeks."""
@@ -221,7 +223,7 @@ def get_focus_annual(indicator, year):
                       f"Indicador eq '{indicator}' and DataReferencia eq '{year}' and baseCalculo eq 0", 20)
 
 
-@cache_data(ttl=3600)
+@cache_data(ttl=3600, stale=DAY_SECONDS)
 def get_focus_inflation_12m():
     """Smoothed 12-month-ahead IPCA expectations, the BCB's input for the ex-ante real rate."""
     return _focus_get("ExpectativasMercadoInflacao12Meses", "Indicador eq 'IPCA' and Suavizada eq 'S' and baseCalculo eq 0", 5)
@@ -246,7 +248,7 @@ def real_rate_item(selic_rows, focus_rows, today):
                        min(selic_date, focus_date), source, "a.a., Fisher")
 
 
-@cache_data(ttl=3600)
+@cache_data(ttl=3600, stale=DAY_SECONDS)
 def get_tesouro_rates():
     """Head of the Tesouro Direto offered-rates CSV, newest base date first.
     The server answers a Range request with the whole file, so the body is

@@ -211,7 +211,7 @@ export function SectorMap({ stocks, selection, busy, active, available, onSector
       </span>
       <span className="hm-nodata"><i data-tone="none" aria-hidden="true" />sem dado{missing ? ` (${missing})` : ""}</span>
     </div>
-    <p className="pane-foot">{changes.kind === "loading" ? "Carregando variações do Yahoo Finance…" : changes.kind === "error" ? `Variações indisponíveis: ${changes.message}` : `${color.label}: ${changes.data.source}, pregão de ${shortDate(changes.data.session)}.`}
+    <p className="pane-foot">{changes.kind === "loading" ? "Carregando variações do Yahoo Finance…" : changes.kind === "error" ? `Variações indisponíveis: ${changes.message}` : `${color.label}: ${changes.data.source}, pregão de ${shortDate(changes.data.session)}, atualizado ${brasiliaTime.format(new Date(changes.data.fetched_at))}.`}
       {" "}Tamanho: Fundamentus, liquidez média diária em 2 meses.{unsized > 0 && sizeBy === "liquidity" ? ` ${unsized} ações sem liquidez ficam fora do mapa.` : ""}</p>
     {note}
   </Pane>;

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import requests
 from utils.cache import cache_data
+from utils.market_data import YFINANCE_REQUEST_LOCK
 import yfinance as yf
 from bcb import sgs
 from pypfopt import expected_returns, risk_models
@@ -27,14 +28,15 @@ def _download_close(tickers_yf, start_date, auto_adjust=True):
     last_exc = None
     for attempt in range(_YF_DOWNLOAD_ATTEMPTS):
         try:
-            downloaded = yf.download(
-                tickers_yf,
-                start=start_date,
-                end=datetime.date.today(),
-                progress=False,
-                auto_adjust=auto_adjust,
-                timeout=_YF_DOWNLOAD_TIMEOUT_SECONDS,
-            )
+            with YFINANCE_REQUEST_LOCK:
+                downloaded = yf.download(
+                    tickers_yf,
+                    start=start_date,
+                    end=datetime.date.today(),
+                    progress=False,
+                    auto_adjust=auto_adjust,
+                    timeout=_YF_DOWNLOAD_TIMEOUT_SECONDS,
+                )
             if "Close" not in downloaded:
                 raise ValueError("Yahoo Finance não retornou a coluna Close.")
             close = downloaded["Close"]
