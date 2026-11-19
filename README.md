@@ -55,11 +55,14 @@ Para publicar atrás de um proxy HTTPS, mantenha a API privada e configure `B3LA
 
 ### Render
 
-O `render.yaml` cria um serviço web Docker no plano gratuito. O contêiner usa `PORT` e `RENDER_EXTERNAL_URL` do Render como porta e origem pública, e `B3LAB_HOST=0.0.0.0` expõe o Next.js. A API continua privada em `127.0.0.1`.
+O `render.yaml` configura o serviço web Docker com a instância paga `0.5c-512mb` (Starter), que continua ativa sem tráfego. O disco persistente de 1 GB é montado em `/app/storage` e `B3LAB_DB` aponta para `/app/storage/b3_data.db`. O contêiner usa `PORT` e `RENDER_EXTERNAL_URL` como porta e origem pública. O Next.js atende externamente e a API continua em `127.0.0.1`, com um único worker.
 
-Configure `TYPESAFE_API_KEY` como segredo no Render para classificar notícias com Jev. O contêiner não carrega modelos locais. Sem a chave ou quando a API falha, as notícias usam o fallback léxico identificado. O disco é efêmero: favoritos e seleções em SQLite se perdem a cada deploy ou reinício.
+Configure `TYPESAFE_API_KEY` como segredo no Render para classificar notícias com Jev. O contêiner não carrega modelos locais. Sem a chave ou quando a API falha, as notícias usam o fallback léxico identificado.
 
-O plano gratuito suspende o serviço após 15 minutos sem tráfego. Para evitar a suspensão, o launcher acessa a própria URL pública (`RENDER_EXTERNAL_URL`) a cada 10 minutos. O workflow `keep-render-awake.yml` acessa a URL da variável de repositório `B3LAB_URL` como reserva, mas o GitHub executa agendamentos com atraso e pode passar horas sem rodar. As 750 horas mensais do plano gratuito cobrem um serviço ativo o mês inteiro.
+1. Confirme no painel que a mudança será aplicada ao serviço existente (`srv-db5domo473hc73app7mg`) e mantenha a URL pública atual. Antes de alterar o plano, anexar o disco ou sincronizar o Blueprint, obtenha autorização para a cobrança e resolva a migração dos dados. O sistema de arquivos do plano gratuito é apagado ao entrar em repouso ou ao fazer deploy, inclusive na troca de plano. O plano gratuito não oferece shell e o B3Lab não oferece exportação desse banco. Se não houver cópia, confirme com o suporte do Render se é possível recuperar o arquivo da instância atual.
+2. Se houver dados a preservar, programe uma janela de manutenção, bloqueie novas gravações antes da cópia final e mantenha o bloqueio até a troca. Antes de iniciar a troca, verifique fora da instância um backup consistente, como o gerado pela API de backup do SQLite. Se alguma etapa for inviável, obtenha autorização explícita para a janela de perda de dados identificada ou para iniciar com um banco vazio, conforme o caso.
+3. Para restaurar uma cópia, mantenha o PR sem merge e, se houver um Blueprint vinculado, desative temporariamente o `Auto Sync`. Provisione o plano pago e o disco pelo painel, mantendo o caminho de banco em uso. Transfira a cópia para `/app/storage/b3_data.db` pelo Shell do painel com `magic-wormhole`, conforme a documentação do Render. Compare o hash da cópia com o backup e execute `PRAGMA integrity_check` em modo somente leitura antes de mudar `B3LAB_DB`. Se a preparação do disco ou a verificação da cópia falhar, suspenda a publicação. Após a verificação, faça o merge aprovado e sincronize o Blueprint, se vinculado, restaurando a configuração anterior de `Auto Sync` após confirmar o deploy. Em um serviço gerenciado pelo painel, aplique `B3LAB_DB` no serviço existente antes do merge que remove os pings. Para uma instalação vazia autorizada, o plano, o disco e a variável podem ser aplicados juntos. Deploys com disco exigem uma breve interrupção. Consulte as instruções do [plano gratuito](https://render.com/docs/free), do [Auto Sync](https://render.com/docs/infrastructure-as-code#disabling-automatic-sync) e da [transferência de arquivos para o disco](https://render.com/docs/disks#transferring-files).
+4. Após publicar, confirme no painel que o deploy concluído usa a instância paga e que o disco está montado. Num navegador novo com largura de celular, cronometre da navegação até a tabela de liquidez e o mapa de calor estarem preenchidos. Confira as respostas HTTP de `/api/session`, `/api/universe`, `/api/universe/liquidity`, `/api/universe/changes` e `/api/market/strip`. Repita a visita em outra sessão nova após mais de 15 minutos sem tráfego público, confirmado na métrica de volume de requisições ou nos logs HTTP quando disponíveis. Compare os tempos e confirme que a tela de inicialização do Render não aparece. Para validar o disco, confirme que um favorito de teste permanece após um reinício usando o mesmo cookie. Consulte as [métricas de requisições do Render](https://render.com/docs/service-metrics#http-requests).
 
 ## Configuração
 
@@ -70,10 +73,9 @@ O plano gratuito suspende o serviço após 15 minutos sem tráfego. Para evitar 
 | `B3LAB_API_PORT` | `8000` | Porta da API no launcher |
 | `B3LAB_API_URL` | `http://127.0.0.1:8000` | Endereço privado usado pelo proxy Next.js |
 | `B3LAB_ORIGIN` | `http://localhost:3000` | Origem autorizada para mutações; o launcher adapta a porta |
-| `B3LAB_DB` | `b3_data.db` na raiz | Arquivo SQLite gravável e persistente |
+| `B3LAB_DB` | `b3_data.db` na raiz | Arquivo SQLite gravável. O Blueprint do Render define `/app/storage/b3_data.db` |
 | `B3LAB_ENV` | Não definido | `production` exige cookie Secure e a origem configurada |
 | `B3LAB_HOST` | `127.0.0.1` | Endereço de escuta do Next.js no launcher |
-| `B3LAB_KEEPALIVE_URL` | `RENDER_EXTERNAL_URL` no contêiner | URL acessada pelo launcher a cada 10 minutos; vazio desativa |
 
 O launcher configura `B3LAB_API_URL` a partir de `B3LAB_API_PORT` quando não há endereço explícito. Portas personalizadas devem usar uma origem correspondente; `localhost` e `127.0.0.1` são origens distintas.
 

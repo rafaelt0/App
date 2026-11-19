@@ -2,7 +2,14 @@ services:
   - type: web
     name: b3lab
     runtime: docker
-    plan: free
+    plan: 0.5c-512mb
     branch: main
     healthCheckPath: /
     autoDeploy: true
+    disk:
+      name: b3lab-data
+      mountPath: /app/storage
+      sizeGB: 1
+    envVars:
+      - key: B3LAB_DB
+        value: /app/storage/b3_data.db
