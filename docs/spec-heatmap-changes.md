@@ -79,7 +79,7 @@ pytest, determinístico, sem rede (mesmo padrão de `adjusted_closes()`):
 - "s/d" fica restrito aos tickers sem cotação nos pregões usados (hoje, os 5 listados acima).
 - Novo teste de regressão passando, e os testes atuais sem alteração.
 
-## Open Questions
+## Decisões
 
-1. O limite de 50% (tanto para uma linha contar como pregão quanto para aceitar o resultado) está bom?
-2. Quando a variação falhar, basta o rodapé "Variações indisponíveis: …" com os blocos neutros, ou você quer também um botão para tentar de novo no mapa? Hoje é preciso recarregar a página. O botão mudaria o frontend, que está em "Ask first".
+1. O limite de 50% vale para as duas regras: uma linha contar como pregão e o resultado ser aceito.
+2. Quando a variação falhar, basta o rodapé "Variações indisponíveis: …" com os blocos neutros. Não há botão para tentar de novo nem mudança no frontend.
