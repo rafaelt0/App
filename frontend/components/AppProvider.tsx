@@ -1,9 +1,11 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
+import QuickGuide from "./QuickGuide";
 import Shell from "./Shell";
-import { Loading, Notice } from "./ui";
+import { Notice } from "./ui";
 
 export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null };
 export type Session = {
@@ -59,6 +61,7 @@ export function useApp() {
 }
 
 export default function AppProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [current, setCurrent] = useState<Session | null>(null);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +110,12 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
     finally { setLoading(false); }
   }
+  let content = children;
+  if (pathname !== "/guia") {
+    if (loading) content = <QuickGuide loading />;
+    else if (error) content = <Notice tone="negative">{error}<button onClick={retry}>Tentar novamente</button></Notice>;
+  }
   return <Context value={{ session: current, stocks, loading, error, setSelection, refreshSession, toggleFavorite }}>
-    <Shell>{loading ? <Loading>Carregando a sessão e a lista de ativos.</Loading> : error ? <Notice tone="negative">{error}<button onClick={retry}>Tentar novamente</button></Notice> : children}</Shell>
+    <Shell>{content}</Shell>
   </Context>;
 }
