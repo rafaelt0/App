@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
+import Intro from "./Intro";
 import Shell from "./Shell";
 import { Loading, Notice } from "./ui";
 
@@ -29,6 +30,7 @@ type AppContext = {
 export const MAX_SELECTION = 20;
 export const SELECTION_FULL_MESSAGE = "Seleção cheia: remova um ativo para adicionar outro.";
 const Context = createContext<AppContext | null>(null);
+let introMounted = false;
 let bootstrap: Promise<{ session: Session; stocks: Stock[] }> | null = null;
 let liquidity: Promise<Record<string, number | null>> | null = null;
 
@@ -62,6 +64,7 @@ export default function AppProvider({ children }: { children: ReactNode }) {
   const [current, setCurrent] = useState<Session | null>(null);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showIntro, setShowIntro] = useState(() => !introMounted);
   const [error, setError] = useState<string | null>(null);
   const sessionRef = useRef<Session | null>(null);
   const queue = useRef(Promise.resolve());
@@ -71,7 +74,9 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     return next;
   }, []);
   const accept = useCallback((value: Session) => { sessionRef.current = value; setCurrent(value); }, []);
+  const finishIntro = useCallback(() => setShowIntro(false), []);
   useEffect(() => {
+    introMounted = true;
     let active = true;
     initialize().then(value => {
       if (active) { accept(value.session); setStocks(value.stocks); setLoading(false); }
@@ -108,6 +113,7 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     finally { setLoading(false); }
   }
   return <Context value={{ session: current, stocks, loading, error, setSelection, refreshSession, toggleFavorite }}>
-    <Shell>{loading ? <Loading>Carregando a sessão e a lista de ativos.</Loading> : error ? <Notice tone="negative">{error}<button onClick={retry}>Tentar novamente</button></Notice> : children}</Shell>
+    <Shell introActive={showIntro}>{loading ? <Loading>Carregando a sessão e a lista de ativos.</Loading> : error ? <Notice tone="negative">{error}<button onClick={retry}>Tentar novamente</button></Notice> : children}</Shell>
+    {showIntro && <Intro loading={loading} onFinish={finishIntro} />}
   </Context>;
 }

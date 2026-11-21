@@ -226,7 +226,7 @@ function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
   </div>;
 }
 
-export default function Shell({ children }: { children: ReactNode }) {
+export default function Shell({ children, introActive }: { children: ReactNode; introActive: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, setSelection } = useApp();
@@ -264,6 +264,7 @@ export default function Shell({ children }: { children: ReactNode }) {
     return () => { active = false; clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
   useEffect(() => {
+    if (introActive) return;
     const onKey = (event: KeyboardEvent) => {
       const typing = event.target instanceof Element && !!event.target.closest("input, textarea, select, [contenteditable='true']");
       const viewIndex = /^F[1-5]$/.test(event.key) ? Number(event.key.slice(1)) - 1 : event.altKey && !event.ctrlKey && !event.metaKey && /^Digit[1-5]$/.test(event.code) ? Number(event.code.slice(5)) - 1 : -1;
@@ -273,7 +274,7 @@ export default function Shell({ children }: { children: ReactNode }) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [router]);
+  }, [introActive, router]);
   useEffect(() => { setMenu(false); }, [pathname]);
   useEffect(() => {
     if (!flash) return;
@@ -287,7 +288,7 @@ export default function Shell({ children }: { children: ReactNode }) {
     catch (reason) { setFlash({ text: reason instanceof Error ? reason.message : String(reason), tone: "negative" }); }
   }
   return <MarketContext value={market}>
-    <div className="mesa" data-menu={menu ? "open" : undefined}>
+    <div className="mesa" data-menu={menu ? "open" : undefined} inert={introActive} aria-hidden={introActive || undefined}>
       <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
       <header className="cmd">
         <Link href="/" className="cmd-brand" aria-label="B3Lab, Início"><span>B3</span>LAB<i aria-hidden="true" /></Link>
