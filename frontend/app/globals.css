@@ -159,6 +159,8 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .status { display: flex; align-items: center; gap: 0; height: var(--status-h); border-top: 1px solid var(--line-2); background: #000; color: var(--text-3); font: 10.5px var(--mono); }
 .status > span { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 10px; border-right: 1px solid var(--line); white-space: nowrap; }
 .status-activity { color: var(--text-3); }
+.status-link { height: auto; padding: 0; border: 0; color: var(--amber-2); font: inherit; letter-spacing: 0; text-decoration: underline; text-underline-offset: 2px; }
+.status-link:hover:not(:disabled) { border-color: transparent; color: var(--amber); }
 .status-activity.is-busy { color: var(--amber); }
 .status-activity.is-busy span { animation: blink .8s steps(1) infinite; }
 .status-flash { flex: 1; min-width: 0; overflow: hidden; }
@@ -301,18 +303,13 @@ tr.is-clickable { cursor: pointer; }
 .onboarding-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
 .onboarding-actions :is(button, .button-link) { height: 44px; padding: 0 12px; font-size: 12px; }
 
-.tutorial { width: min(520px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: clamp(16px, 4vw, 32px); border: 1px solid var(--line-3); border-top: 2px solid var(--amber); background: var(--pane); color: var(--text); }
-.tutorial::backdrop { background: rgb(0 0 0 / .72); }
-.tutorial-progress { color: var(--amber); font: 500 12px/1.4 var(--mono); }
-.tutorial h2 { margin-block: 8px; font: 600 clamp(22px, 4vw, 28px)/1.15 var(--sans); }
-.tutorial h2:focus { outline: none; }
-.tutorial #tutorial-description { color: var(--text-2); font-size: 16px; line-height: 1.5; }
-.tutorial strong { color: var(--text); }
-.tutorial .onboarding-actions { padding-top: 16px; border-top: 1px solid var(--line-2); }
-.tutorial .tutorial-skip { border-color: transparent; text-decoration: underline; text-underline-offset: 3px; }
-@media (prefers-reduced-motion: no-preference) {
-  .tutorial-step { animation: tutorial-enter 160ms ease-out; }
-}
+.welcome-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 28px 0 0; padding: 0; border: 1px solid var(--line-2); background: var(--line-2); list-style: none; }
+.welcome-steps li { display: grid; gap: 4px; padding: 14px 16px; background: var(--bg); }
+.welcome-steps span { color: var(--amber); font: 600 10.5px var(--mono); }
+.welcome-steps strong { color: var(--text); font: 600 13.5px/1.3 var(--sans); }
+.welcome-steps p { color: var(--text-3); font: 12.5px/1.45 var(--sans); }
+@media (max-width: 640px) { .welcome-steps { grid-template-columns: minmax(0, 1fr); } }
+
 @keyframes tutorial-enter {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }

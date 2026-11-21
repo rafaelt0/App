@@ -229,7 +229,7 @@ function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
 export default function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, setSelection, loading } = useApp();
+  const { session, setSelection, loading, openTutorial } = useApp();
   const [market, setMarket] = useState<Market>({ strip: null, failed: false });
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -311,6 +311,7 @@ export default function Shell({ children }: { children: ReactNode }) {
       <footer className="status">
         <span className={`status-activity${busy ? " is-busy" : ""}`}><span aria-hidden="true">{busy ? "◐" : "●"}</span>{busy ? "Processando" : "Pronto"}</span>
         <span><Link href="/guia" aria-current={pathname === "/guia" ? "page" : undefined}>Boas-vindas</Link></span>
+        {!loading && <span><button type="button" className="status-link" onClick={openTutorial}>Tutorial</button></span>}
         <span className="status-flash" role="status" aria-live="polite">{flash && <span className={`is-${flash.tone}`}><span>{flash.text}</span>{flash.undo && <button type="button" onClick={() => void undo(flash.undo!)}>Desfazer</button>}</span>}</span>
         <span className="status-note">Sessão anônima · resultados temporários</span>
         <span className="status-note">Dados para pesquisa, não recomendação de investimento</span>
