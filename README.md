@@ -51,15 +51,19 @@ python run.py --production
 
 O launcher usa um único worker Python. Os resultados de análise pertencem a esse processo. Adicionar workers sem compartilhar o estado quebra essa arquitetura.
 
+O launcher mantém os dois processos vivos: se o Next.js ou a API encerrar, ele libera a porta do processo que caiu, espera de 1 a 30 segundos conforme as tentativas seguidas e inicia apenas esse processo de novo. Um processo que ficou 60 segundos no ar zera a contagem. Após 5 saídas precoces seguidas, o launcher encerra com código 1 para que a plataforma reinicie o contêiner inteiro. Uma falha transitória ao criar o processo entra na mesma espera, sem derrubar o processo saudável. No desligamento, o launcher dá até 25 segundos para as requisições em andamento terminarem e só então encerra os processos à força. O log registra cada queda, cada reinício e a confirmação de que painel e API respondem ao mesmo tempo.
+
+O caminho `/health` no Next.js é a prontidão do serviço. Ele responde 200 quando a API Python responde e o SQLite aceita uma escrita. Durante os primeiros 180 segundos de um processo novo, ou até 180 segundos depois da última resposta saudável da API, ele responde 200 com `{"status":"starting"}`; sem essa janela, a importação lenta da API em uma instância de 0,1 CPU viraria um ciclo de reinícios. Passada a janela, uma API que não volta responde 503 com `{"status":"degraded"}`. Use esse caminho em monitores de disponibilidade e no health check da plataforma.
+
 Para publicar atrás de um proxy HTTPS, mantenha a API privada e configure `B3LAB_ENV=production` e `B3LAB_ORIGIN` com a origem pública exata. A interface e os pedidos `/api` compartilham a mesma origem. O proxy precisa admitir a duração das análises, incluindo as chamadas à API do Jev. Não há fila de execução nem promessa de implantação serverless.
 
 ### Render
 
-O `render.yaml` cria um serviço web Docker no plano gratuito. O contêiner usa `PORT` e `RENDER_EXTERNAL_URL` do Render como porta e origem pública, e `B3LAB_HOST=0.0.0.0` expõe o Next.js. A API continua privada em `127.0.0.1`.
+O `render.yaml` cria um serviço web Docker no plano gratuito. O contêiner usa `PORT` e `RENDER_EXTERNAL_URL` do Render como porta e origem pública, e `B3LAB_HOST=0.0.0.0` expõe o Next.js. A API continua privada em `127.0.0.1`. O health check do Render usa `/health`, que falha quando a API Python ou a escrita no SQLite seguem indisponíveis depois da janela de inicialização.
 
 Configure `TYPESAFE_API_KEY` como segredo no Render para classificar notícias com Jev. O contêiner não carrega modelos locais. Sem a chave ou quando a API falha, as notícias usam o fallback léxico identificado. O disco é efêmero: favoritos e seleções em SQLite se perdem a cada deploy ou reinício.
 
-O plano gratuito suspende o serviço após 15 minutos sem tráfego. Para evitar a suspensão, o launcher acessa a própria URL pública (`RENDER_EXTERNAL_URL`) a cada 10 minutos. O workflow `keep-render-awake.yml` acessa a URL da variável de repositório `B3LAB_URL` como reserva, mas o GitHub executa agendamentos com atraso e pode passar horas sem rodar. As 750 horas mensais do plano gratuito cobrem um serviço ativo o mês inteiro.
+O plano gratuito suspende o serviço após 15 minutos sem tráfego. Para evitar a suspensão, o launcher acessa a própria URL pública (`RENDER_EXTERNAL_URL`) a cada 10 minutos. O workflow `keep-render-awake.yml` acessa `/health` da URL da variável de repositório `B3LAB_URL` como reserva, mas o GitHub executa agendamentos com atraso e pode passar horas sem rodar. Um monitor externo de disponibilidade apontado para `/health` a cada 5 minutos é a reserva confiável; o mesmo monitor acusa quando o serviço responde 503. As 750 horas mensais do plano gratuito cobrem um serviço ativo o mês inteiro.
 
 ## Configuração
 

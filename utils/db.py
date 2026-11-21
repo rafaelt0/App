@@ -7,11 +7,17 @@ import json
 import time
 import os
 import logging
+import threading
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
 _DB = os.environ.get("B3LAB_DB", os.path.join(os.path.dirname(__file__), '..', 'b3_data.db'))
+_READY_TTL = 60.0
+_ready_lock = threading.Lock()
+_ready_at = 0.0
+_ready_value = False
+_ready_key = None
 
 
 def _migrate_legacy_watchlist(conn):
@@ -72,6 +78,38 @@ def _conn():
             yield conn
     finally:
         conn.close()
+
+
+def ready() -> bool:
+    """Whether the store accepts a write; a read-only file answers SELECT but cannot persist sessions.
+
+    The probe is cached because the platform asks every few seconds and each check takes a write lock.
+    """
+    global _ready_at, _ready_value, _ready_key
+    now = time.monotonic()
+    with _ready_lock:
+        if _ready_key == _DB and now - _ready_at < _READY_TTL:
+            return _ready_value
+        _ready_value = _write_probe()
+        _ready_at = now
+        _ready_key = _DB
+        return _ready_value
+
+
+def _write_probe() -> bool:
+    connection = None
+    try:
+        connection = sqlite3.connect(_DB, timeout=5)
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute("CREATE TABLE IF NOT EXISTS __b3lab_ready (ok INTEGER)")
+        connection.rollback()
+        return True
+    except sqlite3.Error:
+        logger.exception("Readiness probe failed for %s", _DB)
+        return False
+    finally:
+        if connection is not None:
+            connection.close()
 
 
 # ── Cache ──────────────────────────────────────────────────────────────────────

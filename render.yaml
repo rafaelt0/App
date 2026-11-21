@@ -4,5 +4,8 @@ services:
     runtime: docker
     plan: free
     branch: main
-    healthCheckPath: /
+    # Deep readiness through Next.js. The route reports 200 "starting" during the API's boot
+    # grace, because a 0.1-CPU instance imports the Python app in tens of seconds and Render
+    # restarts an instance after 60 seconds of failed checks.
+    healthCheckPath: /health
     autoDeploy: true
