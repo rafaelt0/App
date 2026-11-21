@@ -229,7 +229,7 @@ function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
 export default function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, setSelection } = useApp();
+  const { session, setSelection, loading } = useApp();
   const [market, setMarket] = useState<Market>({ strip: null, failed: false });
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -306,10 +306,11 @@ export default function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <Tape />
-      <main id="conteudo" className="mesa-main" tabIndex={-1} aria-busy={busy}>{children}</main>
+      <main id="conteudo" className="mesa-main" tabIndex={-1} aria-busy={busy && !loading && pathname !== "/guia"}>{children}</main>
       <footer className="status">
         <span className={`status-activity${busy ? " is-busy" : ""}`}><span aria-hidden="true">{busy ? "◐" : "●"}</span>{busy ? "Processando" : "Pronto"}</span>
-        <span className="status-flash" role="status" aria-live="polite">{flash && <span className={`is-${flash.tone}`}>{flash.text}{flash.undo && <button type="button" onClick={() => void undo(flash.undo!)}>Desfazer</button>}</span>}</span>
+        <span><Link href="/guia" aria-current={pathname === "/guia" ? "page" : undefined}>Guia rápido</Link></span>
+        <span className="status-flash" role="status" aria-live="polite">{flash && <span className={`is-${flash.tone}`}><span>{flash.text}</span>{flash.undo && <button type="button" onClick={() => void undo(flash.undo!)}>Desfazer</button>}</span>}</span>
         <span className="status-note">Sessão anônima · resultados temporários</span>
         <span className="status-note">Dados para pesquisa, não recomendação de investimento</span>
       </footer>
