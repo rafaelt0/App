@@ -1,10 +1,10 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
-import QuickGuide from "./QuickGuide";
 import Shell from "./Shell";
+import Tutorial from "./Tutorial";
+import Welcome from "./Welcome";
 import { Notice } from "./ui";
 
 export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null };
@@ -24,6 +24,7 @@ type AppContext = {
   stocks: Stock[];
   loading: boolean;
   error: string | null;
+  openTutorial: () => void;
   setSelection: (tickers: SelectionUpdate) => Promise<void>;
   refreshSession: () => Promise<void>;
   toggleFavorite: (ticker: string) => Promise<void>;
@@ -31,6 +32,7 @@ type AppContext = {
 export const MAX_SELECTION = 20;
 export const SELECTION_FULL_MESSAGE = "Seleção cheia: remova um ativo para adicionar outro.";
 const Context = createContext<AppContext | null>(null);
+const tutorialKey = "b3lab:tutorial-seen";
 let bootstrap: Promise<{ session: Session; stocks: Stock[] }> | null = null;
 let liquidity: Promise<Record<string, number | null>> | null = null;
 
@@ -61,11 +63,12 @@ export function useApp() {
 }
 
 export default function AppProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const [current, setCurrent] = useState<Session | null>(null);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const checkedTutorial = useRef(false);
   const sessionRef = useRef<Session | null>(null);
   const queue = useRef(Promise.resolve());
   const enqueue = useCallback((operation: () => Promise<void>) => {
@@ -89,6 +92,16 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
     return () => { active = false; };
   }, [loading, error]);
+  useEffect(() => {
+    if (loading || error || checkedTutorial.current) return;
+    checkedTutorial.current = true;
+    try {
+      if (window.localStorage.getItem(tutorialKey) === "1") return;
+    } catch {
+      // The tutorial is still available when browser storage is disabled.
+    }
+    setTutorialOpen(true);
+  }, [loading, error]);
   const refreshSession = useCallback(() => enqueue(async () => {
     accept(await api<Session>("/api/session"));
   }), [accept, enqueue]);
@@ -110,12 +123,19 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
     finally { setLoading(false); }
   }
-  let content = children;
-  if (pathname !== "/guia") {
-    if (loading) content = <QuickGuide loading />;
-    else if (error) content = <Notice tone="negative">{error}<button onClick={retry}>Tentar novamente</button></Notice>;
+  function dismissTutorial() {
+    setTutorialOpen(false);
+    try {
+      window.localStorage.setItem(tutorialKey, "1");
+    } catch {
+      // The current visit still remembers the dismissal.
+    }
   }
-  return <Context value={{ session: current, stocks, loading, error, setSelection, refreshSession, toggleFavorite }}>
+  let content = children;
+  if (loading) content = <Welcome />;
+  else if (error) content = <Notice tone="negative">{error}<button onClick={retry}>Tentar novamente</button></Notice>;
+  return <Context value={{ session: current, stocks, loading, error, openTutorial: () => setTutorialOpen(true), setSelection, refreshSession, toggleFavorite }}>
     <Shell>{content}</Shell>
+    {tutorialOpen && <Tutorial onDismiss={dismissTutorial} />}
   </Context>;
 }

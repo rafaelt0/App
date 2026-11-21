@@ -265,6 +265,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.target instanceof Element && event.target.closest("dialog[open]")) return;
       const typing = event.target instanceof Element && !!event.target.closest("input, textarea, select, [contenteditable='true']");
       const viewIndex = /^F[1-5]$/.test(event.key) ? Number(event.key.slice(1)) - 1 : event.altKey && !event.ctrlKey && !event.metaKey && /^Digit[1-5]$/.test(event.code) ? Number(event.code.slice(5)) - 1 : -1;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); window.dispatchEvent(new Event("b3lab:focus-search")); }
@@ -309,7 +310,7 @@ export default function Shell({ children }: { children: ReactNode }) {
       <main id="conteudo" className="mesa-main" tabIndex={-1} aria-busy={busy && !loading && pathname !== "/guia"}>{children}</main>
       <footer className="status">
         <span className={`status-activity${busy ? " is-busy" : ""}`}><span aria-hidden="true">{busy ? "◐" : "●"}</span>{busy ? "Processando" : "Pronto"}</span>
-        <span><Link href="/guia" aria-current={pathname === "/guia" ? "page" : undefined}>Guia rápido</Link></span>
+        <span><Link href="/guia" aria-current={pathname === "/guia" ? "page" : undefined}>Boas-vindas</Link></span>
         <span className="status-flash" role="status" aria-live="polite">{flash && <span className={`is-${flash.tone}`}><span>{flash.text}</span>{flash.undo && <button type="button" onClick={() => void undo(flash.undo!)}>Desfazer</button>}</span>}</span>
         <span className="status-note">Sessão anônima · resultados temporários</span>
         <span className="status-note">Dados para pesquisa, não recomendação de investimento</span>

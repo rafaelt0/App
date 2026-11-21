@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import QuickGuide from "../../components/QuickGuide";
+import Welcome from "../../components/Welcome";
 
-export const metadata: Metadata = { title: "Guia rápido" };
+export const metadata: Metadata = { title: "Boas-vindas" };
 
-export default function GuidePage() {
-  return <QuickGuide />;
+export default function WelcomePage() {
+  return <Welcome />;
 }
