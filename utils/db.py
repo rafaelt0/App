@@ -13,7 +13,7 @@ from contextlib import contextmanager
 logger = logging.getLogger(__name__)
 
 _DB = os.environ.get("B3LAB_DB", os.path.join(os.path.dirname(__file__), '..', 'b3_data.db'))
-_READY_TTL = 60.0
+_READY_TTL = 15.0
 _ready_lock = threading.Lock()
 _ready_at = 0.0
 _ready_value = False
@@ -99,7 +99,7 @@ def ready() -> bool:
 def _write_probe() -> bool:
     connection = None
     try:
-        connection = sqlite3.connect(_DB, timeout=5)
+        connection = sqlite3.connect(_DB, timeout=2)
         connection.execute("BEGIN IMMEDIATE")
         connection.execute("CREATE TABLE IF NOT EXISTS __b3lab_ready (ok INTEGER)")
         connection.rollback()

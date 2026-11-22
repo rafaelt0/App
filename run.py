@@ -1,5 +1,6 @@
 import argparse
 import os
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 import signal
@@ -66,7 +67,7 @@ def stop_group(process, timeout=5) -> None:
         pass
 
 
-def shutdown(managed: list["Managed"], timeout=25) -> None:
+def shutdown(managed: list["Managed"], timeout=28) -> None:
     """Let in-flight requests finish inside the platform's grace period, then force the rest."""
     running = [item.process for item in managed if item.process is not None]
     for process in running:
@@ -162,13 +163,17 @@ def healthy(url: str) -> bool:
 
 
 def announce_ready(urls: list[str], stopping) -> None:
-    """Log once when both processes answer at the same moment, so the boot log is honest."""
+    """Log once when every process answers in two consecutive rounds, so the boot log is honest."""
     deadline = time.monotonic() + READY_TIMEOUT_SECONDS
+    consecutive = 0
     while not stopping.is_set() and time.monotonic() < deadline:
-        if all(healthy(url) for url in urls):
+        with ThreadPoolExecutor(max_workers=len(urls)) as pool:
+            answers = list(pool.map(healthy, urls))
+        consecutive = consecutive + 1 if all(answers) else 0
+        if consecutive >= 2:
             print("Pronto: painel e API respondendo.", flush=True)
             return
-        stopping.wait(2)
+        stopping.wait(1)
     print(f"Prontidão não confirmada para: {', '.join(urls)}.", flush=True)
 
 
@@ -188,12 +193,13 @@ def main():
     stopping = threading.Event()
     for event in (signal.SIGTERM, signal.SIGINT):
         signal.signal(event, lambda *_: stopping.set())
-    frontend_args = ["--port", port]
-    if host := os.environ.get("B3LAB_HOST"):
-        frontend_args += ["--hostname", host]
+    # Invoking Next directly skips the npm wrapper process, which costs about 70 MB on a 512 MB instance.
+    next_cli = ROOT / "frontend/node_modules/.bin/next"
+    if not next_cli.exists():
+        parser.error("Execute npm ci no diretório frontend antes de iniciar.")
     managed = [
         Managed("API Python", [sys.executable, "-m", "uvicorn", "backend.app:app", "--host", "127.0.0.1", "--port", api_port, "--workers", "1"], ROOT),
-        Managed("Next.js", ["npm", "run", "start" if args.production else "dev", "--", *frontend_args], ROOT / "frontend"),
+        Managed("Next.js", [str(next_cli), "start" if args.production else "dev", "--hostname", os.environ.get("B3LAB_HOST", "127.0.0.1"), "--port", port], ROOT / "frontend"),
     ]
     try:
         print(f"Iniciando B3Lab em http://localhost:{port}. API privada em 127.0.0.1:{api_port}.", flush=True)

@@ -19,10 +19,10 @@ export default function AppError({ error }: { error: Error & { digest?: string }
     <div className="desk">
       <Pane title="Algo falhou nesta tela" meta="Erro inesperado">
         <Notice tone="negative">
-          A tela não pôde ser exibida com os dados recebidos. A sua seleção e os favoritos continuam salvos nesta sessão.
+          A tela não pôde ser exibida com os dados recebidos. Os favoritos salvos continuam nesta sessão.
         </Notice>
         <div className="idle">
-          <p>Tente carregar a tela de novo. Se o erro persistir, volte ao início e refaça a análise.</p>
+          <p>Tente carregar a tela de novo. Se o erro persistir, volte ao início e refaça a seleção de ativos.</p>
           <div className="param-run">
             <button type="button" className="primary" onClick={() => window.location.reload()}>Tentar novamente</button>
             <Link className="button-link" href="/">Voltar ao início</Link>
