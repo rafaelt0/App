@@ -117,7 +117,16 @@ async def invalid_request(request: Request, exc: RequestValidationError):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    if not db.ready():
+        return JSONResponse({"status": "degraded", "database": "unavailable"}, status_code=503)
+    return {"status": "ok", "database": "ok"}
+
+
+@app.exception_handler(Exception)
+async def unexpected_error(request: Request, exc: Exception):
+    # Keeps an unexpected failure in the app's own error shape instead of a bare 500 page.
+    logger.error("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse({"detail": "Falha interna ao processar a solicitação. Tente novamente."}, status_code=500)
 
 
 def session_payload(ctx):
