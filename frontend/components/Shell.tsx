@@ -25,13 +25,13 @@ export function stripQuote(strip: Strip | null, ticker: string): StripItem | und
 /** One color per position in the selection, shared by chips, monitor rows and comparison bars. */
 export const tickerColor = (index: number) => comparisonColors[index % comparisonColors.length];
 
-type View = { key: string; href: string; label: string; ready?: (session: Session) => boolean; requirement?: string };
+type View = { key: string; href: string; label: string; title?: string; description: string; ready?: (session: Session) => boolean; requirement?: string };
 export const views: View[] = [
-  { key: "F1", href: "/", label: "Início" },
-  { key: "F2", href: "/portfolio", label: "Carteira", ready: session => session.portfolio_ready, requirement: "carteira ainda não carregada" },
-  { key: "F3", href: "/simulacao", label: "Simulação", ready: session => session.simulation_ready, requirement: "requer carteira carregada" },
-  { key: "F4", href: "/noticias", label: "Notícias", ready: session => session.portfolio_ready, requirement: "requer carteira carregada" },
-  { key: "F5", href: "/screener", label: "Screener" },
+  { key: "F1", href: "/", label: "Início", title: "Análise de ações", description: "Busque ações da B3, consulte indicadores e compare empresas." },
+  { key: "F2", href: "/portfolio", label: "Carteira", description: "Monte uma carteira e veja como ela teria se saído no passado.", ready: session => session.portfolio_ready, requirement: "Carteira a calcular" },
+  { key: "F3", href: "/simulacao", label: "Simulação", description: "Explore cenários para o valor futuro da sua carteira.", ready: session => session.simulation_ready, requirement: "Requer histórico da carteira" },
+  { key: "F4", href: "/noticias", label: "Notícias", description: "Acompanhe as notícias dos ativos da sua carteira e o tom das matérias.", ready: session => session.portfolio_ready, requirement: "Requer carteira calculada" },
+  { key: "F5", href: "/screener", label: "Screener", title: "Screener de ações", description: "Encontre ações por critérios como dividendos, rentabilidade e liquidez." },
 ];
 
 const refreshMs = 5 * 60 * 1000;
@@ -128,18 +128,19 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
   const expanded = open && options.length > 0;
   return <div className="cmd-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
     <span className="cmd-prompt" aria-hidden="true">&gt;</span>
-    <input ref={input} type="search" autoComplete="off" spellCheck={false} value={query}
-      aria-label="Buscar ativo: ticker, empresa ou setor" aria-controls={`${id}-list`} aria-activedescendant={expanded ? `${id}-${current}` : undefined}
-      placeholder={compact ? "Ticker ou empresa" : "Ticker, empresa, setor ou F1–F5"}
+    <input ref={input} type="search" role="combobox" aria-autocomplete="list" aria-expanded={expanded} autoComplete="off" spellCheck={false} value={query}
+      aria-label="Buscar ações por código, empresa ou setor" aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-${current}` : undefined}
+      placeholder={compact ? "Buscar ações" : "Buscar código ou empresa"}
       onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
       onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }}
       onKeyDown={event => {
-        if (event.key === "ArrowDown") { event.preventDefault(); setOpen(true); setActive(Math.min(current + 1, options.length - 1)); }
+        if (event.key === "ArrowDown" && options.length) { event.preventDefault(); setOpen(true); setActive(Math.min(current + 1, options.length - 1)); }
         else if (event.key === "ArrowUp") { event.preventDefault(); setActive(Math.max(current - 1, 0)); }
         else if (event.key === "Enter" && expanded) { event.preventDefault(); void choose(options[current]); }
         else if (event.key === "Escape") { event.preventDefault(); if (open) setOpen(false); else input.current?.blur(); }
       }} />
     {!compact && <kbd className="cmd-kbd" aria-hidden="true">Ctrl K</kbd>}
+    {open && query.trim() && !options.length && <p className="cmd-results cmd-empty" role="status">Nenhum resultado. Tente outro código ou nome de empresa.</p>}
     {expanded && <ul className="cmd-results" id={`${id}-list`} role="listbox" aria-label="Resultados da busca">
       {options.map((option, index) => {
         const selected = option.kind === "stock" && selection.includes(option.stock.ticker);
@@ -235,6 +236,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   const [menu, setMenu] = useState(false);
   const [compact, setCompact] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
+  const view = views.find(item => item.href === pathname);
   useEffect(() => subscribeActivity(setBusy), []);
   useEffect(() => {
     const query = window.matchMedia("(max-width: 900px)");
@@ -277,6 +279,11 @@ export default function Shell({ children }: { children: ReactNode }) {
   }, [router]);
   useEffect(() => { setMenu(false); }, [pathname]);
   useEffect(() => {
+    const closeMenu = () => setMenu(false);
+    window.addEventListener("b3lab:focus-search", closeMenu);
+    return () => window.removeEventListener("b3lab:focus-search", closeMenu);
+  }, []);
+  useEffect(() => {
     if (!flash) return;
     const timer = window.setTimeout(() => setFlash(null), flash.undo ? 9000 : 5000);
     return () => window.clearTimeout(timer);
@@ -295,10 +302,10 @@ export default function Shell({ children }: { children: ReactNode }) {
         <CommandSearch onFlash={showFlash} compact={compact} />
         <button type="button" className="cmd-menu" aria-expanded={menu} aria-controls="cmd-drawer" onClick={() => setMenu(value => !value)}>{menu ? "Fechar" : "Menu"}</button>
         <div className="cmd-drawer" id="cmd-drawer">
-          <nav className="cmd-views" aria-label="Telas">{views.map(view => {
+          <nav className="cmd-views" aria-label="Páginas do B3Lab">{views.map(view => {
             const ready = !session || !view.ready || view.ready(session);
-            return <Link key={view.href} href={view.href} aria-current={pathname === view.href ? "page" : undefined} aria-keyshortcuts={view.key} title={`${view.label} (${view.key} ou Alt+${view.key.slice(1)})${ready ? "" : ` · ${view.requirement}`}`}>
-              <kbd>{view.key}</kbd>{view.label}{view.ready && <span className={`cmd-ready${ready ? " is-ready" : ""}`} aria-hidden="true" />}
+            return <Link key={view.href} href={view.href} onClick={() => setMenu(false)} aria-current={pathname === view.href ? "page" : undefined} aria-keyshortcuts={`${view.key} Alt+${view.key.slice(1)}`} title={`${view.label} (${view.key} ou Alt+${view.key.slice(1)})${ready ? "" : ` · ${view.requirement}`}`}>
+              <kbd aria-hidden="true">{view.key}</kbd>{view.label}{view.ready && <span className={`cmd-ready${ready ? " is-ready" : ""}`} aria-hidden="true" />}
               {!ready && <small className="cmd-req">{view.requirement}</small>}
             </Link>;
           })}</nav>
@@ -307,7 +314,13 @@ export default function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <Tape />
-      <main id="conteudo" className="mesa-main" tabIndex={-1} aria-busy={busy && !loading && pathname !== "/guia"}>{children}</main>
+      <main id="conteudo" className="mesa-main" tabIndex={-1}>
+        {!loading && view && <header className="workspace-intro">
+          <div><h1>{view.title ?? view.label}</h1><p>{view.description}</p></div>
+          {pathname === "/" && session && <button type="button" onClick={openTutorial}>Ver tutorial</button>}
+        </header>}
+        {children}
+      </main>
       <footer className="status">
         <span className={`status-activity${busy ? " is-busy" : ""}`}><span aria-hidden="true">{busy ? "◐" : "●"}</span>{busy ? "Processando" : "Pronto"}</span>
         <span><Link href="/guia" aria-current={pathname === "/guia" ? "page" : undefined}>Boas-vindas</Link></span>

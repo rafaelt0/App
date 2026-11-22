@@ -1062,9 +1062,9 @@ export function PortfolioScene({
           setStrategy("markowitz");
         }, 560))) break;
 
-        // Beat 1: Click Carregar portfólio -> unlocks F3 & F4
+        // Beat 1: Click Calcular carteira -> unlocks F3 & F4
         onBeatChange(1);
-        if (!(await runner.moveTo("btn-load-pf", "Carregar portfólio", { offsetX: 0.52, offsetY: 0.54, settleMs: 640 }))) break;
+        if (!(await runner.moveTo("btn-load-pf", "Calcular carteira", { offsetX: 0.52, offsetY: 0.54, settleMs: 640 }))) break;
         if (!(await runner.click(() => {
           setReady(true);
         }, 760))) break;
@@ -1163,7 +1163,7 @@ export function PortfolioScene({
                 {...demoProps("btn-load-pf", hoverTarget, pressTarget)}
                 onClick={() => { onUserInteract(); setReady(true); }}
               >
-                {ready ? "✓ Portfólio carregado" : "Carregar portfólio"}
+                {ready ? "✓ Carteira calculada" : "Calcular carteira"}
               </button>
             </div>
           </div>

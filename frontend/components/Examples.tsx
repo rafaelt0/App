@@ -31,10 +31,9 @@ const heat = <>{Array.from({ length: 36 }, (_, i) => { const level = [3, 1, 4, 2
 const portfolioMetrics = ["Retorno total", "Volatilidade anual", "Índice Sharpe", "Índice Sortino", "Queda máxima (max drawdown)"];
 
 /** The Carteira board before the first run: every pane it will fill, with what it shows and a labelled sketch. */
-export function PortfolioPreview({ status }: { status: ReactNode }) {
+export function PortfolioPreview() {
   return <>
-    <Pane title="Resumo de desempenho" className="span-12" meta="aguardando cálculo">
-      {status}
+    <Pane title="Resumo de desempenho" className="span-12" meta="exemplo">
       <Metrics size="lg" items={portfolioMetrics.map(label => ({ label, value: null }))} />
     </Pane>
     <Pane title="Pesos do portfólio" className="span-4" meta="prévia">
@@ -61,10 +60,9 @@ export function PortfolioPreview({ status }: { status: ReactNode }) {
 const simulationMetrics = ["Valor esperado final", "CAGR do valor final médio (a.a.)", "Probabilidade de ganho", "Retorno final P5"];
 
 /** The Simulação board before a run (or while the carteira is missing): the panes a run fills, sketched and labelled as examples. */
-export function SimulationPreview({ status, meta }: { status: ReactNode; meta: string }) {
+export function SimulationPreview() {
   return <>
-    <Pane title="Estatísticas da simulação" className="span-12" meta={meta}>
-      {status}
+    <Pane title="Estatísticas da simulação" className="span-12" meta="exemplo">
       <Metrics size="lg" items={simulationMetrics.map(label => ({ label, value: null }))} />
     </Pane>
     <Pane title="Faixas de percentis" className="span-8" meta="prévia">

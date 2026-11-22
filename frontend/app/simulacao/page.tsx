@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
-import { ElapsedLoading } from "../../components/PortfolioParts";
+import { ElapsedLoading, PortfolioRequired } from "../../components/PortfolioParts";
 import { ExportButton, formatValue, Idle, Loading, Metrics, Notice, Pane, Table, useMedia } from "../../components/ui";
 import { SimulationPreview } from "../../components/Examples";
 import { tickerColor } from "../../components/Shell";
@@ -149,14 +149,6 @@ export default function SimulationPage() {
   const histogram = useMemo(() => visible ? polishFigure(visible.charts.histogram, "histogram") : null, [visible]);
   const trajectoryMax = visible ? Math.min(50, visible.inputs.simulations) : 50;
 
-  const prerequisite = restoreFailed
-    ? { title: "Não foi possível restaurar a carteira", message: "A carteira salva foi encontrada, mas seu histórico não pôde ser carregado. Abra Portfólio e carregue a análise novamente." }
-    : session?.selection.length === 1
-      ? { title: "Adicione mais um ativo", message: "A simulação precisa de pelo menos duas ações na carteira. Adicione mais um ativo na Portfólio para simular." }
-    : session?.selection.length
-      ? { title: "Atualize o portfólio", message: "A seleção atual não possui histórico analisado. Volte para Portfólio e clique em Carregar portfólio antes de rodar a simulação." }
-      : { title: "Portfólio não configurado", message: "Configure seu portfólio na página Portfólio e carregue a análise para liberar a Simulação Monte Carlo." };
-
   const field = (id: string, label: string, valid: boolean, help: string, error: string, value: number, change: (value: number) => void, limits: { min: number; max?: number }) => <label>{label}
     <input type="number" required min={limits.min} max={limits.max} step={1} inputMode="numeric" disabled={running} aria-invalid={!valid} aria-describedby={valid ? `sim-help-${id}` : `sim-help-${id} sim-error-${id}`} value={Number.isNaN(value) ? "" : value} onChange={event => change(event.target.valueAsNumber)} />
     <span className="param-hint" id={`sim-help-${id}`}>{help}</span>
@@ -174,31 +166,19 @@ export default function SimulationPage() {
   </>;
 
   if (loading || preparing) return <div className="desk">{notes}<Loading>Restaurando contexto da carteira…</Loading></div>;
-  if (!ready) return <div className="desk desk-split">
-    <Pane title="Parâmetros" className="pane-params" meta="bloqueado">
-      {notes}
-      <p className="locked-title">{prerequisite.title}</p>
-      <p className="pane-lead">{prerequisite.message}</p>
-      <div className="param-run"><Link className="button-link primary" href="/portfolio"><kbd>F2</kbd> Ir para Carteira</Link></div>
-      <h3 className="pane-sub">O que a simulação calcula</h3>
-      <ul className="plain-list">
-        <li>Faixas de percentis do valor da carteira ao longo do horizonte.</li>
-        <li>Distribuição dos valores finais, com quartis, média e desvio padrão.</li>
-        <li>Probabilidade de ganho e estatísticas da cauda inferior.</li>
-        <li>Calibração histórica e comparação entre modelo normal e reamostragem.</li>
-      </ul>
-    </Pane>
-    <div className="board is-preview">
-      <SimulationPreview meta="aguardando carteira" status={<Idle>{prerequisite.title}: carregue a carteira em <kbd>F2</kbd> Carteira para liberar a simulação.</Idle>} />
-    </div>
-  </div>;
+  const preview = <details className="disclosure"><summary>Ver prévia da simulação</summary>
+    <div className="board is-preview"><SimulationPreview /></div>
+  </details>;
+  if (!ready) return <>
+    {notes}
+    <PortfolioRequired count={session?.selection.length ?? 0} title={restoreFailed ? "Não foi possível carregar o histórico da carteira" : undefined}>{preview}</PortfolioRequired>
+  </>;
 
-  // On narrow screens a run moves results above the parameters, which fold to a one-line recap.
+  // Keep the compact setup header above results.
   const folded = foldParams && (!!visible || running);
   const recap = `${yearsLabel(inputs.years)} · ${number.format(inputs.simulations)} trajetórias · ${formatValue(inputs.initial_capital, "money", 0)}`;
-  return <div className={`desk desk-split${folded ? " is-folded" : ""}`}>
-    <Pane title="Parâmetros" className="pane-params" meta={folded && narrow ? recap : portfolio?.mode ?? undefined} narrowCollapsed={folded}>
-      {notes}
+  return <div className="desk desk-split">
+    <Pane title="Configurar simulação" className="pane-params" meta={folded && narrow ? recap : portfolio?.mode ?? undefined} narrowCollapsed={folded}>
       {restoredNotice && <Notice>Carteira salva restaurada. Confira ativos e pesos antes de rodar.</Notice>}
       <form className="param-group param-fields" onSubmit={submit} aria-busy={running} noValidate>
         <h3 className="pane-sub">Pontos de partida</h3>
@@ -212,14 +192,13 @@ export default function SimulationPage() {
         {field("n", "Número de simulações (trajetórias)", simulationsValid, "Entre 10 e 3.000.", "Use um número inteiro entre 10 e 3.000.", inputs.simulations, value => setInputs(current => ({ ...current, simulations: value })), { min: 10, max: 3000 })}
         {field("c", "Capital inicial (R$)", capitalValid, "Mínimo de R$ 100.", "Informe um valor de pelo menos R$ 100.", inputs.initial_capital, value => setInputs(current => ({ ...current, initial_capital: value })), { min: 100 })}
         {field("y", "Horizonte (anos)", yearsValid, "Entre 1 e 10 anos.", "Use um número inteiro entre 1 e 10 anos.", inputs.years, value => setInputs(current => ({ ...current, years: value })), { min: 1, max: 10 })}
-        <label>Janela de calibração
+        <label>Histórico de referência
           <select disabled={running} aria-describedby="sim-help-w" value={String(inputs.calibration)} onChange={event => setInputs(current => ({ ...current, calibration: (event.target.value === "portfolio" ? "portfolio" : Number(event.target.value)) as CalibrationWindow }))}>
             <option value="portfolio">Histórico do Portfólio</option><option value="2">2 Anos</option><option value="3">3 Anos</option><option value="5">5 Anos</option>
           </select>
           <span className="param-hint" id="sim-help-w">Histórico usado para estimar retornos e risco.</span>
         </label>
-        <div className="param-run"><button type="submit" className="primary" disabled={running || !inputsValid}>{running ? "Rodando simulação…" : "Rodar Simulação"}</button></div>
-        <p className="param-hint">Parâmetros só valem ao rodar; se mudarem depois, o resultado fica marcado como desatualizado.</p>
+        <div className="param-run"><button type="submit" className="primary" disabled={running || !inputsValid}>{running ? "Simulando…" : "Simular carteira"}</button></div>
       </form>
       <h3 className="pane-sub">Alocação usada</h3>
       {sample && <p className="param-hint">Calibração: {calibrationText}. Histórico: {periodLabel(sample)} ({number.format(sample.count)} retornos diários).</p>}
@@ -228,11 +207,17 @@ export default function SimulationPage() {
       <details className="disclosure"><summary>Premissas e calibração</summary><div><p>A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos.</p><p>O horizonte é independente da janela: 252 dias úteis por ano, até 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p></div></details>
     </Pane>
     <div className={`board${visible ? "" : " is-preview"}`}>
-      {(stale || (visible && visible.warnings.length > 0)) && <div className="span-12 board-notes">
-        {stale && <div role="status"><Notice tone="warning">Parâmetros alterados desde a última simulação. Os resultados abaixo são da anterior; clique em Rodar Simulação para atualizá-los.</Notice></div>}
+      {(sessionError || error || portfolioChanged || stale || (visible && visible.warnings.length > 0)) && <div className="span-12 board-notes">
+        {notes}
+        {stale && <div role="status"><Notice tone="warning">O cenário mudou. Clique em “Simular carteira” para atualizar o resultado.</Notice></div>}
         {visible?.warnings.map(warning => <Notice key={warning} tone="warning"><strong>Atenção: </strong>{warning}</Notice>)}
       </div>}
-      {!visible && <SimulationPreview meta={running ? "rodando" : "aguardando execução"} status={running ? <ElapsedLoading>Rodando simulações Monte Carlo multivariadas…</ElapsedLoading> : <Idle>Ajuste os parâmetros e pressione Rodar Simulação.</Idle>} />}
+      {!visible && <Pane title="Resultado da simulação" className="span-12">
+        {running ? <ElapsedLoading>Calculando os cenários da carteira…</ElapsedLoading> : <>
+          <Idle>Veja aqui os possíveis valores futuros e a probabilidade de ganho depois de simular.</Idle>
+          {preview}
+        </>}
+      </Pane>}
       {visible && <>
         <Pane id="sim-stats" title="Estatísticas da simulação" className="span-12" meta={`${yearsLabel(visible.inputs.years)} · ${number.format(visible.inputs.simulations)} trajetórias · capital ${formatValue(visible.inputs.initial_capital, "money")} · calibração ${visible.inputs.calibration === "portfolio" ? "histórico do portfólio" : `${visible.inputs.calibration} anos`}`}>
           <Metrics size="lg" items={[

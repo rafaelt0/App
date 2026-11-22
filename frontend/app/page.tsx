@@ -123,12 +123,11 @@ export default function HomePage() {
   const selection=session?.selection ?? [];
   const ready=session && result && result.revision===session.revision && JSON.stringify(result.requested_tickers)===JSON.stringify(selection) ? result:null;
   if(loading || !session) return <div className="desk">{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
-  const analyzeLabel=busy ? "Analisando…":`Analisar ${selection.length || ""}`.trim();
-  const resultSlot = ready ? <HomeResults ready={ready} selection={selection} busy={busy} onRefreshConsensus={()=>void run("consensus")}/> : <Pane title="Análise" area="res" meta={selection.length ? `${selection.length} ${selection.length===1 ? "ativo":"ativos"} na fila`:"aguardando seleção"} className="pane-idle">
+  const analyzeLabel=busy ? "Analisando…" : selection.length===1 ? "Analisar ação" : `Analisar ${selection.length} ações`;
+  const resultSlot = ready ? <HomeResults ready={ready} selection={selection} busy={busy} onRefreshConsensus={()=>void run("consensus")}/> : <Pane title="Resultados da análise" area="res" className="pane-idle">
     {busy ? <Loading>Buscando indicadores, comparação setorial e consensos de {selection.join(", ")}…</Loading>
       : error ? null
-      : selection.length ? <Idle action={<p className="idle-keys"><kbd>Analisar</kbd> no Monitor busca indicadores, saúde financeira, preço-alvo e síntese setorial.</p>}>{stale ? "A seleção mudou desde a última análise. Analise de novo para atualizar os indicadores." : `Seleção pronta: ${selection.join(", ")}.`}</Idle>
-      : <Idle action={<ol className="idle-steps"><li><kbd>Ctrl K</kbd> ou <kbd>/</kbd> abre a busca; <kbd>Enter</kbd> adiciona o ativo.</li><li>Ou clique em um setor no mapa para pegar os mais líquidos.</li><li><kbd>Analisar</kbd> preenche este painel com indicadores e comparação.</li><li><kbd>F2</kbd> leva a seleção para a Carteira.</li></ol>}>Nenhum ativo na seleção.</Idle>}
+      : <Idle>{stale ? "A seleção mudou. Analise de novo para atualizar os indicadores." : "Indicadores, saúde financeira e preços-alvo aparecem aqui após a análise."}</Idle>}
     {error && <Notice tone="negative">{error}<button disabled={busy} onClick={()=>void (selection.length ? run(retryAction) : suggestions(sectors).then(setSuggested).catch(exc=>setError(exc.message)))}>Tentar novamente</button></Notice>}
   </Pane>;
   return <div className={`desk desk-home${ready ? " is-analyzed":""}`}>
