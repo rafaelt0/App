@@ -20,7 +20,7 @@ const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 const yearsLabel = (years: number) => `${number.format(years)} ${years === 1 ? "ano" : "anos"}`;
 
 export default function SimulationPage() {
-  const { session, loading, error: sessionError, refreshSession } = useApp();
+  const { session, stocks, loading, error: sessionError, refreshSession } = useApp();
   const [portfolio, setPortfolio] = useState<SimulationPortfolio | null>(null);
   const [inputs, setInputs] = useState<SimulationInputs>(initialInputs);
   const [result, setResult] = useState<SimulationResult | null>(null);
@@ -142,6 +142,7 @@ export default function SimulationPage() {
   const individual = useMemo(() => visible ? displayedTrajectories(visible.charts.individual, displayCount) : null, [visible, displayCount]);
   const ready = !!portfolio?.id && portfolio.simulation_ready && portfolio.revision === session?.revision;
   const rawWeights = portfolio ? portfolio.tickers.map(ticker => ({ ticker, weight: portfolio.weights[ticker] })) : [];
+  const hasTreasury = stocks.some(stock => stock.asset?.market === "TD" && rawWeights.some(row => row.ticker === stock.ticker && row.weight > 0));
   const total = rawWeights.reduce((sum, row) => sum + row.weight, 0);
   const allocation = visible?.allocation ?? rawWeights.map(row => ({ ticker: row.ticker, weight: row.weight / total }));
 
@@ -201,6 +202,7 @@ export default function SimulationPage() {
         <div className="param-run"><button type="submit" className="primary" disabled={running || !inputsValid}>{running ? "Simulando…" : "Simular carteira"}</button></div>
       </form>
       <h3 className="pane-sub">Alocação usada</h3>
+      {hasTreasury && <p className="param-hint">O Tesouro entra com retornos históricos de marcação a mercado. A simulação mantém os pesos ao longo do horizonte, inclusive após o vencimento do título.</p>}
       {sample && <p className="param-hint">Calibração: {calibrationText}. Histórico: {periodLabel(sample)} ({number.format(sample.count)} retornos diários).</p>}
       {allocationList}
       <p className="param-hint">Pesos normalizados da carteira carregada; peso zero permanece zerado.</p>

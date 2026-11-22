@@ -12,6 +12,8 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 
 
+from utils.assets import ASSETS
+
 # Use issuer names rather than ambiguous shorthand in Google News searches.
 TICKER_TO_COMPANY = {
     "PETR3": "Petrobras", "PETR4": "Petrobras",
@@ -47,7 +49,12 @@ TICKER_TO_COMPANY = {
 def build_news_query(ticker):
     """Search exact tickers and issuer names; unknown tickers stay ticker-only."""
     terms = [f'"{ticker}"']
-    company = TICKER_TO_COMPANY.get(ticker)
+    asset = ASSETS.get(ticker)
+    if asset and asset.market == "TD":
+        return f'"Tesouro Direto" "{asset.company}"'
+    if asset and asset.market == "US":
+        return f'"{asset.company}"'
+    company = asset.company if asset else TICKER_TO_COMPANY.get(ticker)
     if company:
         terms.append(f'"{company}"')
     return " OR ".join(terms)

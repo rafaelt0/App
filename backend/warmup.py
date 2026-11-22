@@ -1,4 +1,4 @@
-"""Keeps the Home page's shared market caches warm so visitors never wait on a cold fetch.
+"""Keeps shared market caches warm so visitors never wait on a cold fetch.
 
 The Yahoo download for the whole universe costs tens of seconds of CPU on the
 host. Priming at boot and touching the caches during B3 hours moves that cost
@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from backend.news import _market_headlines
 from utils.market_data import get_listed_stocks, get_liquidity_by_ticker, get_universe_changes
 from utils.market_strip import market_strip
+from utils.treasury_data import get_treasury_history
 
 logger = logging.getLogger(__name__)
 BRASILIA = ZoneInfo("America/Sao_Paulo")
@@ -25,6 +26,7 @@ TASKS = (
     ("market strip", market_strip),
     ("liquidity", get_liquidity_by_ticker),
     ("headlines", _market_headlines),
+    ("Tesouro Direto", get_treasury_history),
 )
 
 
@@ -34,7 +36,7 @@ def in_session(now: datetime.datetime) -> bool:
 
 
 def warm() -> None:
-    """Touch each Home cache: fills a missing entry, or starts a background refresh of a stale one.
+    """Touch each market data cache: fills a missing entry, or starts a background refresh of a stale one.
 
     Each provider group has its own thread, so priming costs the slowest group
     instead of their sum. Yahoo stays serialized by its own lock, and the
@@ -58,7 +60,7 @@ def _warm_one(name, task) -> None:
 def run(stopping: threading.Event) -> None:
     started = time.monotonic()
     warm()
-    logger.info("Home caches primed in %.1fs", time.monotonic() - started)
+    logger.info("Shared market caches primed in %.1fs", time.monotonic() - started)
     while not stopping.wait(INTERVAL_SECONDS):
         if in_session(datetime.datetime.now(datetime.timezone.utc)):
             warm()

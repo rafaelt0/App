@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { subscribeActivity } from "../lib/api";
 import { comparisonColors } from "../lib/home";
+import { assetLabel } from "../lib/assets";
 import { rankStocks, sortStocks } from "../lib/tickerSearch";
 import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp, type Session, type Stock } from "./AppProvider";
 import { formatBrasilia, formatCompactValue, formatValue, type Unit } from "./ui";
@@ -120,7 +121,7 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
     setQuery(""); setActive(0); setOpen(false);
     try {
       await setSelection(current => removing ? current.filter(item => item !== ticker) : current.includes(ticker) ? [...current] : [...current, ticker]);
-      onFlash({ text: removing ? `${ticker} removida da seleção.` : `${ticker} adicionada à seleção (${Math.min(before.length + 1, MAX_SELECTION)}/${MAX_SELECTION}).`, tone: "positive", undo: before });
+      onFlash({ text: removing ? `${ticker} removido da seleção.` : `${ticker} adicionado à seleção (${Math.min(before.length + 1, MAX_SELECTION)}/${MAX_SELECTION}).`, tone: "positive", undo: before });
     } catch (reason) {
       onFlash({ text: reason instanceof Error ? reason.message : String(reason), tone: "negative" });
     } finally { busy.current = false; }
@@ -129,8 +130,8 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
   return <div className="cmd-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
     <span className="cmd-prompt" aria-hidden="true">&gt;</span>
     <input ref={input} type="search" role="combobox" aria-autocomplete="list" aria-expanded={expanded} autoComplete="off" spellCheck={false} value={query}
-      aria-label="Buscar ações por código, empresa ou setor" aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-${current}` : undefined}
-      placeholder={compact ? "Buscar ações" : "Buscar código ou empresa"}
+      aria-label="Buscar ativos por código, nome, setor ou classe" aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-${current}` : undefined}
+      placeholder={compact ? "Buscar ativos" : "Buscar código, nome ou classe"}
       onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
       onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }}
       onKeyDown={event => {
@@ -140,19 +141,19 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
         else if (event.key === "Escape") { event.preventDefault(); if (open) setOpen(false); else input.current?.blur(); }
       }} />
     {!compact && <kbd className="cmd-kbd" aria-hidden="true">Ctrl K</kbd>}
-    {open && query.trim() && !options.length && <p className="cmd-results cmd-empty" role="status">Nenhum resultado. Tente outro código ou nome de empresa.</p>}
+    {open && query.trim() && !options.length && <p className="cmd-results cmd-empty" role="status">Nenhum resultado. Tente outro código, nome ou classe.</p>}
     {expanded && <ul className="cmd-results" id={`${id}-list`} role="listbox" aria-label="Resultados da busca">
       {options.map((option, index) => {
         const selected = option.kind === "stock" && selection.includes(option.stock.ticker);
         const favorite = option.kind === "stock" && watchlist.includes(option.stock.ticker);
-        return <li key={option.kind === "view" ? option.view.key : option.stock.ticker} id={`${id}-${index}`} role="option" aria-selected={index === current} className={`cmd-option${selected ? " is-selected" : ""}`}
+        return <li key={option.kind === "view" ? option.view.key : option.stock.ticker} id={`${id}-${index}`} role="option" aria-selected={index === current} data-market={option.kind === "stock" ? option.stock.asset?.market : undefined} className={`cmd-option${selected ? " is-selected" : ""}`}
           onMouseMove={() => { if (index !== current) setActive(index); }} onMouseDown={event => event.preventDefault()} onClick={() => void choose(option)}>
           {option.kind === "view" ? <>
             <span className="cmd-option-mark" aria-hidden="true">↗</span><b>{option.view.key}</b><span className="cmd-option-name">Ir para {option.view.label}</span><span className="cmd-option-hint">abrir</span>
           </> : <>
             <span className="cmd-option-mark" aria-hidden="true">{selected ? "✓" : "+"}</span>
             <b>{option.stock.ticker}</b>
-            <span className="cmd-option-name">{option.stock.company || "Empresa não informada"}<small>{option.stock.sector || "Setor não informado"}</small></span>
+            <span className="cmd-option-name">{option.stock.company || "Nome não informado"}<small>{option.stock.asset ? assetLabel(option.stock.asset) : option.stock.sector || "Ação · B3"}</small></span>
             <span className="cmd-option-liq" title="Volume financeiro médio diário em 2 meses">{option.stock.liquidity === null ? "—" : formatCompactValue(option.stock.liquidity, "money", 1)}</span>
             <span className="cmd-option-hint">{selected ? "remover" : "adicionar"}</span>
             <button type="button" className="cmd-star" tabIndex={-1} aria-pressed={favorite} aria-label={favorite ? `Remover ${option.stock.ticker} dos favoritos` : `Adicionar ${option.stock.ticker} aos favoritos`}
@@ -200,7 +201,7 @@ function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
     try { await setSelection(next); onFlash({ text, tone: "positive", undo: before }); }
     catch (reason) { onFlash({ text: reason instanceof Error ? reason.message : String(reason), tone: "negative" }); }
   }
-  const remove = (ticker: string) => void update(selection.filter(item => item !== ticker), `${ticker} removida da seleção.`);
+  const remove = (ticker: string) => void update(selection.filter(item => item !== ticker), `${ticker} removido da seleção.`);
   return <div className="cmd-selection" ref={root}>
     <button type="button" className="cmd-count" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen(value => !value)} title="Editar a seleção de ativos">
       <span>Seleção</span><b>{selection.length}/{MAX_SELECTION}</b><span className="visually-hidden">{selection.length === 1 ? "ativo selecionado" : "ativos selecionados"}</span>

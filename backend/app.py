@@ -13,6 +13,7 @@ from pydantic import Field, field_validator
 from backend.serialization import StrictModel, clean_json
 from backend.state import SESSION_COOKIE, release_session, replace_selection, resolve_session, session
 from utils import db
+from utils.assets import ASSETS
 from utils.market_data import get_listed_stocks
 
 
@@ -166,8 +167,8 @@ class SelectionRequest(StrictModel):
 @app.put("/api/session/selection")
 def select_stocks(body: SelectionRequest, request: Request):
     universe = set(get_listed_stocks()["Ticker"])
-    if any(ticker not in universe for ticker in body.tickers):
-        raise HTTPException(422, "A seleção contém ativos fora da lista da B3.")
+    if any(ticker not in universe and ticker not in ASSETS for ticker in body.tickers):
+        raise HTTPException(422, "A seleção contém ativos fora do catálogo.")
     ctx = session(request)
     replace_selection(ctx, body.tickers, body.revision)
     with ctx.lock:
@@ -182,8 +183,8 @@ def read_watchlist(request: Request):
 @app.put("/api/watchlist/{ticker}")
 def add_favorite(ticker: str, request: Request):
     ticker = ticker.strip().upper().removesuffix(".SA")
-    if ticker not in set(get_listed_stocks()["Ticker"]):
-        raise HTTPException(422, "Ativo indisponível na lista da B3.")
+    if ticker not in ASSETS and ticker not in set(get_listed_stocks()["Ticker"]):
+        raise HTTPException(422, "Ativo indisponível no catálogo.")
     ctx = session(request)
     if not db.wl_add(ctx.uid, ticker):
         raise HTTPException(503, "Não foi possível salvar o favorito.")

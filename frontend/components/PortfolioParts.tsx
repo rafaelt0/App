@@ -10,8 +10,8 @@ const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "
 export function PortfolioRequired({ count, title = "Calcule uma carteira primeiro", children }: { count: number; title?: string; children?: ReactNode }) {
   return <section className="workspace-start">
     <h2>{title}</h2>
-    <p>{count === 0 ? "Na Carteira, adicione pelo menos duas ações e clique em “Calcular carteira”."
-      : count === 1 ? "Na Carteira, adicione mais uma ação e clique em “Calcular carteira”."
+    <p>{count === 0 ? "Na Carteira, adicione pelo menos dois ativos e clique em “Calcular carteira”."
+      : count === 1 ? "Na Carteira, adicione mais um ativo e clique em “Calcular carteira”."
       : "Abra a Carteira e clique em “Calcular carteira” para usar a seleção atual."}</p>
     <Link className="button-link primary" href="/portfolio">Abrir Carteira <span aria-hidden="true">→</span></Link>
     {children}

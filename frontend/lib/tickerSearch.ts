@@ -1,4 +1,6 @@
-type Searchable = { ticker: string; company: string; sector: string };
+import { assetLabel, type CatalogAsset } from "./assets";
+
+type Searchable = { ticker: string; company: string; sector: string; asset?: CatalogAsset };
 
 const combiningMarks = /[̀-ͯ]/g;
 const wordSeparator = /[^\p{L}\p{N}]+/u;
@@ -38,13 +40,16 @@ export function sortStocks<T extends Sortable>(stocks: T[], sort: StockSort): T[
 export function rankStocks<T extends Searchable>(stocks: T[], query: string, limit: number): { items: T[]; total: number } {
   const needle = normalizeSearch(query.trim());
   if (!needle) return { items: stocks.slice(0, limit), total: stocks.length };
+  const category = needle === "acoes americanas" ? "acao americana"
+    : needle === "fiis" ? "fii" : needle === "etfs" ? "etf" : needle === "reits" ? "reit" : needle;
   const ranked: { stock: T; rank: number }[] = [];
   for (const stock of stocks) {
     const ticker = normalizeSearch(stock.ticker);
     const company = normalizeSearch(stock.company ?? "");
+    const classification = stock.asset ? normalizeSearch(assetLabel(stock.asset)) : "";
     const rank = ticker === needle ? 0 : ticker.startsWith(needle) ? 1 : company.startsWith(needle) ? 2
       : company.split(wordSeparator).some(word => word.startsWith(needle)) ? 3 : company.includes(needle) ? 4
-      : normalizeSearch(stock.sector ?? "").includes(needle) ? 5 : -1;
+      : (normalizeSearch(stock.sector ?? "").includes(needle) || classification.includes(category)) ? 5 : -1;
     if (rank >= 0) ranked.push({ stock, rank });
   }
   ranked.sort((a, b) => a.rank - b.rank);

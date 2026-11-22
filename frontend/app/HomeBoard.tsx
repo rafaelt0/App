@@ -1,4 +1,5 @@
 "use client";
+import { assetLabel } from "../lib/assets";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MAX_SELECTION, type Stock } from "../components/AppProvider";
 import { Change, stripQuote, tickerColor, useMarket } from "../components/Shell";
@@ -40,15 +41,15 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
     if (item) return { value: item.value as number | null, change: item.change, source: `Yahoo Finance com atraso, ${shortDate(item.as_of)}` };
     return { value: company?.market.price ?? null, change: null, source: company?.market.last_quote_date ? `Fundamentus, ${company.market.last_quote_date.split("-").reverse().join("/")}` : "Sem cotação no painel" };
   };
-  return <Pane title="Seleção de ações" area="mon" className="pane-monitor" meta={`${selection.length} de ${MAX_SELECTION} ações`} actions={selection.length ? analyze : undefined} flush>
+  return <Pane title="Seleção de ativos" area="mon" className="pane-monitor" meta={`${selection.length} de ${MAX_SELECTION} ativos`} actions={selection.length ? analyze : undefined} flush>
     {notices}
     <div className="monitor-start">
-      <button type="button" className={selection.length ? undefined : "primary"} onClick={() => window.dispatchEvent(new Event("b3lab:focus-search"))}>{selection.length ? "Adicionar ações" : "Buscar ações"}</button>
-      {selection.length > 0 && !ready && <p>Use “Analisar” para consultar os indicadores da seleção.</p>}
-      {!selection.length && <p>Busque pelo código ou nome da empresa, ou escolha uma ação abaixo para analisar agora.</p>}
+      <button type="button" className={selection.length ? undefined : "primary"} onClick={() => window.dispatchEvent(new Event("b3lab:focus-search"))}>{selection.length ? "Adicionar ativos" : "Buscar ativos"}</button>
+      {analyze && !ready && <p>Use “Analisar” para consultar os indicadores da seleção.</p>}
+      {!selection.length && <p>Busque pelo código, nome ou classe, ou escolha uma ação abaixo para analisar agora.</p>}
     </div>
     {selection.length ? <ScrollX label="Ativos selecionados"><table className="grid monitor">
-      <thead><tr><th scope="col">Ativo</th><th scope="col">Empresa</th><th scope="col" className="num">Últ. R$</th><th scope="col" className="num">Var.</th>
+      <thead><tr><th scope="col">Ativo</th><th scope="col">Nome</th><th scope="col" className="num">Últ. R$</th><th scope="col" className="num">Var.</th>
         {ready ? <><th scope="col" className="num">P/L</th><th scope="col" className="num">ROE</th><th scope="col" className="num">DY</th><th scope="col" className="num">52 sem.</th><th scope="col" className="num" title="Áreas favoráveis na síntese setorial">Sínt.</th><th scope="col">Setor</th></>
           : <th scope="col" className="num" title="Volume financeiro médio diário em 2 meses">Liq. 2m</th>}
         <th scope="col"><span className="visually-hidden">Ações</span></th></tr></thead>
@@ -58,8 +59,8 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
         const { value, change, source } = quote(ticker);
         const favorite = watchlist.includes(ticker);
         return <tr key={ticker}>
-          <th scope="row" title={stock?.company ?? "Fora da lista B3"}><span className="tk"><i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><StockLogo ticker={ticker} company={stock?.company ?? ticker} size={16} />{ticker}</span></th>
-          <td className="ell">{company?.identity.company ?? stock?.company ?? "Fora da lista B3"}</td>
+          <th scope="row" title={stock?.company ?? "Fora do catálogo"}><span className="tk"><i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><StockLogo ticker={ticker} company={stock?.company ?? ticker} size={16} />{ticker}</span></th>
+          <td className="ell">{company?.identity.company ?? stock?.company ?? "Fora do catálogo"}{stock?.asset && ` · ${assetLabel(stock.asset)}`}</td>
           <td className="num" title={source}>{value === null ? "—" : <ValueText value={value} unit="money" currency={company?.market.currency ?? "BRL"} />}</td>
           <td className="num">{change === null ? <span className="muted">—</span> : <Change value={change} />}</td>
           {ready ? <>
@@ -95,7 +96,7 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
       <ul className="fav-list">{watchlist.map(ticker => {
         const known = byTicker.has(ticker);
         const inside = selection.includes(ticker);
-        return <li key={ticker}><b>{ticker}</b><span className="ell">{byTicker.get(ticker)?.company ?? "Fora da lista B3"}</span>
+        return <li key={ticker}><b>{ticker}</b><span className="ell">{byTicker.get(ticker)?.company ?? "Fora do catálogo"}</span>
           {known && !inside && <button type="button" disabled={busy || selection.length >= MAX_SELECTION} onClick={() => onAdd(ticker)} aria-label={`Adicionar ${ticker} à seleção`}>+ seleção</button>}
           {inside && <span className="muted">na seleção</span>}
           <button type="button" className="icon-btn" aria-label={`Remover ${ticker} dos favoritos`} onClick={() => onFavorite(ticker)}>★</button>

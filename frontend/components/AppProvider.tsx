@@ -2,12 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
+import type { CatalogAsset } from "../lib/assets";
 import Shell from "./Shell";
 import Tutorial from "./Tutorial";
 import Welcome from "./Welcome";
 import { Notice } from "./ui";
 
-export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null };
+export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null; asset?: CatalogAsset };
 export type Session = {
   selection: string[];
   revision: number;
@@ -48,8 +49,10 @@ function loadLiquidity() {
 function initialize() {
   loadLiquidity();
   if (!bootstrap) {
-    bootstrap = Promise.all([api<Session>("/api/session"), api<{ stocks: Omit<Stock, "liquidity">[] }>("/api/universe")]).then(([session, universe]) => {
-      return { session, stocks: universe.stocks.map(stock => ({ ...stock, liquidity: null })) };
+    bootstrap = Promise.all([api<Session>("/api/session"), api<{ stocks: Omit<Stock, "liquidity">[]; assets?: CatalogAsset[] }>("/api/universe")]).then(([session, universe]) => {
+      const stocks = universe.stocks.map(stock => ({ ...stock, liquidity: null }));
+      const assets = (universe.assets ?? []).map(asset => ({ ticker: asset.ticker, company: asset.company, sector: "", liquidity: null, asset }));
+      return { session, stocks: [...stocks, ...assets] };
     }).catch(error => { bootstrap = null; throw error; });
   }
   return bootstrap;

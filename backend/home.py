@@ -13,6 +13,7 @@ from backend.state import artifact, begin, publish, session
 from utils.formatting import extract_debt_metric, get_ev_ebitda_context
 from utils.home_data import (build_analyst_synthesis, clear_fundamentus_cache,
                              compute_sector_ranking, get_fundamentus_data, get_sector_peers)
+from utils.assets import ASSETS
 from utils.market_data import (clean_numeric_column, compute_target_upside, get_liquidity_by_ticker,
                                get_listed_stocks, get_universe_changes, get_market_target_data, get_sorted_tickers_by_liquidity)
 
@@ -215,7 +216,8 @@ def validate_selection(ctx, body):
     if len(set(tickers)) != len(tickers):
         raise HTTPException(422, "A seleção contém tickers repetidos.")
     with ctx.lock:
-        if body.revision != ctx.revision or tickers != ctx.selection:
+        stocks = [ticker for ticker in ctx.selection if ticker not in ASSETS]
+        if body.revision != ctx.revision or tickers != stocks:
             raise HTTPException(409, "A seleção mudou; clique em Analisar novamente.")
     known = set(get_listed_stocks()["Ticker"])
     if any(t not in known for t in tickers):
@@ -227,7 +229,10 @@ def validate_selection(ctx, body):
 def universe():
     try:
         frame = get_listed_stocks()
+        frame = frame.loc[~frame["Ticker"].isin(ASSETS)]
         return clean_json({"source": "local_csv", "stocks": [{"ticker": row["Ticker"], "company": row.get("Empresa", ""), "legal_name": row.get("RazaoSocial", ""), "sector": row.get("Setor", "")} for row in frame.to_dict("records")],
+                           "assets": [{"ticker": ticker, "company": asset.company, "asset_class": asset.asset_class, "market": asset.market}
+                                      for ticker, asset in ASSETS.items()],
                            "sectors": sorted(frame["Setor"].dropna().unique()), "selection_limit": 20, "sector_autopick_limit": 8})
     except (OSError, ValueError) as exc:
         raise HTTPException(503, f"Não foi possível carregar a lista de ações da B3: {exc}") from exc
@@ -320,7 +325,8 @@ def current_analysis(request: Request):
     ctx = session(request)
     with ctx.lock:
         saved = ctx.artifacts.get("home")
-        if not saved or saved["result"]["revision"] != ctx.revision or saved["result"]["requested_tickers"] != ctx.selection:
+        stocks = [ticker for ticker in ctx.selection if ticker not in ASSETS]
+        if not saved or saved["result"]["revision"] != ctx.revision or saved["result"]["requested_tickers"] != stocks:
             return None
         return clean_json(saved["result"])
 

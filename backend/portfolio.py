@@ -1,5 +1,6 @@
 """Portfolio orchestration; optimizer and historical-return conventions are unchanged."""
 from datetime import date, timedelta
+from decimal import Decimal
 import uuid
 from typing import Literal
 
@@ -7,7 +8,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import Field, StrictInt
+from pydantic import Field, StrictFloat, StrictInt, field_validator
 from pypfopt import objective_functions
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt.hierarchical_portfolio import HRPOpt
@@ -16,6 +17,7 @@ import quantstats as qs
 from backend.serialization import StrictModel, clean_json, csv_response, figure
 from backend.state import PortfolioSnapshot, artifact, begin, publish, session
 from utils import db
+from utils.assets import ASSETS, is_treasury, is_us_asset, price_symbol
 from utils.market_data import get_listed_stocks
 from utils.portfolio_data import (
     align_benchmark_returns, align_daily_rates, align_weights_to_columns, bound_efficient_return,
@@ -24,6 +26,7 @@ from utils.portfolio_data import (
     get_cdi_daily_rates, get_portfolio_prices, get_portfolio_trade_prices, get_selic_rate,
     historical_var_cvar,
 )
+from utils.treasury_data import get_treasury_history
 from utils.portfolio_charts import plot_efficient_frontier_and_random_portfolios
 from utils.charts import (
     CHART_ACCENT, CHART_DANGER, CHART_DANGER_FILL, CHART_GRID, CHART_MUTED,
@@ -53,8 +56,21 @@ class AnalyzeRequest(StrictModel):
     strategy: Strategy = "min_volatility"
     capital: float = Field(default=10000, ge=100, le=1000000, allow_inf_nan=False)
     lookback_days: int = Field(default=730, ge=60, le=5000)
-    manual_shares: dict[str, StrictInt] = Field(default_factory=dict)
+    manual_shares: dict[str, StrictInt | StrictFloat] = Field(default_factory=dict)
     gamma: float = Field(default=1, ge=0, le=3, allow_inf_nan=False)
+
+    @field_validator("manual_shares")
+    @classmethod
+    def validate_share_units(cls, shares):
+        for ticker, quantity in shares.items():
+            if not is_treasury(ticker):
+                if not isinstance(quantity, int) or quantity < 0:
+                    raise ValueError("Cotas de ativos de bolsa devem ser inteiros não negativos.")
+            else:
+                amount = Decimal(str(quantity))
+                if not amount.is_finite() or amount < 0 or amount.normalize().as_tuple().exponent < -2:
+                    raise ValueError("Títulos do Tesouro aceitam múltiplos não negativos de 0,01 título.")
+        return shares
 
 
 class RestoreRequest(StrictModel):
@@ -85,10 +101,10 @@ def history(tickers, start):
     try:
         prices = price_frame(get_portfolio_prices(tuple(tickers), start), tickers)
     except Exception as exc:
-        raise HTTPException(422, f"Erro ao buscar cotações no Yahoo Finance: {exc}. Verifique sua conexão e tente novamente.") from exc
+        raise HTTPException(422, f"Erro ao buscar cotações: {exc}. Verifique sua conexão e tente novamente.") from exc
     if prices.empty:
         raise HTTPException(422, "Nenhuma cotação retornada para os ativos selecionados. Verifique os tickers e o período escolhido.")
-    missing = [ticker.removesuffix(".SA") for ticker in tickers if ticker not in prices.columns]
+    missing = [ticker.removesuffix(".SA") for ticker in tickers if ticker not in prices.columns or prices[ticker].isna().all()]
     if missing:
         raise HTTPException(422, f"Não foi possível obter cotações para: {', '.join(missing)}. Remova esses ativos ou tente novamente mais tarde.")
     prices = prices.loc[:, tickers]
@@ -136,7 +152,10 @@ def purchase_suggestion(weights, capital, quotes, failed=False):
             shares, cost = 0, 0.0
         elif quote is not None:
             price, stamp = quote
-            shares = int(np.floor(suggested / price))
+            if is_treasury(ticker):
+                shares = float((Decimal(str(suggested)) // (Decimal(str(price)) / 100)) / 100)
+            else:
+                shares = int(np.floor(suggested / price))
             cost = shares * price
             total += cost
         rows.append({"ticker": ticker.removesuffix(".SA"), "price": price, "quote_date": pd.Timestamp(stamp).date().isoformat() if stamp is not None else None, "shares": shares, "effective_value": cost, "suggested_value": suggested, "suggested_weight": weight, "effective_weight": None})
@@ -280,10 +299,19 @@ def health_result(metrics, max_weight):
 def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, daily_rf, rf_source, warnings, label, mu, covariance):
     start = date.today() - timedelta(days=payload.lookback_days)
     daily = returns.dot(align_weights_to_columns(weights, returns.columns))
-    benchmark_prices, benchmark = None, None
+    mixed_calendar = any(is_us_asset(ticker) or is_treasury(ticker) for ticker in returns.columns)
+    comparison_daily, benchmark_prices, benchmark = daily, None, None
     try:
         benchmark_prices = get_benchmark_prices(start)
-        daily, benchmark = align_benchmark_returns(daily, benchmark_prices)
+        comparison_prices = benchmark_prices
+        if mixed_calendar:
+            # Carry the benchmark close over market holidays so foreign-market moves
+            # on those dates are retained in the portfolio's cumulative return.
+            joined = benchmark_prices.reindex(benchmark_prices.index.union(prices.index)).sort_index()
+            comparison_prices = joined.ffill().where(joined.bfill().notna()).reindex(prices.index)
+        comparison_daily, benchmark = align_benchmark_returns(daily, comparison_prices)
+        if not mixed_calendar:
+            daily = comparison_daily
     except Exception:
         pass
     available = benchmark is not None and not benchmark.empty
@@ -326,14 +354,27 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     value_fig = line_chart(value, "Evolução do Valor do Portfólio" + (" vs Benchmark" if available else ""), "Portfólio")
     value_fig.update_yaxes(title="Valor (R$)")
     if available:
-        value_fig.add_trace(go.Scatter(x=benchmark.index, y=(1 + benchmark).cumprod() * payload.capital, mode="lines", name="IBOVESPA", line=dict(color=CHART_SECONDARY, width=1.5, dash="dash")))
+        before_comparison = value.loc[value.index < benchmark.index[0]]
+        comparison_base = before_comparison.iloc[-1] if not before_comparison.empty else payload.capital
+        value_fig.add_trace(go.Scatter(x=benchmark.index, y=(1 + benchmark).cumprod() * comparison_base, mode="lines", name="IBOVESPA", line=dict(color=CHART_SECONDARY, width=1.5, dash="dash")))
     charts = {"value": figure(value_fig)}
     if payload.strategy == "markowitz":
         charts["frontier"] = figure(plot_efficient_frontier_and_random_portfolios(mu, covariance, weights, rf, label))
     purchases, totals, missing = purchase_suggestion(weights, payload.capital, quotes, quote_failed)
     if quote_failed or missing:
-        warnings.append("Fechamento bruto indisponível para " + ", ".join(missing or [t.removesuffix('.SA') for t, w in weights.items() if w > 0]) + "; cotas e totais aparecem como “—”.")
-    result = {"strategy": payload.strategy, "mode": MODES[payload.strategy], "allocation_label": label, "capital": payload.capital, "lookback_days": payload.lookback_days, "tickers": payload.tickers, "weights": [{"ticker": ticker.removesuffix('.SA'), "weight": weight} for ticker, weight in weights.items()], "sample": {**sample_info(returns), "selected_count": len(payload.tickers), "zero_excluded": payload.strategy == "manual" and len(returns.columns) < len(payload.tickers)}, "comparison_sample": sample_info(daily) if available else None, "source": {"adjusted_prices": "Yahoo Finance Close ajustado", "trade_quotes": "Yahoo Finance Close bruto (últimos 14 dias)", "selic_source": rf_source, "selic_daily": daily_rf, "selic_annual": rf, "historical_rf": historical_rf_source}, "trade_suggestions": purchases, "trade_totals": totals, "metrics": metrics, "metric_status": metric_status, "metric_signal": {key: signal_for(label) for key, label in metric_status.items()}, "metric_help": METRIC_HELP, "inputs": {"strategy": payload.strategy, "capital": payload.capital, "lookback_days": payload.lookback_days, "gamma": payload.gamma, "manual_shares": payload.manual_shares}, "monthly_returns": years, "benchmark_available": available, "charts": charts, "warnings": warnings, "health": None, "stress": None, "regime": None, "concentration": None, "asset_drawdowns": []}
+        warnings.append("Preço de referência indisponível para " + ", ".join(missing or [t.removesuffix('.SA') for t, w in weights.items() if w > 0]) + "; cotas e totais aparecem como “—”.")
+    adjusted_sources = []
+    trade_sources = []
+    if any(not is_treasury(ticker) for ticker in returns.columns):
+        adjusted_sources.append("Yahoo Finance Close ajustado")
+        trade_sources.append("Yahoo Finance Close bruto (últimos 14 dias)")
+    if any(is_treasury(ticker) for ticker in returns.columns):
+        adjusted_sources.append("Tesouro Transparente · PU Base Manhã (marcação a mercado)")
+        trade_sources.append("Tesouro Transparente · PU Compra Manhã (últimos 14 dias)")
+    if any(is_us_asset(ticker) for ticker in returns.columns):
+        adjusted_sources.append("USD/BRL diário do Yahoo Finance, com último câmbio de até 4 dias corridos quando faltar cotação")
+        trade_sources.append("conversão para reais pelo USD/BRL da data")
+    result = {"strategy": payload.strategy, "mode": MODES[payload.strategy], "allocation_label": label, "capital": payload.capital, "lookback_days": payload.lookback_days, "tickers": payload.tickers, "weights": [{"ticker": ticker.removesuffix('.SA'), "weight": weight} for ticker, weight in weights.items()], "sample": {**sample_info(returns), "selected_count": len(payload.tickers), "zero_excluded": payload.strategy == "manual" and len(returns.columns) < len(payload.tickers)}, "comparison_sample": sample_info(comparison_daily) if available else None, "source": {"adjusted_prices": " + ".join(adjusted_sources), "trade_quotes": " + ".join(trade_sources), "selic_source": rf_source, "selic_daily": daily_rf, "selic_annual": rf, "historical_rf": historical_rf_source}, "trade_suggestions": purchases, "trade_totals": totals, "metrics": metrics, "metric_status": metric_status, "metric_signal": {key: signal_for(label) for key, label in metric_status.items()}, "metric_help": METRIC_HELP, "inputs": {"strategy": payload.strategy, "capital": payload.capital, "lookback_days": payload.lookback_days, "gamma": payload.gamma, "manual_shares": payload.manual_shares}, "monthly_returns": years, "benchmark_available": available, "charts": charts, "warnings": warnings, "health": None, "stress": None, "regime": None, "concentration": None, "asset_drawdowns": []}
     max_weight = max(weights.values()) * 100
     squares = sum(weight ** 2 for weight in weights.values())
     hhi, effective = squares * 10000, round(1 / squares, 1)
@@ -344,17 +385,18 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     result["asset_drawdowns"] = sorted([{"ticker": ticker.removesuffix('.SA'), "max_drawdown": asset_dd[ticker].min() * 100, "date": asset_dd[ticker].idxmin().date().isoformat()} for ticker in returns.columns], key=lambda row: row["max_drawdown"])
     if not available:
         return result
-    cov = np.cov(daily.squeeze(), benchmark.squeeze())
+    cov = np.cov(comparison_daily, benchmark)
     variance = float(cov[1, 1])
     relative_valid = np.isfinite(variance) and variance > 1e-12
     beta = finite_or_none(cov[0, 1] / variance) if relative_valid else None
-    alpha = finite_or_none(excess.mean() - beta * (benchmark - historical_rf).mean()) if beta is not None else None
+    comparison_rf = historical_rf.reindex(comparison_daily.index)
+    alpha = finite_or_none((comparison_daily - comparison_rf).mean() - beta * (benchmark - comparison_rf).mean()) if beta is not None else None
     r2, ir = None, None
     if relative_valid:
         try:
-            r2 = finite_or_none(qs.stats.r_squared(daily, benchmark))
+            r2 = finite_or_none(qs.stats.r_squared(comparison_daily, benchmark))
             # qs.information_ratio is daily mean/std; annualize with the same 252-day basis as the other ratios.
-            ir = finite_or_none(qs.stats.information_ratio(daily, benchmark) * np.sqrt(252))
+            ir = finite_or_none(qs.stats.information_ratio(comparison_daily, benchmark) * np.sqrt(252))
         except Exception:
             pass
     else:
@@ -363,12 +405,12 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     result["health"] = health_result(metrics, max_weight)
     active = [ticker for ticker, weight in weights.items() if weight > 0]
     result["stress"] = stress_result(prices.reindex(columns=active), benchmark_prices, weights, start)
-    recent = (1 + daily.tail(21)).prod() - 1
+    recent = (1 + comparison_daily.tail(21)).prod() - 1
     recent_bench = (1 + benchmark.tail(21)).prod() - 1
     regime, advice = ("Alta", "Manter exposição. Ativos com momentum positivo podem ser aumentados.") if recent > .03 else ("Queda", "Revise os pesos. Considere reduzir exposição ou adicionar proteção (ex: BOVA11 put).") if recent < -.03 else ("Lateral", "Consolidação. Bom momento para revisar correlações e rebalancear.")
-    result["regime"] = {"label": regime, "portfolio": recent * 100, "benchmark": recent_bench * 100, "difference_pp": (recent - recent_bench) * 100, "volatility": daily.tail(21).std() * np.sqrt(252) * 100, "advice": advice}
+    result["regime"] = {"label": regime, "portfolio": recent * 100, "benchmark": recent_bench * 100, "difference_pp": (recent - recent_bench) * 100, "volatility": comparison_daily.tail(21).std() * np.sqrt(252) * 100, "advice": advice}
     rolling_var = benchmark.rolling(60).var()
-    rolling_beta = daily.rolling(60).cov(benchmark) / rolling_var.where(rolling_var.abs() > 1e-12)
+    rolling_beta = comparison_daily.rolling(60).cov(benchmark) / rolling_var.where(rolling_var.abs() > 1e-12)
     rolling_excess = excess.rolling(60)
     rolling_sharpe = (rolling_excess.mean() / rolling_excess.std()) * np.sqrt(252)
     charts["rolling_beta"] = figure(line_chart(rolling_beta, "Beta Móvel (60 dias) vs IBOVESPA", "Beta Móvel", CHART_SECONDARY, reference=1))
@@ -387,11 +429,11 @@ def analyze(payload: AnalyzeRequest, request: Request):
         universe = set(get_listed_stocks()["Ticker"])
     except (OSError, ValueError) as exc:
         raise HTTPException(503, f"Não foi possível carregar a lista de ações da B3: {exc}") from exc
-    if len(set(payload.tickers)) != len(payload.tickers) or any(ticker not in universe for ticker in payload.tickers):
-        raise HTTPException(422, "Selecione de 2 a 20 ações distintas da lista atual da B3.")
-    if any(ticker not in payload.tickers or shares < 0 for ticker, shares in payload.manual_shares.items()):
-        raise HTTPException(422, "Cotas devem ser inteiros não negativos dos ativos selecionados.")
-    tickers = [f"{ticker}.SA" for ticker in payload.tickers]
+    if len(set(payload.tickers)) != len(payload.tickers) or any(ticker not in universe and ticker not in ASSETS for ticker in payload.tickers):
+        raise HTTPException(422, "Selecione de 2 a 20 ativos distintos do catálogo.")
+    if any(ticker not in payload.tickers for ticker in payload.manual_shares):
+        raise HTTPException(422, "Informe quantidades apenas para os ativos selecionados.")
+    tickers = [price_symbol(ticker) for ticker in payload.tickers]
     required = [ticker for ticker in tickers if payload.manual_shares.get(ticker.removesuffix('.SA'), 0) > 0] if payload.strategy == "manual" else tickers
     if not required:
         raise HTTPException(422, "A alocação manual precisa ter ao menos uma cota positiva.")
@@ -481,11 +523,12 @@ def restore_portfolio(ctx, target, revision):
         tickers = [str(ticker).removesuffix('.SA').strip().upper() for ticker in saved_tickers]
         if tickers != selection or len(tickers) < (2 if target == "simulation" else 1):
             raise HTTPException(422, "Não há carteira salva válida para restaurar.")
-        generation = begin(ctx, "portfolio", revision)
+        generation = begin(ctx, "portfolio", revision, keep_portfolio=True)
     weights = restored_weights(tickers, saved, target)
     prices, returns = pd.DataFrame(), pd.DataFrame()
     if target == "simulation":
-        prices, returns = history([f"{ticker}.SA" for ticker in tickers], date.today() - timedelta(days=730))
+        active = [price_symbol(ticker) for ticker, weight in weights.items() if weight > 0]
+        prices, returns = history(active, date.today() - timedelta(days=730))
     # The saved record stores only tickers and weights, so the original strategy and lookback are unknown.
     mode = restored_mode(tickers, saved, target)
     identifier = uuid.uuid4().hex
@@ -506,7 +549,10 @@ def refresh(payload: RefreshRequest, request: Request):
     with ctx.lock:
         begin(ctx, "portfolio", ctx.revision)
         ctx.restored = False
-    for provider in (get_portfolio_prices, get_portfolio_trade_prices, get_benchmark_prices, get_selic_rate, get_cdi_daily_rates):
+    for provider in (
+        get_treasury_history, get_portfolio_prices, get_portfolio_trade_prices,
+        get_benchmark_prices, get_selic_rate, get_cdi_daily_rates,
+    ):
         provider.clear()
     return {"message": "Cotações atualizadas. Clique em Carregar portfólio para recalcular a análise. A Simulação também precisará da análise recarregada."}
 
@@ -528,7 +574,7 @@ def stress(identifier: str, payload: StressRequest, request: Request):
     snapshot = artifact(ctx, "portfolio", identifier)
     if not snapshot.result.get("benchmark_available"):
         raise HTTPException(422, "Stress test indisponível enquanto o IBOVESPA não responder.")
-    weights = {f"{ticker}.SA": weight for ticker, weight in snapshot.weights.items()}
+    weights = {price_symbol(ticker): weight for ticker, weight in snapshot.weights.items()}
     active = [ticker for ticker, weight in weights.items() if weight > 0]
     prices = snapshot.prices.reindex(columns=active)
     start = date.today() - timedelta(days=snapshot.lookback_days)
@@ -569,8 +615,11 @@ def trades_csv(identifier: str, request: Request):
         raise HTTPException(404, "Sugestão de compra indisponível para esta análise.")
     def percent(value):
         return None if value is None else round(value * 100, 2)
+    mixed = any(ticker in ASSETS for ticker in snapshot.tickers)
+    price_header = "Preço de referência (R$)" if mixed else "Preço bruto de fechamento (R$)"
+    date_header = "Data do preço de referência" if mixed else "Data da cotação bruta"
     frame = pd.DataFrame([{
-        "Ativo": row["ticker"], "Preço bruto de fechamento (R$)": row["price"], "Data da cotação bruta": row["quote_date"],
+        "Ativo": row["ticker"], price_header: row["price"], date_header: row["quote_date"],
         "Cotas a comprar": row["shares"], "Valor efetivo (R$)": row["effective_value"], "Valor sugerido (R$)": row["suggested_value"],
         "Peso sugerido (%)": percent(row["suggested_weight"]), "Peso efetivo (%)": percent(row["effective_weight"]),
     } for row in suggestions])

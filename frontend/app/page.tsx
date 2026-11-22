@@ -26,6 +26,11 @@ export default function HomePage() {
   const generation = useRef(0);
   const sectorGeneration = useRef(0);
   const analyzedRevision = useRef<number|null>(null);
+  const selection = session?.selection ?? [];
+  const equities = stocks.filter(stock => !stock.asset);
+  const nonEquityTickers = new Set(stocks.filter(stock => stock.asset).map(stock => stock.ticker));
+  const homeSelection = selection.filter(ticker => !nonEquityTickers.has(ticker));
+  const hasOtherAssets = selection.length !== homeSelection.length;
   const revision = useRef(session?.revision);
   revision.current = session?.revision;
   useEffect(() => {generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);},[session?.revision]);
@@ -47,7 +52,7 @@ export default function HomePage() {
     const request=generation.current;
     let active=true;
     currentAnalysis().then(saved => {
-      if(active && saved && request===generation.current && saved.revision===session?.revision && JSON.stringify(saved.requested_tickers)===JSON.stringify(session?.selection ?? []))setResult(saved);
+      if(active && saved && request===generation.current && saved.revision===session?.revision && JSON.stringify(saved.requested_tickers)===JSON.stringify(homeSelection))setResult(saved);
     }).catch(() => {});
     return () => {active=false;};
   },[]);
@@ -93,7 +98,7 @@ export default function HomePage() {
     if(!session)return;
     const gen=++generation.current;
     const rev=session.revision;
-    const tickers=[...session.selection];
+    const tickers = homeSelection;
     setRetryAction(action);setBusy(true);setError(null);setStale(false);
     if(action==="analyze")analyzedRevision.current=rev;
     if(action!=="consensus")setResult(null);
@@ -120,30 +125,30 @@ export default function HomePage() {
   async function favorite(ticker:string) {
     try {await toggleFavorite(ticker);} catch(exc) {setError((exc as Error).message);}
   }
-  const selection=session?.selection ?? [];
-  const ready=session && result && result.revision===session.revision && JSON.stringify(result.requested_tickers)===JSON.stringify(selection) ? result:null;
+  const ready=session && result && result.revision===session.revision && JSON.stringify(result.requested_tickers)===JSON.stringify(homeSelection) ? result:null;
   if(loading || !session) return <div className="desk">{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
-  const analyzeLabel=busy ? "Analisando…" : selection.length===1 ? "Analisar ação" : `Analisar ${selection.length} ações`;
-  const resultSlot = ready ? <HomeResults ready={ready} selection={selection} busy={busy} onRefreshConsensus={()=>void run("consensus")}/> : <Pane title="Resultados da análise" area="res" className="pane-idle">
-    {busy ? <Loading>Buscando indicadores, comparação setorial e consensos de {selection.join(", ")}…</Loading>
+  const analyzeLabel=busy ? "Analisando…" : homeSelection.length===1 ? "Analisar ação" : `Analisar ${homeSelection.length} ações`;
+  const resultSlot = ready ? <HomeResults ready={ready} selection={homeSelection} busy={busy} onRefreshConsensus={()=>void run("consensus")}/> : <Pane title="Resultados da análise" area="res" className="pane-idle">
+    {busy ? <Loading>Buscando indicadores, comparação setorial e consensos de {homeSelection.join(", ")}…</Loading>
       : error ? null
       : <Idle>{stale ? "A seleção mudou. Analise de novo para atualizar os indicadores." : "Indicadores, saúde financeira e preços-alvo aparecem aqui após a análise."}</Idle>}
-    {error && <Notice tone="negative">{error}<button disabled={busy} onClick={()=>void (selection.length ? run(retryAction) : suggestions(sectors).then(setSuggested).catch(exc=>setError(exc.message)))}>Tentar novamente</button></Notice>}
+    {error && <Notice tone="negative">{error}<button disabled={busy} onClick={()=>void (homeSelection.length ? run(retryAction) : suggestions(sectors).then(setSuggested).catch(exc=>setError(exc.message)))}>Tentar novamente</button></Notice>}
   </Pane>;
   return <div className={`desk desk-home${ready ? " is-analyzed":""}`}>
     <Monitor selection={selection} stocks={stocks} watchlist={session.watchlist} ready={ready} busy={busy || sectorBusy}
-      analyze={<button type="button" className="primary" disabled={busy || sectorBusy || !selection.length} aria-busy={busy} onClick={()=>void run()}>{analyzeLabel}</button>}
+      analyze={homeSelection.length > 0 && <button type="button" className="primary" disabled={busy || sectorBusy} aria-busy={busy} onClick={()=>void run()}>{analyzeLabel}</button>}
       onQuick={ticker=>void startQuickAnalysis(ticker)} onFavorite={ticker=>void favorite(ticker)}
       onAdd={ticker=>{if(selection.length<MAX_SELECTION)void changeSelection(current=>Array.from(new Set([...current,ticker])));}}
       onRemove={ticker=>void changeSelection(current=>current.filter(item=>item!==ticker))}
       notices={<>
-        {session.restored && <Notice>Seleção da carteira salva carregada. Revise e clique em Analisar.</Notice>}
-        {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ação(ões) da carteira salva não estão na lista B3 e foram removidas.</Notice>}
-        {session.restored && !!session.restoration?.truncated_count && <Notice>A seleção salva tinha {session.restoration.original_count} ações; carregamos as 20 primeiras válidas.</Notice>}
+        {hasOtherAssets && <Notice>Os indicadores desta página cobrem ações da B3. <Link href="/portfolio">Calcule a carteira</Link> com todos os ativos selecionados.</Notice>}
+        {session.restored && <Notice>Seleção da carteira salva carregada. Confira os ativos selecionados.</Notice>}
+        {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ativo(s) da carteira salva estavam fora do catálogo.</Notice>}
+        {session.restored && !!session.restoration?.truncated_count && <Notice>A seleção salva tinha {session.restoration.original_count} ativos, dos quais carregamos os primeiros 20 disponíveis.</Notice>}
         {ready && !!ready.missing_tickers.length && <Notice tone="warning">Fundamentus indisponível para {ready.missing_tickers.join(", ")}.</Notice>}
       </>}/>
     {resultSlot}
-    <SectorMap stocks={stocks} selection={selection} busy={busy || sectorBusy} active={sectors} available={suggested?.count ?? stocks.length} onSector={sector=>void changeSectors([sector])} onAdd={ticker=>{if(selection.length<MAX_SELECTION)void changeSelection(current=>Array.from(new Set([...current,ticker])));}} onReset={()=>void changeSectors([])}
+    <SectorMap stocks={equities} selection={selection} busy={busy || sectorBusy} active={sectors} available={suggested?.count ?? equities.length} onSector={sector=>void changeSectors([sector])} onAdd={ticker=>{if(selection.length<MAX_SELECTION)void changeSelection(current=>Array.from(new Set([...current,ticker])));}} onReset={()=>void changeSectors([])}
       onRefresh={()=>void run("source")}
       note={notice ? <Notice tone="positive">{notice}{sectorUndo && <> <button type="button" onClick={()=>void undoSectorChange()}>Desfazer</button></>}</Notice> : sectorBusy ? <Loading>Ordenando ações do setor por liquidez…</Loading> : null}/>
     <Macro/>

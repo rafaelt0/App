@@ -17,6 +17,7 @@ from utils.charts import (
     CHART_PRIMARY_LIGHT, CHART_PRIMARY_TRACE, CHART_TEXT,
     apply_plotly_theme,
 )
+from utils.assets import price_symbol
 from utils.portfolio_data import daily_returns, get_portfolio_prices
 from utils.simulation import annualized_log_return_stats, bootstrap_terminal_values, simulate_portfolio
 
@@ -59,7 +60,7 @@ def calibration_sample(portfolio, calibration, today):
         _invalid("Os pesos analisados devem ser finitos, não negativos e somar um valor positivo.")
     normalized = raw / total
     active = raw > 0
-    columns = [f"{ticker}.SA" for ticker, included in zip(tickers, active) if included]
+    columns = [price_symbol(ticker) for ticker, included in zip(tickers, active) if included]
     weights = normalized[active]
     returns = portfolio.returns
     if calibration != "portfolio":

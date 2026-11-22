@@ -1,11 +1,11 @@
 # B3Lab
 
-B3Lab analisa ações brasileiras com uma interface React em Next.js e uma API Python em FastAPI. Os cálculos financeiros continuam em Python. A interface usa o sistema visual fintech-neutral definido em `DESIGN.md`.
+B3Lab analisa fundamentos de ações brasileiras e carteiras com várias classes de ativos. Usa uma interface React em Next.js e uma API Python em FastAPI. Os cálculos financeiros continuam em Python. A interface usa o sistema visual fintech-neutral definido em `DESIGN.md`.
 
 ## Funcionalidades
 
 - **Fundamentos.** Seleção por empresa e setor, indicadores do Fundamentus, endividamento, comparação setorial, favoritos e consenso de preços-alvo do Yahoo Finance. A seleção exige a ação **Analisar** antes de buscar os detalhes.
-- **Portfólio.** Mínima volatilidade, Markowitz com regularização L2, HRP e cotas manuais. Inclui alocação, estimativa de compra por cotas, fronteira eficiente, desempenho histórico, retornos mensais, Sharpe, Sortino, drawdown, beta, alpha, VaR diário, concentração, regime recente e crises históricas. A ação **Carregar portfólio** libera as análises seguintes.
+- **Portfólio.** Combine ações da B3 com um catálogo inicial de ações americanas, FIIs, ETFs brasileiros e americanos, títulos do Tesouro Direto e REITs. Mínima volatilidade, Markowitz com regularização L2, HRP e cotas manuais. Inclui alocação, estimativa de compra por cotas, fronteira eficiente, desempenho histórico, retornos mensais, Sharpe, Sortino, drawdown, beta, alpha, VaR diário, concentração, regime recente e crises históricas. A ação **Carregar portfólio** libera as análises seguintes.
 - **Simulação.** De 10 a 3.000 trajetórias, com até 10 anos de horizonte. Compara o modelo normal multivariado com a reamostragem conjunta dos dias históricos. Mostra trajetórias, percentis, distribuição final, sensibilidade da calibração e média da cauda inferior. P5 não é VaR nem perda máxima. Alterar o número de trajetórias exibidas não executa novamente os modelos.
 - **Notícias.** Feeds brasileiros dos últimos sete dias, até dez notícias por ativo, deduplicação, classificação com Jev via API e fallback léxico identificado. Filtros e paginação não alteram a nota ponderada da amostra completa. A nota mede tom textual, não retorno esperado.
 - **Screener.** Sete pontos de partida, critérios opcionais, ordenação, escolha de colunas, favoritos e envio de ativos para a análise fundamentalista. Os dados vêm do Fundamentus.
@@ -26,7 +26,9 @@ python run.py
 
 Abra http://localhost:3000. O comando inicia o Next.js e a API privada em http://127.0.0.1:8000. Ao encerrar o comando, os dois processos terminam.
 
-A lista de ações é local. Fundamentus, Yahoo Finance, Banco Central, Google News e a API do Jev precisam de acesso à rede. A indisponibilidade de uma fonte aparece na interface. O fallback léxico não se apresenta como Jev.
+A lista de ativos é local. Fundamentus, Yahoo Finance, Tesouro Transparente, Banco Central, Google News e a API do Jev precisam de acesso à rede. A indisponibilidade de uma fonte aparece na interface. O fallback léxico não se apresenta como Jev.
+
+A carteira e a simulação usam reais. As cotações americanas entram com o câmbio USD/BRL do Yahoo Finance. Na série histórica, dias sem cotação usam o último câmbio publicado em até quatro dias corridos. A estimativa de compra usa o câmbio da data da cotação. Para os títulos sem cupons do catálogo (Selic, Prefixado e IPCA+), os retornos usam o PU Base Manhã e as estimativas de compra usam o PU Compra Manhã, em frações de 0,01 título. O catálogo inclui vencimentos identificados por código fixo e a simulação reamostra retornos históricos sem modelar resgate ou reinvestimento no vencimento. [Histórico oficial de preços e taxas](https://www.tesourotransparente.gov.br/ckan/dataset/taxas-dos-titulos-ofertados-pelo-tesouro-direto).
 
 Exporte `TYPESAFE_API_KEY` no ambiente antes de iniciar a aplicação. O backend envia o título e até 12.000 caracteres do texto combinado à [API TypeSafe](https://docs.typesafe.ai/api), usando `jev-latest`. Probabilidades positivas menos negativas produzem o score. Resultados válidos ficam em cache por uma hora; falhas usam o léxico e suspendem novas chamadas por cinco minutos na sessão. “Atualizar notícias” libera nova tentativa imediatamente.
 

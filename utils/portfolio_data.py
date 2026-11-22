@@ -8,7 +8,9 @@ import time
 import numpy as np
 import pandas as pd
 import requests
+from utils.assets import is_treasury, is_us_asset
 from utils.cache import cache_data
+from utils.treasury_data import treasury_prices
 from utils.market_data import YFINANCE_REQUEST_LOCK
 import yfinance as yf
 from bcb import sgs
@@ -183,21 +185,77 @@ def historical_var_cvar(returns, confidence=0.95):
     return var, float(tail.mean())
 
 
+_USD_BRL = "BRL=X"
+_FX_MAX_AGE = datetime.timedelta(days=4)
+
+
+def _portfolio_closes(symbols, start_date, adjusted):
+    treasury = tuple(symbol for symbol in symbols if is_treasury(symbol))
+    listed = tuple(symbol for symbol in symbols if not is_treasury(symbol))
+    american = [symbol for symbol in listed if is_us_asset(symbol)]
+    if not treasury and not american:
+        close = _download_close(listed, start_date, auto_adjust=adjusted)
+        return close.to_frame(name=listed[0]) if not adjusted and isinstance(close, pd.Series) else close
+
+    treasury_close = pd.DataFrame()
+    if treasury:
+        try:
+            treasury_close = treasury_prices(treasury, start_date, adjusted)
+        except Exception:
+            if adjusted or not listed:
+                raise
+            logger.warning("Tesouro Transparente purchase prices unavailable", exc_info=True)
+    if not listed:
+        return treasury_close
+
+    yahoo_symbols = (*listed, _USD_BRL) if american else listed
+    download_start = pd.Timestamp(start_date).date() - _FX_MAX_AGE if american and adjusted else start_date
+    try:
+        close = _download_close(yahoo_symbols, download_start, auto_adjust=adjusted)
+    except Exception:
+        if adjusted or not treasury:
+            raise
+        logger.warning("Yahoo Finance purchase prices unavailable", exc_info=True)
+        return treasury_close.reindex(columns=symbols)
+    if isinstance(close, pd.Series):
+        close = close.to_frame(name=listed[0])
+    exchange = close.reindex(columns=listed).dropna(how="all")
+    prices = pd.concat([exchange, treasury_close], axis=1).sort_index()
+    if american:
+        fx_source = close.reindex(columns=[_USD_BRL])[_USD_BRL]
+        fx_source = fx_source.loc[fx_source.gt(0) & fx_source.lt(float("inf"))].sort_index()
+        usd_prices = prices[american]
+        if adjusted:
+            # Mark the last USD close in reais on days when only the local market trades.
+            usd_prices = usd_prices.ffill().where(usd_prices.bfill().notna())
+            # The FX feed can be closed while US equities trade. Value with the last
+            # published FX within a long holiday weekend, and surface longer gaps.
+            fx = fx_source.reindex(prices.index, method="ffill", tolerance=_FX_MAX_AGE)
+            coverage_gaps = usd_prices.loc[fx.isna() & (prices.index >= pd.Timestamp(start_date))].dropna(how="all")
+            if not coverage_gaps.empty:
+                affected = ", ".join(coverage_gaps.columns[coverage_gaps.notna().any()])
+                dates = ", ".join(f"{day:%d/%m/%Y}" for day in coverage_gaps.index[:5])
+                remainder = f" (+{len(coverage_gaps) - 5} datas)" if len(coverage_gaps) > 5 else ""
+                raise ValueError(f"Câmbio USD/BRL indisponível para {affected} em {dates}{remainder}")
+        else:
+            fx = fx_source.reindex(prices.index)
+        prices[american] = usd_prices.mul(fx, axis=0)
+        prices = prices.loc[prices.index >= pd.Timestamp(start_date)]
+    return prices.reindex(columns=symbols)
+
+
 @cache_data(ttl=3600)
 def get_portfolio_prices(tickers_yf, start_date):
-    return _download_close(tickers_yf, start_date)
+    return _portfolio_closes(tickers_yf, start_date, adjusted=True)
 
 
 @cache_data(ttl=900)
 def get_portfolio_trade_prices(tickers_yf):
-    """Fetch recent unadjusted closes for share-count estimates, not returns."""
+    """Fetch recent purchase references in reais, independently of adjusted returns."""
     if not tickers_yf:
         return pd.DataFrame()
     start_date = datetime.date.today() - datetime.timedelta(days=14)
-    prices = _download_close(tickers_yf, start_date, auto_adjust=False)
-    if isinstance(prices, pd.Series):
-        prices = prices.to_frame(name=tuple(tickers_yf)[0])
-    return prices
+    return _portfolio_closes(tickers_yf, start_date, adjusted=False)
 
 
 @cache_data(ttl=3600)
@@ -247,11 +305,12 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
         return []
     portfolio_prices = portfolio_prices.loc[:, active_columns]
 
-    benchmark_returns = (
-        daily_returns(benchmark_prices)
-        if benchmark_prices is not None and not benchmark_prices.empty
+    benchmark_closes = (
+        benchmark_prices.dropna()
+        if benchmark_prices is not None
         else pd.Series(dtype=float, index=pd.DatetimeIndex([]))
     )
+    benchmark_returns = daily_returns(benchmark_closes)
     results = []
     for name, (start, end) in crises.items():
         start, end = pd.Timestamp(start), pd.Timestamp(end)
@@ -275,9 +334,16 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
         portfolio_return = (
             1 + period_returns.dot(aligned_weights / weight_sum)
         ).prod() - 1
+        base = period_prices.index[period_prices.index.get_loc(period_returns.index[0]) - 1]
+        last = period_returns.index[-1]
         period_benchmark = benchmark_returns.loc[
-            (benchmark_returns.index >= start) & (benchmark_returns.index <= end)
+            (benchmark_returns.index > base) & (benchmark_returns.index <= last)
         ]
+        benchmark_covers_window = (
+            len(period_benchmark) >= 5
+            and benchmark_closes.index[0] <= base
+            and benchmark_closes.index[-1] >= last
+        )
         results.append(
             {
                 "Crise": name,
@@ -287,7 +353,7 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
                 ),
                 "Portfólio": portfolio_return,
                 "IBOV": (1 + period_benchmark).prod() - 1
-                if len(period_benchmark) >= 5
+                if benchmark_covers_window
                 else None,
             }
         )
