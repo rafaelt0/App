@@ -4,8 +4,8 @@ services:
     runtime: docker
     plan: free
     branch: main
-    # Deep readiness through Next.js. The route reports 200 "starting" during the API's boot
-    # grace, because a 0.1-CPU instance imports the Python app in tens of seconds and Render
-    # restarts an instance after 60 seconds of failed checks.
+    # Deep readiness through Next.js. Only a fully serving app returns 200. During the API's
+    # boot the route returns 503 with a "starting" body, so Render never routes traffic to a
+    # half-ready instance and never mistakes a slow boot for a healthy one.
     healthCheckPath: /health
     autoDeploy: true

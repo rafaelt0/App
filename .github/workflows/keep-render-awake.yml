@@ -18,8 +18,8 @@ jobs:
             exit 0
           fi
           # A primeira requisição pode acordar o serviço; o Render leva até ~1 min.
-          # /health responde 503 quando a API ou o SQLite seguem indisponíveis; durante a
-          # inicialização ele responde 200 com {"status":"starting"}.
+          # /health responde 503 até a API e o SQLite estarem prontos; durante a inicialização
+          # o corpo vem com {"status":"starting"}.
           curl --fail --silent --show-error --location --retry 3 --retry-delay 20 \
             --max-time 120 --output /dev/null --write-out "HTTP %{http_code} em %{time_total}s\n" \
             "${B3LAB_URL%/}/health"
