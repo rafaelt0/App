@@ -2,11 +2,11 @@ import type { PlotFigure } from "../components/Chart";
 
 export type Strategy = "min_volatility" | "markowitz" | "hrp" | "manual";
 export type Signal = "positive" | "negative" | "warning" | "neutral" | "info";
-export const strategies: { value: Strategy; label: string }[] = [
-  { value: "min_volatility", label: "Otimização de Mínima Volatilidade" },
-  { value: "markowitz", label: "Otimização de Markowitz (Média-Variância)" },
-  { value: "hrp", label: "Otimização Hierarchical Risk Parity (HRP)" },
-  { value: "manual", label: "Alocação Manual" },
+export const strategies: { value: Strategy; label: string; description: string }[] = [
+  { value: "min_volatility", label: "Mínima volatilidade", description: "Busca a combinação com a menor oscilação estimada." },
+  { value: "markowitz", label: "Markowitz (média-variância)", description: "Equilibra o retorno estimado e o risco. Você pode ajustar a diversificação." },
+  { value: "hrp", label: "Paridade de risco (HRP)", description: "Agrupa ações que tendem a oscilar juntas para distribuir o risco." },
+  { value: "manual", label: "Alocação manual", description: "Calcula os pesos pelo valor de mercado das quantidades informadas." },
 ];
 export interface PortfolioInputs {
   strategy: Strategy; capital: number; lookback_days: number;

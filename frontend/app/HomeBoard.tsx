@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MAX_SELECTION, type Stock } from "../components/AppProvider";
 import { Change, stripQuote, tickerColor, useMarket } from "../components/Shell";
 import StockLogo from "../components/StockLogo";
-import { formatBrasilia, formatCompactValue, formatValue, Loading, Notice, Pane, relativeAge, ScrollX, useMedia, ValueText } from "../components/ui";
+import { formatBrasilia, formatCompactValue, formatValue, Loading, Notice, Pane, relativeAge, ScrollX, ValueText } from "../components/ui";
 import { quickTickers, universeChanges, type HomeResult, type UniverseChanges } from "../lib/home";
 import { loadMarketNews, type MarketNews } from "../lib/marketNews";
 import { nestedSquarify } from "../lib/treemap";
@@ -32,18 +32,21 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
   const units = new Map(ready?.comparison_indicators.map(item => [item.key, item.unit]) ?? []);
   const liquid = stocks.filter(stock => stock.liquidity !== null).sort((a, b) => (b.liquidity ?? 0) - (a.liquidity ?? 0));
   const starters = liquid.length ? liquid.slice(0, 14) : quickTickers.map(ticker => byTicker.get(ticker)).filter((stock): stock is Stock => !!stock);
-  const narrow = useMedia("(max-width: 900px)");
   const [showAll, setShowAll] = useState(false);
-  // On phones the starter list stops at six rows so the explanation and the sector map stay within reach.
-  const shownStarters = narrow && !showAll ? starters.slice(0, 6) : starters;
+  const shownStarters = showAll ? starters : starters.slice(0, 6);
   const quote = (ticker: string) => {
     const item = stripQuote(strip, ticker);
     const company = companies.get(ticker);
     if (item) return { value: item.value as number | null, change: item.change, source: `Yahoo Finance com atraso, ${shortDate(item.as_of)}` };
     return { value: company?.market.price ?? null, change: null, source: company?.market.last_quote_date ? `Fundamentus, ${company.market.last_quote_date.split("-").reverse().join("/")}` : "Sem cotação no painel" };
   };
-  return <Pane title="Monitor" area="mon" className="pane-monitor" meta={`${selection.length}/${MAX_SELECTION}`} actions={analyze} flush>
+  return <Pane title="Seleção de ações" area="mon" className="pane-monitor" meta={`${selection.length} de ${MAX_SELECTION} ações`} actions={selection.length ? analyze : undefined} flush>
     {notices}
+    <div className="monitor-start">
+      <button type="button" className={selection.length ? undefined : "primary"} onClick={() => window.dispatchEvent(new Event("b3lab:focus-search"))}>{selection.length ? "Adicionar ações" : "Buscar ações"}</button>
+      {selection.length > 0 && !ready && <p>Use “Analisar” para consultar os indicadores da seleção.</p>}
+      {!selection.length && <p>Busque pelo código ou nome da empresa, ou escolha uma ação abaixo para analisar agora.</p>}
+    </div>
     {selection.length ? <ScrollX label="Ativos selecionados"><table className="grid monitor">
       <thead><tr><th scope="col">Ativo</th><th scope="col">Empresa</th><th scope="col" className="num">Últ. R$</th><th scope="col" className="num">Var.</th>
         {ready ? <><th scope="col" className="num">P/L</th><th scope="col" className="num">ROE</th><th scope="col" className="num">DY</th><th scope="col" className="num">52 sem.</th><th scope="col" className="num" title="Áreas favoráveis na síntese setorial">Sínt.</th><th scope="col">Setor</th></>
@@ -72,13 +75,12 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
         </tr>;
       })}</tbody>
     </table></ScrollX> : <>
-      <p className="pane-lead">Seleção vazia. Busque com <kbd>Ctrl K</kbd> ou clique em um dos mais líquidos para analisar:</p>
-      <ScrollX label="Ativos mais líquidos"><table className="grid monitor is-quick"><caption className="visually-hidden">Ativos mais líquidos da lista B3</caption>
+      <ScrollX label="Ações para análise rápida"><table className="grid monitor is-quick"><caption className="visually-hidden">Ações para análise rápida</caption>
         <thead><tr><th scope="col">Ativo</th><th scope="col">Empresa</th><th scope="col" className="num" title="Volume financeiro médio diário em 2 meses">Liq. 2m</th><th scope="col" className="num">Últ.</th><th scope="col" className="num">Var.</th></tr></thead>
         <tbody>{shownStarters.map(stock => {
           const item = stripQuote(strip, stock.ticker);
-          return <tr key={stock.ticker} className="is-clickable" onClick={() => onQuick(stock.ticker)}>
-            <th scope="row"><button type="button" className="row-btn" disabled={busy} aria-label={`Analisar ${stock.ticker} agora`}><span className="tk"><StockLogo ticker={stock.ticker} company={stock.company} size={16} />{stock.ticker}</span></button></th>
+          return <tr key={stock.ticker} className="is-clickable" onClick={() => { if (!busy) onQuick(stock.ticker); }}>
+            <th scope="row"><button type="button" className="row-btn" disabled={busy} aria-label={`Analisar ${stock.ticker} agora`}><span className="tk"><StockLogo ticker={stock.ticker} company={stock.company} size={16} />{stock.ticker}</span><span aria-hidden="true">→</span></button></th>
             <td className="ell">{stock.company || "—"}</td>
             <td className="num">{stock.liquidity === null ? "—" : formatCompactValue(stock.liquidity, "money", 1)}</td>
             <td className="num">{item ? formatValue(item.value, "money") : <span className="muted">—</span>}</td>
@@ -86,7 +88,7 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
           </tr>;
         })}</tbody>
       </table></ScrollX>
-      {narrow && starters.length > 6 && <button type="button" className="more-rows" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? "Ver menos" : `Ver mais ${starters.length - 6} ativos líquidos`}</button>}
+      {starters.length > 6 && <button type="button" className="more-rows" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? "Mostrar menos ações" : `Ver mais ${starters.length - 6} ações`}</button>}
     </>}
     {watchlist.length > 0 && <>
       <h3 className="pane-sub">Favoritos</h3>
@@ -174,6 +176,7 @@ export function SectorMap({ stocks, selection, busy, active, available, onSector
       <label>Cor<select aria-label="Cor" value={colorBy} onChange={event => setColorBy(event.target.value as ColorBy)}>{Object.entries(colorOptions).map(([key, option]) => <option key={key} value={key}>{option.label}</option>)}</select></label>
       <label>Setor<select aria-label="Setor" value={only} onChange={event => setOnly(event.target.value)}><option value="">Todos os setores</option>{names.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
     </div>
+    <p className="map-help">Escolha uma ação para adicioná-la à seleção. O nome de um setor troca a seleção pelas ações mais líquidas daquele setor.</p>
     <div className="hmap" ref={map} role="group" aria-label={`Mapa de calor: área por ${sizeOptions[sizeBy].toLocaleLowerCase("pt-BR")}, cor por ${color.label.toLocaleLowerCase("pt-BR")}`}>
       {laid.map(sector => {
         const known = sector.key !== "Setor não informado";

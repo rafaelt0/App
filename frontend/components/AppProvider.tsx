@@ -32,7 +32,6 @@ type AppContext = {
 export const MAX_SELECTION = 20;
 export const SELECTION_FULL_MESSAGE = "Seleção cheia: remova um ativo para adicionar outro.";
 const Context = createContext<AppContext | null>(null);
-const tutorialKey = "b3lab:tutorial-seen";
 let bootstrap: Promise<{ session: Session; stocks: Stock[] }> | null = null;
 let liquidity: Promise<Record<string, number | null>> | null = null;
 
@@ -68,7 +67,6 @@ export default function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const checkedTutorial = useRef(false);
   const sessionRef = useRef<Session | null>(null);
   const queue = useRef(Promise.resolve());
   const enqueue = useCallback((operation: () => Promise<void>) => {
@@ -91,16 +89,6 @@ export default function AppProvider({ children }: { children: ReactNode }) {
       if (active) setStocks(current => current.map(stock => ({ ...stock, liquidity: values[stock.ticker] ?? null })));
     }).catch(() => {});
     return () => { active = false; };
-  }, [loading, error]);
-  useEffect(() => {
-    if (loading || error || checkedTutorial.current) return;
-    checkedTutorial.current = true;
-    try {
-      if (window.localStorage.getItem(tutorialKey) === "1") return;
-    } catch {
-      // The tutorial is still available when browser storage is disabled.
-    }
-    setTutorialOpen(true);
   }, [loading, error]);
   const refreshSession = useCallback(() => enqueue(async () => {
     accept(await api<Session>("/api/session"));
@@ -125,11 +113,6 @@ export default function AppProvider({ children }: { children: ReactNode }) {
   }
   function dismissTutorial() {
     setTutorialOpen(false);
-    try {
-      window.localStorage.setItem(tutorialKey, "1");
-    } catch {
-      // The current visit still remembers the dismissal.
-    }
   }
   let content = children;
   if (loading) content = <Welcome />;

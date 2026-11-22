@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Chart, { type PlotFigure } from "../../components/Chart";
 import { useApp } from "../../components/AppProvider";
-import Link from "next/link";
 import { formatBrasilia, formatPercent, formatValue, Loading, Metrics, Notice, Pane, relativeAge, Table } from "../../components/ui";
 import { tickerColor } from "../../components/Shell";
-import { ElapsedLoading } from "../../components/PortfolioParts";
+import { ElapsedLoading, PortfolioRequired } from "../../components/PortfolioParts";
 import "./news.css";
 import { api } from "../../lib/api";
 import { filterArticles, initialFilters, intensityLevels, safeNewsLink, sortModes } from "../../lib/news";
@@ -150,45 +149,43 @@ export default function NewsPage() {
   const stale = !!snapshot && Date.now() - Date.parse(snapshot.as_of) > staleAfterMs;
   const activeFilters = (["ticker", "sentiment", "intensity"] as const).filter(key => filters[key] !== initialFilters[key]);
   const examples = [["10:42", "Exemplo: manchete otimista sobre resultado trimestral", "positive"], ["09:15", "Exemplo: manchete neutra sobre agenda da empresa", "neutral"], ["08:03", "Exemplo: manchete pessimista sobre revisão de guidance", "negative"]] as const;
-  // Once the feed is in, phones show it first; the carteira and filters fold below with a one-line recap.
-  return <div className={`desk desk-split${snapshot ? " is-folded" : ""}`}>
+  if (bootstrapLoading || (busy && !session?.portfolio_ready)) return <div className="desk"><Loading>Recuperando a carteira…</Loading></div>;
+  if (!session?.portfolio_ready) return <>
+    {error && <Notice tone="negative">{error}</Notice>}
+    <PortfolioRequired count={session?.selection.length ?? 0}>
+      <details className="disclosure"><summary>Ver exemplo de lista de notícias</summary>
+        <div className="example">{examples.map(([time, title, tone]) => <div className="feed-row is-example" key={time}><time>{time}</time><span className="feed-tickers">ABCD3</span><span className={`feed-tone is-${tone}`}>{tone === "positive" ? "Otimista" : tone === "negative" ? "Pessimista" : "Neutro"}</span><span className="feed-score">—</span><div className="feed-body"><h3>{title}</h3></div></div>)}
+          <p>Cada notícia traz horário, ativos citados, avaliação do tom e link para a fonte.</p></div>
+      </details>
+    </PortfolioRequired>
+  </>;
+  return <div className="desk desk-split">
     <Pane title="Carteira e filtros" className="pane-params" narrowCollapsed={!!snapshot} meta={snapshot ? `${snapshot.tickers.length} ativos · ${activeFilters.length ? `${activeFilters.length} ${activeFilters.length === 1 ? "filtro" : "filtros"}` : "sem filtros"}` : undefined}>
-      {bootstrapLoading ? <Loading>Restaurando sessão…</Loading> : <>
-        {error && <Notice tone="negative">{error}</Notice>}
-        {!session?.portfolio_ready && !busy && <>
-          <p className="locked-title">{session?.selection.length ? "Atualize a carteira" : "Carteira não configurada"}</p>
-          <p className="pane-lead">{session?.selection.length ? "A seleção precisa de uma análise atual. Carregue a carteira antes de consultar as notícias." : "Configure e carregue a carteira para acompanhar os ativos e seus pesos."}</p>
-          <div className="param-run"><Link className="button-link primary" href="/portfolio"><kbd>F2</kbd> Ir para Carteira</Link></div>
-          <h3 className="pane-sub">O que aparece aqui</h3>
-          <ul className="plain-list"><li>Leitura por ativo: filtre por empresa, sentimento e intensidade.</li><li>Tom da carteira: síntese ponderada pelos pesos da alocação.</li><li>Fontes e cobertura: links, motor de análise e disponibilidade de cada feed.</li></ul>
-        </>}
-        {session?.portfolio_ready && <>
-          {snapshot && <ul className="weights" aria-label="Carteira e pesos">{snapshot.tickers.map((ticker, index) => <li key={ticker}><i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><b>{ticker}</b><span className="weights-track" aria-hidden="true"><span style={{ width: `${Math.min(1, snapshot.weights[ticker]) * 100}%` }} /></span><span className="weights-value">{formatPercent(snapshot.weights[ticker], 1)}</span></li>)}</ul>}
-          {snapshot && <p className="param-hint">Amostra {formatBrasilia(snapshot.as_of)} · {relativeAge(snapshot.as_of)}</p>}
-          {snapshot && <p className={`engine ${!snapshot.articles.length ? "is-none" : snapshot.model.lexicon_count ? "is-fallback" : ""}`}><span aria-hidden="true">●</span>{snapshot.articles.length ? engineSplit(snapshot.model, snapshot.articles.length) : "Sem notícias classificadas"}</p>}
-          <div className="param-run"><button className="primary" onClick={() => void execute(true)} disabled={busy}>{busy ? "Atualizando…" : "Atualizar notícias"}</button></div>
-          {snapshot && <>
-            <h3 className="pane-sub">Filtros do feed</h3>
-            <div className="param-group">
-              <label>Ativo<select value={filters.ticker} onChange={event => changeFilter("ticker", event.target.value)}><option value="Todos">Todos os ativos</option>{snapshot.tickers.map(ticker => <option key={ticker} value={ticker}>{ticker} ({snapshot.articles.filter(article => article.tickers.includes(ticker)).length})</option>)}</select></label>
-              <label>Ordenar por<select value={filters.sort} onChange={event => changeFilter("sort", event.target.value)}>{sortModes.map(sort => <option key={sort}>{sort}</option>)}</select></label>
-              <label>Sentimento<select value={filters.sentiment} onChange={event => changeFilter("sentiment", event.target.value)}><option>Todos</option><option value="Otimista">Otimistas</option><option value="Neutro">Neutras</option><option value="Pessimista">Pessimistas</option></select></label>
-              <label>Intensidade<select value={filters.intensity} onChange={event => changeFilter("intensity", event.target.value)}><option>Todos</option>{intensityLevels.filter(level => level !== "Evidência limitada" || snapshot.articles.some(article => !article.is_jev)).map(level => <option key={level}>{level}</option>)}</select></label>
-            </div>
-            {activeFilters.length > 0 && <div className="filter-chips" aria-label="Filtros ativos">
-              {activeFilters.map(key => <button type="button" className="chip" key={key} aria-label={`Remover filtro ${filterNames[key]}: ${filters[key]}`} onClick={() => changeFilter(key, initialFilters[key])}>{filterNames[key]}: {filters[key]} <span aria-hidden="true">×</span></button>)}
-              <button type="button" onClick={clearFilters}>Limpar filtros</button>
-            </div>}
-            <p className="param-hint">Filtros e “Ver mais” mudam só a lista; nota, gráfico e síntese não mudam.</p>
-            <details className="disclosure"><summary>Fontes e metodologia</summary><div>
-              <p>Até {snapshot.max_per_ticker} notícias únicas mais recentes por ativo nos últimos {snapshot.window_days} dias, antes dos filtros: {snapshot.articles.length} artigos únicos · {snapshot.summary.observation_count} observações artigo-ativo. Feeds indisponíveis: {failed.join(", ") || "nenhum"}.</p>
-              <p>A cobertura depende do Google News e dos feeds acessíveis. Sem texto acessível usamos descrição RSS ou título. Importância é triagem por palavras-chave, não materialidade. No léxico, menos de dois termos implica evidência limitada; essas notícias não entram na nota agregada.</p>
-            </div></details>
-          </>}
-        </>}
+      {snapshot && <ul className="weights" aria-label="Carteira e pesos">{snapshot.tickers.map((ticker, index) => <li key={ticker}><i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><b>{ticker}</b><span className="weights-track" aria-hidden="true"><span style={{ width: `${Math.min(1, snapshot.weights[ticker]) * 100}%` }} /></span><span className="weights-value">{formatPercent(snapshot.weights[ticker], 1)}</span></li>)}</ul>}
+      {snapshot && <p className="param-hint">Amostra {formatBrasilia(snapshot.as_of)} · {relativeAge(snapshot.as_of)}</p>}
+      {snapshot && <p className={`engine ${!snapshot.articles.length ? "is-none" : snapshot.model.lexicon_count ? "is-fallback" : ""}`}><span aria-hidden="true">●</span>{snapshot.articles.length ? engineSplit(snapshot.model, snapshot.articles.length) : "Sem notícias classificadas"}</p>}
+      <div className="param-run"><button className="primary" onClick={() => void execute(true)} disabled={busy}>{busy ? "Atualizando…" : "Atualizar notícias"}</button></div>
+      {snapshot && <>
+        <h3 className="pane-sub">Filtros do feed</h3>
+        <div className="param-group">
+          <label>Ativo<select value={filters.ticker} onChange={event => changeFilter("ticker", event.target.value)}><option value="Todos">Todos os ativos</option>{snapshot.tickers.map(ticker => <option key={ticker} value={ticker}>{ticker} ({snapshot.articles.filter(article => article.tickers.includes(ticker)).length})</option>)}</select></label>
+          <label>Ordenar por<select value={filters.sort} onChange={event => changeFilter("sort", event.target.value)}>{sortModes.map(sort => <option key={sort}>{sort}</option>)}</select></label>
+          <label>Sentimento<select value={filters.sentiment} onChange={event => changeFilter("sentiment", event.target.value)}><option>Todos</option><option value="Otimista">Otimistas</option><option value="Neutro">Neutras</option><option value="Pessimista">Pessimistas</option></select></label>
+          <label>Intensidade<select value={filters.intensity} onChange={event => changeFilter("intensity", event.target.value)}><option>Todos</option>{intensityLevels.filter(level => level !== "Evidência limitada" || snapshot.articles.some(article => !article.is_jev)).map(level => <option key={level}>{level}</option>)}</select></label>
+        </div>
+        {activeFilters.length > 0 && <div className="filter-chips" aria-label="Filtros ativos">
+          {activeFilters.map(key => <button type="button" className="chip" key={key} aria-label={`Remover filtro ${filterNames[key]}: ${filters[key]}`} onClick={() => changeFilter(key, initialFilters[key])}>{filterNames[key]}: {filters[key]} <span aria-hidden="true">×</span></button>)}
+          <button type="button" onClick={clearFilters}>Limpar filtros</button>
+        </div>}
+        <p className="param-hint">Filtros e “Ver mais” mudam só a lista; nota, gráfico e síntese não mudam.</p>
+        <details className="disclosure"><summary>Fontes e metodologia</summary><div>
+          <p>Até {snapshot.max_per_ticker} notícias únicas mais recentes por ativo nos últimos {snapshot.window_days} dias, antes dos filtros: {snapshot.articles.length} artigos únicos · {snapshot.summary.observation_count} observações artigo-ativo. Feeds indisponíveis: {failed.join(", ") || "nenhum"}.</p>
+          <p>A cobertura depende do Google News e dos feeds acessíveis. Sem texto acessível usamos descrição RSS ou título. Importância é triagem por palavras-chave, não materialidade. No léxico, menos de dois termos implica evidência limitada; essas notícias não entram na nota agregada.</p>
+        </div></details>
       </>}
     </Pane>
     <div className="board">
+      {error && <div className="span-12"><Notice tone="negative">{error} <button type="button" disabled={busy} onClick={() => void execute(true)}>Tentar novamente</button></Notice></div>}
       {snapshot && (failed.length > 0 || jevPaused || stale || snapshot.feeds.some(feed => feed.ok && !feed.recent_count)) && <div className="span-12 board-notes">
         {snapshot.feeds.map(feed => !feed.ok ? <Notice key={feed.ticker} tone="warning">Feed indisponível para {feed.ticker}; nenhum item foi usado na análise.</Notice> : !feed.recent_count ? <Notice key={feed.ticker}>Nenhuma notícia recente (7 dias) para {feed.ticker}.</Notice> : null)}
         {jevPaused && <Notice>Análise avançada indisponível; nova tentativa após {formatBrasilia(new Date(retryAt).toISOString(), false)}.</Notice>}
@@ -196,15 +193,6 @@ export default function NewsPage() {
         {failed.length > 0 && <Notice tone="warning">Alguns feeds falharam. <button onClick={() => void execute(true)} disabled={busy}>Tentar feeds novamente</button></Notice>}
       </div>}
       {busy && <Pane title="Notícias da carteira" className="span-12"><ElapsedLoading>Buscando as notícias dos seus ativos e avaliando o tom de cada uma. Pode levar até um minuto.</ElapsedLoading></Pane>}
-      {!snapshot && !busy && <>
-        <Pane title="Tom da carteira" className="span-12" meta="aguardando carteira">
-          <Metrics size="lg" items={["Nota do tom (/100)", "Cobertura do peso", "Otimistas", "Neutras", "Pessimistas"].map(label => ({ label, value: null }))} />
-        </Pane>
-        <Pane title="Feed de notícias" className="span-12" meta="aguardando carteira">
-          <div className="example">{examples.map(([time, title, tone]) => <div className="feed-row is-example" key={time}><time>{time}</time><span className="feed-tickers">ABCD3</span><span className={`feed-tone is-${tone}`}>{tone === "positive" ? "Otimista" : tone === "negative" ? "Pessimista" : "Neutro"}</span><span className="feed-score">—</span><div className="feed-body"><h3>{title}</h3></div></div>)}
-            <p>Cada linha traz horário, ativos, tom, score de −1 a +1 e o link para o publicador. As notícias reais aparecem depois de carregar a carteira.</p></div>
-        </Pane>
-      </>}
       {snapshot && <>
         <Pane title="Tom da carteira" className="span-8" meta={snapshot.summary.label}>
           <Metrics size="lg" items={[

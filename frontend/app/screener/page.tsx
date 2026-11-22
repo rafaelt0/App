@@ -136,11 +136,12 @@ export default function ScreenerPage() {
   const columnCount=visible?.length ?? 0;
   const selectionSet=new Set(session.selection);
   return <div className="desk desk-split desk-screener">
-    <Pane title="Filtros" className="pane-params" narrowCollapsed meta={chips.length ? `${chips.length} ${chips.length===1 ? "critério ativo":"critérios ativos"}` : "nenhum critério"}>
-      <label>Ponto de partida<select value={config ? controls.preset:""} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config ? config.presets.map(item=><option key={item.name}>{item.name}</option>):<option value="">Carregando…</option>}</select></label>
+    <Pane title="Filtrar ações" className="pane-params" narrowCollapsed meta={chips.length ? `${chips.length} ${chips.length===1 ? "critério ativo":"critérios ativos"}` : "nenhum critério"}>
+      <label>Conjunto de filtros<select value={config ? controls.preset:""} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config ? config.presets.map(item=><option key={item.name}>{item.name}</option>):<option value="">Carregando…</option>}</select></label>
       {preset?.description && <p className="param-hint">{preset.description}</p>}
       <label>Ordenar resultados<select value={config ? sortKey(sort):""} disabled={!config} onChange={event=>{const [field,direction]=event.target.value.split(":");setSort({field,direction:direction as Sort["direction"]});}}>{config ? sortOptions.map(option=><option key={sortKey(option)} value={sortKey(option)}>{sortLabel(option)}</option>):<option value="">Carregando…</option>}</select></label>
-      <h3 className="pane-sub">Critérios</h3>
+      <h3 className="pane-sub">Critérios individuais</h3>
+      <p className="param-hint">Marque um critério para ajustar seu limite. A lista se atualiza conforme você altera os filtros.</p>
       <ul className="criteria">{criterionDefs.map(def=>{
         const enabled=controls[def.enabled];
         return <li key={def.key} data-active={enabled}>
@@ -149,14 +150,14 @@ export default function ScreenerPage() {
         </li>;
       })}</ul>
       <div className="param-run">
-        <button disabled={actionBusy} onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button>
+        <button disabled={actionBusy} onClick={()=>setControls({...defaults})}>Restaurar filtros iniciais</button>
         <button disabled={actionBusy} title="Limpa o cache Fundamentus e busca os dados de novo" onClick={()=>void sourceRefresh()}>{actionBusy ? "Atualizando…":"Atualizar dados Fundamentus"}</button>
       </div>
       {result && <>
         <details className="disclosure"><summary>Colunas ({columnCount} de {result.available_columns.length})</summary><fieldset className="column-picker"><legend className="visually-hidden">Indicadores na tabela</legend>{result.available_columns.map(column=><label key={column.key}><input type="checkbox" checked={visible?.includes(column.key) ?? false} onChange={event=>setVisible(current=>{const next=new Set(current ?? []);if(event.target.checked)next.add(column.key);else next.delete(column.key);return result.available_columns.map(item=>item.key).filter(key=>next.has(key));})}/>{column.label}</label>)}</fieldset></details>
         <details className="disclosure"><summary>Entenda os indicadores</summary><dl className="glossary">{result.available_columns.filter(column=>visible?.includes(column.key) && column.help).map(column=><div key={column.key}><dt>{column.label}</dt><dd>{column.help}</dd></div>)}</dl></details>
       </>}
-      <p className="param-hint">Resultados atualizam ao alterar os critérios. Fonte: Fundamentus, com atraso. Triagem, não recomendação de investimento.</p>
+      <p className="param-hint">Dados da Fundamentus, com atraso.</p>
     </Pane>
     <Pane title="Resultados" className="pane-screener" flush
       meta={result && !busy && !invalidCriteria ? <span role="status"><b className="scr-count">{result.matched_count}</b> de {result.total_count} · DY médio {formatValue(result.metrics.mean_dy,"percent",2)} · ROE médio {formatValue(result.metrics.mean_roe,"percent",2)}{result.fetched_at ? ` · coleta há ${result.age_minutes} min`:" · horário da coleta indisponível"}</span> : <span role="status">{error || invalidCriteria ? "Resultado indisponível":"Atualizando…"}</span>}
@@ -168,14 +169,14 @@ export default function ScreenerPage() {
       {undoSelection && <Notice tone="positive"><span className="scr-undo">{undoSelection.mode==="only" ? `Seleção substituída por ${undoSelection.ticker} (eram ${undoSelection.before.length} ativos).` : `${undoSelection.ticker} adicionada à seleção (${undoSelection.before.length+1}/${MAX_SELECTION}).`}</span><button disabled={actionBusy} onClick={()=>void undoOnly()}>Desfazer</button><Link className="button-link" href="/"><kbd>F1</kbd> Analisar no Início</Link></Notice>}
       {(busy || actionBusy || !config) && !error && <Loading>{actionBusy ? "Atualizando dados da Fundamentus…":"Carregando dados da B3…"}</Loading>}
       {error && <Notice tone="negative"><strong>Não foi possível exibir os resultados.</strong> {error}{!invalidCriteria && <button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button>}</Notice>}
-      {result && !invalidCriteria && (!result.matched_count ? <Idle action={<button className="primary" onClick={()=>setControls({...defaults})}>Redefinir para Explorar B3</button>}>Nenhuma ação encontrada. Reduza os limites ou desative critérios; dados ausentes não contam como aprovação.</Idle> : <>
+      {result && !invalidCriteria && (!result.matched_count ? <Idle action={<button className="primary" onClick={()=>setControls({...defaults})}>Restaurar filtros iniciais</button>}>Nenhuma ação atende a todos os critérios. Ajuste os limites ou remova filtros para ampliar a busca.</Idle> : <>
         <div className="scr-actionbar" data-selected={selectedCurrent ? "true":"false"} role="region" aria-label="Ação selecionada" aria-live="polite">
           {selectedCurrent ? <>
             <b>{selectedCurrent}</b><span className="muted ell">{stocks.find(stock=>stock.ticker===selectedCurrent)?.company ?? ""}</span>
             <button className="primary" disabled={actionBusy || selectionSet.has(selectedCurrent)} onClick={()=>void handoff("add")}>{selectionSet.has(selectedCurrent) ? "Já na seleção":"Adicionar à seleção"}</button>
-            <button disabled={actionBusy} onClick={()=>void handoff("only")}>Ver só este</button>
+            <button disabled={actionBusy} onClick={()=>void handoff("only")}>Manter só {selectedCurrent} na seleção</button>
             <button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favorito":"☆ Favoritar"}</button>
-          </> : <span className="muted">Clique em uma linha para adicionar à seleção · ↑↓ percorre · Enter adiciona · ✓ já está na seleção</span>}
+          </> : <span className="muted">Escolha uma ação na tabela para adicioná-la à seleção do B3Lab. O símbolo ✓ indica que ela já foi adicionada.</span>}
         </div>
         <ScrollX label="Ações que atendem aos critérios" className={`scr-scroll${busy ? " is-stale":""}`}>
           <ScreenerTable columns={result.available_columns.filter(column=>visible?.includes(column.key))} rows={result.rows} sort={sort} onSort={sortBy} selectedKey={selectedCurrent ?? undefined} onSelect={setSelected} onActivate={ticker=>{setSelected(ticker);void handoff("add",ticker);}} inSelection={selectionSet}/>

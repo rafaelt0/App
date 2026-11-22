@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
@@ -84,10 +83,10 @@ export default function PortfolioPage() {
       const tickers = handoffTickers(raw, new Set(stocks.map(stock => stock.ticker)));
       if (tickers.length) {
         setSelectionBusy(true);
-        setSelection(tickers).then(() => setNotice("Seleção carregada da análise de ativos. Confira os papéis e clique em Carregar portfólio.")).catch(exc => setError(String(exc.message ?? exc))).finally(() => setSelectionBusy(false));
+        setSelection(tickers).then(() => setNotice("Seleção carregada da análise de ativos. Confira os papéis e clique em Calcular carteira.")).catch(exc => setError(String(exc.message ?? exc))).finally(() => setSelectionBusy(false));
       }
     } else if (session.restored) {
-      setNotice("Carteira salva restaurada. Clique em Carregar portfólio para atualizar a análise.");
+      setNotice("Carteira salva restaurada. Clique em Calcular carteira para atualizar a análise.");
     }
   }, [session, stocks, setSelection]);
 
@@ -100,7 +99,7 @@ export default function PortfolioPage() {
       setStressResult(null);
       if (!analysisPending.current) setBusy(false);
       setStressBusy(false);
-      setNotice("A seleção mudou. Clique em Carregar portfólio para atualizar a análise.");
+      setNotice("A seleção mudou. Clique em Calcular carteira para atualizar a análise.");
     }
   }, [selectionKey, loadedSelection]);
 
@@ -180,7 +179,7 @@ export default function PortfolioPage() {
     if (!analysisPending.current) setBusy(false);
     setStressBusy(false);
     setSelectionBusy(true);
-    try { await setSelection(tickers); setNotice("Confira a seleção e clique em Carregar portfólio."); }
+    try { await setSelection(tickers); setNotice("Confira a seleção e clique em Calcular carteira."); }
     finally { setSelectionBusy(false); }
   }
 
@@ -220,34 +219,34 @@ export default function PortfolioPage() {
   const core = [["total_return", "Retorno Total", "percent"], ["volatility", "Volatilidade Anual", "percent"], ["sharpe", "Índice Sharpe", "ratio"], ["sortino", "Índice Sortino", "ratio"], ["max_drawdown", "Queda máxima (Max Drawdown)", "percent"]] as const;
   const extra = [["annual_return", "Retorno Anualizado", "percent"], ["beta", "Beta vs IBOV", "ratio"], ["annual_alpha", "Alpha Anual", "percent"], ["daily_var", "VaR Diário 95% (paramétrico normal)", "percent"], ["historical_var_95", "VaR Histórico 95% (diário)", "percent"], ["cvar_95", "CVaR 95% (diário)", "percent"], ["information_ratio", "Information Ratio (anualizado)", "ratio"]] as const;
   const sections: [string, string][] = activeResult ? [["pf-resumo", "Resumo"], ["pf-pesos", "Pesos"], ["pf-valor", "Valor"], ["pf-compra", "Compra"], ...(activeResult.charts.frontier ? [["pf-fronteira", "Fronteira"]] as [string, string][] : []), ...(activeResult.charts.drawdown ? [["pf-drawdown", "Drawdown"]] as [string, string][] : []), ["pf-mensal", "Mensal"], ...(activeResult.stress ? [["pf-stress", "Stress"]] as [string, string][] : []), ["pf-risco", "Risco"], ...(activeResult.charts.rolling_beta || activeResult.charts.rolling_sharpe ? [["pf-moveis", "Móveis"]] as [string, string][] : [])] : [];
-  // On narrow screens a run moves results above the parameters, which fold to a one-line recap.
+  // The compact setup header stays above results so it is easy to find and reopen.
   const folded = foldParams && (!!activeResult || busy || staleResult);
   const recap = [windowLabels[windowChoice] ?? `${inputs.lookback_days} dias`, strategyShort[inputs.strategy], formatValue(inputs.capital, "money", 0)].join(" · ");
-  const idle = (text: ReactNode) => <Idle>{text}</Idle>;
-  const waiting = count < 2 ? `Selecione ao menos 2 ativos (${count}/2) pela busca, Ctrl+K.` : busy ? "Calculando…" : "Pressione Carregar portfólio para calcular pesos, risco e retorno.";
 
-  return <div className={`desk desk-split${folded ? " is-folded" : ""}`}>
-    <Pane title="Parâmetros" className="pane-params" meta={folded && narrow ? recap : `${count}/20 ativos`} narrowCollapsed={folded}>
+  return <div className="desk desk-split">
+    <Pane title="Configurar carteira" className="pane-params" meta={folded && narrow ? recap : `${count}/20 ativos`} narrowCollapsed={folded}>
       <div className="param-group">
         <h3 className="pane-sub">Ativos da carteira</h3>
         {count ? <ol className="asset-list">{session.selection.map((ticker, index) => <li key={ticker}>
           <i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><b>{ticker}</b><span>{companies.get(ticker) ?? "Fora da lista B3"}</span>
           <button type="button" className="icon-btn" disabled={selectionBusy} aria-label={`Remover ${ticker}`} onClick={() => void changeSelection(session.selection.filter(item => item !== ticker))}>×</button>
-        </li>)}</ol> : <p className="pane-lead">Nenhum ativo selecionado.</p>}
-        <button type="button" className="ghost-add" onClick={() => window.dispatchEvent(new Event("b3lab:focus-search"))}>+ Adicionar ativo <kbd>Ctrl K</kbd></button>
+        </li>)}</ol> : null}
+        {count < 2 && <p className="pane-lead">{count ? "Adicione mais uma ação para calcular a carteira." : "Adicione pelo menos duas ações para calcular a carteira."}</p>}
+        <button type="button" className={count < 2 ? "ghost-add primary" : "ghost-add"} onClick={() => window.dispatchEvent(new Event("b3lab:focus-search"))}>Buscar ações para a carteira</button>
       </div>
       <div className="param-group param-fields">
         <h3 className="pane-sub">Janela e capital</h3>
         <label>Período de análise<select disabled={busy} value={windowChoice} onChange={event => { const value = event.target.value; setWindowChoice(value); setInputs(previous => ({ ...previous, lookback_days: value === "custom" ? customDays : Number(value) })); }}>
           <option value="730">2 Anos (Padrão)</option><option value="365">1 Ano</option><option value="1095">3 Anos</option><option value="1825">5 Anos</option><option value="180">6 Meses</option><option value="custom">Personalizado (Dias)</option>
         </select></label>
-        {windowChoice === "custom" && <label>Dias de lookback<input type="number" disabled={busy} min={60} max={5000} step={10} value={customDays} onChange={event => { const days = Number(event.target.value); setCustomDays(days); setInputs(previous => ({ ...previous, lookback_days: days })); }} /></label>}
+        {windowChoice === "custom" && <label>Dias de histórico<input type="number" disabled={busy} min={60} max={5000} step={10} value={customDays} onChange={event => { const days = Number(event.target.value); setCustomDays(days); setInputs(previous => ({ ...previous, lookback_days: days })); }} /></label>}
         <label>Capital disponível (R$)<input type="number" disabled={busy} min={100} max={1000000} step={100} value={inputs.capital} onChange={event => setInputs(previous => ({ ...previous, capital: Number(event.target.value) }))} /></label>
         <p className="param-hint">Dados a partir de {new Date(Date.now() - inputs.lookback_days * 86400000).toLocaleDateString("pt-BR")} · dias corridos.</p>
         <h3 className="pane-sub">Estratégia</h3>
-        <label>Estratégia de alocação<select disabled={busy} value={inputs.strategy} onChange={event => setInputs(previous => ({ ...previous, strategy: event.target.value as Strategy }))}>{strategies.map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}</select></label>
+        <label>Estratégia de alocação<select disabled={busy} value={inputs.strategy} aria-describedby="strategy-help" onChange={event => setInputs(previous => ({ ...previous, strategy: event.target.value as Strategy }))}>{strategies.map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}</select></label>
+        <p id="strategy-help" className="param-hint">{strategies.find(strategy => strategy.value === inputs.strategy)?.description}</p>
         {inputs.strategy === "manual" && <>
-          <p className="param-hint">Pesos pelo valor de mercado das cotas informadas; o capital só entra no histórico de valor.</p>
+          <p className="param-hint">O capital informado serve para calcular o histórico de valor.</p>
           <div className="param-pairs">{session.selection.map(ticker => <label key={ticker}>Cotas de {ticker}<input type="number" disabled={busy} min={0} step={1} value={inputs.manual_shares[ticker] ?? 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>)}</div>
         </>}
         {inputs.strategy === "markowitz" && <>
@@ -258,10 +257,10 @@ export default function PortfolioPage() {
       {!manualValid && <Notice tone="warning">A alocação manual precisa ter ao menos uma cota positiva.</Notice>}
       {!validInputs && <Notice tone="warning">Confira os limites de capital, histórico, cotas inteiras e diversificação.</Notice>}
       <div className="param-run">
-        <button type="button" className="primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => { setFoldParams(true); void runAnalysis(); }}>{busy ? "Calculando…" : "Carregar portfólio"}</button>
-        <button type="button" disabled={selectionBusy} title="Limpa o cache de preços desta sessão e baixa as cotações de novo" onClick={() => void refreshQuotes()}>Rebaixar preços</button>
+        <button type="button" className="primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => { setFoldParams(true); void runAnalysis(); }}>{busy ? "Calculando…" : "Calcular carteira"}</button>
+        <button type="button" disabled={selectionBusy} title="Limpa o cache de preços desta sessão e baixa as cotações de novo" onClick={() => void refreshQuotes()}>Buscar preços novamente</button>
       </div>
-      <p className="param-hint">{loadedSelection === selectionKey ? "Parâmetros recalculam sozinhos após meio segundo sem edições. Trocar ativos exige Carregar portfólio." : "Trocar ativos ou parâmetros exige Carregar portfólio uma vez; depois, parâmetros recalculam sozinhos."}</p>
+      {loadedSelection === selectionKey && <p className="param-hint">Alterações de período, capital ou estratégia recalculam o resultado. Ao trocar as ações, calcule a carteira de novo.</p>}
       {sections.length > 0 && <nav className="jump" aria-label="Seções do resultado"><h3 className="pane-sub">Ir para</h3><ul>{sections.map(([id, label]) => <li key={id}><a href={`#${id}`}>{label}</a></li>)}</ul></nav>}
     </Pane>
     <div className={`board${activeResult ? "" : " is-preview"}`}>
@@ -271,14 +270,23 @@ export default function PortfolioPage() {
         {error && <Notice tone="negative">{error}</Notice>}
         {staleResult && <Notice>{validInputs && manualValid ? "Parâmetros alterados. A análise será atualizada em instantes." : "Parâmetros fora dos limites. O resultado anterior fica oculto até que sejam corrigidos."}</Notice>}
       </div>}
-      {!activeResult && <PortfolioPreview status={busy ? <ElapsedLoading>Baixando cotações e calculando alocação, risco e retorno…</ElapsedLoading> : idle(waiting)} />}
+      {!activeResult && <Pane title="Resultado da carteira" className="span-12">
+        {busy ? <ElapsedLoading>Baixando cotações e calculando alocação, risco e retorno…</ElapsedLoading> : <>
+          <Idle>Veja aqui a composição, o retorno e o risco depois de calcular a carteira.</Idle>
+          <details className="disclosure"><summary>Ver prévia dos resultados</summary><div className="board is-preview"><PortfolioPreview /></div></details>
+        </>}
+      </Pane>}
       {activeResult && <>
+        {(session.simulation_ready || session.portfolio_ready) && <div className="span-12 flow-links">
+          {session.simulation_ready && <Link className="button-link" href="/simulacao">Simular esta carteira <span aria-hidden="true">→</span></Link>}
+          {session.portfolio_ready && <Link className="button-link" href="/noticias">Ver notícias da carteira <span aria-hidden="true">→</span></Link>}
+        </div>}
         {narrow && <nav className="span-12" aria-label="Seções do resultado"><ul className="jump-strip">{sections.map(([id, label]) => <li key={id}><a href={`#${id}`}>{label}</a></li>)}</ul></nav>}
         {activeResult.warnings.length > 0 && <div className="span-12 board-notes">{activeResult.warnings.map((warning, index) => <Notice tone="warning" key={index}>{warning}</Notice>)}</div>}
         <Pane id="pf-resumo" title="Resumo de desempenho" className="span-12" meta={runFacts(activeResult).join(" · ")}>
           <Metrics size="lg" items={core.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, signed: key === "total_return", ...(key === "total_return" ? {} : { status: activeResult.metric_signal[key], classification: activeResult.metric_status[key] }), help: activeResult.metric_help[key], trend: key === "total_return" ? valueTrend(activeResult) : undefined }))} />
           {activeResult.benchmark_available ? <Metrics items={extra.map(([key, label, unit]) => ({ label, value: activeResult.metrics[key], unit, signed: key === "annual_return" || key === "annual_alpha", help: activeResult.metric_help[key] }))} />
-            : <Notice>Comparações que dependem do IBOVESPA ficam indisponíveis; as métricas próprias do portfólio continuam válidas. Rebaixe os preços quando o benchmark responder.</Notice>}
+            : <Notice>Comparação com o Ibovespa indisponível. Use “Buscar preços novamente” para tentar carregar o índice.</Notice>}
           <p className="pane-foot">{activeResult.saved ? "Carteira salva para esta sessão anônima; não é uma conta." : "A carteira não foi salva para esta sessão anônima."}{activeResult.sample.zero_excluded ? " Ativos com peso zero foram excluídos da amostra." : ""}</p>
         </Pane>
         <Pane id="pf-pesos" title="Pesos do portfólio" className="span-4" meta={activeResult.mode} actions={<ExportButton path={`/api/portfolio/${activeResult.id}/allocation.csv`}>CSV</ExportButton>}>
@@ -329,7 +337,6 @@ export default function PortfolioPage() {
         {activeResult.charts.rolling_sharpe && <Pane id={activeResult.charts.rolling_beta ? undefined : "pf-moveis"} title="Sharpe móvel 60d anualizado" className="span-6"><Chart figure={activeResult.charts.rolling_sharpe} height={240} /></Pane>}
         <div className="span-12 board-foot">
           <p>Fontes: {activeResult.source.adjusted_prices}; {activeResult.source.trade_quotes}; Selic: {activeResult.source.selic_source} ({(activeResult.source.selic_annual * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% a.a.); taxa livre de risco histórica: {activeResult.source.historical_rf}.</p>
-          <p>Próximo <Link href="/simulacao"><kbd>F3</kbd> Simulação</Link> projeta trajetórias Monte Carlo com estes pesos · <Link href="/noticias"><kbd>F4</kbd> Notícias</Link> lê o tom das notícias da carteira.</p>
         </div>
       </>}
     </div>
