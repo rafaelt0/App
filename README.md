@@ -4,11 +4,13 @@ B3Lab analisa ações brasileiras com uma interface React em Next.js e uma API P
 
 ## Funcionalidades
 
-- **Fundamentos.** Seleção por empresa e setor, indicadores do Fundamentus, endividamento, comparação setorial, favoritos e consenso de preços-alvo do Yahoo Finance. A busca da página carrega os indicadores ao escolher a primeira ação. Para comparar, adicione outros códigos e use **Comparar ações**.
+- **Análise de ativos.** Ações da B3 usam Fundamentus para indicadores e comparação setorial; ações dos EUA usam indicadores equivalentes quando o Yahoo Finance os fornece. FIIs e REITs mostram P/VP e rendimentos quando disponíveis; ETFs e BDRs mostram proventos, não múltiplos de empresas. Renda fixa listada, cripto, commodities e câmbio mostram dados de mercado, não fundamentos corporativos. Exposições modeladas (como CDI, CDB personalizado e Tesouro no modelo) mostram suas premissas, não cotações ou taxas de mercado.
 - **Portfólio.** Mínima volatilidade, Markowitz com regularização L2, HRP e cotas manuais. Inclui alocação, estimativa de compra por cotas, fronteira eficiente, desempenho histórico, retornos mensais, Sharpe, Sortino, drawdown, beta, alpha, VaR diário, concentração, regime recente e crises históricas. Escolha as ações na própria página. A ação **Calcular carteira** libera as análises seguintes.
 - **Simulação.** De 10 a 3.000 trajetórias, com até 10 anos de horizonte. Compara o modelo normal multivariado com a reamostragem conjunta dos dias históricos. Mostra trajetórias, percentis, distribuição final, sensibilidade da calibração e média da cauda inferior. P5 não é VaR nem perda máxima. Alterar o número de trajetórias exibidas não executa novamente os modelos.
 - **Notícias.** Feeds brasileiros dos últimos sete dias, até dez notícias por ativo, deduplicação, classificação com Jev via API e fallback léxico identificado. Filtros e paginação não alteram a nota ponderada da amostra completa. A nota mede tom textual, não retorno esperado.
-- **Screener.** Sete pontos de partida, critérios opcionais, ordenação, escolha de colunas, favoritos e acesso à análise fundamentalista junto ao código de cada ativo. Os dados vêm do Fundamentus.
+- **Screener.** Presets de ações B3 com dados do Fundamentus e filtros por classe no catálogo de referência. Valores do catálogo não são cotações ao vivo; valores monetários são exibidos e ordenados por moeda, sem conversão. Indicadores e critérios não aplicáveis à classe são omitidos.
+
+Exposições modeladas podem compor carteiras e simulações, mas suas séries não são cotações históricas. O B3Lab não estima compras em cotas para essas exposições nem para a classe de criptoativos, commodities e câmbio.
 
 As cinco exportações disponíveis são CSV de fundamentos, alocação, resumo da simulação, percentis por data e resultados completos do screener. Não há geração de relatório HTML.
 

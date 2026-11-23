@@ -29,7 +29,7 @@ export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey
     button?.focus();
     button?.closest("tr")?.scrollIntoView({ block: "nearest" });
   }
-  return <table className="grid scr-grid" aria-label="Ações que atendem aos critérios"><thead><tr>
+  return <table className="grid scr-grid" aria-label="Ativos que atendem aos critérios"><thead><tr>
     <th scope="col">Papel</th>
     {columns.map(column => {
       const active = sort.field === column.key;

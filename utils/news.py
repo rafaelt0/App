@@ -14,6 +14,8 @@ import unicodedata
 import urllib.parse
 import xml.etree.ElementTree as ET
 
+from utils.assets import asset_metadata
+
 
 # Use issuer names rather than ambiguous shorthand in Google News searches.
 TICKER_TO_COMPANY = {
@@ -298,14 +300,18 @@ def _ticker_aliases(ticker):
         return ()
     by_ticker, by_root = _listed_issuer_index()
     root = clean[:4]
-    aliases = {clean.lower(), *by_root.get(root, ())}
-    for alias in _ISSUER_ALIASES.get(root, ()):
+    aliases = {clean.lower()} if len(clean) > 2 else set()
+    if clean in by_ticker:
+        aliases.update(by_root.get(root, ()))
+    for alias in _ISSUER_ALIASES.get(root, ()) if clean in by_ticker or clean in TICKER_TO_COMPANY else ():
         aliases.add(_fold_text(alias))
-    company = TICKER_TO_COMPANY.get(clean)
+    company = TICKER_TO_COMPANY.get(clean) or asset_metadata(clean)["company"].split(" (")[0]
     empresa, _ = by_ticker.get(clean, ("", ""))
     for raw_name in (company, empresa):
         folded = _fold_text(raw_name)
         stripped = " ".join(re.sub(r"\b(?:s/a|s\.a\.?|sa|on|pn|pna|pnb|unt)\b", " ", folded).split())
+        if clean not in by_ticker:
+            stripped = re.sub(r"\b(?:corporation|corp|inc|ltd|reit)\.?$", "", stripped).strip()
         if stripped and stripped not in _GENERIC_ISSUER_WORDS and len(stripped) >= 3:
             aliases.add(stripped)
         words = [word for word in re.findall(r"[a-z0-9]+", stripped)
@@ -341,21 +347,25 @@ def is_relevant_company_news(ticker, title, summary=""):
         return False
     folded_summary = _fold_text(summary)
     combined = f"{folded_title} {folded_summary}".strip()
+    def ticker_mentioned(text):
+        if len(clean) > 2:
+            return _contains_term(text, clean.lower())
+        return bool(re.search(rf"\${re.escape(clean.lower())}\b|\({re.escape(clean.lower())}\)", text))
 
     # Reject comparative mentions such as "valendo 14 Petrobras" or "quer um Bradesco".
     for alias in _ticker_aliases(clean):
         if re.search(rf"\b(?:\d+|um|uma|novo|nova)\s+{re.escape(alias)}\b", folded_title):
-            if not _contains_term(folded_title, clean.lower()):
+            if not ticker_mentioned(folded_title):
                 return False
 
     aliases = _ticker_aliases(clean)
-    mentioned_in_title = any(_contains_alias(folded_title, alias) for alias in aliases)
-    ticker_in_summary = _contains_term(folded_summary, clean.lower())
+    mentioned_in_title = ticker_mentioned(folded_title) or any(_contains_alias(folded_title, alias) for alias in aliases)
+    ticker_in_summary = ticker_mentioned(folded_summary)
     if not mentioned_in_title and not ticker_in_summary:
         return False
 
     has_financial_context = (
-        _contains_term(combined, clean.lower())
+        ticker_mentioned(combined)
         or any(_contains_term(combined, term) for term in _FINANCIAL_CONTEXT_TERMS)
     )
     if any(_contains_term(combined, term) for term in _NON_ECONOMIC_HEADLINE_TERMS):
@@ -371,8 +381,8 @@ def is_relevant_company_news(ticker, title, summary=""):
 def build_news_query(ticker):
     """Search exact tickers and issuer names; unknown tickers stay ticker-only."""
     terms = [f'"{ticker}"']
-    company = TICKER_TO_COMPANY.get(ticker)
-    if company:
+    company = TICKER_TO_COMPANY.get(ticker) or asset_metadata(ticker)["company"].split(" (")[0]
+    if company != ticker:
         terms.append(f'"{company}"')
     return " OR ".join(terms)
 

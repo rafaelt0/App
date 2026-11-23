@@ -11,7 +11,7 @@ from pydantic import Field
 from backend.serialization import StrictModel, clean_json, csv_response
 from backend.state import artifact, begin, publish, session
 from utils.assets import (
-    ASSET_CLASSES, asset_metadata, get_extra_asset_fundamentals, get_full_universe,
+    ASSET_CLASSES, ASSET_INDICATORS, EQUITY_CLASSES, asset_metadata, get_extra_asset_fundamentals, get_full_universe,
     is_valid_asset_ticker, normalize_ticker, parse_fixed_income_asset, search_yahoo_assets,
 )
 from utils.formatting import extract_debt_metric, get_ev_ebitda_context
@@ -80,9 +80,12 @@ def recommendation(key, score):
     return "Compra forte" if value <= 1.5 else "Compra" if value <= 2.5 else "Manter" if value <= 3.5 else "Abaixo da média" if value <= 4.5 else "Venda"
 
 
-def consensus(tickers, refresh=False):
+def consensus(tickers, refresh=False, asset_classes=None):
     rows, failed, has_targets = [], [], False
     for ticker in tickers:
+        asset_class = asset_classes[ticker] if asset_classes is not None else asset_metadata(ticker)["asset_class"]
+        if asset_class not in EQUITY_CLASSES | {"reit"}:
+            continue
         if refresh:
             get_market_target_data.clear(ticker)
         market = get_market_target_data(ticker) or {}
@@ -175,20 +178,31 @@ def build_analysis(raw, peers, tickers, universe):
         present = ticker in latest.index
         row = latest.loc[ticker] if present else pd.Series(dtype=object)
         ind_row = indicator_frame.loc[ticker] if ticker in indicator_frame.index else pd.Series(dtype=object)
-        sector = str(row.get("Setor", "")) if pd.notna(row.get("Setor", "")) else ""
+        meta = asset_metadata(ticker, universe)
+        asset_class = row["Classe"] if pd.notna(row.get("Classe")) else meta["asset_class"]
+        source_name = row["Fonte"] if pd.notna(row.get("Fonte")) else "Fundamentus" if ticker in sector_lookup else None
+        sector = str(row["Setor"]) if pd.notna(row.get("Setor")) else meta["sector"]
+        applicable = ASSET_INDICATORS[asset_class]
         indicators, metric_groups, indicator_available = {}, {}, {}
         for key, source, label, unit, group, help_text in INDICATORS:
+            if key not in applicable:
+                continue
             value = numeric(ind_row.get(source))
             if value is not None and unit == "multiple":
                 value /= 100
-            if key in ("net_margin", "ebit_margin") and value == 0:
+            if source_name == "Fundamentus" and key in ("net_margin", "ebit_margin") and value == 0:
                 value = None  # Fundamentus prints 0,0% for banks and insurers, where margins do not apply
             indicators[key] = value
             negative_equity = indicators.get("pvp") is not None and indicators["pvp"] < 0
-            metric = indicator_metric(key, label, unit, help_text, value, sector, negative_equity)
+            if asset_class not in EQUITY_CLASSES:
+                if key == "dy":
+                    label, group, help_text = "Rendimento distribuído (12m)", "Rendimentos", "Proventos dos últimos 12 meses divididos pelo preço. Não representa retorno total ou futuro."
+                metric = {"label": label, "unit": unit, "value": value, "help": help_text, "classification": None, "status": "neutral"}
+            else:
+                metric = indicator_metric(key, label, unit, help_text, value, sector, negative_equity)
             metric_groups.setdefault(group, []).append(metric)
             indicator_available[key] = metric["value"] is not None
-        local_sector = sector_lookup.get(ticker, "")
+        local_sector = sector_lookup.get(ticker, "") if asset_class == "acao_br" else ""
         local_sector = local_sector.strip() if isinstance(local_sector, str) else ""
         synthesis = build_analyst_synthesis(peers, ticker, local_sector, universe)
         ranking = compute_sector_ranking(peers, ticker, local_sector, universe) if not peers.empty and local_sector else pd.DataFrame()
@@ -202,17 +216,21 @@ def build_analysis(raw, peers, tickers, universe):
                                 "unit": "percent" if is_percent else "multiple", "median": detail["Mediana Setor"] * (100 if is_percent else 1),
                                 "mean": detail["Média Setor"] * (100 if is_percent else 1), "observations": detail["Peers (n)"],
                                 "percentile": detail["Percentil"], "verdict": detail["Veredicto"], "category": detail["Categoria"]})
-        companies.append({"ticker": ticker, "available": present,
-                          "identity": {"company": row.get("Empresa"), "sector": sector or None, "subsector": row.get("Subsetor")},
+        companies.append({"ticker": ticker, "available": present, "asset_class": asset_class, "source": source_name,
+                          "fixed_income": row.get("fixed_income"),
+                          "identity": {"company": row.get("Empresa", meta["company"]), "sector": sector or None, "subsector": row.get("Subsetor")},
                           "market": {**{key: numeric(row.get(source)) for key, source in MARKET}, "last_quote_date": row.get("Data_ult_cot"),
-                                     "currency": str(row.get("Moeda") or "BRL") if pd.notna(row.get("Moeda")) else "BRL"},
+                                     "currency": str(row["Moeda"]) if pd.notna(row.get("Moeda")) else meta["currency"]},
                           "indicators": indicators, "indicator_available": indicator_available,
-                          "metric_groups": metric_groups, "indicators_available": ticker in indicator_frame.index,
-                          "health": health(row), "synthesis": {**synthesis, "sector": local_sector or sector or None, "details": details,
+                          "metric_groups": metric_groups, "indicators_available": any(indicator_available.values()),
+                          "health": health(row) if asset_class in EQUITY_CLASSES else {"metrics": [], "diagnostics": []},
+                          "synthesis": {**synthesis, "sector": local_sector or sector or None, "details": details,
                           "favorable_categories": sum(c["veredicto"] == "Favorável" for c in synthesis["categorias"].values())}})
+    shown = set().union(*(ASSET_INDICATORS[company["asset_class"]] for company in companies))
+    fund_yields = any(company["asset_class"] in {"fii", "reit", "etf"} for company in companies)
     return clean_json({"requested_tickers": tickers, "missing_tickers": [t for t in tickers if t not in latest.index],
-                       "companies": companies, "health_summary": HEALTH_SUMMARY, "comparison_indicators": [{"key": k, "label": label, "unit": unit} for k, _, label, unit, *_ in INDICATORS],
-                       "sources": {"fundamentals": "Fundamentus / Yahoo Finance / BCB", "peer_units": "fractions", "detail_percentages": "percentage_points", "detail_multiples": "ratio (scraper /100 correction)"}})
+                       "companies": companies, "health_summary": HEALTH_SUMMARY, "comparison_indicators": [{"key": key, "label": "Proventos / preço (12m)" if key == "dy" and fund_yields else label, "unit": unit} for key, _, label, unit, *_ in INDICATORS if key in shown],
+                       "sources": {"fundamentals": "Fundamentus / Yahoo Finance", "peer_units": "fractions", "detail_percentages": "percentage_points", "detail_multiples": "ratio (scraper /100 correction)"}})
 
 
 def _extra_fundamentals_frame(tickers: list[str]) -> pd.DataFrame:
@@ -231,6 +249,12 @@ def _extra_fundamentals_frame(tickers: list[str]) -> pd.DataFrame:
             "Empresa": data.get("company") or ticker,
             "Setor": data.get("sector") or "",
             "Subsetor": data.get("subsector") or "",
+            "Classe": data["asset_class"],
+            "Fonte": data["source"],
+            "fixed_income": data.get("fixed_income"),
+            "Remuneracao_modelo": (data.get("fixed_income") or {}).get("label"),
+            "Taxa_modelo": (data.get("fixed_income") or {}).get("rate"),
+            "Unidade_taxa_modelo": (data.get("fixed_income") or {}).get("unit"),
             "Moeda": data.get("currency") or "BRL",
             "Cotacao": data.get("price"),
             "Min_52_sem": data.get("low_52w"),
@@ -409,8 +433,8 @@ def analyze(body: HomeRequest, request: Request):
     try:
         universe_frame = get_listed_stocks()
         b3_set = set(universe_frame["Ticker"])
-        b3_tickers = [t for t in tickers if t in b3_set]
-        extra_tickers = [t for t in tickers if t not in b3_set]
+        b3_tickers = [ticker for ticker in tickers if ticker in b3_set and asset_metadata(ticker, universe_frame)["asset_class"] == "acao_br"]
+        extra_tickers = [ticker for ticker in tickers if ticker not in b3_tickers]
         frames = []
         if b3_tickers:
             try:
@@ -428,15 +452,28 @@ def analyze(body: HomeRequest, request: Request):
                 frames.append(extra_raw)
         raw = pd.concat(frames) if frames else pd.DataFrame()
         if raw is None or raw.empty:
-            raise HTTPException(503, "A Fundamentus não retornou dados para os ativos selecionados. Tente novamente.")
+            source = "A Fundamentus" if not extra_tickers else "A fonte de dados"
+            raise HTTPException(503, f"{source} não retornou dados para os ativos selecionados. Tente novamente.")
         peers = get_sector_peers() if b3_tickers else pd.DataFrame()
         result = build_analysis(raw, peers, tickers, universe_frame)
-        if any(t in b3_set for t in result["missing_tickers"]):
+        if any(t in b3_tickers for t in result["missing_tickers"]):
             clear_fundamentus_cache()
-        result["consensus"] = consensus(tickers)
+        result["consensus"] = consensus(tickers, asset_classes={item["ticker"]: item["asset_class"] for item in result["companies"]})
         result["id"] = uuid.uuid4().hex
         result["revision"] = body.revision
-        raw_export = raw[[column for column in EXPORT_FIELDS if column in raw]].copy()
+        export_fields = EXPORT_FIELDS
+        if extra_tickers:
+            raw["Classe"] = raw["Classe"].fillna("acao_br") if "Classe" in raw else "acao_br"
+            raw["Moeda"] = raw["Moeda"].fillna("BRL") if "Moeda" in raw else "BRL"
+            raw["Fonte"] = raw["Fonte"].fillna("Fundamentus") if "Fonte" in raw else "Fundamentus"
+            indicator_fields = {source for _, source, *_ in INDICATORS}
+            applicable_fields = {source for key, source, *_ in INDICATORS
+                                 if any(key in company["indicators"] for company in result["companies"])}
+            export_fields = ["Classe", "Moeda", "Fonte", *(field for field in EXPORT_FIELDS
+                                                          if field not in indicator_fields or field in applicable_fields)]
+            if any(company["fixed_income"] for company in result["companies"]):
+                export_fields += ["Remuneracao_modelo", "Taxa_modelo", "Unidade_taxa_modelo"]
+        raw_export = raw[[column for column in export_fields if column in raw]].copy()
         publish(ctx, "home", body.revision, generation, {"id": result["id"], "result": result, "export": raw_export})
         return clean_json(result)
     except HTTPException:
@@ -459,8 +496,9 @@ def refresh_consensus(body: HomeRequest, request: Request):
         current = ctx.artifacts.get("home")
         if not current or current["result"]["requested_tickers"] != tickers or current["result"]["revision"] != body.revision:
             raise HTTPException(409, "Clique em Analisar antes de atualizar os consensos.")
+        asset_classes = {item["ticker"]: item["asset_class"] for item in current["result"]["companies"]}
     generation = begin(ctx, "home-consensus", body.revision)
-    result = consensus(tickers, refresh=True)
+    result = consensus(tickers, refresh=True, asset_classes=asset_classes)
     publish(ctx, "home-consensus", body.revision, generation, {"id": uuid.uuid4().hex, "result": result})
     return clean_json(result)
 
@@ -479,4 +517,5 @@ def current_analysis(request: Request):
 def fundamentals_csv(id: str, request: Request):
     saved = artifact(session(request), "home", id)
     tickers = saved["result"]["requested_tickers"]
-    return csv_response(saved["export"], f"fundamentus_{'+'.join(tickers)}_{dt.date.today().isoformat()}.csv")
+    prefix = "ativos" if "Classe" in saved["export"] else "fundamentus"
+    return csv_response(saved["export"], f"{prefix}_{'+'.join(tickers)}_{dt.date.today().isoformat()}.csv")

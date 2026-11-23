@@ -149,7 +149,8 @@ export default function NewsPage() {
   const positive = articles.filter(article => article.sentiment === "Otimista").length;
   const negative = articles.filter(article => article.sentiment === "Pessimista").length;
   const failed = snapshot?.feeds.filter(feed => !feed.ok).map(feed => feed.ticker) ?? [];
-  const allFailed = !!snapshot && failed.length === snapshot.feeds.length;
+  const coveredFeeds = snapshot?.feeds.filter(feed => !feed.modeled).length ?? 0;
+  const allFailed = coveredFeeds > 0 && failed.length === coveredFeeds;
   const retryAt = snapshot?.model.retry_after ? snapshot.model.retry_after * 1000 : 0;
   const jevPaused = !!snapshot && snapshot.model.lexicon_count > 0 && retryAt > Date.now();
   const stale = !!snapshot && Date.now() - Date.parse(snapshot.as_of) > staleAfterMs;
@@ -188,7 +189,7 @@ export default function NewsPage() {
     <div className="board">
       {error && <div className="span-12"><Notice tone="negative">{error} <button type="button" disabled={busy} onClick={() => void execute(true)}>Tentar novamente</button></Notice></div>}
       {snapshot && (failed.length > 0 || jevPaused || stale || snapshot.feeds.some(feed => feed.ok && !feed.recent_count)) && <div className="span-12 board-notes">
-        {snapshot.feeds.map(feed => !feed.ok ? <Notice key={feed.ticker} tone="warning">Feed indisponível para {feed.ticker}; nenhum item foi usado na análise.</Notice> : !feed.recent_count ? <Notice key={feed.ticker}>Nenhuma notícia recente (7 dias) para {feed.ticker}.</Notice> : null)}
+        {snapshot.feeds.map(feed => feed.modeled ? <Notice key={feed.ticker}>{feed.ticker}: exposição modelada, sem feed de notícias próprio.</Notice> : !feed.ok ? <Notice key={feed.ticker} tone="warning">Feed indisponível para {feed.ticker}; nenhum item foi usado na análise.</Notice> : !feed.recent_count ? <Notice key={feed.ticker}>Nenhuma notícia recente (7 dias) para {feed.ticker}.</Notice> : null)}
         {jevPaused && <Notice>Análise avançada indisponível; nova tentativa após {formatBrasilia(new Date(retryAt).toISOString(), false)}.</Notice>}
         {stale && <Notice tone="warning">Amostra com mais de 15 minutos. Use “Atualizar notícias” para buscar os feeds de novo.</Notice>}
         {failed.length > 0 && <Notice tone="warning">Alguns feeds falharam. <button onClick={() => void execute(true)} disabled={busy}>Tentar feeds novamente</button></Notice>}
@@ -228,12 +229,12 @@ export default function NewsPage() {
             </div>}
             <p className="param-hint">A nota e os gráficos usam a amostra completa. Os filtros se aplicam à lista de notícias.</p>
           </div>
-          {!articles.length && <Notice>{snapshot.articles.length ? <>Nenhuma notícia corresponde aos filtros atuais. <button type="button" onClick={clearFilters}>Limpar filtros</button></> : allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : "Nenhuma notícia recente encontrada nos feeds disponíveis."}</Notice>}
+          {!articles.length && <Notice>{snapshot.articles.length ? <>Nenhuma notícia corresponde aos filtros atuais. <button type="button" onClick={clearFilters}>Limpar filtros</button></> : !coveredFeeds ? "A carteira contém apenas exposições modeladas, sem feed próprio." : allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : "Nenhuma notícia recente encontrada nos feeds disponíveis."}</Notice>}
           {visible.length > 0 && <ul className="feed">{visible.map(article => <li key={article.id}><Article article={article} /></li>)}</ul>}
           {articles.length > limit ? <div className="feed-more"><button onClick={() => setLimit(previous => previous + 15)}>Ver mais {Math.min(15, articles.length - limit)} notícias ({articles.length - limit} restantes)</button></div> : articles.length > 15 ? <p className="pane-foot">Todas as {articles.length} notícias carregadas.</p> : null}
         </Pane>
         <Pane title="Tom por ativo" className="span-12" meta={`nota da carteira ${snapshot.summary.score100 === null ? "— (sem peso coberto)" : `${snapshot.summary.score100}/100`} · cobertura ${formatPercent(snapshot.summary.coverage, 1)} do peso`} flush>
-          {!snapshot.articles.length && <Notice>{allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : failed.length ? "Nenhuma notícia recente nos feeds acessíveis; alguns feeds falharam." : "Nenhuma notícia recente retornada pelos feeds consultados."}</Notice>}
+          {!snapshot.articles.length && <Notice>{!coveredFeeds ? "A carteira contém apenas exposições modeladas, sem feed próprio." : allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : failed.length ? "Nenhuma notícia recente nos feeds acessíveis; alguns feeds falharam." : "Nenhuma notícia recente retornada pelos feeds consultados."}</Notice>}
           <Table caption="Tom por ativo" sortable columns={[{key: "ticker", label: "Ativo"}, {key: "state", label: "Feed"}, {key: "count", label: "Artigos", unit: "integer"}, {key: "positive", label: "Otim. (+)", unit: "integer"}, {key: "neutral", label: "Neutr. (0)", unit: "integer"}, {key: "negative", label: "Pessim. (−)", unit: "integer"}, {key: "mean", label: "Média −1 a +1", unit: "number", digits: 2, plus: true}, {key: "covered_share", label: "% do peso coberto", unit: "fraction", digits: 1}, {key: "contribution", label: "Contribuição vs 50", unit: "number", digits: 2, plus: true}]}
             rows={snapshot.summary.tone} />
           <details className="disclosure flush-disclosure"><summary>Como são calculadas a nota e a cobertura</summary><div>
