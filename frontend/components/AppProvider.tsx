@@ -25,7 +25,7 @@ type AppContext = {
   loading: boolean;
   error: string | null;
   openTutorial: () => void;
-  setSelection: (tickers: SelectionUpdate) => Promise<void>;
+  setSelection: (tickers: SelectionUpdate) => Promise<Session>;
   refreshSession: () => Promise<void>;
   toggleFavorite: (ticker: string) => Promise<void>;
 };
@@ -69,9 +69,9 @@ export default function AppProvider({ children }: { children: ReactNode }) {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const sessionRef = useRef<Session | null>(null);
   const queue = useRef(Promise.resolve());
-  const enqueue = useCallback((operation: () => Promise<void>) => {
+  const enqueue = useCallback(<T,>(operation: () => Promise<T>) => {
     const next = queue.current.then(operation);
-    queue.current = next.catch(() => {});
+    queue.current = next.then(() => {}, () => {});
     return next;
   }, []);
   const accept = useCallback((value: Session) => { sessionRef.current = value; setCurrent(value); }, []);
@@ -97,7 +97,9 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     const state = sessionRef.current;
     if (!state) throw new Error("A sessão ainda não foi carregada.");
     const tickers = typeof update === "function" ? update(state.selection) : update;
-    accept(await api<Session>("/api/session/selection", { tickers, revision: state.revision }, "PUT"));
+    const updated = await api<Session>("/api/session/selection", { tickers, revision: state.revision }, "PUT");
+    accept(updated);
+    return updated;
   }), [accept, enqueue]);
   const toggleFavorite = useCallback((ticker: string) => enqueue(async () => {
     const state = sessionRef.current;

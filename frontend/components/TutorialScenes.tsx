@@ -500,7 +500,7 @@ export function AnalyzeScene({
 
     const runLoop = async () => {
       while (!runner.isCancelled()) {
-        // Beat 0: Monitor ready, click Analisar 2
+        // Beat 0: Monitor ready for comparison
         onBeatChange(0);
         setAnalyzed(false);
         setScanning(false);
@@ -508,7 +508,7 @@ export function AnalyzeScene({
         setMetric("roe");
         if (!(await runner.wait(360))) break;
 
-        if (!(await runner.moveTo("btn-analyze", "Clique em Analisar", { offsetX: 0.52, offsetY: 0.54, settleMs: 650 }))) break;
+        if (!(await runner.moveTo("btn-analyze", "Clique em Comparar ações", { offsetX: 0.52, offsetY: 0.54, settleMs: 650 }))) break;
         if (!(await runner.click(() => {
           setScanning(true);
         }, 420))) break;
@@ -566,7 +566,7 @@ export function AnalyzeScene({
             {...demoProps("btn-analyze", hoverTarget, pressTarget)}
             onClick={handleAnalyzeClick}
           >
-            {scanning ? "Analisando…" : "Analisar 3"}
+            {scanning ? "Analisando…" : "Comparar 3 ações"}
           </button>
         </div>
         <ul className="tut-monitor-list">
@@ -594,7 +594,7 @@ export function AnalyzeScene({
         ) : !analyzed ? (
           <div className="tut-mini-idle">
             <p>Seleção pronta: <strong>PETR4, VALE3, BBAS3</strong>.</p>
-            <p className="muted">Clique em <strong>Analisar 3</strong> para preencher indicadores, comparação e preços-alvo.</p>
+            <p className="muted">Clique em <strong>Comparar 3 ações</strong> para preencher indicadores, comparação e preços-alvo.</p>
           </div>
         ) : (
           <div className="tut-analysis-content">

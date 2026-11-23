@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useApp } from "../../components/AppProvider";
+import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp, type SelectionUpdate } from "../../components/AppProvider";
+import StockPicker from "../../components/StockPicker";
 import Chart from "../../components/Chart";
 import { Diagnostics, ExportButton, formatValue, Idle, Loading, Metrics, Notice, Pane, Table, useMedia } from "../../components/ui";
 import { PortfolioPreview } from "../../components/Examples";
@@ -46,6 +47,7 @@ export default function PortfolioPage() {
   const [resultKey, setResultKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [selectionBusy, setSelectionBusy] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [longHistory, setLongHistory] = useState(false);
@@ -124,6 +126,7 @@ export default function PortfolioPage() {
       const value = await api<PortfolioResult>("/api/portfolio/analyze", { ...inputs, manual_shares: manualShares, tickers: session.selection, revision: session.revision });
       if (generation !== requestGeneration.current || submittedSelection !== currentSelection.current || submittedKey !== currentFingerprint.current) return;
       setResult(value);
+      setFoldParams(true);
       setResultKey(submittedKey);
       setStressResult(value.stress);
       await refreshSession();
@@ -156,6 +159,7 @@ export default function PortfolioPage() {
       setCustomDays(restored.lookback_days);
       setLoadedSelection(selectionKey);
       setResult(value);
+      setFoldParams(true);
       setResultKey(key);
       setStressResult(value.stress);
       setFoldParams(true);
@@ -170,16 +174,12 @@ export default function PortfolioPage() {
     return () => window.clearTimeout(timer);
   }, [fingerprint, loadedSelection, selectionKey, session, busy, validInputs, manualValid]);
 
-  async function changeSelection(tickers: string[]) {
-    if (selectionBusy) return;
-    requestGeneration.current += 1;
-    stressGeneration.current += 1;
-    setLoadedSelection(null);
-    setResult(null);
-    if (!analysisPending.current) setBusy(false);
-    setStressBusy(false);
+  async function changeSelection(tickers: SelectionUpdate) {
+    if (selectionBusy || busy) return;
     setSelectionBusy(true);
-    try { await setSelection(tickers); setNotice("Confira a seleção e clique em Calcular carteira."); }
+    setSelectionError(null);
+    try { await setSelection(tickers); }
+    catch (cause) { setSelectionError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setSelectionBusy(false); }
   }
 
@@ -224,15 +224,22 @@ export default function PortfolioPage() {
   const recap = [windowLabels[windowChoice] ?? `${inputs.lookback_days} dias`, strategyShort[inputs.strategy], formatValue(inputs.capital, "money", 0)].join(" · ");
 
   return <div className="desk desk-split">
-    <Pane title="Configurar carteira" className="pane-params" meta={folded && narrow ? recap : `${count}/20 ativos`} narrowCollapsed={folded}>
+    <Pane title="Montar carteira" className="pane-params" meta={folded && narrow ? recap : `${count}/${MAX_SELECTION} ativos`} narrowCollapsed={folded}>
       <div className="param-group">
-        <h3 className="pane-sub">Ativos da carteira</h3>
+        <StockPicker selection={session.selection} action="Adicionar" disabled={selectionBusy || busy || count >= MAX_SELECTION}
+          onChoose={ticker => void changeSelection(current => {
+            if (current.includes(ticker)) return [...current];
+            if (current.length >= MAX_SELECTION) throw new Error(SELECTION_FULL_MESSAGE);
+            return [...current, ticker];
+          })} />
         {count ? <ol className="asset-list">{session.selection.map((ticker, index) => <li key={ticker}>
           <i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><b>{ticker}</b><span>{companies.get(ticker) ?? "Fora da lista B3"}</span>
-          <button type="button" className="icon-btn" disabled={selectionBusy} aria-label={`Remover ${ticker}`} onClick={() => void changeSelection(session.selection.filter(item => item !== ticker))}>×</button>
+          <button type="button" className="icon-btn" disabled={selectionBusy || busy} aria-label={`Remover ${ticker}`} onClick={() => void changeSelection(current => current.filter(item => item !== ticker))}>×</button>
         </li>)}</ol> : null}
         {count < 2 && <p className="pane-lead">{count ? "Adicione mais uma ação para calcular a carteira." : "Adicione pelo menos duas ações para calcular a carteira."}</p>}
-        <button type="button" className={count < 2 ? "ghost-add primary" : "ghost-add"} onClick={() => window.dispatchEvent(new Event("b3lab:focus-search"))}>Buscar ações para a carteira</button>
+        {count >= MAX_SELECTION && <p className="param-hint">Remova uma ação para adicionar outra.</p>}
+        {selectionBusy && <p role="status" className="param-hint">Atualizando a carteira…</p>}
+        {selectionError && <Notice tone="negative">{selectionError}</Notice>}
       </div>
       <div className="param-group param-fields">
         <h3 className="pane-sub">Janela e capital</h3>
@@ -257,9 +264,9 @@ export default function PortfolioPage() {
       {!manualValid && <Notice tone="warning">A alocação manual precisa ter ao menos uma cota positiva.</Notice>}
       {!validInputs && <Notice tone="warning">Confira os limites de capital, histórico, cotas inteiras e diversificação.</Notice>}
       <div className="param-run">
-        <button type="button" className="primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => { setFoldParams(true); void runAnalysis(); }}>{busy ? "Calculando…" : "Calcular carteira"}</button>
-        <button type="button" disabled={selectionBusy} title="Limpa o cache de preços desta sessão e baixa as cotações de novo" onClick={() => void refreshQuotes()}>Buscar preços novamente</button>
+        <button type="button" className="primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => { void runAnalysis(); }}>{busy ? "Calculando…" : "Calcular carteira"}</button>
       </div>
+      <details className="disclosure"><summary>Dados de cotação</summary><div><button type="button" disabled={selectionBusy || busy} onClick={() => void refreshQuotes()}>Buscar preços novamente</button></div></details>
       {loadedSelection === selectionKey && <p className="param-hint">Alterações de período, capital ou estratégia recalculam o resultado. Ao trocar as ações, calcule a carteira de novo.</p>}
       {sections.length > 0 && <nav className="jump" aria-label="Seções do resultado"><h3 className="pane-sub">Ir para</h3><ul>{sections.map(([id, label]) => <li key={id}><a href={`#${id}`}>{label}</a></li>)}</ul></nav>}
     </Pane>
@@ -278,7 +285,7 @@ export default function PortfolioPage() {
       </Pane>}
       {activeResult && <>
         {(session.simulation_ready || session.portfolio_ready) && <div className="span-12 flow-links">
-          {session.simulation_ready && <Link className="button-link" href="/simulacao">Simular esta carteira <span aria-hidden="true">→</span></Link>}
+          {session.simulation_ready && <Link className="button-link primary" href="/simulacao">Simular esta carteira <span aria-hidden="true">→</span></Link>}
           {session.portfolio_ready && <Link className="button-link" href="/noticias">Ver notícias da carteira <span aria-hidden="true">→</span></Link>}
         </div>}
         {narrow && <nav className="span-12" aria-label="Seções do resultado"><ul className="jump-strip">{sections.map(([id, label]) => <li key={id}><a href={`#${id}`}>{label}</a></li>)}</ul></nav>}

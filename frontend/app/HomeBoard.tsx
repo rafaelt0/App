@@ -20,12 +20,12 @@ function Range52({ low, high, price }: { low: number | null; high: number | null
 }
 
 type MonitorProps = {
-  selection: string[]; stocks: Stock[]; watchlist: string[]; ready: HomeResult | null; busy: boolean; analyze: ReactNode; notices: ReactNode;
+  selection: string[]; stocks: Stock[]; watchlist: string[]; ready: HomeResult | null; busy: boolean; picker: ReactNode; notices: ReactNode;
   onQuick: (ticker: string) => void; onFavorite: (ticker: string) => void; onAdd: (ticker: string) => void; onRemove: (ticker: string) => void;
 };
 
 /** Selection quote table: delayed Yahoo quote from the tape, Fundamentus indicators once analysed. */
-export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, notices, onQuick, onFavorite, onAdd, onRemove }: MonitorProps) {
+export function Monitor({ selection, stocks, watchlist, ready, busy, picker, notices, onQuick, onFavorite, onAdd, onRemove }: MonitorProps) {
   const { strip } = useMarket();
   const byTicker = new Map(stocks.map(stock => [stock.ticker, stock]));
   const companies = new Map(ready?.companies.map(company => [company.ticker, company]) ?? []);
@@ -40,13 +40,10 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
     if (item) return { value: item.value as number | null, change: item.change, source: `Yahoo Finance com atraso, ${shortDate(item.as_of)}` };
     return { value: company?.market.price ?? null, change: null, source: company?.market.last_quote_date ? `Fundamentus, ${company.market.last_quote_date.split("-").reverse().join("/")}` : "Sem cotação no painel" };
   };
-  return <Pane title="Seleção de ações" area="mon" className="pane-monitor" meta={`${selection.length} de ${MAX_SELECTION} ações`} actions={selection.length ? analyze : undefined} flush>
+  return <Pane id="selecao-de-acoes" title="Seleção de ações" area="mon" className="pane-monitor" meta={selection.length ? `${selection.length} de ${MAX_SELECTION} ações` : undefined} flush>
+    <div className="monitor-start">{picker}</div>
     {notices}
-    <div className="monitor-start">
-      <button type="button" className={selection.length ? undefined : "primary"} onClick={() => window.dispatchEvent(new Event("b3lab:focus-search"))}>{selection.length ? "Adicionar ações" : "Buscar ações"}</button>
-      {selection.length > 0 && !ready && <p>Use “Analisar” para consultar os indicadores da seleção.</p>}
-      {!selection.length && <p>Busque pelo código ou nome da empresa, ou escolha uma ação abaixo para analisar agora.</p>}
-    </div>
+    {selection.length >= MAX_SELECTION && <p className="picker-status">Remova uma ação para adicionar outra.</p>}
     {selection.length ? <ScrollX label="Ativos selecionados"><table className="grid monitor">
       <thead><tr><th scope="col">Ativo</th><th scope="col">Empresa</th><th scope="col" className="num">Últ. R$</th><th scope="col" className="num">Var.</th>
         {ready ? <><th scope="col" className="num">P/L</th><th scope="col" className="num">ROE</th><th scope="col" className="num">DY</th><th scope="col" className="num">52 sem.</th><th scope="col" className="num" title="Áreas favoráveis na síntese setorial">Sínt.</th><th scope="col">Setor</th></>
@@ -75,12 +72,13 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
         </tr>;
       })}</tbody>
     </table></ScrollX> : <>
+      <h3 className="pane-sub">Ações mais negociadas</h3>
       <ScrollX label="Ações para análise rápida"><table className="grid monitor is-quick"><caption className="visually-hidden">Ações para análise rápida</caption>
         <thead><tr><th scope="col">Ativo</th><th scope="col">Empresa</th><th scope="col" className="num" title="Volume financeiro médio diário em 2 meses">Liq. 2m</th><th scope="col" className="num">Últ.</th><th scope="col" className="num">Var.</th></tr></thead>
         <tbody>{shownStarters.map(stock => {
           const item = stripQuote(strip, stock.ticker);
-          return <tr key={stock.ticker} className="is-clickable" onClick={() => { if (!busy) onQuick(stock.ticker); }}>
-            <th scope="row"><button type="button" className="row-btn" disabled={busy} aria-label={`Analisar ${stock.ticker} agora`}><span className="tk"><StockLogo ticker={stock.ticker} company={stock.company} size={16} />{stock.ticker}</span><span aria-hidden="true">→</span></button></th>
+          return <tr key={stock.ticker}>
+            <th scope="row"><button type="button" className="row-btn" disabled={busy} aria-label={`Analisar ${stock.ticker} agora`} onClick={() => onQuick(stock.ticker)}><span className="tk"><StockLogo ticker={stock.ticker} company={stock.company} size={16} />{stock.ticker}</span><span className="quick-action" aria-hidden="true">Analisar</span></button></th>
             <td className="ell">{stock.company || "—"}</td>
             <td className="num">{stock.liquidity === null ? "—" : formatCompactValue(stock.liquidity, "money", 1)}</td>
             <td className="num">{item ? formatValue(item.value, "money") : <span className="muted">—</span>}</td>
@@ -96,7 +94,7 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, analyze, no
         const known = byTicker.has(ticker);
         const inside = selection.includes(ticker);
         return <li key={ticker}><b>{ticker}</b><span className="ell">{byTicker.get(ticker)?.company ?? "Fora da lista B3"}</span>
-          {known && !inside && <button type="button" disabled={busy || selection.length >= MAX_SELECTION} onClick={() => onAdd(ticker)} aria-label={`Adicionar ${ticker} à seleção`}>+ seleção</button>}
+          {known && !inside && <button type="button" disabled={busy || selection.length >= MAX_SELECTION} onClick={() => onAdd(ticker)} aria-label={selection.length ? `Adicionar ${ticker} à seleção` : `Analisar ${ticker}`}>{selection.length ? "Adicionar" : "Analisar"}</button>}
           {inside && <span className="muted">na seleção</span>}
           <button type="button" className="icon-btn" aria-label={`Remover ${ticker} dos favoritos`} onClick={() => onFavorite(ticker)}>★</button>
         </li>;
@@ -125,7 +123,7 @@ function tone(change: number | null, step: number): number | null {
 }
 
 /** Stock heatmap of the local B3 list, nested by sector: area is the size metric, colour the sign and size of the change. */
-export function SectorMap({ stocks, selection, busy, active, available, onSector, onAdd, onReset, onRefresh, note }: { stocks: Stock[]; selection: string[]; busy: boolean; active: string[]; available: number; onSector: (sector: string) => void; onAdd: (ticker: string) => void; onReset: () => void; onRefresh: () => void; note: ReactNode }) {
+export function SectorMap({ stocks, selection, busy, onSector, onAdd, onRefresh, note }: { stocks: Stock[]; selection: string[]; busy: boolean; onSector: (sector: string) => void; onAdd: (ticker: string) => void; onRefresh: () => void; note: ReactNode }) {
   const map = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 200, h: 100 });
   const [sizeBy, setSizeBy] = useState<SizeBy>("liquidity");
@@ -163,26 +161,30 @@ export function SectorMap({ stocks, selection, busy, active, available, onSector
   const shown = only && sectors.has(only) ? [[only, sectors.get(only)!] as const] : [...sectors];
   const laid = nestedSquarify(shown.map(([key, items]) => ({ key, items })), { x: 0, y: 0, w: box.w, h: box.h }, headerHeight);
   const missing = changes.kind === "ready" ? stocks.filter(stock => changeOf(stock.ticker) === null).length : 0;
-  const filtered = active.length > 0 && !active.includes("Todos");
   const pct = (x: number) => `${x / box.w * 100}%`, pctY = (y: number) => `${y / box.h * 100}%`;
   const describe = (block: Block, sector: string) => [`${block.ticker} · ${block.company || "empresa não informada"}`, sector,
     `Liquidez 2m ${block.liquidity === null ? "indisponível" : formatCompactValue(block.liquidity, "money", 1)}`,
     `${color.short} ${changes.kind === "loading" ? "carregando" : block.change === null ? "sem dado" : formatValue(block.change, "fraction", 2, "BRL", true)}`].join(" · ");
   const full = selection.length >= MAX_SELECTION;
-  return <Pane title="Mapa de calor" area="sec" className="pane-sectors" meta={`${stocks.length} ações · ${sectors.size} setores${filtered ? ` · ${active.join(", ")}: ${available}` : ""}`}
-    actions={<>{filtered && <button type="button" disabled={busy} onClick={onReset}>Todos</button>}<button type="button" disabled={busy} onClick={onRefresh} title="Limpa o cache Fundamentus e busca os dados de novo">Atualizar Fundamentus</button></>}>
+  return <Pane title="Mapa de calor" area="sec" className="pane-sectors" meta={`${stocks.length} ações · ${sectors.size} setores`}
+    actions={<button type="button" disabled={busy} onClick={onRefresh} title="Limpa o cache compartilhado da Fundamentus e busca novos dados">Atualizar Fundamentus</button>}>
     <div className="hm-controls">
       <label>Tamanho<select aria-label="Tamanho" value={sizeBy} onChange={event => setSizeBy(event.target.value as SizeBy)}>{Object.entries(sizeOptions).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       <label>Cor<select aria-label="Cor" value={colorBy} onChange={event => setColorBy(event.target.value as ColorBy)}>{Object.entries(colorOptions).map(([key, option]) => <option key={key} value={key}>{option.label}</option>)}</select></label>
       <label>Setor<select aria-label="Setor" value={only} onChange={event => setOnly(event.target.value)}><option value="">Todos os setores</option>{names.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
     </div>
-    <p className="map-help">Escolha uma ação para adicioná-la à seleção. O nome de um setor troca a seleção pelas ações mais líquidas daquele setor.</p>
+    <div className="map-help">
+      <span>{selection.length ? "Escolha uma ação no mapa para adicioná-la à seleção." : "Escolha uma ação no mapa para analisar."}</span>
+      {only && only !== "Setor não informado" && <button type="button" disabled={busy} onClick={() => onSector(only)}>{selection.length ? "Trocar seleção pelas mais líquidas" : "Selecionar as mais líquidas"}</button>}
+      {selection.length > 0 && <a href="#selecao-de-acoes">Ver seleção ↑</a>}
+    </div>
+    {note}
     <div className="hmap" ref={map} role="group" aria-label={`Mapa de calor: área por ${sizeOptions[sizeBy].toLocaleLowerCase("pt-BR")}, cor por ${color.label.toLocaleLowerCase("pt-BR")}`}>
       {laid.map(sector => {
         const known = sector.key !== "Setor não informado";
         return <div key={sector.key} className="hm-sector" style={{ left: pct(sector.x), top: pctY(sector.y), width: pct(sector.w), height: pctY(sector.h) }}>
           {sector.header && (known
-            ? <button type="button" className="hm-head" disabled={busy} title={`${sector.key}: selecionar os mais líquidos`} aria-label={`Selecionar os mais líquidos de ${sector.key}`} onClick={() => onSector(sector.key)}>{sector.key} <span aria-hidden="true">›</span></button>
+            ? <button type="button" className="hm-head" title={`Filtrar o mapa por ${sector.key}`} aria-label={`Filtrar o mapa por ${sector.key}`} onClick={() => setOnly(only === sector.key ? "" : sector.key)}>{sector.key} <span aria-hidden="true">›</span></button>
             : <span className="hm-head">{sector.key}</span>)}
         </div>;
       })}
@@ -196,7 +198,7 @@ export function SectorMap({ stocks, selection, busy, active, available, onSector
         const value = changes.kind === "loading" ? "…" : block.change === null ? "s/d" : formatValue(block.change, "fraction", big ? 2 : 1, "BRL", true);
         return <button type="button" key={block.ticker} className={`hm-block${inside ? " is-selected" : ""}`} data-ticker={block.ticker} data-sector={sector.key} data-tone={level ?? "none"} data-change={block.change ?? ""} data-size={block.value}
           style={{ left: pct(block.x), top: pctY(block.y), width: pct(block.w), height: pctY(block.h) }}
-          disabled={busy || (!inside && full)} aria-label={inside ? `${label}. Já está na seleção.` : full ? `${label}. Seleção cheia.` : `Adicionar à seleção: ${label}`}
+          disabled={busy || (!inside && full)} aria-label={inside ? `${label}. Já está na seleção.` : full ? `${label}. Seleção cheia.` : `${selection.length ? "Adicionar à seleção" : "Analisar"}: ${label}`}
           onClick={() => { if (!inside) onAdd(block.ticker); }} onMouseEnter={() => setFocus(label)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(label)} onBlur={() => setFocus(null)}>
           {(big || medium) && <span className="hm-body" aria-hidden="true">
             <StockLogo ticker={block.ticker} company={block.company} size={logo} />
@@ -207,7 +209,7 @@ export function SectorMap({ stocks, selection, busy, active, available, onSector
       }))}
     </div>
     <div className="hm-legend">
-      <span className="hm-readout" aria-hidden="true">{focus ?? <>Área: {sizeOptions[sizeBy].toLocaleLowerCase("pt-BR")} · clique adiciona à seleção, o nome do setor pega os mais líquidos</>}</span>
+      <span className="hm-readout" aria-hidden="true">{focus ?? <>Área: {sizeOptions[sizeBy].toLocaleLowerCase("pt-BR")}</>}</span>
       <span className="hm-scale" role="img" aria-label={`Escala de ${color.label.toLocaleLowerCase("pt-BR")}: vermelho para queda, cinza para zero, verde para alta, mais forte a cada ${formatValue(color.step, "fraction", 0)}; hachurado sem dado`}>
         <span className="hm-swatches">{[-4, -3, -2, -1, 0, 1, 2, 3, 4].map(level => <i key={level} data-tone={level} />)}</span>
         <span className="hm-ticks" aria-hidden="true">{[[1, -3], [2, -2], [3, -1], [4.5, 0], [6, 1], [7, 2], [8, 3]].map(([at, n]) => <span key={n} style={{ left: at * 24 }}>{n === 0 ? "0" : `${n < 0 ? "−" : "+"}${formatValue(Math.abs(n) * color.step, "fraction", 0)}`}</span>)}</span>
@@ -216,7 +218,6 @@ export function SectorMap({ stocks, selection, busy, active, available, onSector
     </div>
     <p className="pane-foot">{changes.kind === "loading" ? "Carregando variações do Yahoo Finance…" : changes.kind === "error" ? `Variações indisponíveis: ${changes.message}` : `${color.label}: ${changes.data.source}, pregão de ${shortDate(changes.data.session)}, atualizado ${brasiliaTime.format(new Date(changes.data.fetched_at))}.`}
       {" "}Tamanho: Fundamentus, liquidez média diária em 2 meses.{unsized > 0 && sizeBy === "liquidity" ? ` ${unsized} ações sem liquidez ficam fora do mapa.` : ""}</p>
-    {note}
   </Pane>;
 }
 
