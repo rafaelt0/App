@@ -497,6 +497,11 @@ def is_synthetic_fixed_income(symbol_or_ticker: str) -> bool:
     return parse_fixed_income_asset(cleaned) is not None
 
 
+def supports_share_allocation(symbol_or_ticker: str) -> bool:
+    """Whether share-count allocation and purchase estimates apply to this asset."""
+    return not is_synthetic_fixed_income(symbol_or_ticker) and asset_metadata(symbol_or_ticker)["asset_class"] != "outros"
+
+
 def asset_metadata(ticker: str, b3_frame: pd.DataFrame | None = None) -> dict[str, Any]:
     """Return full metadata for any B3, US, FII, REIT, Fixed Income, ETF, or dynamic ticker."""
     canonical = normalize_ticker(ticker)
@@ -624,6 +629,7 @@ def get_full_universe(b3_frame: pd.DataFrame | None = None) -> list[dict[str, An
             "sector": row.get("Setor", ""),
             "asset_class": "acao_br",
             "currency": "BRL",
+            "supports_shares": True,
         })
     for ticker, item in EXTRA_ASSETS_BY_TICKER.items():
         if ticker in seen:
@@ -636,6 +642,7 @@ def get_full_universe(b3_frame: pd.DataFrame | None = None) -> list[dict[str, An
             "sector": item["sector"],
             "asset_class": item["asset_class"],
             "currency": item["currency"],
+            "supports_shares": item["yahoo_symbol"] is not None and item["asset_class"] != "outros",
         })
     with _DYNAMIC_ASSETS_LOCK:
         for ticker, item in _DYNAMIC_ASSETS.items():
@@ -649,6 +656,7 @@ def get_full_universe(b3_frame: pd.DataFrame | None = None) -> list[dict[str, An
                 "sector": item.get("sector", "Ativo Global"),
                 "asset_class": item.get("asset_class", "acao_us"),
                 "currency": item.get("currency", "USD"),
+                "supports_shares": item.get("asset_class") != "outros",
             })
     return stocks
 
@@ -886,11 +894,18 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
     quote_time = _num(info.get("regularMarketTime")) if current_price is not None else None
     low_52w = _num(info.get("fiftyTwoWeekLow"))
     high_52w = _num(info.get("fiftyTwoWeekHigh"))
+    raw_dy = _pct("yield" if info.get("quoteType") in {"ETF", "MUTUALFUND"} else "trailingAnnualDividendYield")
+    if raw_dy is None or raw_dy == 0.0:
+        # Yahoo Finance often returns trailingAnnualDividendYield=0.0 for Brazilian FIIs (e.g. HGLG11, KNRI11, XPML11)
+        # while reporting the 12m yield in percentage points under `dividendYield`.
+        fallback_dy = _num(info.get("dividendYield"))
+        if fallback_dy is not None and fallback_dy > 0:
+            raw_dy = fallback_dy
     candidates = {
         "pl": _num(info.get("trailingPE")), "pvp": _num(info.get("priceToBook")),
         "ev_ebitda": _num(info.get("enterpriseToEbitda")), "roe": _pct("returnOnEquity"),
         "net_margin": _pct("profitMargins"), "ebit_margin": _pct("operatingMargins"),
-        "dy": _pct("yield" if info.get("quoteType") in {"ETF", "MUTUALFUND"} else "trailingAnnualDividendYield"),
+        "dy": raw_dy,
     }
     indicators = {key: value for key, value in candidates.items() if key in ASSET_INDICATORS[asset_class]}
 

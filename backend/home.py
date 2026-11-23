@@ -12,7 +12,7 @@ from backend.serialization import StrictModel, clean_json, csv_response
 from backend.state import artifact, begin, publish, session
 from utils.assets import (
     ASSET_CLASSES, ASSET_INDICATORS, EQUITY_CLASSES, asset_metadata, get_extra_asset_fundamentals, get_full_universe,
-    is_valid_asset_ticker, normalize_ticker, parse_fixed_income_asset, search_yahoo_assets,
+    is_valid_asset_ticker, normalize_ticker, parse_fixed_income_asset, search_yahoo_assets, supports_share_allocation,
 )
 from utils.formatting import extract_debt_metric, get_ev_ebitda_context
 from utils.home_data import (build_analyst_synthesis, clear_fundamentus_cache,
@@ -113,18 +113,20 @@ def health(row):
     ev = ev / 100 if ev is not None else None
     metrics, diagnostics = [], []
     if debt is not None:
+        debt_text = f"{debt:.2f}".replace(".", ",")
         if debt < 0:
             status = "positive"
-            text = f"Dívida Líquida/PL de {debt:.2f}×: caixa líquido — a empresa tem mais caixa do que dívida líquida."
+            text = f"Dívida Líquida/PL de {debt_text}×: caixa líquido — a empresa tem mais caixa do que dívida líquida."
         else:
             status = "negative" if debt > DEBT_ALERT else "warning" if debt > DEBT_WARNING else "positive"
-            text = f"Dívida Líquida/PL de {debt:.2f}× " + ("é elevada — verifique capacidade de pagamento" if debt > DEBT_ALERT else "é moderada — monitorar" if debt > DEBT_WARNING else "é saudável")
+            text = f"Dívida Líquida/PL de {debt_text}× " + ("é elevada — verifique capacidade de pagamento" if debt > DEBT_ALERT else "é moderada — monitorar" if debt > DEBT_WARNING else "é saudável")
         metrics.append({"label": "Dív. Líquida/PL", "value": debt, "unit": "multiple", "status": status})
         diagnostics.append({"status": status, "text": text})
     if liquidity is not None:
+        liquidity_text = f"{liquidity:.2f}".replace(".", ",")
         status = "negative" if liquidity < LIQUIDITY_ALERT else "warning" if liquidity < LIQUIDITY_WARNING else "positive"
         metrics.append({"label": "Liquidez Corrente", "value": liquidity, "unit": "multiple", "status": status})
-        text = f"Liquidez Corrente {liquidity:.2f}× " + ("< 1 — risco de dificuldade de caixa" if liquidity < LIQUIDITY_ALERT else "— margem estreita" if liquidity < LIQUIDITY_WARNING else "— empresa com boa folga de caixa")
+        text = f"Liquidez Corrente {liquidity_text}× " + ("< 1 — risco de dificuldade de caixa" if liquidity < LIQUIDITY_ALERT else "— margem estreita" if liquidity < LIQUIDITY_WARNING else "— empresa com boa folga de caixa")
         diagnostics.append({"status": status, "text": text})
     if ev is not None:
         metric = {"label": "EV / EBIT", "value": ev, "unit": "multiple", "digits": 1,
@@ -333,6 +335,7 @@ def universe_search(q: str = "", asset_class: str = ""):
             "sector": fi["sector"],
             "asset_class": "titulo",
             "currency": fi["currency"],
+            "supports_shares": False,
         })
 
     # 2. Local multi-asset catalog matches
@@ -370,6 +373,7 @@ def universe_search(q: str = "", asset_class: str = ""):
                     "sector": remote["sector"],
                     "asset_class": remote["asset_class"],
                     "currency": remote["currency"],
+                    "supports_shares": supports_share_allocation(remote["ticker"]),
                 })
 
     # 4. Direct custom ticker fallback if the user typed a valid symbol code
@@ -384,6 +388,7 @@ def universe_search(q: str = "", asset_class: str = ""):
                 "sector": meta["sector"],
                 "asset_class": meta["asset_class"],
                 "currency": meta["currency"],
+                "supports_shares": supports_share_allocation(meta["ticker"]),
             })
 
     return clean_json({"items": results[:20], "query": query})

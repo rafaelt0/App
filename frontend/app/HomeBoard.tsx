@@ -13,10 +13,10 @@ const brasiliaTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute:
 const shortDate = (value: string) => value.split("-").reverse().slice(0, 2).join("/");
 
 /** Where the quote sits in the 52-week range, drawn in a 64px cell. */
-function Range52({ low, high, price }: { low: number | null; high: number | null; price: number | null }) {
+function Range52({ low, high, price, currency = "BRL" }: { low: number | null; high: number | null; price: number | null; currency?: string }) {
   if (low === null || high === null || price === null || !(high > low)) return <span className="muted">—</span>;
   const at = Math.min(100, Math.max(0, (price - low) / (high - low) * 100));
-  const label = `Faixa de 52 semanas: mínima ${formatValue(low, "money")}, máxima ${formatValue(high, "money")}, cotação ${formatValue(price, "money")}`;
+  const label = `Faixa de 52 semanas: mínima ${formatValue(low, "money", 2, currency)}, máxima ${formatValue(high, "money", 2, currency)}, cotação ${formatValue(price, "money", 2, currency)}`;
   return <span className="r52" role="img" aria-label={label} title={label}><span style={{ left: `${at}%` }} /></span>;
 }
 
@@ -77,10 +77,10 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
           <td className="num">{change === null ? <span className="muted">—</span> : <Change value={change} />}</td>
           {ready ? <>
             {monitorIndicators.map(({key}) => <td className="num" key={key}>{company?.indicator_available[key] ? formatValue(company.indicators[key], units.get(key) ?? "number", 1) : "—"}</td>)}
-            <td className="num"><Range52 low={company?.market.low_52w ?? null} high={company?.market.high_52w ?? null} price={company?.market.price ?? null} /></td>
+            <td className="num"><Range52 low={company?.market.low_52w ?? null} high={company?.market.high_52w ?? null} price={company?.market.price ?? null} currency={currency} /></td>
             {showSynthesis && <td className="num">{company?.synthesis.categorias_validas ? <span className="synth" title={`${company.synthesis.favorable_categories} de ${company.synthesis.categorias_validas} áreas favoráveis no setor`}>{Array.from({ length: company.synthesis.categorias_validas }, (_, slot) => <i key={slot} data-on={slot < company.synthesis.favorable_categories} />)}</span> : <span className="muted">—</span>}</td>}
             <td className="ell">{[company?.identity.sector, company?.identity.subsector].filter(Boolean).join(" · ") || stock?.sector || "Setor não informado"}</td>
-          </> : <td className="num">{stock?.liquidity == null ? <span className="muted">{currency}</span> : formatCompactValue(stock.liquidity, "money", 1)}</td>}
+          </> : <td className="num">{stock?.liquidity == null ? <span className="muted">{currency}</span> : formatCompactValue(stock.liquidity, "money", 1, currency)}</td>}
           <td className="row-tools">
             <button type="button" className="icon-btn" aria-pressed={favorite} aria-label={favorite ? `Remover ${ticker} dos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => onFavorite(ticker)}>{favorite ? "★" : "☆"}</button>
             <button type="button" className="icon-btn" aria-label={`Remover ${ticker}`} disabled={busy} onClick={() => onRemove(ticker)}>×</button>

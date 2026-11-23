@@ -27,8 +27,8 @@ function withinLimits(inputs: PortfolioInputs): boolean {
   return inputs.capital >= 100 && inputs.capital <= 1000000 && inputs.lookback_days >= 60 && inputs.lookback_days <= 5000 && inputs.gamma >= 0 && inputs.gamma <= 3 && Object.values(inputs.manual_shares).every(value => Number.isInteger(value) && value >= 0);
 }
 
-function hasManualShares(inputs: PortfolioInputs, selection: readonly string[]): boolean {
-  return inputs.strategy !== "manual" || selection.some(ticker => inputs.manual_shares[ticker] > 0);
+function hasManualShares(inputs: PortfolioInputs, selection: readonly string[], supportsShares: (ticker: string) => boolean): boolean {
+  return inputs.strategy !== "manual" || selection.some(ticker => supportsShares(ticker) && (inputs.manual_shares[ticker] ?? 0) > 0);
 }
 
 /** Pause after the last edit before recalculating, so typing a value does not send one request per keystroke. */
@@ -66,8 +66,10 @@ export default function PortfolioPage() {
   const fingerprint = JSON.stringify([selectionKey, inputs]);
   const currentFingerprint = useRef(fingerprint);
   currentFingerprint.current = fingerprint;
+  const stockByTicker = new Map(stocks.map(stock => [stock.ticker, stock]));
+  const supportsShares = (ticker: string) => stockByTicker.get(ticker)?.supports_shares !== false;
   const validInputs = withinLimits(inputs);
-  const manualValid = hasManualShares(inputs, session?.selection ?? []);
+  const manualValid = hasManualShares(inputs, session?.selection ?? [], supportsShares);
 
   useEffect(() => () => {
     requestGeneration.current += 1;
@@ -122,7 +124,7 @@ export default function PortfolioPage() {
     stressGeneration.current += 1;
     setStressBusy(false);
     try {
-      const manualShares = Object.fromEntries(session.selection.map(ticker => [ticker, inputs.manual_shares[ticker] ?? 0]));
+      const manualShares = Object.fromEntries(session.selection.map(ticker => [ticker, supportsShares(ticker) ? (inputs.manual_shares[ticker] ?? 0) : 0]));
       const value = await api<PortfolioResult>("/api/portfolio/analyze", { ...inputs, manual_shares: manualShares, tickers: session.selection, revision: session.revision });
       if (generation !== requestGeneration.current || submittedSelection !== currentSelection.current || submittedKey !== currentFingerprint.current) return;
       setResult(value);
@@ -236,8 +238,8 @@ export default function PortfolioPage() {
           <i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><b>{ticker}</b><span>{companies.get(ticker) ?? "Fora da lista B3"}</span>
           <button type="button" className="icon-btn" disabled={selectionBusy || busy} aria-label={`Remover ${ticker}`} onClick={() => void changeSelection(current => current.filter(item => item !== ticker))}>×</button>
         </li>)}</ol> : null}
-        {count < 2 && <p className="pane-lead">{count ? "Adicione mais uma ação para calcular a carteira." : "Adicione pelo menos duas ações para calcular a carteira."}</p>}
-        {count >= MAX_SELECTION && <p className="param-hint">Remova uma ação para adicionar outra.</p>}
+        {count < 2 && <p className="pane-lead">{count ? "Adicione mais um ativo para calcular a carteira." : "Adicione pelo menos dois ativos para calcular a carteira."}</p>}
+        {count >= MAX_SELECTION && <p className="param-hint">Remova um ativo para adicionar outro.</p>}
         {selectionBusy && <p role="status" className="param-hint">Atualizando a carteira…</p>}
         {selectionError && <Notice tone="negative">{selectionError}</Notice>}
       </div>
@@ -254,7 +256,11 @@ export default function PortfolioPage() {
         <p id="strategy-help" className="param-hint">{strategies.find(strategy => strategy.value === inputs.strategy)?.description}</p>
         {inputs.strategy === "manual" && <>
           <p className="param-hint">O capital informado serve para calcular o histórico de valor.</p>
-          <div className="param-pairs">{session.selection.map(ticker => <label key={ticker}>Cotas de {ticker}<input type="number" disabled={busy} min={0} step={1} value={inputs.manual_shares[ticker] ?? 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>)}</div>
+          {session.selection.some(ticker => !supportsShares(ticker)) && <p className="param-hint">Renda fixa modelada e cripto/commodities/câmbio não usam alocação por cotas (ficam com 0).</p>}
+          <div className="param-pairs">{session.selection.map(ticker => {
+            const eligible = supportsShares(ticker);
+            return <label key={ticker}>Cotas de {ticker}{eligible ? "" : " (sem cotas)"}<input type="number" disabled={busy || !eligible} min={0} step={1} value={eligible ? (inputs.manual_shares[ticker] ?? 0) : 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>;
+          })}</div>
         </>}
         {inputs.strategy === "markowitz" && <>
           <div className="segmented" role="group" aria-label="Diversificação">{[{ label: "Concentrada", gamma: 0 }, { label: "Equilibrada", gamma: 1 }, { label: "Diversificada", gamma: 2 }].map(preset => <button type="button" key={preset.label} disabled={busy} aria-pressed={inputs.gamma === preset.gamma} onClick={() => setInputs(previous => ({ ...previous, gamma: preset.gamma }))}>{preset.label}</button>)}</div>
@@ -267,7 +273,7 @@ export default function PortfolioPage() {
         <button type="button" className="primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => { void runAnalysis(); }}>{busy ? "Calculando…" : "Calcular carteira"}</button>
       </div>
       <details className="disclosure"><summary>Dados de cotação</summary><div><button type="button" disabled={selectionBusy || busy} onClick={() => void refreshQuotes()}>Buscar preços novamente</button></div></details>
-      {loadedSelection === selectionKey && <p className="param-hint">Alterações de período, capital ou estratégia recalculam o resultado. Ao trocar as ações, calcule a carteira de novo.</p>}
+      {loadedSelection === selectionKey && <p className="param-hint">Alterações de período, capital ou estratégia recalculam o resultado. Ao trocar os ativos, calcule a carteira de novo.</p>}
       {sections.length > 0 && <nav className="jump" aria-label="Seções do resultado"><h3 className="pane-sub">Ir para</h3><ul>{sections.map(([id, label]) => <li key={id}><a href={`#${id}`}>{label}</a></li>)}</ul></nav>}
     </Pane>
     <div className={`board${activeResult ? "" : " is-preview"}`}>

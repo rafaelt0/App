@@ -214,7 +214,7 @@ export default function NewsPage() {
             <Table caption="Observações artigo-ativo por ativo" columns={[{key: "ticker", label: "Ativo"}, {key: "positive", label: "Otim.", unit: "integer"}, {key: "neutral", label: "Neutr.", unit: "integer"}, {key: "negative", label: "Pessim.", unit: "integer"}]} rows={snapshot.summary.distribution} />
           </details>
         </Pane>
-        <Pane id="feed-noticias" title="Feed de notícias" className="span-12" meta={<span role="status" aria-live="polite">{visible.length} de {articles.length} após filtros · {positive} otimistas · {articles.length - positive - negative} neutras · {negative} pessimistas</span>} flush>
+        <Pane id="feed-noticias" title="Feed de notícias" className="span-12" meta={<span role="status" aria-live="polite">{visible.length} de {articles.length} após filtros · {positive} {positive === 1 ? "otimista" : "otimistas"} · {articles.length - positive - negative} {articles.length - positive - negative === 1 ? "neutra" : "neutras"} · {negative} {negative === 1 ? "pessimista" : "pessimistas"}</span>} flush>
           <div className="news-filters">
             <h3>Filtrar notícias</h3>
             <div className="news-filter-fields">

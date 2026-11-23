@@ -169,7 +169,7 @@ export default function HomePage() {
   const selection = session.selection;
   const ready = result?.revision === session.revision && result.requested_tickers.join(",") === selection.join(",") ? result : null;
   const disabled = busy || selecting;
-  const analyzeLabel = busy ? "Analisando…" : ready ? "Atualizar análise" : selection.length === 1 ? `Analisar ${selection[0]}` : `Comparar ${selection.length} ações`;
+  const analyzeLabel = busy ? "Analisando…" : ready ? "Atualizar análise" : selection.length === 1 ? `Analisar ${selection[0]}` : `Comparar ${selection.length} ativos`;
   const undo = sectorUndo?.revision === session.revision ? sectorUndo : null;
 
   return <div className={`desk desk-home${selection.length || busy ? " has-selection" : ""}`}>
