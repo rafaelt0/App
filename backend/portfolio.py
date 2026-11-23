@@ -16,7 +16,7 @@ import quantstats as qs
 from backend.serialization import StrictModel, clean_json, csv_response, figure
 from backend.state import PortfolioSnapshot, artifact, begin, publish, session
 from utils import db
-from utils.assets import is_valid_asset_ticker, modeled_history_notice, normalize_ticker, provider_symbol
+from utils.assets import is_valid_asset_ticker, modeled_history_notice, normalize_ticker, provider_symbol, supports_share_allocation
 from utils.market_data import get_listed_stocks
 from utils.portfolio_data import (
     align_benchmark_returns, align_daily_rates, align_weights_to_columns, bound_efficient_return,
@@ -401,6 +401,9 @@ def analyze(payload: AnalyzeRequest, request: Request):
         raise HTTPException(422, "A alocação manual precisa ter ao menos uma cota positiva.")
     quotes, failed, manual_weights = {}, False, {}
     if payload.strategy == "manual":
+        unsupported = [normalize_ticker(ticker) for ticker in required if not supports_share_allocation(ticker)]
+        if unsupported:
+            raise HTTPException(422, f"Alocação manual por cotas não se aplica a {', '.join(unsupported)} (renda fixa modelada ou cripto/commodities/câmbio). Zere as cotas desses ativos ou escolha outra estratégia.")
         quotes, failed = trade_quotes(required)
         missing = [normalize_ticker(ticker) for ticker in required if ticker not in quotes]
         if failed or missing:

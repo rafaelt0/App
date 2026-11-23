@@ -159,8 +159,8 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
   return <div className="cmd-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
     <span className="cmd-prompt" aria-hidden="true">&gt;</span>
     <input ref={input} type="search" role="combobox" aria-autocomplete="list" aria-expanded={expanded} autoComplete="off" spellCheck={false} value={query}
-      aria-label="Buscar ações por código, empresa ou setor" aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-${current}` : undefined}
-      placeholder={compact ? "Busca rápida" : "Busca rápida de ações"}
+      aria-label="Buscar ativos por código, empresa ou setor" aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-${current}` : undefined}
+      placeholder={compact ? "Busca rápida" : "Busca rápida de ativos"}
       onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
       onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }}
       onKeyDown={event => {

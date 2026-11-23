@@ -245,10 +245,9 @@ def get_portfolio_trade_prices(tickers_yf):
     """Fetch recent unadjusted closes for share-count estimates, not returns."""
     if not tickers_yf:
         return pd.DataFrame()
-    from utils.assets import asset_metadata, is_synthetic_fixed_income, is_usd_symbol
+    from utils.assets import is_usd_symbol, supports_share_allocation
 
-    symbols = tuple(symbol for symbol in tickers_yf
-                    if not is_synthetic_fixed_income(symbol) and asset_metadata(symbol)["asset_class"] != "outros")
+    symbols = tuple(symbol for symbol in tickers_yf if supports_share_allocation(symbol))
     if not symbols:
         return pd.DataFrame()
     usd_syms = [s for s in symbols if is_usd_symbol(s)]
@@ -294,6 +293,13 @@ def align_weights_to_columns(weights, columns):
         tickers = ", ".join(map(str, missing))
         raise ValueError(f"Missing portfolio weights for: {tickers}")
     return [weights[column] for column in columns]
+
+
+_PT_MONTHS = ("", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez")
+
+
+def _format_month_year(stamp) -> str:
+    return f"{_PT_MONTHS[stamp.month]}/{stamp.year}"
 
 
 def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, crises):
@@ -342,8 +348,8 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
             {
                 "Crise": name,
                 "Período": (
-                    f"{period_returns.index.min().strftime('%b/%Y')} → "
-                    f"{period_returns.index.max().strftime('%b/%Y')}"
+                    f"{_format_month_year(period_returns.index.min())} → "
+                    f"{_format_month_year(period_returns.index.max())}"
                 ),
                 "Portfólio": portfolio_return,
                 "IBOV": (1 + period_benchmark).prod() - 1

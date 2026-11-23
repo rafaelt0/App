@@ -17,7 +17,6 @@
 .monitor th, .monitor td { padding: 0 6px; }
 .monitor .ell { max-width: 116px; }
 .monitor tbody .ell { max-width: 260px; }
-.monitor .value-unit { display: none; }
 .monitor .tk > span { border-radius: 2px; }
 .monitor.is-quick tbody tr:hover th, .monitor.is-quick tbody tr:hover td { background: var(--amber-dim); }
 .pane-monitor .pane-body > .note { margin: 8px 10px; }

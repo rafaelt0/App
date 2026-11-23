@@ -293,3 +293,56 @@ def test_only_real_instrument_mentions_drive_portfolio_news():
     assert news.get_brazilian_news.__wrapped__("TESOURO-IPCA-2035") == {"ok": True, "items": [], "modeled": True}
     assert not is_relevant_company_news("O", "O mercado acompanha a Selic hoje")
     assert is_relevant_company_news("O", "Realty Income anuncia dividendos")
+
+
+def test_fii_falls_back_to_yahoo_dividend_yield_when_trailing_is_zero(monkeypatch):
+    assets.get_extra_asset_fundamentals.clear()
+    monkeypatch.setattr(assets.yf, "Ticker", lambda symbol: SimpleNamespace(info={
+        "quoteType": "EQUITY",
+        "regularMarketPrice": 140.5,
+        "priceToBook": 0.89,
+        "trailingAnnualDividendYield": 0.0,
+        "dividendYield": 9.9,
+        "currency": "BRL",
+    }))
+    try:
+        data = assets.get_extra_asset_fundamentals("HGLG11")
+    finally:
+        assets.get_extra_asset_fundamentals.clear()
+    assert data["indicators"]["dy"] == pytest.approx(9.9)
+    assert data["indicators"]["pvp"] == pytest.approx(0.89)
+
+
+def test_universe_exposes_supports_shares_and_manual_rejects_modeled_and_outros(client):
+    universe = {item["ticker"]: item for item in client.get("/api/universe").json()["stocks"]}
+    assert universe["PETR4"]["supports_shares"] is True
+    assert universe["HGLG11"]["supports_shares"] is True
+    assert universe["AAPL"]["supports_shares"] is True
+    assert universe["CDI"]["supports_shares"] is False
+    assert universe["BTC-USD"]["supports_shares"] is False
+
+    client.get("/api/session")
+    sel = client.put("/api/session/selection", headers=HEADERS, json={"tickers": ["PETR4", "CDI", "BTC-USD"], "revision": 0}).json()
+    rejected = client.post("/api/portfolio/analyze", headers=HEADERS, json={
+        "tickers": sel["selection"],
+        "revision": sel["revision"],
+        "strategy": "manual",
+        "capital": 10000,
+        "lookback_days": 365,
+        "manual_shares": {"PETR4": 10, "CDI": 5, "BTC-USD": 1},
+        "gamma": 1,
+    })
+    assert rejected.status_code == 422
+    detail = rejected.json()["detail"]
+    assert "CDI" in detail and "BTC-USD" in detail and "não se aplica" in detail
+
+
+def test_historical_stress_uses_portuguese_month_names():
+    dates = pd.bdate_range("2024-11-25", "2024-12-30")
+    prices = pd.DataFrame({"PETR4.SA": [40.0 + i * 0.1 for i in range(len(dates))]}, index=dates)
+    bench = pd.Series([120000.0 - i * 100.0 for i in range(len(dates))], index=dates)
+    rows = portfolio_data.calculate_historical_stress(
+        prices, bench, {"PETR4.SA": 1.0}, {"Crise fiscal brasileira (2024)": ("2024-11-26", "2024-12-30")}
+    )
+    assert len(rows) == 1
+    assert rows[0]["Período"] == "Nov/2024 → Dez/2024"
