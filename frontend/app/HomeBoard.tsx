@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { MAX_SELECTION, type Stock } from "../components/AppProvider";
+import { MAX_SELECTION, type AssetClass, type Stock } from "../components/AppProvider";
 import { Change, stripQuote, tickerColor, useMarket } from "../components/Shell";
 import StockLogo from "../components/StockLogo";
 import { formatBrasilia, formatCompactValue, formatValue, Loading, Notice, Pane, relativeAge, ScrollX, ValueText } from "../components/ui";
-import { quickTickers, universeChanges, type HomeResult, type UniverseChanges } from "../lib/home";
+import { quickTickers, quickTickersByClass, universeChanges, type HomeResult, type UniverseChanges } from "../lib/home";
 import { loadMarketNews, type MarketNews } from "../lib/marketNews";
+import { assetBadge } from "../lib/tickerSearch";
 import { nestedSquarify } from "../lib/treemap";
 
 const brasiliaTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -24,47 +25,59 @@ type MonitorProps = {
   onQuick: (ticker: string) => void; onFavorite: (ticker: string) => void; onAdd: (ticker: string) => void; onRemove: (ticker: string) => void;
 };
 
-/** Selection quote table: delayed Yahoo quote from the tape, Fundamentus indicators once analysed. */
+const starterTabs: { key: AssetClass; label: string }[] = [
+  { key: "acao_br", label: "Ações B3" },
+  { key: "fii", label: "FIIs" },
+  { key: "acao_us", label: "Ações EUA" },
+  { key: "reit", label: "REITs" },
+  { key: "titulo", label: "Títulos e RF" },
+  { key: "etf", label: "ETFs e BDRs" },
+];
+
+/** Selection quote table: delayed Yahoo quote from the tape, Fundamentus/Yahoo/BCB indicators once analysed. */
 export function Monitor({ selection, stocks, watchlist, ready, busy, picker, notices, onQuick, onFavorite, onAdd, onRemove }: MonitorProps) {
   const { strip } = useMarket();
+  const [starterClass, setStarterClass] = useState<AssetClass>("acao_br");
   const byTicker = new Map(stocks.map(stock => [stock.ticker, stock]));
   const companies = new Map(ready?.companies.map(company => [company.ticker, company]) ?? []);
   const units = new Map(ready?.comparison_indicators.map(item => [item.key, item.unit]) ?? []);
-  const liquid = stocks.filter(stock => stock.liquidity !== null).sort((a, b) => (b.liquidity ?? 0) - (a.liquidity ?? 0));
-  const starters = liquid.length ? liquid.slice(0, 14) : quickTickers.map(ticker => byTicker.get(ticker)).filter((stock): stock is Stock => !!stock);
+  const liquid = stocks.filter(stock => (!stock.asset_class || stock.asset_class === "acao_br") && stock.liquidity !== null).sort((a, b) => (b.liquidity ?? 0) - (a.liquidity ?? 0));
+  const classList = quickTickersByClass[starterClass]?.map(ticker => byTicker.get(ticker)).filter((stock): stock is Stock => !!stock) ?? [];
+  const starters = starterClass === "acao_br" && liquid.length ? liquid.slice(0, 14) : classList.length ? classList : quickTickers.map(ticker => byTicker.get(ticker)).filter((stock): stock is Stock => !!stock);
   const [showAll, setShowAll] = useState(false);
   const shownStarters = showAll ? starters : starters.slice(0, 6);
   const quote = (ticker: string) => {
     const item = stripQuote(strip, ticker);
     const company = companies.get(ticker);
     if (item) return { value: item.value as number | null, change: item.change, source: `Yahoo Finance com atraso, ${shortDate(item.as_of)}` };
-    return { value: company?.market.price ?? null, change: null, source: company?.market.last_quote_date ? `Fundamentus, ${company.market.last_quote_date.split("-").reverse().join("/")}` : "Sem cotação no painel" };
+    return { value: company?.market.price ?? null, change: null, source: company?.market.last_quote_date ? `Cotação de referência, ${company.market.last_quote_date.split("-").reverse().join("/")}` : "Sem cotação no painel" };
   };
-  return <Pane id="selecao-de-acoes" title="Seleção de ações" area="mon" className="pane-monitor" meta={selection.length ? `${selection.length} de ${MAX_SELECTION} ações` : undefined} flush>
+  return <Pane id="selecao-de-acoes" title="Seleção de ativos" area="mon" className="pane-monitor" meta={selection.length ? `${selection.length} de ${MAX_SELECTION} ativos` : undefined} flush>
     <div className="monitor-start">{picker}</div>
     {notices}
-    {selection.length >= MAX_SELECTION && <p className="picker-status">Remova uma ação para adicionar outra.</p>}
+    {selection.length >= MAX_SELECTION && <p className="picker-status">Remova um ativo para adicionar outro.</p>}
     {selection.length ? <ScrollX label="Ativos selecionados"><table className="grid monitor">
-      <thead><tr><th scope="col">Ativo</th><th scope="col">Empresa</th><th scope="col" className="num">Últ. R$</th><th scope="col" className="num">Var.</th>
-        {ready ? <><th scope="col" className="num">P/L</th><th scope="col" className="num">ROE</th><th scope="col" className="num">DY</th><th scope="col" className="num">52 sem.</th><th scope="col" className="num" title="Áreas favoráveis na síntese setorial">Sínt.</th><th scope="col">Setor</th></>
-          : <th scope="col" className="num" title="Volume financeiro médio diário em 2 meses">Liq. 2m</th>}
+      <thead><tr><th scope="col">Ativo</th><th scope="col">Nome / Classe</th><th scope="col" className="num">Últ.</th><th scope="col" className="num">Var.</th>
+        {ready ? <><th scope="col" className="num">P/L</th><th scope="col" className="num">ROE</th><th scope="col" className="num">DY / Taxa</th><th scope="col" className="num">52 sem.</th><th scope="col" className="num" title="Áreas favoráveis na síntese setorial">Sínt.</th><th scope="col">Setor</th></>
+          : <th scope="col" className="num" title="Volume financeiro médio diário em 2 meses ou moeda">Liq. 2m / Moeda</th>}
         <th scope="col"><span className="visually-hidden">Ações</span></th></tr></thead>
       <tbody>{selection.map((ticker, index) => {
         const stock = byTicker.get(ticker);
         const company = companies.get(ticker);
         const { value, change, source } = quote(ticker);
         const favorite = watchlist.includes(ticker);
+        const currency = company?.market.currency ?? stock?.currency ?? "BRL";
         return <tr key={ticker}>
-          <th scope="row" title={stock?.company ?? "Fora da lista B3"}><span className="tk"><i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><StockLogo ticker={ticker} company={stock?.company ?? ticker} size={16} />{ticker}</span></th>
-          <td className="ell">{company?.identity.company ?? stock?.company ?? "Fora da lista B3"}</td>
-          <td className="num" title={source}>{value === null ? "—" : <ValueText value={value} unit="money" currency={company?.market.currency ?? "BRL"} />}</td>
+          <th scope="row" title={stock?.company ?? ticker}><span className="tk"><i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><StockLogo ticker={ticker} company={stock?.company ?? ticker} size={16} />{ticker}</span></th>
+          <td className="ell">{company?.identity.company ?? stock?.company ?? ticker} {stock && <small className="asset-badge">{assetBadge(stock)}</small>}</td>
+          <td className="num" title={source}>{value === null ? "—" : <ValueText value={value} unit="money" currency={currency} />}</td>
           <td className="num">{change === null ? <span className="muted">—</span> : <Change value={change} />}</td>
           {ready ? <>
             {["pl", "roe", "dy"].map(key => <td className="num" key={key}>{company?.indicators_available ? formatValue(company.indicators[key], units.get(key) ?? "number", key === "pl" ? 1 : 1) : "—"}</td>)}
             <td className="num"><Range52 low={company?.market.low_52w ?? null} high={company?.market.high_52w ?? null} price={company?.market.price ?? null} /></td>
             <td className="num">{company?.synthesis.categorias_validas ? <span className="synth" title={`${company.synthesis.favorable_categories} de ${company.synthesis.categorias_validas} áreas favoráveis no setor`}>{Array.from({ length: company.synthesis.categorias_validas }, (_, slot) => <i key={slot} data-on={slot < company.synthesis.favorable_categories} />)}</span> : <span className="muted">—</span>}</td>
             <td className="ell">{[company?.identity.sector, company?.identity.subsector].filter(Boolean).join(" · ") || stock?.sector || "Setor não informado"}</td>
-          </> : <td className="num">{stock?.liquidity == null ? "—" : formatCompactValue(stock.liquidity, "money", 1)}</td>}
+          </> : <td className="num">{stock?.liquidity == null ? <span className="muted">{currency}</span> : formatCompactValue(stock.liquidity, "money", 1)}</td>}
           <td className="row-tools">
             <button type="button" className="icon-btn" aria-pressed={favorite} aria-label={favorite ? `Remover ${ticker} dos favoritos` : `Adicionar ${ticker} aos favoritos`} onClick={() => onFavorite(ticker)}>{favorite ? "★" : "☆"}</button>
             <button type="button" className="icon-btn" aria-label={`Remover ${ticker}`} disabled={busy} onClick={() => onRemove(ticker)}>×</button>
@@ -72,21 +85,26 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
         </tr>;
       })}</tbody>
     </table></ScrollX> : <>
-      <h3 className="pane-sub">Ações mais negociadas</h3>
-      <ScrollX label="Ações para análise rápida"><table className="grid monitor is-quick"><caption className="visually-hidden">Ações para análise rápida</caption>
-        <thead><tr><th scope="col">Ativo</th><th scope="col">Empresa</th><th scope="col" className="num" title="Volume financeiro médio diário em 2 meses">Liq. 2m</th><th scope="col" className="num">Últ.</th><th scope="col" className="num">Var.</th></tr></thead>
+      <div className="quick-bar">
+        <h3 className="pane-sub">Ativos para análise rápida</h3>
+        <div className="quick-cats" role="group" aria-label="Classes de ativos em destaque">
+          {starterTabs.map(tab => <button type="button" key={tab.key} aria-pressed={starterClass === tab.key} onClick={() => { setStarterClass(tab.key); setShowAll(false); }}>{tab.label}</button>)}
+        </div>
+      </div>
+      <ScrollX label="Ativos para análise rápida"><table className="grid monitor is-quick"><caption className="visually-hidden">Ativos para análise rápida</caption>
+        <thead><tr><th scope="col">Ativo</th><th scope="col">Nome / Setor</th><th scope="col" className="num" title="Classe e moeda do ativo">Classe</th><th scope="col" className="num">Últ.</th><th scope="col" className="num">Var.</th></tr></thead>
         <tbody>{shownStarters.map(stock => {
           const item = stripQuote(strip, stock.ticker);
           return <tr key={stock.ticker}>
             <th scope="row"><button type="button" className="row-btn" disabled={busy} aria-label={`Analisar ${stock.ticker} agora`} onClick={() => onQuick(stock.ticker)}><span className="tk"><StockLogo ticker={stock.ticker} company={stock.company} size={16} />{stock.ticker}</span><span className="quick-action" aria-hidden="true">Analisar</span></button></th>
-            <td className="ell">{stock.company || "—"}</td>
-            <td className="num">{stock.liquidity === null ? "—" : formatCompactValue(stock.liquidity, "money", 1)}</td>
-            <td className="num">{item ? formatValue(item.value, "money") : <span className="muted">—</span>}</td>
+            <td className="ell">{stock.company || "—"} <small className="muted">· {stock.sector}</small></td>
+            <td className="num"><span className="asset-badge">{assetBadge(stock)}</span></td>
+            <td className="num">{item ? formatValue(item.value, "money") : stock.liquidity !== null ? formatCompactValue(stock.liquidity, "money", 1) : <span className="muted">{stock.currency ?? "BRL"}</span>}</td>
             <td className="num">{item ? <Change value={item.change} /> : <span className="muted">—</span>}</td>
           </tr>;
         })}</tbody>
       </table></ScrollX>
-      {starters.length > 6 && <button type="button" className="more-rows" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? "Mostrar menos ações" : `Ver mais ${starters.length - 6} ações`}</button>}
+      {starters.length > 6 && <button type="button" className="more-rows" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? "Mostrar menos ativos" : `Ver mais ${starters.length - 6} ativos`}</button>}
     </>}
     {watchlist.length > 0 && <>
       <h3 className="pane-sub">Favoritos</h3>
@@ -147,11 +165,12 @@ export function SectorMap({ stocks, selection, busy, onSector, onAdd, onRefresh,
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  const b3Stocks = stocks.filter(stock => !stock.asset_class || stock.asset_class === "acao_br");
   const color = colorOptions[colorBy];
   const changeOf = (ticker: string) => changes.kind === "ready" ? changes.data.changes[ticker]?.[colorBy] ?? null : null;
   const sectors = new Map<string, Block[]>();
   let unsized = 0;
-  for (const stock of stocks) {
+  for (const stock of b3Stocks) {
     const value = sizeBy === "equal" ? 1 : stock.liquidity ?? 0;
     if (!(value > 0)) { unsized++; continue; }
     const key = stock.sector || "Setor não informado";
@@ -160,13 +179,13 @@ export function SectorMap({ stocks, selection, busy, onSector, onAdd, onRefresh,
   const names = [...sectors.keys()].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const shown = only && sectors.has(only) ? [[only, sectors.get(only)!] as const] : [...sectors];
   const laid = nestedSquarify(shown.map(([key, items]) => ({ key, items })), { x: 0, y: 0, w: box.w, h: box.h }, headerHeight);
-  const missing = changes.kind === "ready" ? stocks.filter(stock => changeOf(stock.ticker) === null).length : 0;
+  const missing = changes.kind === "ready" ? b3Stocks.filter(stock => changeOf(stock.ticker) === null).length : 0;
   const pct = (x: number) => `${x / box.w * 100}%`, pctY = (y: number) => `${y / box.h * 100}%`;
   const describe = (block: Block, sector: string) => [`${block.ticker} · ${block.company || "empresa não informada"}`, sector,
     `Liquidez 2m ${block.liquidity === null ? "indisponível" : formatCompactValue(block.liquidity, "money", 1)}`,
     `${color.short} ${changes.kind === "loading" ? "carregando" : block.change === null ? "sem dado" : formatValue(block.change, "fraction", 2, "BRL", true)}`].join(" · ");
   const full = selection.length >= MAX_SELECTION;
-  return <Pane title="Mapa de calor" area="sec" className="pane-sectors" meta={`${stocks.length} ações · ${sectors.size} setores`}
+  return <Pane title="Mapa de calor · B3" area="sec" className="pane-sectors" meta={`${b3Stocks.length} ações B3 · ${sectors.size} setores`}
     actions={<button type="button" disabled={busy} onClick={onRefresh} title="Limpa o cache compartilhado da Fundamentus e busca novos dados">Atualizar Fundamentus</button>}>
     <div className="hm-controls">
       <label>Tamanho<select aria-label="Tamanho" value={sizeBy} onChange={event => setSizeBy(event.target.value as SizeBy)}>{Object.entries(sizeOptions).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>

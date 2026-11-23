@@ -8,7 +8,7 @@ import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp } from "../../components/
 import { ExportButton, formatCompactValue, formatValue, Idle, Loading, Notice, Pane, ScrollX } from "../../components/ui";
 import { refreshFundamentus } from "../../lib/home";
 import { activeCriteria, applyPreset, canonicalCriteria, criterionDefs, defaults, editControl, queryScreener, screenerConfig, sortKey } from "../../lib/screener";
-import type { Config, Controls, CriterionDef, CriterionKey, Result, Sort } from "../../lib/screener";
+import type { Config, Controls, CriterionDef, CriterionKey, Result, ScreenerAssetClass, Sort } from "../../lib/screener";
 import ScreenerTable from "./ScreenerTable";
 
 const liquidityShortcuts = [1_000_000, 2_000_000, 5_000_000, 20_000_000];
@@ -18,6 +18,7 @@ export default function ScreenerPage() {
   const {session,stocks,loading,error:appError,setSelection,toggleFavorite,refreshSession} = useApp();
   const router=useRouter();
   const [config,setConfig]=useState<Config|null>(null);
+  const [assetClass,setAssetClass]=useState<ScreenerAssetClass>("b3");
   const [controls,setControls]=useState<Controls>(defaults);
   const [sort,setSort]=useState<Sort>({field:"liq2m",direction:"desc"});
   const [result,setResult]=useState<Result|null>(null);
@@ -53,7 +54,7 @@ export default function ScreenerPage() {
       setResult(null);setError("Preencha todos os limites dos critérios ativos com números válidos.");setBusy(false);return;
     }
     const timer=setTimeout(()=>{
-      queryScreener(criteria,sort).then(value=>{
+      queryScreener(criteria,sort,assetClass).then(value=>{
         if(gen!==generation.current || revision.current!==rev)return;
         const identity=value.rows.map(row=>String(row.ticker)).join("|");
         if(identity!==orderedTickers.current)setSelected(null);
@@ -63,7 +64,7 @@ export default function ScreenerPage() {
       }).catch(exc=>{if(gen===generation.current && revision.current===rev){setResult(null);setError(exc.message);}}).finally(()=>{if(gen===generation.current)setBusy(false);});
     },200);
     return ()=>{clearTimeout(timer);generation.current++;};
-  },[config,controls,sort,reload,session?.revision]);
+  },[config,controls,sort,assetClass,reload,session?.revision]);
   async function sourceRefresh() {
     generation.current++;setResult(null);setSelected(null);setActionBusy(true);setError(null);
     try {const response=await refreshFundamentus();setNotice(`Cache Fundamentus atualizado (${response.removed} entradas removidas). ${response.scope}.`);setReload(value=>value+1);}
@@ -155,7 +156,14 @@ export default function ScreenerPage() {
   const columnCount=visible?.length ?? 0;
   const selectionSet=new Set(session.selection);
   return <div className="desk desk-split desk-screener">
-    <Pane title="Filtrar ações" className="pane-params" narrowCollapsed meta={chips.length ? `${chips.length} ${chips.length===1 ? "critério ativo":"critérios ativos"}` : "nenhum critério"}>
+    <Pane title="Filtrar ativos" className="pane-params" narrowCollapsed meta={chips.length ? `${chips.length} ${chips.length===1 ? "critério ativo":"critérios ativos"}` : "nenhum critério"}>
+      <label>Classe de ativo<select value={assetClass} disabled={!config} onChange={event=>{
+        const nextClass=event.target.value as ScreenerAssetClass;
+        setAssetClass(nextClass);
+        if(nextClass !== "b3" && (controls.pl_enabled || controls.roe_enabled || controls.c5y_enabled)) {
+          setControls(current=>({...current,preset:"Explorar B3",pl_enabled:false,roe_enabled:false,c5y_enabled:false,dy_enabled:false,liq2m_enabled:true,liq2m_min:1000000}));
+        }
+      }}>{(config?.asset_classes ?? [{key:"b3",label:"Ações B3 (Fundamentus)"}]).map(item=><option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
       <label>Conjunto de filtros<select value={config ? controls.preset:""} disabled={!config} onChange={event=>{const next=config?.presets.find(item=>item.name===event.target.value);if(next)setControls(current=>applyPreset(current,next.name,next.criteria));}}>{config ? config.presets.map(item=><option key={item.name}>{item.name}</option>):<option value="">Carregando…</option>}</select></label>
       {preset?.description && <p className="param-hint">{preset.description}</p>}
       <label>Ordenar resultados<select value={config ? sortKey(sort):""} disabled={!config} onChange={event=>{const [field,direction]=event.target.value.split(":");setSort({field,direction:direction as Sort["direction"]});}}>{config ? sortOptions.map(option=><option key={sortKey(option)} value={sortKey(option)}>{sortLabel(option)}</option>):<option value="">Carregando…</option>}</select></label>

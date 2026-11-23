@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { rankStocks, sortStocks } from "../lib/tickerSearch";
-import { useApp } from "./AppProvider";
+import { searchUniverse } from "../lib/home";
+import { ASSET_CLASS_FILTERS, assetBadge, rankStocks, sortStocks, synthesizeCustomCandidate } from "../lib/tickerSearch";
+import { useApp, type AssetClass, type Stock } from "./AppProvider";
 import StockLogo from "./StockLogo";
 
 type Props = {
@@ -13,23 +14,58 @@ type Props = {
 };
 
 export default function StockPicker({ selection, action, disabled, onChoose }: Props) {
-  const { stocks, session } = useApp();
+  const { stocks, session, upsertStocks } = useApp();
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<"" | AssetClass>("");
+  const [remote, setRemote] = useState<Stock[]>([]);
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(-1);
   const ordered = useMemo(() => sortStocks(stocks, "liquidity"), [stocks]);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setRemote([]);
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      searchUniverse(trimmed, category).then(response => {
+        if (!active) return;
+        upsertStocks(response.items);
+        setRemote(response.items.map(item => ({ ...item, liquidity: null })));
+      }).catch(() => {});
+    }, 220);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [query, category, upsertStocks]);
+
   const matches = useMemo(() => {
-    const available = ordered.filter(stock => !selection.includes(stock.ticker));
+    const classFiltered = category ? ordered.filter(stock => (stock.asset_class ?? "acao_br") === category) : ordered;
+    const available = classFiltered.filter(stock => !selection.includes(stock.ticker));
     const favorites = session?.watchlist ?? [];
     const pool = query.trim() ? available : [
       ...available.filter(stock => favorites.includes(stock.ticker)),
       ...available.filter(stock => !favorites.includes(stock.ticker)),
     ];
-    return rankStocks(pool, query, 8).items;
-  }, [ordered, query, selection, session?.watchlist]);
+    const localMatches = rankStocks(pool, query, 10).items;
+    const seen = new Set(localMatches.map(item => item.ticker));
+    const merged = [...localMatches];
+    for (const item of remote) {
+      if (!seen.has(item.ticker) && !selection.includes(item.ticker) && (!category || item.asset_class === category)) {
+        seen.add(item.ticker);
+        merged.push(item);
+      }
+    }
+    const custom = query.trim() ? synthesizeCustomCandidate(query) : null;
+    if (custom && !seen.has(custom.ticker) && !selection.includes(custom.ticker) && (!category || custom.asset_class === category)) {
+      merged.push({ ...custom, liquidity: null });
+    }
+    return merged.slice(0, 12);
+  }, [ordered, query, category, remote, selection, session?.watchlist]);
+
   const active = Math.min(index, matches.length - 1);
   const visible = open && !disabled;
   const expanded = visible && matches.length > 0;
@@ -47,21 +83,22 @@ export default function StockPicker({ selection, action, disabled, onChoose }: P
     list.current?.children[position]?.scrollIntoView({ block: "nearest" });
   }
 
-  function choose(ticker: string) {
+  function choose(stock: Stock) {
+    upsertStocks([stock]);
     setOpen(false);
     setIndex(-1);
     setQuery("");
-    onChoose(ticker);
+    onChoose(stock.ticker);
   }
 
   return <div className="stock-picker" onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
   }}>
-    <label htmlFor={id}>{action === "Analisar" ? "Qual ação você quer analisar?" : "Adicionar ações"}</label>
+    <label htmlFor={id}>{action === "Analisar" ? "Qual ativo você quer analisar?" : "Adicionar ativos"}</label>
     <input ref={input} id={id} type="search" role="combobox" autoComplete="off" spellCheck={false} readOnly={disabled} aria-disabled={disabled}
       aria-autocomplete="list" aria-expanded={expanded} aria-controls={expanded ? `${id}-matches` : undefined}
       aria-activedescendant={expanded && active >= 0 ? `${id}-option-${active}` : undefined}
-      placeholder="Código ou empresa, ex. PETR4" value={query}
+      placeholder="Código, empresa ou classe, ex. PETR4, AAPL, HGLG11, O, TLT, CDI" value={query}
       onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
       onChange={event => { setQuery(event.target.value); setOpen(true); setIndex(-1); }}
       onKeyDown={event => {
@@ -70,16 +107,22 @@ export default function StockPicker({ selection, action, disabled, onChoose }: P
         else if (event.key === "ArrowUp" && matches.length) { event.preventDefault(); move(active < 0 ? matches.length - 1 : active - 1); }
         else if (event.key === "Enter" && expanded && (active >= 0 || query.trim())) {
           event.preventDefault();
-          choose(matches[Math.max(0, active)].ticker);
+          choose(matches[Math.max(0, active)]);
         } else if (event.key === "Escape" && visible) { event.preventDefault(); setOpen(false); setIndex(-1); }
       }} />
-    {visible && (expanded ? <ul ref={list} className="stock-picker-options" id={`${id}-matches`} role="listbox" aria-label="Ações encontradas">
-      {matches.map((stock, position) => <li key={stock.ticker} id={`${id}-option-${position}`} role="option" aria-selected={active === position}
-        onMouseDown={event => event.preventDefault()} onClick={() => choose(stock.ticker)}>
-        <StockLogo ticker={stock.ticker} company={stock.company} size={24} />
-        <span className="stock-picker-company"><b>{stock.ticker}</b><span>{stock.company || stock.sector || "Empresa não informada"}</span></span>
-        <span className="stock-picker-action">{action}</span>
-      </li>)}
-    </ul> : <p className="stock-picker-options stock-picker-empty" role="status">Nenhuma ação disponível para essa busca.</p>)}
+    {visible && <div className="stock-picker-dropdown">
+      <div className="picker-cats" role="group" aria-label="Filtrar por classe de ativo">
+        {ASSET_CLASS_FILTERS.map(item => <button type="button" key={item.key || "all"} aria-pressed={category === item.key}
+          onMouseDown={event => event.preventDefault()} onClick={() => { setCategory(item.key); setIndex(-1); input.current?.focus(); }}>{item.label}</button>)}
+      </div>
+      {expanded ? <ul ref={list} className="stock-picker-options" id={`${id}-matches`} role="listbox" aria-label="Ativos encontrados">
+        {matches.map((stock, position) => <li key={stock.ticker} id={`${id}-option-${position}`} role="option" aria-selected={active === position}
+          onMouseDown={event => event.preventDefault()} onClick={() => choose(stock)}>
+          <StockLogo ticker={stock.ticker} company={stock.company} size={24} />
+          <span className="stock-picker-company"><b>{stock.ticker} <small className="asset-badge">{assetBadge(stock)}</small></b><span>{stock.company || stock.sector || "Ativo"}</span></span>
+          <span className="stock-picker-action">{action}</span>
+        </li>)}
+      </ul> : <p className="stock-picker-options stock-picker-empty" role="status">Nenhum ativo disponível para essa busca.</p>}
+    </div>}
   </div>;
 }

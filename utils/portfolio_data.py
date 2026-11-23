@@ -183,9 +183,64 @@ def historical_var_cvar(returns, confidence=0.95):
     return var, float(tail.mean())
 
 
+def _convert_usd_columns_to_brl(prices: pd.DataFrame, usd_symbols: list[str], start_date, auto_adjust: bool) -> pd.DataFrame:
+    """Convert USD-denominated Yahoo price series into BRL using historical USD/BRL closes when available."""
+    if not usd_symbols or prices.empty:
+        return prices
+    try:
+        fx = _download_close("BRL=X", start_date, auto_adjust=auto_adjust)
+        if isinstance(fx, pd.DataFrame):
+            fx = fx.iloc[:, 0]
+        fx = fx.dropna()
+        if fx.empty:
+            return prices
+        aligned_fx = fx.reindex(fx.index.union(prices.index)).sort_index().ffill().bfill().reindex(prices.index)
+        result = prices.copy()
+        for sym in usd_symbols:
+            if sym in result.columns:
+                result[sym] = result[sym] * aligned_fx
+        return result
+    except Exception:
+        logger.warning("USD/BRL exchange rate unavailable; keeping USD prices in native currency", exc_info=True)
+        return prices
+
+
 @cache_data(ttl=3600)
 def get_portfolio_prices(tickers_yf, start_date):
-    return _download_close(tickers_yf, start_date)
+    from utils.assets import build_synthetic_fixed_income_prices, is_synthetic_fixed_income, is_usd_symbol
+
+    symbols = tuple(tickers_yf)
+    synthetic = [s for s in symbols if is_synthetic_fixed_income(s)]
+    yahoo_syms = [s for s in symbols if not is_synthetic_fixed_income(s)]
+    usd_syms = [s for s in yahoo_syms if is_usd_symbol(s)]
+
+    if not synthetic and not usd_syms:
+        return _download_close(tickers_yf, start_date)
+
+    y_prices = pd.DataFrame()
+    if yahoo_syms:
+        raw = _download_close(tuple(yahoo_syms), start_date)
+        if isinstance(raw, pd.Series):
+            raw = raw.to_frame(name=yahoo_syms[0])
+        y_prices = _convert_usd_columns_to_brl(raw, usd_syms, start_date, auto_adjust=True)
+
+    s_prices = pd.DataFrame()
+    if synthetic:
+        cdi_rates = None
+        try:
+            cdi_rates = get_cdi_daily_rates(start_date)
+        except Exception:
+            logger.debug("CDI daily rates unavailable for synthetic prices; using fallback rate", exc_info=True)
+        s_prices = build_synthetic_fixed_income_prices(
+            synthetic, start_date, index=y_prices.index if not y_prices.empty else None, cdi_rates=cdi_rates
+        )
+
+    if y_prices.empty:
+        return s_prices.loc[:, list(symbols)]
+    if s_prices.empty:
+        return y_prices.loc[:, [s for s in symbols if s in y_prices.columns]]
+    combined = pd.concat([y_prices, s_prices], axis=1)
+    return combined.loc[:, [s for s in symbols if s in combined.columns]]
 
 
 @cache_data(ttl=900)
@@ -193,11 +248,39 @@ def get_portfolio_trade_prices(tickers_yf):
     """Fetch recent unadjusted closes for share-count estimates, not returns."""
     if not tickers_yf:
         return pd.DataFrame()
+    from utils.assets import build_synthetic_fixed_income_prices, is_synthetic_fixed_income, is_usd_symbol
+
+    symbols = tuple(tickers_yf)
+    synthetic = [s for s in symbols if is_synthetic_fixed_income(s)]
+    yahoo_syms = [s for s in symbols if not is_synthetic_fixed_income(s)]
+    usd_syms = [s for s in yahoo_syms if is_usd_symbol(s)]
     start_date = datetime.date.today() - datetime.timedelta(days=14)
-    prices = _download_close(tickers_yf, start_date, auto_adjust=False)
-    if isinstance(prices, pd.Series):
-        prices = prices.to_frame(name=tuple(tickers_yf)[0])
-    return prices
+
+    if not synthetic and not usd_syms:
+        prices = _download_close(tickers_yf, start_date, auto_adjust=False)
+        if isinstance(prices, pd.Series):
+            prices = prices.to_frame(name=tuple(tickers_yf)[0])
+        return prices
+
+    y_prices = pd.DataFrame()
+    if yahoo_syms:
+        raw = _download_close(tuple(yahoo_syms), start_date, auto_adjust=False)
+        if isinstance(raw, pd.Series):
+            raw = raw.to_frame(name=yahoo_syms[0])
+        y_prices = _convert_usd_columns_to_brl(raw, usd_syms, start_date, auto_adjust=False)
+
+    s_prices = pd.DataFrame()
+    if synthetic:
+        s_prices = build_synthetic_fixed_income_prices(
+            synthetic, start_date, index=y_prices.index if not y_prices.empty else None
+        )
+
+    if y_prices.empty:
+        return s_prices.loc[:, list(symbols)]
+    if s_prices.empty:
+        return y_prices.loc[:, [s for s in symbols if s in y_prices.columns]]
+    combined = pd.concat([y_prices, s_prices], axis=1)
+    return combined.loc[:, [s for s in symbols if s in combined.columns]]
 
 
 @cache_data(ttl=3600)

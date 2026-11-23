@@ -13,6 +13,7 @@ from pydantic import Field
 
 from backend.serialization import StrictModel, clean_json, csv_response, figure
 from backend.state import artifact, begin, publish, require_portfolio, session
+from utils.assets import provider_symbol
 from utils.charts import (
     CHART_MUTED, CHART_PRIMARY, CHART_PRIMARY_FILL, CHART_PRIMARY_FILL_STRONG,
     CHART_PRIMARY_LIGHT, CHART_PRIMARY_TRACE, CHART_TEXT,
@@ -60,9 +61,16 @@ def calibration_sample(portfolio, calibration, today):
         _invalid("Os pesos analisados devem ser finitos, não negativos e somar um valor positivo.")
     normalized = raw / total
     active = raw > 0
-    columns = [f"{ticker}.SA" for ticker, included in zip(tickers, active) if included]
-    weights = normalized[active]
     returns = portfolio.returns
+    def _col(ticker: str) -> str:
+        if not returns.empty:
+            if f"{ticker}.SA" in returns.columns:
+                return f"{ticker}.SA"
+            if ticker in returns.columns:
+                return ticker
+        return provider_symbol(ticker)
+    columns = [_col(ticker) for ticker, included in zip(tickers, active) if included]
+    weights = normalized[active]
     if calibration != "portfolio":
         try:
             prices = get_portfolio_prices(tuple(columns), today - dt.timedelta(days=365 * calibration))

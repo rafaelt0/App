@@ -7,7 +7,8 @@ import Tutorial from "./Tutorial";
 import Welcome from "./Welcome";
 import { Notice } from "./ui";
 
-export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null };
+export type AssetClass = "acao_br" | "fii" | "acao_us" | "reit" | "titulo" | "etf" | "outros";
+export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null; asset_class?: AssetClass; currency?: string };
 export type Session = {
   selection: string[];
   revision: number;
@@ -28,6 +29,7 @@ type AppContext = {
   setSelection: (tickers: SelectionUpdate) => Promise<Session>;
   refreshSession: () => Promise<void>;
   toggleFavorite: (ticker: string) => Promise<void>;
+  upsertStocks: (items: Omit<Stock, "liquidity">[]) => void;
 };
 export const MAX_SELECTION = 20;
 export const SELECTION_FULL_MESSAGE = "Seleção cheia: remova um ativo para adicionar outro.";
@@ -107,6 +109,14 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     const result = await api<{ watchlist: string[] }>(`/api/watchlist/${encodeURIComponent(ticker)}`, undefined, state.watchlist.includes(ticker) ? "DELETE" : "PUT");
     accept({ ...state, watchlist: result.watchlist });
   }), [accept, enqueue]);
+  const upsertStocks = useCallback((items: Omit<Stock, "liquidity">[]) => {
+    if (!items.length) return;
+    setStocks(current => {
+      const existing = new Set(current.map(stock => stock.ticker));
+      const added = items.filter(item => item.ticker && !existing.has(item.ticker)).map(item => ({ ...item, liquidity: null }));
+      return added.length ? [...current, ...added] : current;
+    });
+  }, []);
   async function retry() {
     setLoading(true); setError(null); bootstrap = null;
     try { const value = await initialize(); accept(value.session); setStocks(value.stocks); }
@@ -119,7 +129,7 @@ export default function AppProvider({ children }: { children: ReactNode }) {
   let content = children;
   if (loading) content = <Welcome />;
   else if (error) content = <Notice tone="negative">{error}<button onClick={retry}>Tentar novamente</button></Notice>;
-  return <Context value={{ session: current, stocks, loading, error, openTutorial: () => setTutorialOpen(true), setSelection, refreshSession, toggleFavorite }}>
+  return <Context value={{ session: current, stocks, loading, error, openTutorial: () => setTutorialOpen(true), setSelection, refreshSession, toggleFavorite, upsertStocks }}>
     <Shell>{content}</Shell>
     {tutorialOpen && <Tutorial onDismiss={dismissTutorial} />}
   </Context>;

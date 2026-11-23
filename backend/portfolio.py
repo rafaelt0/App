@@ -16,6 +16,7 @@ import quantstats as qs
 from backend.serialization import StrictModel, clean_json, csv_response, figure
 from backend.state import PortfolioSnapshot, artifact, begin, publish, session
 from utils import db
+from utils.assets import is_valid_asset_ticker, normalize_ticker, provider_symbol
 from utils.market_data import get_listed_stocks
 from utils.portfolio_data import (
     align_benchmark_returns, align_daily_rates, align_weights_to_columns, bound_efficient_return,
@@ -387,11 +388,11 @@ def analyze(payload: AnalyzeRequest, request: Request):
         universe = set(get_listed_stocks()["Ticker"])
     except (OSError, ValueError) as exc:
         raise HTTPException(503, f"Não foi possível carregar a lista de ações da B3: {exc}") from exc
-    if len(set(payload.tickers)) != len(payload.tickers) or any(ticker not in universe for ticker in payload.tickers):
-        raise HTTPException(422, "Selecione de 2 a 20 ações distintas da lista atual da B3.")
+    if len(set(payload.tickers)) != len(payload.tickers) or any(not is_valid_asset_ticker(ticker, universe) for ticker in payload.tickers):
+        raise HTTPException(422, "Selecione de 2 a 20 ativos distintos válidos.")
     if any(ticker not in payload.tickers or shares < 0 for ticker, shares in payload.manual_shares.items()):
         raise HTTPException(422, "Cotas devem ser inteiros não negativos dos ativos selecionados.")
-    tickers = [f"{ticker}.SA" for ticker in payload.tickers]
+    tickers = [provider_symbol(ticker, universe) for ticker in payload.tickers]
     required = [ticker for ticker in tickers if payload.manual_shares.get(ticker.removesuffix('.SA'), 0) > 0] if payload.strategy == "manual" else tickers
     if not required:
         raise HTTPException(422, "A alocação manual precisa ter ao menos uma cota positiva.")
@@ -478,14 +479,18 @@ def restore_portfolio(ctx, target, revision):
             raise HTTPException(409, "A seleção foi alterada. Carregue a carteira em Portfolio.")
         selection = list(ctx.selection)
         saved_tickers, saved = db.portfolio_get(ctx.uid)
-        tickers = [str(ticker).removesuffix('.SA').strip().upper() for ticker in saved_tickers]
+        tickers = [normalize_ticker(ticker) for ticker in saved_tickers]
         if tickers != selection or len(tickers) < (2 if target == "simulation" else 1):
             raise HTTPException(422, "Não há carteira salva válida para restaurar.")
         generation = begin(ctx, "portfolio", revision)
     weights = restored_weights(tickers, saved, target)
     prices, returns = pd.DataFrame(), pd.DataFrame()
     if target == "simulation":
-        prices, returns = history([f"{ticker}.SA" for ticker in tickers], date.today() - timedelta(days=730))
+        try:
+            b3_set = set(get_listed_stocks()["Ticker"])
+        except Exception:
+            b3_set = None
+        prices, returns = history([provider_symbol(ticker, b3_set) for ticker in tickers], date.today() - timedelta(days=730))
     # The saved record stores only tickers and weights, so the original strategy and lookback are unknown.
     mode = restored_mode(tickers, saved, target)
     identifier = uuid.uuid4().hex
@@ -528,7 +533,13 @@ def stress(identifier: str, payload: StressRequest, request: Request):
     snapshot = artifact(ctx, "portfolio", identifier)
     if not snapshot.result.get("benchmark_available"):
         raise HTTPException(422, "Stress test indisponível enquanto o IBOVESPA não responder.")
-    weights = {f"{ticker}.SA": weight for ticker, weight in snapshot.weights.items()}
+    def _col(ticker: str) -> str:
+        if f"{ticker}.SA" in snapshot.prices.columns:
+            return f"{ticker}.SA"
+        if ticker in snapshot.prices.columns:
+            return ticker
+        return provider_symbol(ticker)
+    weights = {_col(ticker): weight for ticker, weight in snapshot.weights.items()}
     active = [ticker for ticker, weight in weights.items() if weight > 0]
     prices = snapshot.prices.reindex(columns=active)
     start = date.today() - timedelta(days=snapshot.lookback_days)

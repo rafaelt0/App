@@ -91,13 +91,32 @@ def compute_target_upside(current_price, target_price):
 
 @cache_data(ttl=3600)
 def get_market_target_data(ticker_b3):
-    """Fetch Yahoo Finance's target-price and recommendation data for a B3 ticker."""
+    """Fetch Yahoo Finance's target-price and recommendation data for a ticker."""
+    from utils.assets import asset_metadata, is_synthetic_fixed_income, provider_symbol
+
+    if is_synthetic_fixed_income(ticker_b3):
+        meta = asset_metadata(ticker_b3)
+        return {
+            "company_name": meta.get("company") or ticker_b3,
+            "currency": meta.get("currency") or "BRL",
+            "price": None,
+            "regular_price": None,
+            "target_low": None,
+            "target_mean": None,
+            "target_median": None,
+            "target_high": None,
+            "analyst_count": None,
+            "recommendation": None,
+            "recommendation_mean": None,
+        }
+    symbol = provider_symbol(ticker_b3)
+    default_currency = "BRL" if symbol.endswith(".SA") else "USD"
     try:
         with YFINANCE_REQUEST_LOCK:
-            info = yf.Ticker(f"{ticker_b3}.SA").info or {}
+            info = yf.Ticker(symbol).info or {}
         return {
             "company_name": info.get("longName") or info.get("shortName"),
-            "currency": info.get("currency") or "BRL",
+            "currency": info.get("currency") or default_currency,
             "price": info.get("currentPrice"),
             "regular_price": info.get("regularMarketPrice"),
             "target_low": info.get("targetLowPrice"),
