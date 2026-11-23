@@ -89,7 +89,7 @@ def compute_target_upside(current_price, target_price):
     return (target / current - 1) * 100
 
 
-@cache_data(ttl=3600)
+@cache_data(ttl=3600, cache_if=lambda data: "_error" not in data)
 def get_market_target_data(ticker_b3):
     """Fetch Yahoo Finance's target-price and recommendation data for a ticker."""
     from utils.assets import asset_metadata, is_synthetic_fixed_income, provider_symbol
@@ -114,6 +114,8 @@ def get_market_target_data(ticker_b3):
     try:
         with YFINANCE_REQUEST_LOCK:
             info = yf.Ticker(symbol).info or {}
+        if not info:
+            return {"_error": "Yahoo Finance não retornou dados"}
         return {
             "company_name": info.get("longName") or info.get("shortName"),
             "currency": info.get("currency") or default_currency,
