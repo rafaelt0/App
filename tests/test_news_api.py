@@ -217,7 +217,19 @@ def test_missing_key_never_calls_api(context, monkeypatch):
 
 
 def test_real_feed_wrapper_distinguishes_parse_failure_and_empty(monkeypatch):
-    payloads = [b"<invalid", b"<rss><channel/></rss>", b"x" * (2 * 1024 * 1024 + 1)]
+    import email.utils
+    published = email.utils.format_datetime(dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=10))
+    filtered_rss = (
+        f"<rss><channel>"
+        f'<item><title>Petrobras anuncia dividendos - Valor Econômico</title><link>https://valor.globo.com/1</link>'
+        f'<source url="https://valor.globo.com">Valor Econômico</source><pubDate>{published}</pubDate></item>'
+        f'<item><title>Futebol feminino: São Paulo é campeão do Paulistão F Petrobras Sub-17 - Valor Econômico</title>'
+        f'<link>https://valor.globo.com/2</link><source url="https://valor.globo.com">Valor Econômico</source><pubDate>{published}</pubDate></item>'
+        f'<item><title>Petrobras anuncia dividendos - Blog Desconhecido</title><link>https://blog.example/3</link>'
+        f'<source url="https://blog.example">Blog Desconhecido</source><pubDate>{published}</pubDate></item>'
+        f"</channel></rss>"
+    ).encode()
+    payloads = [b"<invalid", b"<rss><channel/></rss>", b"x" * (2 * 1024 * 1024 + 1), filtered_rss]
     class Response:
         def __enter__(self): return self
         def __exit__(self, *args): pass
@@ -229,6 +241,11 @@ def test_real_feed_wrapper_distinguishes_parse_failure_and_empty(monkeypatch):
     assert news.get_brazilian_news("PETR4") == {"ok": False, "items": []}
     assert news.get_brazilian_news("VALE3") == {"ok": True, "items": []}
     assert news.get_brazilian_news("WEGE3") == {"ok": False, "items": []}
+    news._fetch_brazilian_news.clear()
+    news.get_brazilian_news.clear()
+    fetched = news.get_brazilian_news("PETR4")
+    assert fetched["ok"] is True
+    assert [item["title"] for item in fetched["items"]] == ["Petrobras anuncia dividendos"]
 
 
 def test_rss_vs_extracted_body_provenance_and_importance_remain_independent(context, monkeypatch):
@@ -248,7 +265,7 @@ def test_refresh_refetches_rss_and_text_and_retries_failed_inference(client, con
     context.selection = ["PETR4"]
     context.portfolio.tickers = ["PETR4"]
     context.portfolio.weights = {"PETR4": 1}
-    entry = story("lucro lucro", "https://publisher.example/one")
+    entry = story("Petrobras reporta lucro lucro", "https://valor.globo.com/one")
     news_items = [entry]
     fetched = []
     extracted = []
@@ -259,7 +276,12 @@ def test_refresh_refetches_rss_and_text_and_retries_failed_inference(client, con
         def read(self, size):
             import email.utils
             published = email.utils.format_datetime(entry["published"])
-            xml = "".join(f'<item><title>{item["title"]}</title><link>{item["link"]}</link><pubDate>{published}</pubDate></item>' for item in news_items)
+            xml = "".join(
+                f'<item><title>{item["title"]}</title><link>{item["link"]}</link>'
+                f'<source url="https://valor.globo.com">Valor Econômico</source>'
+                f'<pubDate>{published}</pubDate></item>'
+                for item in news_items
+            )
             return f"<rss><channel>{xml}</channel></rss>".encode()
     def urlopen(request, timeout):
         fetched.append(request.full_url)
@@ -279,14 +301,14 @@ def test_refresh_refetches_rss_and_text_and_retries_failed_inference(client, con
     monkeypatch.setattr(news.requests, "post", post)
     initial = client.post("/api/news/analyze", json={"revision": 0}).json()
     assert initial["articles"][0]["is_jev"] is False
-    news_items.append(story("prejuizo prejuizo", "https://publisher.example/two"))
+    news_items.append(story("Petrobras registra prejuizo prejuizo", "https://valor.globo.com/two"))
     context.model_retry_at = 12345
     refreshed = client.post("/api/news/refresh", json={"revision": 0}).json()
     assert len(fetched) == 2
-    assert extracted.count("https://publisher.example/one") == 2
+    assert extracted.count("https://valor.globo.com/one") == 2
     assert len(calls) == 3  # Failed judgments are retried after refresh.
     engines = {article["title"]: article["engine"] for article in refreshed["articles"]}
-    assert engines == {"lucro lucro": "Jev", "prejuizo prejuizo": "Jev"}
+    assert engines == {"Petrobras reporta lucro lucro": "Jev", "Petrobras registra prejuizo prejuizo": "Jev"}
     assert refreshed["summary"]["counts"] == {"positive": 0, "neutral": 0, "negative": 2}
     assert refreshed["model"]["engines_used"] == ["Jev"]
     assert context.model_retry_at == 0

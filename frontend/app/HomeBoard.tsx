@@ -262,6 +262,6 @@ export function Headlines() {
       {article.importance_label === "Alta" ? <span className="flag" title="Importância alta por palavras-chave">Alta</span> : <span className="flag is-dim" title={`Importância ${article.importance_label.toLocaleLowerCase("pt-BR")}`}>{article.importance_label.slice(0, 5)}</span>}
       <span className="heads-title">{article.link ? <a href={article.link} target="_blank" rel="noopener noreferrer">{article.title}<span className="visually-hidden"> (abre em nova aba)</span></a> : article.title}<small>{article.provider} · {relativeAge(article.published)}</small></span>
     </li>)}</ol> : <p className="pane-lead">Nenhuma manchete nas últimas {feed.data.window_hours} horas.</p>)}
-    <p className="pane-foot">Google News e publicadores · relevância por palavras-chave.</p>
+    <p className="pane-foot">Google News · fontes financeiras validadas · relevância por palavras-chave.</p>
   </Pane>;
 }
