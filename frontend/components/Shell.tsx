@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { subscribeActivity } from "../lib/api";
-import { comparisonColors } from "../lib/home";
-import { rankStocks, sortStocks } from "../lib/tickerSearch";
+import { comparisonColors, searchUniverse } from "../lib/home";
+import { assetBadge, rankStocks, sortStocks, synthesizeCustomCandidate } from "../lib/tickerSearch";
 import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp, type Session, type Stock } from "./AppProvider";
 import { formatBrasilia, formatCompactValue, formatValue, type Unit } from "./ui";
 
@@ -27,11 +27,11 @@ export const tickerColor = (index: number) => comparisonColors[index % compariso
 
 type View = { key: string; href: string; label: string; title?: string; description: string; ready?: (session: Session) => boolean; requirement?: string };
 export const views: View[] = [
-  { key: "F1", href: "/", label: "Início", title: "Análise de ações", description: "Busque ações da B3, consulte indicadores e compare empresas." },
-  { key: "F2", href: "/portfolio", label: "Carteira", description: "Monte uma carteira e veja como ela teria se saído no passado.", ready: session => session.portfolio_ready, requirement: "Aguardando cálculo" },
+  { key: "F1", href: "/", label: "Início", title: "Análise de ativos", description: "Busque ações da B3 e EUA, FIIs, REITs, títulos, renda fixa e ETFs." },
+  { key: "F2", href: "/portfolio", label: "Carteira", description: "Monte uma carteira multi-ativos e veja como ela teria se saído no passado.", ready: session => session.portfolio_ready, requirement: "Aguardando cálculo" },
   { key: "F3", href: "/simulacao", label: "Simulação", description: "Explore cenários para o valor futuro da sua carteira.", ready: session => session.simulation_ready, requirement: "Requer histórico da carteira" },
   { key: "F4", href: "/noticias", label: "Notícias", description: "Acompanhe as notícias dos ativos da sua carteira e o tom das matérias.", ready: session => session.portfolio_ready, requirement: "Requer carteira calculada" },
-  { key: "F5", href: "/screener", label: "Screener", title: "Screener de ações", description: "Encontre ações por critérios como dividendos, rentabilidade e liquidez." },
+  { key: "F5", href: "/screener", label: "Screener", title: "Screener de ativos", description: "Filtre ações B3, ações EUA, FIIs, REITs, títulos e ETFs por indicadores." },
 ];
 
 const refreshMs = 5 * 60 * 1000;
@@ -86,23 +86,53 @@ type Flash = { text: string; tone: "positive" | "negative" | "info"; undo?: { ti
 type Option = { kind: "view"; view: View } | { kind: "stock"; stock: Stock };
 
 function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; compact: boolean }) {
-  const { session, stocks, setSelection, toggleFavorite } = useApp();
+  const { session, stocks, setSelection, toggleFavorite, upsertStocks } = useApp();
   const router = useRouter();
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  const [remote, setRemote] = useState<Stock[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const busy = useRef(false);
   const selection = session?.selection ?? [];
   const watchlist = session?.watchlist ?? [];
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setRemote([]);
+      return;
+    }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      searchUniverse(trimmed).then(response => {
+        if (!live) return;
+        upsertStocks(response.items);
+        setRemote(response.items.map(item => ({ ...item, liquidity: null })));
+      }).catch(() => {});
+    }, 220);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [query, upsertStocks]);
   const options = useMemo<Option[]>(() => {
     const needle = query.trim().toLocaleLowerCase("pt-BR");
     const viewHits = needle ? views.filter(view => view.key.toLowerCase() === needle || view.label.toLocaleLowerCase("pt-BR").startsWith(needle)).map(view => ({ kind: "view" as const, view })) : [];
     const liquid = sortStocks(stocks, "liquidity");
     const pool = needle ? liquid : [...liquid.filter(stock => watchlist.includes(stock.ticker)), ...liquid.filter(stock => !watchlist.includes(stock.ticker))];
-    return [...viewHits, ...rankStocks(pool, query, 9).items.map(stock => ({ kind: "stock" as const, stock }))];
-  }, [query, stocks, watchlist]);
+    const localHits = rankStocks(pool, query, 9).items;
+    const seen = new Set(localHits.map(item => item.ticker));
+    const combined = [...localHits];
+    for (const item of remote) {
+      if (!seen.has(item.ticker)) {
+        seen.add(item.ticker);
+        combined.push(item);
+      }
+    }
+    const custom = query.trim() ? synthesizeCustomCandidate(query) : null;
+    if (custom && !seen.has(custom.ticker)) {
+      combined.push({ ...custom, liquidity: null });
+    }
+    return [...viewHits, ...combined.slice(0, 10).map(stock => ({ kind: "stock" as const, stock }))];
+  }, [query, stocks, remote, watchlist]);
   useEffect(() => {
     const focus = () => { input.current?.focus(); input.current?.select(); setOpen(true); };
     window.addEventListener("b3lab:focus-search", focus);
@@ -152,8 +182,8 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
           </> : <>
             <span className="cmd-option-mark" aria-hidden="true">{selected ? "✓" : "+"}</span>
             <b>{option.stock.ticker}</b>
-            <span className="cmd-option-name">{option.stock.company || "Empresa não informada"}<small>{option.stock.sector || "Setor não informado"}</small></span>
-            <span className="cmd-option-liq" title="Volume financeiro médio diário em 2 meses">{option.stock.liquidity === null ? "—" : formatCompactValue(option.stock.liquidity, "money", 1)}</span>
+            <span className="cmd-option-name">{option.stock.company || "Ativo"}<small>{assetBadge(option.stock)} · {option.stock.sector || "Mercado"}</small></span>
+            <span className="cmd-option-liq" title="Volume financeiro médio diário em 2 meses">{option.stock.liquidity === null ? option.stock.currency ?? "—" : formatCompactValue(option.stock.liquidity, "money", 1)}</span>
             <span className="cmd-option-hint">{selected ? "remover" : "adicionar"}</span>
             <button type="button" className="cmd-star" tabIndex={-1} aria-pressed={favorite} aria-label={favorite ? `Remover ${option.stock.ticker} dos favoritos` : `Adicionar ${option.stock.ticker} aos favoritos`}
               onClick={event => { event.stopPropagation(); void toggleFavorite(option.stock.ticker).catch(reason => onFlash({ text: String(reason instanceof Error ? reason.message : reason), tone: "negative" })); }}>{favorite ? "★" : "☆"}</button>

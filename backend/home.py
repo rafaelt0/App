@@ -10,6 +10,10 @@ from pydantic import Field
 
 from backend.serialization import StrictModel, clean_json, csv_response
 from backend.state import artifact, begin, publish, session
+from utils.assets import (
+    ASSET_CLASSES, asset_metadata, get_extra_asset_fundamentals, get_full_universe,
+    is_valid_asset_ticker, normalize_ticker, parse_fixed_income_asset, search_yahoo_assets,
+)
 from utils.formatting import extract_debt_metric, get_ev_ebitda_context
 from utils.home_data import (build_analyst_synthesis, clear_fundamentus_cache,
                              compute_sector_ranking, get_fundamentus_data, get_sector_peers)
@@ -200,26 +204,69 @@ def build_analysis(raw, peers, tickers, universe):
                                 "percentile": detail["Percentil"], "verdict": detail["Veredicto"], "category": detail["Categoria"]})
         companies.append({"ticker": ticker, "available": present,
                           "identity": {"company": row.get("Empresa"), "sector": sector or None, "subsector": row.get("Subsetor")},
-                          "market": {**{key: numeric(row.get(source)) for key, source in MARKET}, "last_quote_date": row.get("Data_ult_cot"), "currency": "BRL"},
+                          "market": {**{key: numeric(row.get(source)) for key, source in MARKET}, "last_quote_date": row.get("Data_ult_cot"),
+                                     "currency": str(row.get("Moeda") or "BRL") if pd.notna(row.get("Moeda")) else "BRL"},
                           "indicators": indicators, "indicator_available": indicator_available,
                           "metric_groups": metric_groups, "indicators_available": ticker in indicator_frame.index,
-                          "health": health(row), "synthesis": {**synthesis, "sector": local_sector or None, "details": details,
+                          "health": health(row), "synthesis": {**synthesis, "sector": local_sector or sector or None, "details": details,
                           "favorable_categories": sum(c["veredicto"] == "Favorável" for c in synthesis["categorias"].values())}})
     return clean_json({"requested_tickers": tickers, "missing_tickers": [t for t in tickers if t not in latest.index],
                        "companies": companies, "health_summary": HEALTH_SUMMARY, "comparison_indicators": [{"key": k, "label": label, "unit": unit} for k, _, label, unit, *_ in INDICATORS],
-                       "sources": {"fundamentals": "Fundamentus", "peer_units": "fractions", "detail_percentages": "percentage_points", "detail_multiples": "ratio (scraper /100 correction)"}})
+                       "sources": {"fundamentals": "Fundamentus / Yahoo Finance / BCB", "peer_units": "fractions", "detail_percentages": "percentage_points", "detail_multiples": "ratio (scraper /100 correction)"}})
+
+
+def _extra_fundamentals_frame(tickers: list[str]) -> pd.DataFrame:
+    """Convert non-Fundamentus assets (FIIs, US stocks, REITs, Títulos/RF, ETFs) into build_analysis detail schema."""
+    rows = []
+    index = []
+    for ticker in tickers:
+        data = get_extra_asset_fundamentals(ticker)
+        if not data or not data.get("available"):
+            continue
+        ind = data.get("indicators") or {}
+        hlth = data.get("health") or {}
+        def _scaled(val):
+            return val * 100.0 if val is not None else None
+        rows.append({
+            "Empresa": data.get("company") or ticker,
+            "Setor": data.get("sector") or "",
+            "Subsetor": data.get("subsector") or "",
+            "Moeda": data.get("currency") or "BRL",
+            "Cotacao": data.get("price"),
+            "Min_52_sem": data.get("low_52w"),
+            "Max_52_sem": data.get("high_52w"),
+            "Vol_med_2m": data.get("volume_2m"),
+            "Valor_de_mercado": data.get("market_cap"),
+            "Data_ult_cot": data.get("last_quote_date"),
+            "PL": _scaled(ind.get("pl")),
+            "PVP": _scaled(ind.get("pvp")),
+            "EV_EBITDA": _scaled(ind.get("ev_ebitda")),
+            "ROE": ind.get("roe"),
+            "ROIC": ind.get("roic"),
+            "Marg_Liquida": ind.get("net_margin"),
+            "Marg_EBIT": ind.get("ebit_margin"),
+            "Div_Yield": ind.get("dy"),
+            "Cres_Rec_5a": ind.get("growth"),
+            "Div_Liq_Patrim": _scaled(hlth.get("debt_equity")),
+            "Liquidez_Corr": _scaled(hlth.get("current_ratio")),
+            "EV_EBIT": _scaled(hlth.get("ev_ebit")),
+        })
+        index.append(ticker)
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows, index=index)
 
 
 def validate_selection(ctx, body):
-    tickers = [str(t).strip().upper().removesuffix(".SA") for t in body.tickers]
+    tickers = [normalize_ticker(t) for t in body.tickers]
     if len(set(tickers)) != len(tickers):
         raise HTTPException(422, "A seleção contém tickers repetidos.")
     with ctx.lock:
         if body.revision != ctx.revision or tickers != ctx.selection:
             raise HTTPException(409, "A seleção mudou; clique em Analisar novamente.")
     known = set(get_listed_stocks()["Ticker"])
-    if any(t not in known for t in tickers):
-        raise HTTPException(422, "A seleção contém ações fora da lista B3.")
+    if any(not is_valid_asset_ticker(t, known) for t in tickers):
+        raise HTTPException(422, "A seleção contém ativos inválidos.")
     return tickers
 
 
@@ -227,10 +274,95 @@ def validate_selection(ctx, body):
 def universe():
     try:
         frame = get_listed_stocks()
-        return clean_json({"source": "local_csv", "stocks": [{"ticker": row["Ticker"], "company": row.get("Empresa", ""), "legal_name": row.get("RazaoSocial", ""), "sector": row.get("Setor", "")} for row in frame.to_dict("records")],
-                           "sectors": sorted(frame["Setor"].dropna().unique()), "selection_limit": 20, "sector_autopick_limit": 8})
+        stocks = get_full_universe(frame)
+        return clean_json({"source": "multi_asset_catalog", "stocks": stocks,
+                           "sectors": sorted(frame["Setor"].dropna().unique()),
+                           "asset_classes": list(ASSET_CLASSES),
+                           "selection_limit": 20, "sector_autopick_limit": 8})
     except (OSError, ValueError) as exc:
-        raise HTTPException(503, f"Não foi possível carregar a lista de ações da B3: {exc}") from exc
+        raise HTTPException(503, f"Não foi possível carregar a lista de ativos: {exc}") from exc
+
+
+@catalog_router.get("/universe/search")
+def universe_search(q: str = "", asset_class: str = ""):
+    query = str(q or "").strip()
+    b3_frame = get_listed_stocks()
+    catalog = get_full_universe(b3_frame)
+    if asset_class:
+        catalog = [item for item in catalog if item.get("asset_class") == asset_class]
+    if not query:
+        return clean_json({"items": catalog[:30], "query": query})
+
+    needle = query.casefold()
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    # 1. Dynamic fixed-income expression (e.g. "CDB-112CDI", "IPCA+7.5", "PRE-13.5", "TESOURO-IPCA-2040")
+    fi = parse_fixed_income_asset(query)
+    if fi is not None and (not asset_class or asset_class == "titulo"):
+        t = fi["ticker"]
+        seen.add(t)
+        results.append({
+            "ticker": t,
+            "company": fi["company"],
+            "legal_name": fi["company"],
+            "sector": fi["sector"],
+            "asset_class": "titulo",
+            "currency": fi["currency"],
+        })
+
+    # 2. Local multi-asset catalog matches
+    scored = []
+    for item in catalog:
+        t = item["ticker"]
+        if t in seen:
+            continue
+        t_low = t.casefold()
+        c_low = str(item.get("company") or "").casefold()
+        s_low = str(item.get("sector") or "").casefold()
+        rank = (0 if t_low == needle else
+                1 if t_low.startswith(needle) else
+                2 if c_low.startswith(needle) else
+                3 if needle in c_low else
+                4 if needle in s_low else -1)
+        if rank >= 0:
+            scored.append((rank, item))
+    scored.sort(key=lambda pair: pair[0])
+    for _, item in scored[:16]:
+        seen.add(item["ticker"])
+        results.append(item)
+
+    # 3. Live Yahoo Finance search for any global ticker not yet covered
+    if len(query) >= 2 and len(results) < 12:
+        for remote in search_yahoo_assets(query):
+            if asset_class and remote.get("asset_class") != asset_class:
+                continue
+            if remote["ticker"] not in seen:
+                seen.add(remote["ticker"])
+                results.append({
+                    "ticker": remote["ticker"],
+                    "company": remote["company"],
+                    "legal_name": remote.get("legal_name", remote["company"]),
+                    "sector": remote["sector"],
+                    "asset_class": remote["asset_class"],
+                    "currency": remote["currency"],
+                })
+
+    # 4. Direct custom ticker fallback if the user typed a valid symbol code
+    candidate = normalize_ticker(query)
+    if candidate not in seen and is_valid_asset_ticker(candidate) and len(candidate) >= 1:
+        meta = asset_metadata(candidate, b3_frame)
+        if not asset_class or meta.get("asset_class") == asset_class:
+            results.append({
+                "ticker": meta["ticker"],
+                "company": meta["company"],
+                "legal_name": meta["legal_name"],
+                "sector": meta["sector"],
+                "asset_class": meta["asset_class"],
+                "currency": meta["currency"],
+            })
+
+    return clean_json({"items": results[:20], "query": query})
 
 
 @catalog_router.get("/universe/liquidity")
@@ -276,12 +408,30 @@ def analyze(body: HomeRequest, request: Request):
     generation = begin(ctx, "home", body.revision)
     try:
         universe_frame = get_listed_stocks()
-        raw = get_fundamentus_data(tickers)
+        b3_set = set(universe_frame["Ticker"])
+        b3_tickers = [t for t in tickers if t in b3_set]
+        extra_tickers = [t for t in tickers if t not in b3_set]
+        frames = []
+        if b3_tickers:
+            try:
+                raw_b3 = get_fundamentus_data(b3_tickers)
+                if raw_b3 is not None and not raw_b3.empty:
+                    frames.append(raw_b3)
+            except OSError:
+                raise
+            except Exception:
+                if not extra_tickers:
+                    raise
+        if extra_tickers:
+            extra_raw = _extra_fundamentals_frame(extra_tickers)
+            if not extra_raw.empty:
+                frames.append(extra_raw)
+        raw = pd.concat(frames) if frames else pd.DataFrame()
         if raw is None or raw.empty:
             raise HTTPException(503, "A Fundamentus não retornou dados para os ativos selecionados. Tente novamente.")
-        peers = get_sector_peers()
+        peers = get_sector_peers() if b3_tickers else pd.DataFrame()
         result = build_analysis(raw, peers, tickers, universe_frame)
-        if result["missing_tickers"]:
+        if any(t in b3_set for t in result["missing_tickers"]):
             clear_fundamentus_cache()
         result["consensus"] = consensus(tickers)
         result["id"] = uuid.uuid4().hex

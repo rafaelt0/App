@@ -9,6 +9,7 @@ from pydantic import Field, model_validator
 
 from backend.serialization import StrictModel, clean_json, csv_response
 from backend.state import artifact, begin, publish, session
+from utils.assets import ASSET_CLASSES, ASSET_CLASS_LABELS, get_multi_asset_screener_frame
 from utils.market_data import clean_numeric_column, get_full_market_data
 from utils.screener import PRESET_FILTERS, filter_stocks, prepare_export
 
@@ -99,6 +100,7 @@ class Sort(StrictModel):
 class Query(StrictModel):
     criteria: Criteria = Field(default_factory=Criteria)
     sort: Sort = Field(default_factory=Sort)
+    asset_class: Literal["b3", "all", "acao_br", "fii", "acao_us", "reit", "titulo", "etf", "outros"] = "b3"
 
 
 def columns():
@@ -183,8 +185,14 @@ def screen(raw, body):
 
 @router.get("/config")
 def config():
+    asset_classes = [
+        {"key": "b3", "label": "Ações B3 (Fundamentus)"},
+        {"key": "all", "label": "Todos os ativos (B3, EUA, FIIs, REITs, Títulos e ETFs)"},
+        *[{"key": item["key"], "label": item["label"]} for item in ASSET_CLASSES if item["key"] != "acao_br"],
+    ]
     return {"presets": [{"name": name, "description": DESCRIPTIONS[name], "criteria": criteria} for name, criteria in PRESET_FILTERS.items()],
             "sorts": SORTS, "columns": columns(), "default_columns": DEFAULT_COLUMNS,
+            "asset_classes": asset_classes,
             "bounds": {"pl": [-50, 200, .5], "roe": [0, 80, 1], "growth": [0, 100, 1], "dy": [0, 30, .5], "liquidity": [0, 100_000_000, 100_000]}}
 
 
@@ -195,7 +203,18 @@ def query(body: Query, request: Request):
         revision = ctx.revision
     generation = begin(ctx, "screener", revision)
     try:
-        result, exported = screen(get_full_market_data(), body)
+        if body.asset_class == "b3":
+            result, exported = screen(get_full_market_data(), body)
+        else:
+            b3_raw = None
+            if body.asset_class in {"all", "acao_br"}:
+                try:
+                    b3_raw = get_full_market_data()
+                except Exception:
+                    b3_raw = None
+            multi_raw = get_multi_asset_screener_frame(body.asset_class, b3_raw)
+            result, exported = screen(multi_raw, body)
+            result["source"] = "Catálogo Multi-Ativos (Fundamentus · Yahoo Finance · BCB / Tesouro)" if body.asset_class == "all" else f"Catálogo · {ASSET_CLASS_LABELS.get(body.asset_class, 'Multi-Ativos')}"
     except HTTPException:
         raise
     except Exception as exc:
