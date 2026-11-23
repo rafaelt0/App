@@ -13,7 +13,7 @@ from pydantic import Field
 
 from backend.serialization import StrictModel, clean_json, csv_response, figure
 from backend.state import artifact, begin, publish, require_portfolio, session
-from utils.assets import provider_symbol
+from utils.assets import modeled_history_notice, provider_symbol
 from utils.charts import (
     CHART_MUTED, CHART_PRIMARY, CHART_PRIMARY_FILL, CHART_PRIMARY_FILL_STRONG,
     CHART_PRIMARY_LIGHT, CHART_PRIMARY_TRACE, CHART_TEXT,
@@ -128,7 +128,8 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
                 calibration["sensitivity"].append({"years": years, "count": len(window), **_period(window),
                                                     "annual_log_mean": mean, "iid_standard_error": error})
     days = params.years * 252
-    warnings = []
+    modeled = modeled_history_notice(ticker for ticker, weight in portfolio.weights.items() if weight > 0)
+    warnings = [modeled] if modeled else []
     if len(aligned) < 252 or days > len(aligned):
         warnings.append("A amostra histórica é curta para este horizonte. Médias e riscos estimados podem mudar muito com outra janela; estas trajetórias não são previsões.")
     if params.simulations < 1000:

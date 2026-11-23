@@ -23,6 +23,7 @@ export const ASSET_CLASS_FILTERS: { key: "" | AssetClass; label: string }[] = [
   { key: "reit", label: "REITs" },
   { key: "titulo", label: "Títulos e RF" },
   { key: "etf", label: "ETFs e BDRs" },
+  { key: "outros", label: "Cripto, commodities e câmbio" },
 ];
 
 export function assetBadge(stock: { asset_class?: AssetClass; currency?: string }): string {

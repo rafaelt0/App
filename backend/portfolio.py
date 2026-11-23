@@ -16,7 +16,7 @@ import quantstats as qs
 from backend.serialization import StrictModel, clean_json, csv_response, figure
 from backend.state import PortfolioSnapshot, artifact, begin, publish, session
 from utils import db
-from utils.assets import is_valid_asset_ticker, normalize_ticker, provider_symbol
+from utils.assets import is_valid_asset_ticker, modeled_history_notice, normalize_ticker, provider_symbol
 from utils.market_data import get_listed_stocks
 from utils.portfolio_data import (
     align_benchmark_returns, align_daily_rates, align_weights_to_columns, bound_efficient_return,
@@ -126,7 +126,7 @@ def purchase_suggestion(weights, capital, quotes, failed=False):
     ):
         raise ValueError("Portfolio weights must be finite, nonnegative, and have positive total.")
     weights = {ticker: weight / total_weight for ticker, weight in weights.items()}
-    missing = [ticker.removesuffix(".SA") for ticker, weight in weights.items() if weight > 0 and ticker not in quotes]
+    missing = [normalize_ticker(ticker) for ticker, weight in weights.items() if weight > 0 and ticker not in quotes]
     unavailable = failed or bool(missing)
     rows, total = [], 0.0
     for ticker, weight in weights.items():
@@ -140,7 +140,7 @@ def purchase_suggestion(weights, capital, quotes, failed=False):
             shares = int(np.floor(suggested / price))
             cost = shares * price
             total += cost
-        rows.append({"ticker": ticker.removesuffix(".SA"), "price": price, "quote_date": pd.Timestamp(stamp).date().isoformat() if stamp is not None else None, "shares": shares, "effective_value": cost, "suggested_value": suggested, "suggested_weight": weight, "effective_weight": None})
+        rows.append({"ticker": normalize_ticker(ticker), "price": price, "quote_date": pd.Timestamp(stamp).date().isoformat() if stamp is not None else None, "shares": shares, "effective_value": cost, "suggested_value": suggested, "suggested_weight": weight, "effective_weight": None})
     for row in rows:
         row["effective_weight"] = None if unavailable and row["suggested_weight"] > 0 else row["effective_value"] / total if total > 0 else 0.0
     totals = None if unavailable else {"allocated": total, "cash": capital - total, "efficiency": total / capital}
@@ -333,8 +333,11 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
         charts["frontier"] = figure(plot_efficient_frontier_and_random_portfolios(mu, covariance, weights, rf, label))
     purchases, totals, missing = purchase_suggestion(weights, payload.capital, quotes, quote_failed)
     if quote_failed or missing:
-        warnings.append("Fechamento bruto indisponível para " + ", ".join(missing or [t.removesuffix('.SA') for t, w in weights.items() if w > 0]) + "; cotas e totais aparecem como “—”.")
-    result = {"strategy": payload.strategy, "mode": MODES[payload.strategy], "allocation_label": label, "capital": payload.capital, "lookback_days": payload.lookback_days, "tickers": payload.tickers, "weights": [{"ticker": ticker.removesuffix('.SA'), "weight": weight} for ticker, weight in weights.items()], "sample": {**sample_info(returns), "selected_count": len(payload.tickers), "zero_excluded": payload.strategy == "manual" and len(returns.columns) < len(payload.tickers)}, "comparison_sample": sample_info(daily) if available else None, "source": {"adjusted_prices": "Yahoo Finance Close ajustado", "trade_quotes": "Yahoo Finance Close bruto (últimos 14 dias)", "selic_source": rf_source, "selic_daily": daily_rf, "selic_annual": rf, "historical_rf": historical_rf_source}, "trade_suggestions": purchases, "trade_totals": totals, "metrics": metrics, "metric_status": metric_status, "metric_signal": {key: signal_for(label) for key, label in metric_status.items()}, "metric_help": METRIC_HELP, "inputs": {"strategy": payload.strategy, "capital": payload.capital, "lookback_days": payload.lookback_days, "gamma": payload.gamma, "manual_shares": payload.manual_shares}, "monthly_returns": years, "benchmark_available": available, "charts": charts, "warnings": warnings, "health": None, "stress": None, "regime": None, "concentration": None, "asset_drawdowns": []}
+        warnings.append("Estimativa de cotas indisponível para " + ", ".join(missing or [normalize_ticker(ticker) for ticker, weight in weights.items() if weight > 0]) + "; cotas e totais aparecem como “—”.")
+    adjusted_source = "Yahoo Finance Close ajustado"
+    if modeled_history_notice(returns.columns):
+        adjusted_source += " / modelo B3Lab para renda fixa sem cotação"
+    result = {"strategy": payload.strategy, "mode": MODES[payload.strategy], "allocation_label": label, "capital": payload.capital, "lookback_days": payload.lookback_days, "tickers": payload.tickers, "weights": [{"ticker": normalize_ticker(ticker), "weight": weight} for ticker, weight in weights.items()], "sample": {**sample_info(returns), "selected_count": len(payload.tickers), "zero_excluded": payload.strategy == "manual" and len(returns.columns) < len(payload.tickers)}, "comparison_sample": sample_info(daily) if available else None, "source": {"adjusted_prices": adjusted_source, "trade_quotes": "Yahoo Finance Close bruto (últimos 14 dias)", "selic_source": rf_source, "selic_daily": daily_rf, "selic_annual": rf, "historical_rf": historical_rf_source}, "trade_suggestions": purchases, "trade_totals": totals, "metrics": metrics, "metric_status": metric_status, "metric_signal": {key: signal_for(label) for key, label in metric_status.items()}, "metric_help": METRIC_HELP, "inputs": {"strategy": payload.strategy, "capital": payload.capital, "lookback_days": payload.lookback_days, "gamma": payload.gamma, "manual_shares": payload.manual_shares}, "monthly_returns": years, "benchmark_available": available, "charts": charts, "warnings": warnings, "health": None, "stress": None, "regime": None, "concentration": None, "asset_drawdowns": []}
     max_weight = max(weights.values()) * 100
     squares = sum(weight ** 2 for weight in weights.values())
     hhi, effective = squares * 10000, round(1 / squares, 1)
@@ -342,7 +345,7 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     result["concentration"] = {"hhi": hhi, "effective_assets": effective, "selected_assets": len(weights), "largest_weight": max_weight, "level": "Baixo" if hhi < 2500 else "Moderado" if hhi < 5000 else "Alto", "diagnosis": diagnosis, "diagnostic_status": "negative" if hhi > 5000 else "warning" if hhi > 2500 else "positive", "largest_status": "OK" if max_weight <= 35 else "Concentrado", "largest_signal": "positive" if max_weight <= 35 else "negative"}
     charts["drawdown"] = figure(line_chart(drawdown, "Evolução do Drawdown do Portfólio", "Drawdown", CHART_DANGER, percent=True, fill=True))
     asset_dd = returns.apply(drawdown_from_returns)
-    result["asset_drawdowns"] = sorted([{"ticker": ticker.removesuffix('.SA'), "max_drawdown": asset_dd[ticker].min() * 100, "date": asset_dd[ticker].idxmin().date().isoformat()} for ticker in returns.columns], key=lambda row: row["max_drawdown"])
+    result["asset_drawdowns"] = sorted([{"ticker": normalize_ticker(ticker), "max_drawdown": asset_dd[ticker].min() * 100, "date": asset_dd[ticker].idxmin().date().isoformat()} for ticker in returns.columns], key=lambda row: row["max_drawdown"])
     if not available:
         return result
     cov = np.cov(daily.squeeze(), benchmark.squeeze())
@@ -393,20 +396,21 @@ def analyze(payload: AnalyzeRequest, request: Request):
     if any(ticker not in payload.tickers or shares < 0 for ticker, shares in payload.manual_shares.items()):
         raise HTTPException(422, "Cotas devem ser inteiros não negativos dos ativos selecionados.")
     tickers = [provider_symbol(ticker, universe) for ticker in payload.tickers]
-    required = [ticker for ticker in tickers if payload.manual_shares.get(ticker.removesuffix('.SA'), 0) > 0] if payload.strategy == "manual" else tickers
+    required = [ticker for ticker in tickers if payload.manual_shares.get(normalize_ticker(ticker), 0) > 0] if payload.strategy == "manual" else tickers
     if not required:
         raise HTTPException(422, "A alocação manual precisa ter ao menos uma cota positiva.")
     quotes, failed, manual_weights = {}, False, {}
     if payload.strategy == "manual":
         quotes, failed = trade_quotes(required)
-        missing = [ticker.removesuffix('.SA') for ticker in required if ticker not in quotes]
+        missing = [normalize_ticker(ticker) for ticker in required if ticker not in quotes]
         if failed or missing:
             raise HTTPException(422, f"Não foi possível obter cotações atuais para {', '.join(missing or [t.removesuffix('.SA') for t in required])}; elas são necessárias para calcular os pesos por cotas.")
-        values = {ticker: payload.manual_shares[ticker.removesuffix('.SA')] * quotes[ticker][0] for ticker in required}
+        values = {ticker: payload.manual_shares[normalize_ticker(ticker)] * quotes[ticker][0] for ticker in required}
         total = sum(values.values())
         manual_weights = {ticker: values.get(ticker, 0.0) / total for ticker in tickers}
     prices, returns = history(required, date.today() - timedelta(days=payload.lookback_days))
-    warnings = []
+    modeled = modeled_history_notice(required)
+    warnings = [modeled] if modeled else []
     try:
         daily_rf, rf_source = get_selic_rate(), "BCB SGS 432"
     except Exception as exc:
@@ -424,7 +428,7 @@ def analyze(payload: AnalyzeRequest, request: Request):
         raise HTTPException(422, f"Não foi possível concluir a análise do portfólio: {exc}") from exc
     identifier = uuid.uuid4().hex
     result.update({"id": identifier, "portfolio_id": identifier, "revision": payload.revision, "saved": False})
-    snapshot = PortfolioSnapshot(id=identifier, revision=payload.revision, tickers=list(payload.tickers), weights={ticker.removesuffix('.SA'): float(weight) for ticker, weight in weights.items()}, mode=MODES[payload.strategy], returns=returns, prices=prices, lookback_days=payload.lookback_days, result=clean_json(result))
+    snapshot = PortfolioSnapshot(id=identifier, revision=payload.revision, tickers=list(payload.tickers), weights={normalize_ticker(ticker): float(weight) for ticker, weight in weights.items()}, mode=MODES[payload.strategy], returns=returns, prices=prices, lookback_days=payload.lookback_days, result=clean_json(result))
     with ctx.lock:
         publish(ctx, "portfolio", payload.revision, generation, snapshot)
         try:
@@ -442,7 +446,7 @@ def saved_weights(saved):
     for ticker, raw in (saved or {}).items():
         value = finite_or_none(raw)
         if value is not None and value >= 0:
-            valid[str(ticker).removesuffix('.SA').strip().upper()] = value
+            valid[normalize_ticker(ticker)] = value
     return valid
 
 
@@ -544,6 +548,9 @@ def stress(identifier: str, payload: StressRequest, request: Request):
     prices = snapshot.prices.reindex(columns=active)
     start = date.today() - timedelta(days=snapshot.lookback_days)
     benchmark, warnings = None, []
+    modeled = modeled_history_notice(active)
+    if modeled:
+        warnings.append(modeled)
     try:
         benchmark = get_benchmark_prices(start)
     except Exception:

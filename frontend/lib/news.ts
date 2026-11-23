@@ -21,7 +21,7 @@ export interface NewsTone {
 export interface NewsSnapshot {
   id: string; revision: number; portfolio_id: string; tickers: string[]; weights: Record<string, number>;
   as_of: string; window_days: number; max_per_ticker: number;
-  feeds: {ticker: string; ok: boolean; recent_count: number}[];
+  feeds: {ticker: string; ok: boolean; recent_count: number; modeled?: boolean}[];
   articles: NewsArticle[];
   model: {available: boolean; name: string; engines_used: string[]; jev_count: number; lexicon_count: number; retry_after: number | null};
   summary: {raw_score: number | null; score100: number | null; label: string; coverage: number;

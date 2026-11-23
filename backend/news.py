@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from backend.serialization import StrictModel, clean_json, figure
 from backend.state import begin, publish, require_portfolio, session
+from utils.assets import is_synthetic_fixed_income
 from utils.cache import cache_data
 from utils.charts import CHART_DANGER, CHART_POSITIVE, CHART_SECONDARY, CHART_TEXT, apply_plotly_theme
 from utils.news import (
@@ -85,6 +86,8 @@ def market_headlines():
 
 @cache_data(ttl=60)
 def get_brazilian_news(ticker):
+    if is_synthetic_fixed_income(ticker):
+        return {"ok": True, "items": [], "modeled": True}
     try:
         return {"ok": True, "items": _fetch_brazilian_news(ticker)}
     except Exception:
@@ -205,7 +208,7 @@ def analyze_portfolio(ctx, portfolio):
     now = dt.datetime.now(dt.timezone.utc)
     for ticker, feed in zip(portfolio.tickers, results):
         items = recent_rss_sample(feed["items"], now)
-        feeds.append({"ticker": ticker, "ok": feed["ok"], "recent_count": len(items)})
+        feeds.append({"ticker": ticker, "ok": feed["ok"], "recent_count": len(items), **({"modeled": True} if feed.get("modeled") else {})})
         fetched.extend({**item, "ticker": ticker} for item in items)
     merged = merge_shared_articles(fetched)
     articles = []

@@ -32,6 +32,7 @@ const starterTabs: { key: AssetClass; label: string }[] = [
   { key: "reit", label: "REITs" },
   { key: "titulo", label: "Títulos e RF" },
   { key: "etf", label: "ETFs e BDRs" },
+  { key: "outros", label: "Outros" },
 ];
 
 /** Selection quote table: delayed Yahoo quote from the tape, Fundamentus/Yahoo/BCB indicators once analysed. */
@@ -41,6 +42,8 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
   const byTicker = new Map(stocks.map(stock => [stock.ticker, stock]));
   const companies = new Map(ready?.companies.map(company => [company.ticker, company]) ?? []);
   const units = new Map(ready?.comparison_indicators.map(item => [item.key, item.unit]) ?? []);
+  const monitorIndicators = ([{key:"pl",label:"P/L"},{key:"roe",label:"ROE"},{key:"dy",label:"Proventos / preço"}]).filter(item => units.has(item.key));
+  const showSynthesis = ready?.companies.some(company => company.asset_class === "acao_br");
   const liquid = stocks.filter(stock => (!stock.asset_class || stock.asset_class === "acao_br") && stock.liquidity !== null).sort((a, b) => (b.liquidity ?? 0) - (a.liquidity ?? 0));
   const classList = quickTickersByClass[starterClass]?.map(ticker => byTicker.get(ticker)).filter((stock): stock is Stock => !!stock) ?? [];
   const starters = starterClass === "acao_br" && liquid.length ? liquid.slice(0, 14) : classList.length ? classList : quickTickers.map(ticker => byTicker.get(ticker)).filter((stock): stock is Stock => !!stock);
@@ -58,7 +61,7 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
     {selection.length >= MAX_SELECTION && <p className="picker-status">Remova um ativo para adicionar outro.</p>}
     {selection.length ? <ScrollX label="Ativos selecionados"><table className="grid monitor">
       <thead><tr><th scope="col">Ativo</th><th scope="col">Nome / Classe</th><th scope="col" className="num">Últ.</th><th scope="col" className="num">Var.</th>
-        {ready ? <><th scope="col" className="num">P/L</th><th scope="col" className="num">ROE</th><th scope="col" className="num">DY / Taxa</th><th scope="col" className="num">52 sem.</th><th scope="col" className="num" title="Áreas favoráveis na síntese setorial">Sínt.</th><th scope="col">Setor</th></>
+        {ready ? <>{monitorIndicators.map(item => <th key={item.key} scope="col" className="num">{item.label}</th>)}<th scope="col" className="num">52 sem.</th>{showSynthesis && <th scope="col" className="num" title="Áreas favoráveis na síntese setorial">Sínt.</th>}<th scope="col">Setor</th></>
           : <th scope="col" className="num" title="Volume financeiro médio diário em 2 meses ou moeda">Liq. 2m / Moeda</th>}
         <th scope="col"><span className="visually-hidden">Ações</span></th></tr></thead>
       <tbody>{selection.map((ticker, index) => {
@@ -69,13 +72,13 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
         const currency = company?.market.currency ?? stock?.currency ?? "BRL";
         return <tr key={ticker}>
           <th scope="row" title={stock?.company ?? ticker}><span className="tk"><i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><StockLogo ticker={ticker} company={stock?.company ?? ticker} size={16} />{ticker}</span></th>
-          <td className="ell">{company?.identity.company ?? stock?.company ?? ticker} {stock && <small className="asset-badge">{assetBadge(stock)}</small>}</td>
+          <td className="ell">{company?.identity.company ?? stock?.company ?? ticker} {(company || stock) && <small className="asset-badge">{assetBadge({asset_class: company?.asset_class ?? stock?.asset_class, currency})}</small>}</td>
           <td className="num" title={source}>{value === null ? "—" : <ValueText value={value} unit="money" currency={currency} />}</td>
           <td className="num">{change === null ? <span className="muted">—</span> : <Change value={change} />}</td>
           {ready ? <>
-            {["pl", "roe", "dy"].map(key => <td className="num" key={key}>{company?.indicators_available ? formatValue(company.indicators[key], units.get(key) ?? "number", key === "pl" ? 1 : 1) : "—"}</td>)}
+            {monitorIndicators.map(({key}) => <td className="num" key={key}>{company?.indicator_available[key] ? formatValue(company.indicators[key], units.get(key) ?? "number", 1) : "—"}</td>)}
             <td className="num"><Range52 low={company?.market.low_52w ?? null} high={company?.market.high_52w ?? null} price={company?.market.price ?? null} /></td>
-            <td className="num">{company?.synthesis.categorias_validas ? <span className="synth" title={`${company.synthesis.favorable_categories} de ${company.synthesis.categorias_validas} áreas favoráveis no setor`}>{Array.from({ length: company.synthesis.categorias_validas }, (_, slot) => <i key={slot} data-on={slot < company.synthesis.favorable_categories} />)}</span> : <span className="muted">—</span>}</td>
+            {showSynthesis && <td className="num">{company?.synthesis.categorias_validas ? <span className="synth" title={`${company.synthesis.favorable_categories} de ${company.synthesis.categorias_validas} áreas favoráveis no setor`}>{Array.from({ length: company.synthesis.categorias_validas }, (_, slot) => <i key={slot} data-on={slot < company.synthesis.favorable_categories} />)}</span> : <span className="muted">—</span>}</td>}
             <td className="ell">{[company?.identity.sector, company?.identity.subsector].filter(Boolean).join(" · ") || stock?.sector || "Setor não informado"}</td>
           </> : <td className="num">{stock?.liquidity == null ? <span className="muted">{currency}</span> : formatCompactValue(stock.liquidity, "money", 1)}</td>}
           <td className="row-tools">
@@ -118,7 +121,7 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
         </li>;
       })}</ul>
     </>}
-    <p className="pane-foot">Últ./Var.: Yahoo com atraso quando disponível na faixa de cotações; senão, último preço Fundamentus.</p>
+    <p className="pane-foot">Últ./Var.: Yahoo Finance com atraso na faixa de cotações; para os demais ativos, consulte a fonte no resultado da análise.</p>
   </Pane>;
 }
 

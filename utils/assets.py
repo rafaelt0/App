@@ -44,6 +44,17 @@ ASSET_CLASSES: tuple[dict[str, str], ...] = (
 )
 ASSET_CLASS_LABELS = {item["key"]: item["label"] for item in ASSET_CLASSES}
 ASSET_CLASS_BADGES = {item["key"]: item["badge"] for item in ASSET_CLASSES}
+EQUITY_CLASSES = frozenset({"acao_br", "acao_us"})
+_EQUITY_INDICATORS = frozenset({"pl", "pvp", "ev_ebitda", "roe", "net_margin", "ebit_margin", "dy"})
+ASSET_INDICATORS = {
+    "acao_br": _EQUITY_INDICATORS | {"roic", "growth"},
+    "acao_us": _EQUITY_INDICATORS,
+    "fii": frozenset({"pvp", "dy"}),
+    "reit": frozenset({"pvp", "dy"}),
+    "etf": frozenset({"dy"}),
+    "titulo": frozenset(),
+    "outros": frozenset(),
+}
 
 # Tuple format:
 # (ticker, company, legal_name, sector, asset_class, currency, yahoo_symbol, ref_metrics)
@@ -287,7 +298,7 @@ _CATALOG_ENTRIES: tuple[tuple[str, str, str, str, str, str, str | None, dict[str
     ("ADC", "Agree Realty Corporation", "Agree Realty Corporation", "REIT · Varejo e Renda Mensal", "reit", "USD", "ADC", {"cotacao": 74.5, "pl": 36.0, "pvp": 1.55, "dy": 0.041, "roe": 0.04, "roic": 0.04, "evebitda": 18.0, "liq2m": 35_000_000}),
     ("AGNC", "AGNC Investment Corp.", "AGNC Investment Corp.", "REIT · Hipotecas e Recebíveis (mREIT)", "reit", "USD", "AGNC", {"cotacao": 9.6, "pl": 11.0, "pvp": 1.05, "dy": 0.145, "roe": 0.10, "liq2m": 50_000_000}),
     ("NLY", "Annaly Capital Management", "Annaly Capital Management, Inc.", "REIT · Hipotecas e Recebíveis (mREIT)", "reit", "USD", "NLY", {"cotacao": 19.5, "pl": 12.0, "pvp": 0.98, "dy": 0.132, "roe": 0.09, "liq2m": 45_000_000}),
-    ("VNQ", "Vanguard Real Estate ETF", "Vanguard Real Estate Index Fund ETF", "REIT · ETF de REITs Americanos", "reit", "USD", "VNQ", {"cotacao": 93.0, "pl": 32.0, "pvp": 2.3, "dy": 0.038, "liq2m": 65_000_000}),
+    ("VNQ", "Vanguard Real Estate ETF", "Vanguard Real Estate Index Fund ETF", "ETF · REITs Americanos", "etf", "USD", "VNQ", {"cotacao": 93.0, "dy": 0.038, "liq2m": 65_000_000}),
     ("XLRE", "Real Estate Select Sector SPDR ETF", "The Real Estate Select Sector SPDR Fund", "REIT · ETF Setorial Imobiliário S&P 500", "reit", "USD", "XLRE", {"cotacao": 43.2, "pl": 34.0, "pvp": 2.6, "dy": 0.033, "liq2m": 50_000_000}),
     ("SCHH", "Schwab U.S. REIT ETF", "Schwab U.S. REIT ETF", "REIT · ETF de REITs Americanos", "reit", "USD", "SCHH", {"cotacao": 22.4, "pl": 33.0, "pvp": 2.4, "dy": 0.034, "liq2m": 40_000_000}),
     ("REET", "iShares Global REIT ETF", "iShares Global REIT ETF", "REIT · ETF Global de REITs", "reit", "USD", "REET", {"cotacao": 25.2, "pl": 28.0, "pvp": 1.7, "dy": 0.039, "liq2m": 35_000_000}),
@@ -469,6 +480,8 @@ def parse_fixed_income_asset(raw: str) -> dict[str, Any] | None:
 def normalize_ticker(raw: str) -> str:
     """Normalize a user or API ticker string into its canonical B3Lab ticker."""
     cleaned = str(raw or "").strip().upper().removesuffix(".SA")
+    if cleaned == "BRL=X":
+        return "USDBRL=X"
     fi = parse_fixed_income_asset(cleaned)
     if fi is not None:
         return fi["ticker"]
@@ -487,6 +500,8 @@ def is_synthetic_fixed_income(symbol_or_ticker: str) -> bool:
 def asset_metadata(ticker: str, b3_frame: pd.DataFrame | None = None) -> dict[str, Any]:
     """Return full metadata for any B3, US, FII, REIT, Fixed Income, ETF, or dynamic ticker."""
     canonical = normalize_ticker(ticker)
+    if canonical in EXTRA_ASSETS_BY_TICKER:
+        return dict(EXTRA_ASSETS_BY_TICKER[canonical])
     if b3_frame is not None and not b3_frame.empty and canonical in set(b3_frame["Ticker"]):
         row = b3_frame[b3_frame["Ticker"] == canonical].iloc[0]
         return {
@@ -498,8 +513,6 @@ def asset_metadata(ticker: str, b3_frame: pd.DataFrame | None = None) -> dict[st
             "currency": "BRL",
             "yahoo_symbol": f"{canonical}.SA",
         }
-    if canonical in EXTRA_ASSETS_BY_TICKER:
-        return dict(EXTRA_ASSETS_BY_TICKER[canonical])
     with _DYNAMIC_ASSETS_LOCK:
         if canonical in _DYNAMIC_ASSETS:
             return dict(_DYNAMIC_ASSETS[canonical])
@@ -526,25 +539,33 @@ def asset_metadata(ticker: str, b3_frame: pd.DataFrame | None = None) -> dict[st
             "currency": "BRL",
             "yahoo_symbol": f"{canonical}.SA",
         }
+    other_market = canonical.endswith(("=F", "=X", "-USD"))
     return {
         "ticker": canonical,
         "company": canonical,
         "legal_name": canonical,
         "sector": "Ativo Internacional / Global",
-        "asset_class": "acao_us",
+        "asset_class": "outros" if other_market else "acao_us",
         "currency": "USD",
         "yahoo_symbol": canonical,
     }
 
 
+def modeled_history_notice(tickers) -> str | None:
+    modeled = [ticker for ticker in tickers if is_synthetic_fixed_income(ticker)]
+    if modeled:
+        return f"{', '.join(modeled)}: retornos de renda fixa gerados pelo modelo B3Lab, não por cotações históricas."
+    return None
+
+
 def provider_symbol(ticker: str, b3_universe: set[str] | None = None) -> str:
     """Return the price-table column key / Yahoo symbol for a canonical ticker."""
     canonical = normalize_ticker(ticker)
-    if b3_universe is not None and canonical in b3_universe:
-        return f"{canonical}.SA"
     if canonical in EXTRA_ASSETS_BY_TICKER:
         sym = EXTRA_ASSETS_BY_TICKER[canonical]["yahoo_symbol"]
         return sym if sym is not None else canonical
+    if b3_universe is not None and canonical in b3_universe:
+        return f"{canonical}.SA"
     with _DYNAMIC_ASSETS_LOCK:
         if canonical in _DYNAMIC_ASSETS:
             sym = _DYNAMIC_ASSETS[canonical].get("yahoo_symbol")
@@ -593,6 +614,8 @@ def get_full_universe(b3_frame: pd.DataFrame | None = None) -> list[dict[str, An
     stocks: list[dict[str, Any]] = []
     for row in b3_frame.to_dict("records"):
         ticker = str(row["Ticker"]).strip().upper()
+        if ticker in EXTRA_ASSETS_BY_TICKER or ticker in seen:
+            continue
         seen.add(ticker)
         stocks.append({
             "ticker": ticker,
@@ -710,55 +733,69 @@ def _classify_yahoo_quote(quote: dict[str, Any]) -> dict[str, Any] | None:
             return None
     qtype = str(quote.get("quoteType") or "").upper()
     exchange = str(quote.get("exchange") or quote.get("exchDisp") or "").upper()
-    name = str(quote.get("shortname") or quote.get("longname") or symbol).strip()
-    sector = str(quote.get("sectorDisp") or quote.get("sector") or quote.get("industryDisp") or "").strip()
+    long_name = quote.get("longname") or quote.get("longName")
+    name = str(quote.get("shortname") or quote.get("shortName") or long_name or symbol).strip()
+    sector = str(quote.get("sectorDisp") or quote.get("sector") or "").strip()
+    description = f"{name} {long_name or ''} {quote.get('industryDisp') or quote.get('industry') or ''}".upper()
 
     is_b3 = symbol.endswith(".SA") or exchange in {"SAO", "BVMF", "B3"}
-    canonical = symbol.removesuffix(".SA")
+    canonical = normalize_ticker(symbol)
     if not _VALID_TICKER_PATTERN.match(canonical):
         return None
+    if canonical in EXTRA_ASSETS_BY_TICKER:
+        return dict(EXTRA_ASSETS_BY_TICKER[canonical])
+
+    is_fund = qtype in {"ETF", "MUTUALFUND"}
+    is_bond = qtype == "BOND" or (is_fund and bool(re.search(
+        r"\b(TREASUR(?:Y|IES)|BONDS?|T-BILLS?|TIPS|FIXED INCOME|RENDA FIXA|IMA-B)\b", description)))
 
     if is_b3:
         currency = "BRL"
         yahoo_symbol = f"{canonical}.SA"
-        if canonical.endswith("11") and ("FII" in name.upper() or "IMOB" in name.upper() or "FIAGRO" in name.upper()):
+        if qtype not in {"ETF", "BOND"} and canonical.endswith("11") and re.search(r"\b(FII|FIAGRO|FI.INFRA|FUNDO IMOBILIÁRIO)\b", description):
             asset_class = "fii"
             sector = sector or "FII · Fundo Imobiliário B3"
-        elif qtype == "ETF" or canonical.endswith("11"):
+        elif is_bond:
+            asset_class = "titulo"
+            sector = "Renda Fixa · Ativo listado"
+        elif is_fund:
             asset_class = "etf"
-            sector = sector or "ETF / Unit B3"
+            sector = sector or "ETF / Fundo B3"
         elif canonical.endswith(("31", "32", "33", "34", "35", "39")):
             asset_class = "etf"
             sector = sector or "BDR · Ações Globais na B3"
-        else:
+        elif qtype == "EQUITY":
             asset_class = "acao_br"
             sector = sector or "Ações B3"
+        else:
+            asset_class = "outros"
+            sector = sector or "Outros ativos B3"
     else:
         currency = "USD"
         yahoo_symbol = canonical
-        if "REIT" in sector.upper() or "REAL ESTATE" in sector.upper() or "REIT" in name.upper():
-            asset_class = "reit"
-            sector = f"REIT · {sector or 'Imobiliário EUA'}"
-        elif any(term in name.upper() for term in ("TREASURY", "BOND", "T-BILL", "TIPS", "FIXED INCOME", "CORPORATE BOND")):
+        if is_bond:
             asset_class = "titulo"
             sector = "Títulos EUA · Treasuries e Bonds"
-        elif qtype == "ETF" or qtype == "MUTUALFUND":
+        elif is_fund:
             asset_class = "etf"
             sector = f"ETF · {sector or 'Internacional'}"
-        elif qtype in {"CRYPTOCURRENCY", "FUTURE", "CURRENCY"}:
-            asset_class = "outros"
-            sector = "Criptoativos e Commodities"
-        else:
+        elif qtype == "EQUITY" and re.search(r"\bREITS?\b", description):
+            asset_class = "reit"
+            sector = f"REIT · {sector or 'Imobiliário EUA'}"
+        elif qtype == "EQUITY":
             asset_class = "acao_us"
             sector = f"{sector} (EUA)" if sector else "Ações Americanas (EUA)"
+        else:
+            asset_class = "outros"
+            sector = sector or "Criptoativos, moedas e índices"
 
     return {
         "ticker": canonical,
         "company": name,
-        "legal_name": str(quote.get("longname") or name),
+        "legal_name": str(long_name or name),
         "sector": sector,
         "asset_class": asset_class,
-        "currency": currency,
+        "currency": str(quote.get("currency") or currency).upper(),
         "yahoo_symbol": yahoo_symbol,
     }
 
@@ -793,63 +830,45 @@ def search_yahoo_assets(query: str) -> list[dict[str, Any]]:
 
 @cache_data(ttl=3600)
 def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
-    """Fetch fundamental and market indicators for non-Fundamentus assets (FIIs, US Stocks, REITs, Bonds, ETFs)."""
+    """Load the market and fundamental data applicable to a non-Fundamentus asset."""
     canonical = normalize_ticker(ticker)
     meta = asset_metadata(canonical)
-    ref = dict(EXTRA_ASSETS_BY_TICKER.get(canonical, {}).get("ref_metrics") or {})
-
-    # 1. Synthetic Brazilian Fixed Income / Tesouro Direto
-    if is_synthetic_fixed_income(canonical):
-        spec = parse_fixed_income_asset(canonical) or {"rate": 13.75, "kind": "cdi_pct"}
-        kind = spec["kind"]
-        rate = float(spec["rate"])
-        if kind == "cdi_pct":
-            dy_pct = 13.75 * (rate / 100.0)
-        elif kind == "cdi_spread":
-            dy_pct = 13.75 + rate
-        elif kind == "ipca_plus":
-            dy_pct = 4.62 + rate
-        elif kind == "poupanca":
-            dy_pct = 8.10
-        else:
-            dy_pct = rate
-        price = float(ref.get("cotacao") or 100.0)
+    spec = parse_fixed_income_asset(canonical)
+    if spec is not None:
+        terms = {
+            "cdi_pct": ("Percentual do CDI", "% do CDI"),
+            "cdi_spread": ("Adicional sobre o CDI", "% a.a."),
+            "ipca_plus": ("Taxa real acima do IPCA", "% a.a."),
+            "prefixado": ("Taxa prefixada", "% a.a."),
+            "poupanca": ("Poupança", None),
+            "usd_fixed": ("Taxa prefixada em USD", "% a.a."),
+        }
+        label, unit = terms[spec["kind"]]
         return {
             "ticker": canonical,
             "available": True,
             "company": meta["company"],
             "sector": meta["sector"],
-            "subsector": ASSET_CLASS_LABELS.get(meta["asset_class"], "Renda Fixa"),
+            "asset_class": "titulo",
             "currency": meta["currency"],
-            "price": price,
-            "low_52w": round(price * 0.94, 2),
-            "high_52w": round(price * 1.06, 2),
-            "volume_2m": ref.get("liq2m", 25_000_000.0),
-            "market_cap": None,
-            "last_quote_date": dt.date.today().isoformat(),
-            "indicators": {
-                "pl": None,
-                "pvp": 1.0,
-                "ev_ebitda": None,
-                "roe": None,
-                "roic": None,
-                "net_margin": None,
-                "ebit_margin": None,
-                "dy": round(dy_pct, 2),
-                "growth": None,
-            },
-            "health": {"debt_equity": None, "current_ratio": None, "ev_ebit": None},
-            "source": "BCB SGS / Tesouro Transparente",
+            "fixed_income": {"label": label, "rate": spec["rate"] if unit else None, "unit": unit},
+            "indicators": {},
+            "source": "Premissas do modelo B3Lab",
         }
 
-    # 2. Yahoo Finance asset (US Stock, REIT, FII, Bond ETF, Equity ETF, BDR, Crypto)
     symbol = provider_symbol(canonical)
     info: dict[str, Any] = {}
     try:
         with YFINANCE_REQUEST_LOCK:
             info = yf.Ticker(symbol).info or {}
     except Exception:
-        logger.warning("Yahoo fundamentals unavailable for %s (%s)", canonical, symbol, exc_info=True)
+        logger.warning("Yahoo Finance data unavailable for %s (%s)", canonical, symbol, exc_info=True)
+
+    if info.get("quoteType") and canonical not in EXTRA_ASSETS_BY_TICKER:
+        classified = _classify_yahoo_quote({**info, "symbol": symbol})
+        if classified is not None:
+            meta = register_dynamic_asset(classified)
+    asset_class = meta["asset_class"]
 
     def _num(val: Any) -> float | None:
         try:
@@ -858,43 +877,22 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
         except (TypeError, ValueError):
             return None
 
-    price = _num(info.get("currentPrice")) or _num(info.get("regularMarketPrice")) or _num(info.get("previousClose")) or _num(ref.get("cotacao"))
-    low_52w = _num(info.get("fiftyTwoWeekLow")) or (round(price * 0.85, 2) if price else None)
-    high_52w = _num(info.get("fiftyTwoWeekHigh")) or (round(price * 1.15, 2) if price else None)
-    avg_vol = _num(info.get("averageVolume")) or _num(info.get("averageDailyVolume10Day"))
-    volume_2m = (avg_vol * price) if (avg_vol and price) else _num(ref.get("liq2m"))
-    market_cap = _num(info.get("marketCap")) or _num(info.get("totalAssets"))
+    def _pct(field: str) -> float | None:
+        value = _num(info.get(field))
+        return value * 100.0 if value is not None else None
 
-    pl = _num(info.get("trailingPE")) or _num(info.get("forwardPE")) or _num(ref.get("pl"))
-    pvp = _num(info.get("priceToBook")) or _num(ref.get("pvp"))
-    ev_ebitda = _num(info.get("enterpriseToEbitda")) or _num(ref.get("evebitda"))
-    roe_raw = _num(info.get("returnOnEquity"))
-    roe = (roe_raw * 100.0) if roe_raw is not None else (_num(ref.get("roe")) * 100.0 if _num(ref.get("roe")) is not None else None)
-    roa_raw = _num(info.get("returnOnAssets"))
-    roic = (roa_raw * 100.0) if roa_raw is not None else (_num(ref.get("roic")) * 100.0 if _num(ref.get("roic")) is not None else None)
-    net_m = _num(info.get("profitMargins"))
-    net_margin = (net_m * 100.0) if net_m is not None else None
-    ebit_m = _num(info.get("operatingMargins"))
-    ebit_margin = (ebit_m * 100.0) if ebit_m is not None else None
-
-    # Yahoo reports dividendYield or yield as a fraction (e.g. 0.055) or percentage depending on quoteType
-    dy_raw = _num(info.get(" trailingAnnualDividendYield")) or _num(info.get("trailingAnnualDividendYield")) or _num(info.get("yield")) or _num(info.get("dividendYield"))
-    if dy_raw is None and _num(ref.get("dy")) is not None:
-        dy_raw = _num(ref.get("dy"))
-    if dy_raw is not None:
-        dy = dy_raw * 100.0 if abs(dy_raw) <= 1.0 else dy_raw
-    else:
-        dy = None
-
-    growth_raw = _num(info.get("revenueGrowth"))
-    growth = (growth_raw * 100.0) if growth_raw is not None else None
-
-    dte = _num(info.get("debtToEquity"))
-    debt_equity = (dte / 100.0) if dte is not None else None
-    current_ratio = _num(info.get("currentRatio"))
-    ev_val = _num(info.get("enterpriseValue"))
-    ebitda_val = _num(info.get("ebitda"))
-    ev_ebit = (ev_val / ebitda_val) if (ev_val and ebitda_val and ebitda_val != 0) else None
+    current_price = _num(info.get("regularMarketPrice")) or _num(info.get("currentPrice"))
+    price = current_price or _num(info.get("previousClose"))
+    quote_time = _num(info.get("regularMarketTime")) if current_price is not None else None
+    low_52w = _num(info.get("fiftyTwoWeekLow"))
+    high_52w = _num(info.get("fiftyTwoWeekHigh"))
+    candidates = {
+        "pl": _num(info.get("trailingPE")), "pvp": _num(info.get("priceToBook")),
+        "ev_ebitda": _num(info.get("enterpriseToEbitda")), "roe": _pct("returnOnEquity"),
+        "net_margin": _pct("profitMargins"), "ebit_margin": _pct("operatingMargins"),
+        "dy": _pct("yield" if info.get("quoteType") in {"ETF", "MUTUALFUND"} else "trailingAnnualDividendYield"),
+    }
+    indicators = {key: value for key, value in candidates.items() if key in ASSET_INDICATORS[asset_class]}
 
     currency = str(info.get("currency") or meta.get("currency") or "USD").upper()
     company_name = str(info.get("longName") or info.get("shortName") or meta.get("company") or canonical)
@@ -903,99 +901,31 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
 
     return {
         "ticker": canonical,
-        "available": price is not None or bool(info) or bool(ref),
+        "available": any(value is not None for value in (price, low_52w, high_52w, *indicators.values())),
         "company": company_name,
+        "asset_class": asset_class,
         "sector": sector,
         "subsector": subsector or None,
         "currency": currency,
         "price": price,
         "low_52w": low_52w,
         "high_52w": high_52w,
-        "volume_2m": volume_2m,
-        "market_cap": market_cap,
-        "last_quote_date": dt.date.today().isoformat(),
-        "indicators": {
-            "pl": pl,
-            "pvp": pvp,
-            "ev_ebitda": ev_ebitda,
-            "roe": roe,
-            "roic": roic,
-            "net_margin": net_margin,
-            "ebit_margin": ebit_margin,
-            "dy": dy,
-            "growth": growth,
-        },
-        "health": {
-            "debt_equity": debt_equity,
-            "current_ratio": current_ratio,
-            "ev_ebit": ev_ebit,
-        },
+        "market_cap": _num(info.get("marketCap")) if asset_class in EQUITY_CLASSES | {"reit"} else None,
+        "last_quote_date": dt.datetime.fromtimestamp(quote_time, dt.timezone.utc).date().isoformat() if quote_time else None,
+        "indicators": indicators,
+        "health": {"current_ratio": _num(info.get("currentRatio"))} if asset_class in EQUITY_CLASSES else {},
         "source": "Yahoo Finance",
     }
 
 
-def get_multi_asset_screener_frame(asset_class: str = "all", b3_market_raw: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Build a normalized screening DataFrame for non-B3 or combined multi-asset screening."""
-    rows: list[dict[str, Any]] = []
-    seen: set[str] = set()
-
-    if asset_class in {"all", "acao_br"} and b3_market_raw is not None and not b3_market_raw.empty:
-        from backend.screener import normalize_market
-        b3_norm = normalize_market(b3_market_raw)
-        b3_listed = get_listed_stocks().drop_duplicates("Ticker").set_index("Ticker")
-        for ticker, srow in b3_norm.iterrows():
-            t = str(ticker).strip().upper()
-            seen.add(t)
-            sector = str(b3_listed.loc[t, "Setor"]) if t in b3_listed.index else "Ações B3"
-            rows.append({
-                "ticker": t,
-                "cotacao": srow.get("cotacao"),
-                "pl": srow.get("pl"),
-                "pvp": srow.get("pvp"),
-                "dy": srow.get("dy"),
-                "roe": srow.get("roe"),
-                "roic": srow.get("roic"),
-                "evebitda": srow.get("evebitda"),
-                "evebit": srow.get("evebit"),
-                "mrgebit": srow.get("mrgebit"),
-                "mrgliq": srow.get("mrgliq"),
-                "liqc": srow.get("liqc"),
-                "liq2m": srow.get("liq2m"),
-                "divbpatr": srow.get("divbpatr"),
-                "c5y": srow.get("c5y"),
-                "patrliq": srow.get("patrliq"),
-                "setor": sector,
-            })
-
+def catalog_screener_rows(asset_class: str, fields_by_class: dict[str, set[str]]) -> pd.DataFrame:
+    """Build reference-only screener rows; modeled exposures have no market quotes or turnover."""
+    rows = []
     for ticker, item in EXTRA_ASSETS_BY_TICKER.items():
-        if ticker in seen:
+        category = item["asset_class"]
+        if asset_class not in {"all", category}:
             continue
-        if asset_class not in {"all", item["asset_class"]}:
-            continue
-        seen.add(ticker)
-        ref = item.get("ref_metrics") or {}
-        rows.append({
-            "ticker": ticker,
-            "cotacao": ref.get("cotacao"),
-            "pl": ref.get("pl"),
-            "pvp": ref.get("pvp"),
-            "dy": ref.get("dy"),
-            "roe": ref.get("roe"),
-            "roic": ref.get("roic"),
-            "evebitda": ref.get("evebitda"),
-            "evebit": None,
-            "mrgebit": None,
-            "mrgliq": None,
-            "liqc": None,
-            "liq2m": ref.get("liq2m"),
-            "divbpatr": None,
-            "c5y": ref.get("c5y"),
-            "patrliq": None,
-            "setor": item["sector"],
-        })
-
-    if not rows:
-        return pd.DataFrame()
-    frame = pd.DataFrame(rows).set_index("ticker")
-    frame.attrs["fetched_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
-    return frame
+        ref = item["ref_metrics"] if item["yahoo_symbol"] else {}
+        rows.append({"ticker": ticker, "currency": item["currency"], "asset_class": category,
+                     "setor": item["sector"], **{field: ref.get(field) for field in sorted(fields_by_class[category]) if field != "setor"}})
+    return pd.DataFrame(rows).set_index("ticker") if rows else pd.DataFrame()

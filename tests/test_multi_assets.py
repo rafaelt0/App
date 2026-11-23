@@ -1,4 +1,5 @@
 import datetime as dt
+import io
 from types import SimpleNamespace
 
 import numpy as np
@@ -6,8 +7,9 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from backend import app as api_module, home, portfolio, screener, simulation, state
+from backend import app as api_module, home, news, portfolio, screener, simulation, state
 from utils import assets, db, portfolio_data
+from utils.news import is_relevant_company_news
 
 HEADERS = {"Origin": "http://localhost:3000", "X-B3Lab-Request": "1"}
 
@@ -16,6 +18,7 @@ HEADERS = {"Origin": "http://localhost:3000", "X-B3Lab-Request": "1"}
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "_DB", str(tmp_path / "multi_assets.sqlite"))
     monkeypatch.setattr(state, "_states", {})
+    monkeypatch.setattr(home, "search_yahoo_assets", lambda query: [])
     with TestClient(api_module.app) as test_client:
         yield test_client
 
@@ -49,7 +52,7 @@ def test_universe_includes_all_required_asset_classes(client):
 
 
 def test_universe_search_resolves_catalog_custom_fixed_income_and_custom_tickers(client, monkeypatch):
-    monkeypatch.setattr(assets, "search_yahoo_assets", lambda q: [
+    monkeypatch.setattr(home, "search_yahoo_assets", lambda q: [
         {"ticker": "CROX", "company": "Crocs, Inc.", "legal_name": "Crocs, Inc.",
          "sector": "Consumo (EUA)", "asset_class": "acao_us", "currency": "USD", "yahoo_symbol": "CROX"}
     ] if "crox" in q.lower() else [])
@@ -83,8 +86,21 @@ def test_session_selection_and_watchlist_accept_all_asset_classes(client):
 
 def test_home_analysis_supports_mixed_b3_us_fii_reit_and_fixed_income(client, monkeypatch):
     client.get("/api/session")
-    tickers = ["AAPL", "HGLG11", "O", "TLT", "CDI", "TESOURO-IPCA-2035"]
+    tickers = ["PETR4", "AAPL", "HGLG11", "O", "TLT", "CDI", "TESOURO-IPCA-2035", "SPY", "AAPL34", "BTC-USD"]
     sel = client.put("/api/session/selection", headers=HEADERS, json={"tickers": tickers, "revision": 0}).json()
+    monkeypatch.setattr(home, "get_fundamentus_data", lambda tickers: pd.DataFrame(
+        {"Empresa": ["Petrobras"], "Setor": ["Energia"], "Cotacao": ["35,00"], "PL": [600], "ROIC": ["12,00%"]}, index=tickers))
+    monkeypatch.setattr(home, "get_sector_peers", pd.DataFrame)
+    assets.get_extra_asset_fundamentals.clear()
+
+    def yahoo_ticker(symbol):
+        quote_type = {"TLT": "ETF", "SPY": "ETF", "BTC-USD": "CRYPTOCURRENCY"}.get(symbol, "EQUITY")
+        return SimpleNamespace(info={"quoteType": quote_type, "regularMarketPrice": 90, "totalAssets": 3000000,
+                                     "trailingPE": 19, "priceToBook": 1.25, "returnOnEquity": .15, "returnOnAssets": .12,
+                                     "revenueGrowth": .25, "trailingAnnualDividendYield": 0.0, "yield": .035,
+                                     "debtToEquity": 200, "currentRatio": 2, "enterpriseValue": 100, "ebitda": 10})
+
+    monkeypatch.setattr(assets.yf, "Ticker", yahoo_ticker)
 
     monkeypatch.setattr(home, "get_market_target_data", lambda t: {
         "company_name": t,
@@ -99,6 +115,7 @@ def test_home_analysis_supports_mixed_b3_us_fii_reit_and_fixed_income(client, mo
     })
 
     response = client.post("/api/home/analyze", headers=HEADERS, json={"tickers": tickers, "revision": sel["revision"]})
+    assets.get_extra_asset_fundamentals.clear()
     assert response.status_code == 200
     data = response.json()
     by_ticker = {c["ticker"]: c for c in data["companies"]}
@@ -108,8 +125,53 @@ def test_home_analysis_supports_mixed_b3_us_fii_reit_and_fixed_income(client, mo
     assert by_ticker["O"]["market"]["currency"] == "USD"
     assert by_ticker["HGLG11"]["market"]["currency"] == "BRL"
     assert by_ticker["CDI"]["market"]["currency"] == "BRL"
-    assert by_ticker["CDI"]["indicators"]["dy"] == pytest.approx(13.75, rel=0.1)
-    assert by_ticker["TESOURO-IPCA-2035"]["indicators"]["dy"] > 10.0
+    assert by_ticker["PETR4"]["indicators"]["roic"] == 12
+    assert by_ticker["AAPL"]["indicators"]["roe"] == 15
+    assert by_ticker["AAPL"]["indicators"]["pl"] == 19
+    assert "roic" not in by_ticker["AAPL"]["indicators"] and "growth" not in by_ticker["AAPL"]["indicators"]
+    assert [metric["label"] for metric in by_ticker["AAPL"]["health"]["metrics"]] == ["Liquidez Corrente"]
+    for ticker in ("HGLG11", "O"):
+        assert by_ticker[ticker]["indicators"] == {"pvp": 1.25, "dy": 0.0}
+        assert by_ticker[ticker]["health"]["metrics"] == []
+    assert by_ticker["SPY"]["indicators"] == {"dy": pytest.approx(3.5)}
+    assert by_ticker["AAPL34"]["indicators"] == {"dy": 0.0}
+    for ticker in ("TLT", "CDI", "TESOURO-IPCA-2035", "BTC-USD"):
+        assert by_ticker[ticker]["indicators"] == by_ticker[ticker]["metric_groups"] == {}
+        assert by_ticker[ticker]["indicators_available"] is False
+        assert by_ticker[ticker]["health"]["metrics"] == []
+    assert by_ticker["CDI"]["fixed_income"] == {"label": "Percentual do CDI", "rate": 100, "unit": "% do CDI"}
+    assert by_ticker["TESOURO-IPCA-2035"]["fixed_income"]["rate"] == 6.5
+    assert by_ticker["CDI"]["market"]["price"] is None
+    assert by_ticker["TLT"]["market"]["price"] == 90
+    for key in ("market_cap", "low_52w", "high_52w", "volume_2m", "last_quote_date"):
+        assert by_ticker["TLT"]["market"][key] is None
+    assert {row["ticker"] for row in data["consensus"]["rows"]} == {"PETR4", "AAPL", "O"}
+    exported = pd.read_csv(io.BytesIO(client.get(f"/api/home/{data['id']}/fundamentals.csv").content), index_col=0)
+    assert pd.isna(exported.loc["TLT", "Div_Yield"])
+    assert exported.loc["CDI", "Unidade_taxa_modelo"] == "% do CDI"
+
+
+@pytest.mark.parametrize(("symbol", "quote_type", "name", "industry", "expected"), [
+    ("UNIT11.SA", "EQUITY", "Banco Unit", "Banks", "acao_br"),
+    ("FUND11.SA", "EQUITY", "FII Modelo", "", "fii"),
+    ("AGRO11.SA", "MUTUALFUND", "Fiagro Crédito Renda Fixa", "", "fii"),
+    ("IMOB11.SA", "ETF", "ETF Imobiliário", "", "etf"),
+    ("NEWB11.SA", "ETF", "ETF Renda Fixa", "", "titulo"),
+    ("USBD", "ETF", "Treasury Bond Fund", "", "titulo"),
+    ("NEWRE", "ETF", "Real Estate REIT ETF", "REIT", "etf"),
+    ("SAMPLE", "EQUITY", "Real Estate Brokerage", "Real Estate Services", "acao_us"),
+    ("SAMPLE", "EQUITY", "Real Estate Trust", "REIT - Retail", "reit"),
+    ("XRP-USD", "CRYPTOCURRENCY", "XRP", "", "outros"),
+])
+def test_yahoo_classification_uses_instrument_type_before_theme(symbol, quote_type, name, industry, expected):
+    entry = assets._classify_yahoo_quote({"symbol": symbol, "quoteType": quote_type, "longname": name, "industry": industry})
+    assert entry["asset_class"] == expected
+
+
+def test_unavailable_yahoo_quote_does_not_use_catalog_values(monkeypatch):
+    monkeypatch.setattr(assets.yf, "Ticker", lambda symbol: SimpleNamespace(info={}))
+    assert assets.get_extra_asset_fundamentals.__wrapped__("AAPL")["available"] is False
+    assert assets.get_extra_asset_fundamentals.__wrapped__("TLT")["price"] is None
 
 
 def test_portfolio_and_simulation_with_multi_asset_classes(monkeypatch):
@@ -151,7 +213,12 @@ def test_portfolio_and_simulation_with_multi_asset_classes(monkeypatch):
         )
         assert len(res["weights"]) == len(tickers)
         assert sum(w["weight"] for w in res["weights"]) == pytest.approx(1.0, abs=1e-4)
-        assert res["trade_totals"]["allocated"] <= 50000
+        for row in res["trade_suggestions"]:
+            if row["ticker"] in {"CDI", "TESOURO-IPCA-2035"}:
+                assert row["price"] is None
+                if row["suggested_weight"] > 0:
+                    assert row["shares"] is None and res["trade_totals"] is None
+        assert any("não por cotações históricas" in warning for warning in res["warnings"])
 
     # Verify Monte Carlo Simulation runs on the resulting multi-asset portfolio snapshot
     sim = simulation.compute_simulation(
@@ -162,13 +229,15 @@ def test_portfolio_and_simulation_with_multi_asset_classes(monkeypatch):
     assert len(sim.result["allocation"]) == len(tickers)
 
 
-def test_screener_supports_all_multi_asset_classes(client):
+def test_screener_supports_all_multi_asset_classes(client, monkeypatch):
+    monkeypatch.setattr(screener, "get_full_market_data", lambda: pd.DataFrame(
+        {"P/L": [10, 20], "Liq.2meses": [2_000_000, 8_000_000]}, index=["PETR4", "TLT"]))
     client.get("/api/session")
     cfg = client.get("/api/screener/config").json()
     class_keys = {item["key"] for item in cfg["asset_classes"]}
     assert {"b3", "all", "fii", "acao_us", "reit", "titulo", "etf"} <= class_keys
 
-    for cls in ("fii", "acao_us", "reit", "titulo", "etf"):
+    for cls in ("b3", "fii", "acao_us", "reit", "titulo", "etf", "outros", "all"):
         res = client.post("/api/screener/query", headers=HEADERS, json={
             "asset_class": cls,
             "criteria": {"liq2m_min": 1_000_000},
@@ -178,3 +247,49 @@ def test_screener_supports_all_multi_asset_classes(client):
         body = res.json()
         assert body["matched_count"] > 0
         assert len(body["rows"]) == body["matched_count"]
+        if cls == "b3":
+            assert [row["ticker"] for row in body["rows"]] == ["PETR4"]
+        if cls != "b3":
+            assert body["fetched_at"] is None and "referência" in body["source"]
+        if cls in {"titulo", "outros"}:
+            assert {column["key"] for column in body["available_columns"]}.isdisjoint({"dy", "pvp", "pl", "roe"})
+            invalid = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": cls, "criteria": {"dy_min": 0}})
+            assert invalid.status_code == 422
+        if cls == "all":
+            listed = next(row for row in body["rows"] if row["ticker"] == "TLT")
+            assert listed["asset_class"] == "titulo" and listed["currency"] == "USD"
+            assert listed["pl"] is None and listed["pvp"] is None and listed["dy"] is None
+    unfiltered = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": "titulo"}).json()
+    modeled = next(row for row in unfiltered["rows"] if row["ticker"] == "CDI")
+    assert modeled["cotacao"] is None and modeled["liq2m"] is None
+
+
+def test_usd_fixed_income_history_includes_fx_but_does_not_quote_units(monkeypatch):
+    dates = pd.bdate_range("2026-01-05", periods=4)
+    fx = pd.Series([5.0, 5.1, 5.2, 5.3], index=dates)
+    monkeypatch.setattr(portfolio_data, "get_cdi_daily_rates", lambda start: pd.Series(dtype=float))
+    monkeypatch.setattr(portfolio_data, "_download_close", lambda *args, **kwargs: fx)
+    modeled = "TREASURY-4.5"
+    start = dates[0].date()
+    native = assets.build_synthetic_fixed_income_prices([modeled], start)
+    history = portfolio_data.get_portfolio_prices.__wrapped__((modeled,), start)
+    pd.testing.assert_series_equal(history[modeled].loc[dates], native[modeled].loc[dates] * fx.rename(modeled))
+    assert portfolio_data.get_portfolio_trade_prices.__wrapped__((modeled, "BTC-USD", "GC=F", "BRL=X")).empty
+
+
+def test_missing_fx_does_not_return_usd_positions_as_reais(monkeypatch):
+    prices = pd.DataFrame({"TLT": [91.0], "IMAB11.SA": [100.0]})
+    monkeypatch.setattr(portfolio_data, "_download_close", lambda symbols, *args, **kwargs: pd.Series(dtype=float) if symbols == "BRL=X" else prices)
+    assert list(portfolio_data.get_portfolio_trade_prices.__wrapped__(tuple(prices))) == ["IMAB11.SA"]
+
+
+def test_fx_alias_preserves_catalog_identity_and_saved_weight():
+    assert assets.provider_symbol("USDBRL=X") == "BRL=X"
+    assert assets.asset_metadata("BRL=X")["asset_class"] == "outros"
+    assert portfolio.saved_weights({"BRL=X": .4, "PETR4.SA": .6}) == {"USDBRL=X": .4, "PETR4": .6}
+
+
+def test_only_real_instrument_mentions_drive_portfolio_news():
+    assert news.get_brazilian_news.__wrapped__("TESOURO-IPCA-2035") == {"ok": True, "items": [], "modeled": True}
+    assert not is_relevant_company_news("O", "O mercado acompanha a Selic hoje")
+    assert is_relevant_company_news("O", "Realty Income anuncia dividendos")

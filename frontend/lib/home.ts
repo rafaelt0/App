@@ -6,6 +6,8 @@ export type Consensus = {rows: Record<string, unknown>[]; failed_tickers: string
 export type SynthesisDetail = {label:string;value:number;unit:"percent"|"multiple";median:number;mean:number;observations:number;percentile:number;verdict:string;category:string};
 export type Company = {
   ticker:string; available:boolean; indicators_available:boolean;
+  asset_class:AssetClass; source:string|null;
+  fixed_income:{label:string;rate:number|null;unit:string|null}|null;
   identity:{company:string|null;sector:string|null;subsector:string|null};
   market:{price:number|null;low_52w:number|null;high_52w:number|null;volume_2m:number|null;market_cap:number|null;last_quote_date:string|null;currency:string};
   indicators:Record<string,number|null>;
@@ -30,9 +32,9 @@ export const quickTickersByClass: Record<AssetClass, string[]> = {
   acao_br: ["WEGE3", "PETR4", "VALE3", "ITUB4", "BBAS3", "RENT3", "ABEV3", "EGIE3", "RADL3", "BPAC11", "PRIO3", "SUZB3"],
   fii: ["HGLG11", "KNRI11", "MXRF11", "XPML11", "VISC11", "BTLG11", "KNCR11", "KNIP11", "HGRU11", "TRXF11", "BCFF11", "XPLG11"],
   acao_us: ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "BRK-B", "LLY", "JPM", "V", "KO"],
-  reit: ["O", "PLD", "AMT", "EQIX", "WELL", "SPG", "PSA", "DLR", "VICI", "AVB", "VNQ", "WPC"],
+  reit: ["O", "PLD", "AMT", "EQIX", "WELL", "SPG", "PSA", "DLR", "VICI", "AVB", "WPC"],
   titulo: ["CDI", "TESOURO-SELIC", "TESOURO-IPCA-2035", "TESOURO-PRE", "CDB-110CDI", "IPCA+6", "IMAB11", "B5P211", "TLT", "SHY", "BND", "SGOV"],
-  etf: ["BOVA11", "IVVB11", "SMAL11", "SPY", "VOO", "QQQ", "VT", "SCHD", "GLD", "AAPL34", "NVDC34", "BTC-USD"],
+  etf: ["BOVA11", "IVVB11", "SMAL11", "SPY", "VOO", "QQQ", "VT", "SCHD", "GLD", "AAPL34", "NVDC34", "VNQ"],
   outros: ["BTC-USD", "ETH-USD", "SOL-USD", "GC=F", "SI=F", "BZ=F", "USDBRL=X"],
 };
 /** Series colors from the brand chart palette; mirrors the CHART_* constants in utils/charts.py. */
