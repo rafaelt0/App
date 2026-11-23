@@ -21,8 +21,8 @@ from utils.charts import CHART_DANGER, CHART_POSITIVE, CHART_SECONDARY, CHART_TE
 from utils.news import (
     NEWS_IMPORTANCE_LABELS, _article_url_key, aggregate_ticker_sentiment,
     analise_sentimento_pln, build_news_query, extract_article_text, has_scoring_evidence,
-    merge_shared_articles, parse_rss_items, rank_news_importance,
-    recent_rss_sample, sentiment_intensity, ticker_tone_rows,
+    is_relevant_company_news, merge_shared_articles, parse_rss_items,
+    rank_news_importance, recent_rss_sample, sentiment_intensity, ticker_tone_rows,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,12 +45,13 @@ def _fetch_news_query(query):
         xml = response.read(2 * 1024 * 1024 + 1)
     if len(xml) > 2 * 1024 * 1024:
         raise ValueError("RSS excede 2 MB; feed indisponível, nenhum item pontuado")
-    return parse_rss_items(xml)
+    return parse_rss_items(xml, trusted_only=True)
 
 
 @cache_data(ttl=600)
 def _fetch_brazilian_news(ticker):
-    return _fetch_news_query(build_news_query(ticker))
+    items = _fetch_news_query(build_news_query(ticker))
+    return [item for item in items if is_relevant_company_news(ticker, item.get("title", ""), item.get("summary", ""))]
 
 
 @cache_data(ttl=300, stale=3600)

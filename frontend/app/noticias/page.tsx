@@ -181,7 +181,7 @@ export default function NewsPage() {
         </div></details>
         <details className="disclosure"><summary>Fontes e metodologia</summary><div>
           <p>Até {snapshot.max_per_ticker} notícias únicas mais recentes por ativo nos últimos {snapshot.window_days} dias, antes dos filtros: {snapshot.articles.length} artigos únicos · {snapshot.summary.observation_count} observações artigo-ativo. Feeds indisponíveis: {failed.join(", ") || "nenhum"}.</p>
-          <p>A cobertura depende do Google News e dos feeds acessíveis. Sem texto acessível usamos descrição RSS ou título. Importância é triagem por palavras-chave, não materialidade. No léxico, menos de dois termos implica evidência limitada; essas notícias não entram na nota agregada.</p>
+          <p>A cobertura usa somente veículos financeiros validados (como Valor Econômico, Valor Investe, InfoMoney, Money Times, Seu Dinheiro, Suno, Investidor10, E-Investidor, Estadão, Exame, Brazil Journal, NeoFeed, Bloomberg Línea, Forbes Brasil e Investing.com) via Google News e filtra menções sem relação com as ações ou a atividade econômica da companhia. Sem texto acessível usamos descrição RSS ou título. Importância é triagem por palavras-chave, não materialidade. No léxico, menos de dois termos implica evidência limitada; essas notícias não entram na nota agregada.</p>
         </div></details>
       </>}
     </Pane>

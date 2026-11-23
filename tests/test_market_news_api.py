@@ -38,8 +38,9 @@ def test_market_headlines_work_without_portfolio_and_rank_recent_items(client, m
 
 def test_market_feed_parses_and_deduplicates_rss(client, monkeypatch):
     published = email.utils.format_datetime(dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5))
-    item = f"<item><title>Lucro cresce - Publisher</title><source>Publisher</source><link>https://publisher.example/story</link><pubDate>{published}</pubDate></item>"
-    xml = f"<rss><channel>{item}{item}</channel></rss>".encode()
+    item = f"<item><title>Lucro cresce - Valor Econômico</title><source url=\"https://valor.globo.com\">Valor Econômico</source><link>https://valor.globo.com/story</link><pubDate>{published}</pubDate></item>"
+    untrusted = f"<item><title>Boato sem fonte - Blog</title><source url=\"https://blog.example\">Blog</source><link>https://blog.example/story</link><pubDate>{published}</pubDate></item>"
+    xml = f"<rss><channel>{item}{item}{untrusted}</channel></rss>".encode()
     requests = []
 
     class Response:
@@ -62,8 +63,8 @@ def test_market_feed_parses_and_deduplicates_rss(client, monkeypatch):
     data = client.post("/api/news/market").json()
     assert len(data["articles"]) == 1
     assert data["articles"][0]["title"] == "Lucro cresce"
-    assert data["articles"][0]["provider"] == "Publisher"
-    assert data["articles"][0]["link"] == "https://publisher.example/story"
+    assert data["articles"][0]["provider"] == "Valor Econômico"
+    assert data["articles"][0]["link"] == "https://valor.globo.com/story"
     query = urllib.parse.parse_qs(urllib.parse.urlsplit(requests[0]).query)
     assert "Ibovespa" in query["q"][0] and "when:2d" in query["q"][0]
     assert query["hl"] == ["pt-BR"]
