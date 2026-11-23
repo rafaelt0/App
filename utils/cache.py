@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 _caches = []
 
 
-def cache_data(ttl=3600, max_entries=128, stale=0):
+def cache_data(ttl=3600, max_entries=128, stale=0, *, cache_if=None):
     """Memoize by arguments for ``ttl`` seconds, one computation per key at a time.
 
     With ``stale`` > 0, an entry up to ``ttl + stale`` seconds old is returned
     immediately while one background thread recomputes it, so readers wait
-    only when no usable entry exists.
+    only when no usable entry exists. If provided, `cache_if` selects which
+    results to store.
     """
     def decorate(function):
         signature = inspect.signature(function)
@@ -36,6 +37,8 @@ def cache_data(ttl=3600, max_entries=128, stale=0):
         def compute(key, event, started_generation, args, kwargs):
             try:
                 value = function(*args, **kwargs)
+                if cache_if is not None and not cache_if(value):
+                    return value
                 with lock:
                     if generation == started_generation:
                         entries[key] = (time.monotonic(), copy.deepcopy(value))

@@ -97,7 +97,7 @@ def consensus(tickers, refresh=False, asset_classes=None):
         has_targets |= any(value is not None for value in targets.values())
         count = positive(market.get("analyst_count"))
         rows.append({"ticker": ticker, "company": market.get("company_name") or ticker,
-                     "currency": str(market.get("currency") or "BRL").upper(), "price": price, **targets,
+                     "currency": str(market.get("currency") or asset_metadata(ticker)["currency"]).upper(), "price": price, **targets,
                      "upside": compute_target_upside(price, targets["target_mean"]),
                      "analyst_count": int(count) if count else None,
                      "recommendation": recommendation(market.get("recommendation"), market.get("recommendation_mean"))})

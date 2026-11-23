@@ -836,7 +836,67 @@ def search_yahoo_assets(query: str) -> list[dict[str, Any]]:
     return results
 
 
-@cache_data(ttl=3600)
+@cache_data(ttl=60, cache_if=bool)
+def _get_nasdaq_quote(symbol: str, asset_class: str, currency: str) -> dict[str, Any]:
+    """Get a USD quote from Nasdaq for a US stock, REIT, or listed ETF."""
+    if currency != "USD" or not re.fullmatch(r"[A-Z]+(?:-[A-Z])?", symbol):
+        return {}
+    if asset_class in {"acao_us", "reit"}:
+        instrument = "stocks"
+    elif asset_class in {"etf", "titulo"}:
+        instrument = "etf"
+    else:
+        return {}
+
+    nasdaq_symbol = symbol.replace("-", ".")
+    try:
+        response = requests.get(
+            f"https://api.nasdaq.com/api/quote/{nasdaq_symbol}/info",
+            params={"assetclass": instrument},
+            headers={
+                "Accept": "application/json",
+                "Referer": "https://www.nasdaq.com/",
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                              "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            },
+            timeout=4,
+        )
+        response.raise_for_status()
+        data = response.json().get("data") or {}
+        if data.get("symbol") != nasdaq_symbol or data.get("assetClass") != instrument.upper():
+            return {}
+        primary = data.get("primaryData") or {}
+        sale_price = primary.get("lastSalePrice") or ""
+        if not sale_price.startswith("$") or primary.get("currency") not in (None, "", "USD"):
+            return {}
+        price = float(sale_price[1:].replace(",", ""))
+        if not math.isfinite(price) or price <= 0:
+            return {}
+    except (requests.RequestException, AttributeError, TypeError, ValueError):
+        logger.debug("Nasdaq quote unavailable for %s", symbol, exc_info=True)
+        return {}
+
+    quote = {"price": price, "currency": "USD", "source": "Nasdaq"}
+    stats = data.get("keyStats")
+    week_range = stats.get("fiftyTwoWeekHighLow") if isinstance(stats, dict) else None
+    if isinstance(week_range, dict):
+        range_text = str(week_range.get("value")).replace(",", "")
+        bounds = re.fullmatch(r"(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)", range_text)
+        if bounds:
+            low, high = map(float, bounds.groups())
+            if 0 < low <= high and math.isfinite(high):
+                quote.update(low_52w=low, high_52w=high)
+    quote_date = re.search(r"[A-Za-z]{3} \d{1,2}, \d{4}", str(primary.get("lastTradeTimestamp")))
+    if quote_date:
+        try:
+            quote["last_quote_date"] = dt.datetime.strptime(quote_date[0], "%b %d, %Y").date().isoformat()
+        except ValueError:
+            pass
+    return quote
+
+
+# Cache Nasdaq quotes on their own TTL and allow Yahoo fundamentals to recover on the next analysis.
+@cache_data(ttl=3600, cache_if=lambda data: data["available"] and data["source"] != "Nasdaq")
 def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
     """Load the market and fundamental data applicable to a non-Fundamentus asset."""
     canonical = normalize_ticker(ticker)
@@ -913,10 +973,12 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
     company_name = str(info.get("longName") or info.get("shortName") or meta.get("company") or canonical)
     sector = str(meta.get("sector") or info.get("sector") or "Mercado Global")
     subsector = str(info.get("industry") or ASSET_CLASS_LABELS.get(meta.get("asset_class", ""), ""))
+    market_cap = _num(info.get("marketCap")) if asset_class in EQUITY_CLASSES | {"reit"} else None
+    current_ratio = _num(info.get("currentRatio")) if asset_class in EQUITY_CLASSES else None
 
-    return {
+    result = {
         "ticker": canonical,
-        "available": any(value is not None for value in (price, low_52w, high_52w, *indicators.values())),
+        "available": any(value is not None for value in (price, low_52w, high_52w, market_cap, current_ratio, *indicators.values())),
         "company": company_name,
         "asset_class": asset_class,
         "sector": sector,
@@ -925,12 +987,17 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
         "price": price,
         "low_52w": low_52w,
         "high_52w": high_52w,
-        "market_cap": _num(info.get("marketCap")) if asset_class in EQUITY_CLASSES | {"reit"} else None,
+        "market_cap": market_cap,
         "last_quote_date": dt.datetime.fromtimestamp(quote_time, dt.timezone.utc).date().isoformat() if quote_time else None,
         "indicators": indicators,
-        "health": {"current_ratio": _num(info.get("currentRatio"))} if asset_class in EQUITY_CLASSES else {},
+        "health": {"current_ratio": current_ratio} if asset_class in EQUITY_CLASSES else {},
         "source": "Yahoo Finance",
     }
+    if not result["available"]:
+        quote = _get_nasdaq_quote(symbol, asset_class, currency)
+        if quote:
+            result.update(quote, available=True)
+    return result
 
 
 def catalog_screener_rows(asset_class: str, fields_by_class: dict[str, set[str]]) -> pd.DataFrame:

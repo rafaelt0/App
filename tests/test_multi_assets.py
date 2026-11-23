@@ -168,8 +168,69 @@ def test_yahoo_classification_uses_instrument_type_before_theme(symbol, quote_ty
     assert entry["asset_class"] == expected
 
 
+def test_home_uses_nasdaq_quote_when_yahoo_is_unavailable(client, monkeypatch):
+    assets.get_extra_asset_fundamentals.clear()
+    assets._get_nasdaq_quote.clear()
+    home.get_market_target_data.clear()
+    yahoo_info = {}
+    nasdaq_calls = []
+    monkeypatch.setattr(assets.yf, "Ticker", lambda symbol: SimpleNamespace(info=yahoo_info))
+
+    def nasdaq_quote(url, *, params, **kwargs):
+        nasdaq_calls.append(url)
+        assert url.endswith("/AAPL/info")
+        assert params == {"assetclass": "stocks"}
+        if len(nasdaq_calls) == 1:
+            return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"data": None})
+        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"data": {
+            "symbol": "AAPL", "assetClass": "STOCKS",
+            "primaryData": {"lastSalePrice": "$237.51", "lastTradeTimestamp": "Nov 20, 2026 4:00 PM ET"},
+            "keyStats": {"fiftyTwoWeekHighLow": {"value": "175.00 - 260.25"}},
+        }})
+
+    monkeypatch.setattr(assets.requests, "get", nasdaq_quote)
+    client.get("/api/session")
+    selected = client.put("/api/session/selection", headers=HEADERS, json={"tickers": ["AAPL"], "revision": 0})
+    payload = {"tickers": ["AAPL"], "revision": selected.json()["revision"]}
+    try:
+        unavailable = client.post("/api/home/analyze", headers=HEADERS, json=payload)
+        assert unavailable.status_code == 503
+        response = client.post("/api/home/analyze", headers=HEADERS, json=payload)
+        assert response.status_code == 200
+        result = response.json()
+        company = result["companies"][0]
+        assert result["missing_tickers"] == []
+        assert company["source"] == "Nasdaq"
+        assert company["market"] == {
+            "price": 237.51, "currency": "USD", "last_quote_date": "2026-11-20",
+            "low_52w": 175.0, "high_52w": 260.25, "volume_2m": None, "market_cap": None,
+        }
+        assert company["indicators_available"] is False
+        assert result["consensus"]["failed_tickers"] == ["AAPL"]
+        assert result["consensus"]["rows"][0]["currency"] == "USD"
+        export = client.get(f"/api/home/{result['id']}/fundamentals.csv")
+        row = pd.read_csv(io.BytesIO(export.content)).iloc[0]
+        assert row["Fonte"] == "Nasdaq" and row["Cotacao"] == 237.51
+
+        yahoo_info.update(regularMarketPrice=238.0, trailingPE=19, targetMeanPrice=250)
+        recovered = client.post("/api/home/analyze", headers=HEADERS, json=payload).json()
+        assert recovered["companies"][0]["source"] == "Yahoo Finance"
+        assert recovered["companies"][0]["indicators"]["pl"] == 19
+        assert recovered["consensus"]["has_targets"] is True
+        assert len(nasdaq_calls) == 2
+    finally:
+        assets.get_extra_asset_fundamentals.clear()
+        assets._get_nasdaq_quote.clear()
+        home.get_market_target_data.clear()
+
+
 def test_unavailable_yahoo_quote_does_not_use_catalog_values(monkeypatch):
-    monkeypatch.setattr(assets.yf, "Ticker", lambda symbol: SimpleNamespace(info={}))
+    def unavailable(symbol):
+        raise RuntimeError("Yahoo unavailable")
+
+    monkeypatch.setattr(assets.yf, "Ticker", unavailable)
+    monkeypatch.setattr(assets.requests, "get", lambda *args, **kwargs: SimpleNamespace(
+        raise_for_status=lambda: None, json=lambda: {"data": None}))
     assert assets.get_extra_asset_fundamentals.__wrapped__("AAPL")["available"] is False
     assert assets.get_extra_asset_fundamentals.__wrapped__("TLT")["price"] is None
 
