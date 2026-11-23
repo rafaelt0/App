@@ -20,6 +20,7 @@ from utils.charts import (
     apply_plotly_theme,
 )
 from utils.portfolio_data import daily_returns, get_portfolio_prices
+from utils.treasury_data import TREASURY_TITLES
 from utils.simulation import annualized_log_return_stats, bootstrap_terminal_values, simulate_portfolio
 
 router = APIRouter(prefix="/api/simulation", tags=["simulation"])
@@ -130,6 +131,8 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
     days = params.years * 252
     modeled = modeled_history_notice(ticker for ticker, weight in portfolio.weights.items() if weight > 0)
     warnings = [modeled] if modeled else []
+    if any(ticker in TREASURY_TITLES and weight > 0 for ticker, weight in portfolio.weights.items()):
+        warnings.append("O Tesouro Direto entra com retornos históricos de marcação a mercado. A simulação mantém os pesos, inclusive após o vencimento dos títulos.")
     if len(aligned) < 252 or days > len(aligned):
         warnings.append("A amostra histórica é curta para este horizonte. Médias e riscos estimados podem mudar muito com outra janela; estas trajetórias não são previsões.")
     if params.simulations < 1000:

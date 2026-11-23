@@ -15,6 +15,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 
 from utils.assets import asset_metadata
+from utils.treasury_data import TREASURY_TITLES
 
 
 # Use issuer names rather than ambiguous shorthand in Google News searches.
@@ -382,6 +383,8 @@ def build_news_query(ticker):
     """Search exact tickers and issuer names; unknown tickers stay ticker-only."""
     terms = [f'"{ticker}"']
     company = TICKER_TO_COMPANY.get(ticker) or asset_metadata(ticker)["company"].split(" (")[0]
+    if ticker in TREASURY_TITLES:
+        return f'"Tesouro Direto" "{company}"'
     if company != ticker:
         terms.append(f'"{company}"')
     return " OR ".join(terms)

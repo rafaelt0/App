@@ -1,6 +1,6 @@
 # B3Lab
 
-B3Lab analisa ações brasileiras com uma interface React em Next.js e uma API Python em FastAPI. Os cálculos financeiros continuam em Python. A interface usa o sistema visual fintech-neutral definido em `DESIGN.md`.
+B3Lab analisa ativos e carteiras com várias classes de investimento. A interface usa React em Next.js e segue o sistema visual definido em `DESIGN.md`. A API FastAPI faz os cálculos financeiros em Python.
 
 ## Funcionalidades
 
@@ -11,6 +11,8 @@ B3Lab analisa ações brasileiras com uma interface React em Next.js e uma API P
 - **Screener.** Presets de ações B3 com dados do Fundamentus e filtros por classe no catálogo de referência. Valores do catálogo não são cotações ao vivo; valores monetários são exibidos e ordenados por moeda, sem conversão. Indicadores e critérios não aplicáveis à classe são omitidos.
 
 Exposições modeladas podem compor carteiras e simulações, mas suas séries não são cotações históricas. O B3Lab não estima compras em cotas para essas exposições nem para a classe de criptoativos, commodities e câmbio.
+
+A carteira e a simulação calculam em reais. O histórico de ativos em dólar usa o câmbio USD/BRL do Yahoo Finance e admite o último câmbio publicado em até quatro dias corridos. A estimativa de compra usa o câmbio da data da cotação. Para os títulos do Tesouro Direto identificados pelo prefixo `TD-`, os retornos usam o PU Base Manhã e as estimativas de compra usam o PU Compra Manhã, em frações de 0,01 título. A simulação mantém os pesos ao longo do horizonte, inclusive após o vencimento. [Histórico oficial de preços e taxas](https://www.tesourotransparente.gov.br/ckan/dataset/taxas-dos-titulos-ofertados-pelo-tesouro-direto).
 
 As cinco exportações disponíveis são CSV de fundamentos, alocação, resumo da simulação, percentis por data e resultados completos do screener. Não há geração de relatório HTML.
 
@@ -28,7 +30,7 @@ python run.py
 
 Abra http://localhost:3000. O comando inicia o Next.js e a API privada em http://127.0.0.1:8000. Ao encerrar o comando, os dois processos terminam.
 
-A lista de ações é local. Fundamentus, Yahoo Finance, Banco Central, Google News e a API do Jev precisam de acesso à rede. A indisponibilidade de uma fonte aparece na interface. O fallback léxico não se apresenta como Jev.
+O catálogo inicial é local. Fundamentus, Yahoo Finance, Nasdaq, Tesouro Transparente, Banco Central, Google News e a API do Jev precisam de acesso à rede. A interface identifica falhas de fonte e resultados da classificação léxica.
 
 Exporte `TYPESAFE_API_KEY` no ambiente antes de iniciar a aplicação. O backend envia o título e até 12.000 caracteres do texto combinado à [API TypeSafe](https://docs.typesafe.ai/api), usando `jev-latest`. Probabilidades positivas menos negativas produzem o score. Resultados válidos ficam em cache por uma hora; falhas usam o léxico e suspendem novas chamadas por cinco minutos na sessão. “Atualizar notícias” libera nova tentativa imediatamente.
 

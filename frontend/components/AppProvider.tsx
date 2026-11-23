@@ -8,7 +8,7 @@ import Welcome from "./Welcome";
 import { Notice } from "./ui";
 
 export type AssetClass = "acao_br" | "fii" | "acao_us" | "reit" | "titulo" | "etf" | "outros";
-export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null; asset_class?: AssetClass; currency?: string; supports_shares?: boolean };
+export type Stock = { ticker: string; company: string; sector: string; liquidity: number | null; asset_class?: AssetClass; currency?: string; supports_shares?: boolean; share_step?: number };
 export type Session = {
   selection: string[];
   revision: number;

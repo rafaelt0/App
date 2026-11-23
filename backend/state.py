@@ -99,18 +99,22 @@ def release_session(ctx: SessionState):
         ctx.active_requests -= 1
 
 
-def begin(ctx: SessionState, domain: str, revision: int) -> int:
+def _invalidate_portfolio(ctx: SessionState):
+    ctx.portfolio = None
+    for dependent in ("portfolio", "simulation", "news"):
+        ctx.artifacts.pop(dependent, None)
+        if dependent != "portfolio":
+            ctx.generations[dependent] = ctx.generations.get(dependent, 0) + 1
+
+
+def begin(ctx: SessionState, domain: str, revision: int, *, keep_portfolio: bool = False) -> int:
     with ctx.lock:
         if revision != ctx.revision:
             raise HTTPException(409, "A seleção mudou. Atualize a página e execute a análise novamente.")
         generation = ctx.generations.get(domain, 0) + 1
         ctx.generations[domain] = generation
-        if domain == "portfolio":
-            ctx.portfolio = None
-            for dependent in ("portfolio", "simulation", "news"):
-                ctx.artifacts.pop(dependent, None)
-                if dependent != domain:
-                    ctx.generations[dependent] = ctx.generations.get(dependent, 0) + 1
+        if domain == "portfolio" and not keep_portfolio:
+            _invalidate_portfolio(ctx)
         return generation
 
 
@@ -120,12 +124,14 @@ def publish(ctx: SessionState, domain: str, revision: int, generation: int, valu
             raise HTTPException(409, "Esta análise ficou desatualizada. Execute novamente para a seleção atual.")
         if portfolio_id is not None and (ctx.portfolio is None or ctx.portfolio.id != portfolio_id):
             raise HTTPException(409, "O portfólio mudou durante a análise. Execute novamente.")
-        ctx.artifacts[domain] = value
         if domain == "portfolio":
             if not isinstance(value, PortfolioSnapshot):
                 raise TypeError("Portfolio publication requires a PortfolioSnapshot")
+            if ctx.portfolio is not None:
+                _invalidate_portfolio(ctx)
             ctx.portfolio = value
             ctx.restored = False
+        ctx.artifacts[domain] = value
         return value
 
 

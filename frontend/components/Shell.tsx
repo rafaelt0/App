@@ -175,7 +175,7 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
       {options.map((option, index) => {
         const selected = option.kind === "stock" && selection.includes(option.stock.ticker);
         const favorite = option.kind === "stock" && watchlist.includes(option.stock.ticker);
-        return <li key={option.kind === "view" ? option.view.key : option.stock.ticker} id={`${id}-${index}`} role="option" aria-selected={index === current} className={`cmd-option${selected ? " is-selected" : ""}`}
+        return <li key={option.kind === "view" ? option.view.key : option.stock.ticker} id={`${id}-${index}`} role="option" aria-selected={index === current} data-market={option.kind === "stock" && option.stock.share_step ? "TD" : undefined} className={`cmd-option${selected ? " is-selected" : ""}`}
           onMouseMove={() => { if (index !== current) setActive(index); }} onMouseDown={event => event.preventDefault()} onClick={() => void choose(option)}>
           {option.kind === "view" ? <>
             <span className="cmd-option-mark" aria-hidden="true">↗</span><b>{option.view.key}</b><span className="cmd-option-name">Ir para {option.view.label}</span><span className="cmd-option-hint">abrir</span>

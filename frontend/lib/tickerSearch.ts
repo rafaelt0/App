@@ -65,6 +65,8 @@ export function sortStocks<T extends Sortable>(stocks: T[], sort: StockSort): T[
 export function rankStocks<T extends Searchable>(stocks: T[], query: string, limit: number): { items: T[]; total: number } {
   const needle = normalizeSearch(query.trim());
   if (!needle) return { items: stocks.slice(0, limit), total: stocks.length };
+  const category = /^(acao|acoes) americanas?$/.test(needle) ? "acao_us"
+    : needle === "fiis" ? "fii" : needle === "etfs" ? "etf" : needle === "reits" ? "reit" : undefined;
   const ranked: { stock: T; rank: number }[] = [];
   for (const stock of stocks) {
     const ticker = normalizeSearch(stock.ticker);
@@ -72,7 +74,7 @@ export function rankStocks<T extends Searchable>(stocks: T[], query: string, lim
     const badge = normalizeSearch(stock.asset_class ? ASSET_CLASS_BADGES[stock.asset_class] ?? "" : "");
     const rank = ticker === needle ? 0 : ticker.startsWith(needle) ? 1 : company.startsWith(needle) ? 2
       : company.split(wordSeparator).some(word => word.startsWith(needle)) ? 3 : company.includes(needle) ? 4
-      : normalizeSearch(stock.sector ?? "").includes(needle) || badge.includes(needle) ? 5 : -1;
+      : (category !== undefined && stock.asset_class === category) || normalizeSearch(stock.sector ?? "").includes(needle) || badge.includes(needle) ? 5 : -1;
     if (rank >= 0) ranked.push({ stock, rank });
   }
   ranked.sort((a, b) => a.rank - b.rank);

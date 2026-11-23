@@ -30,6 +30,7 @@ import yfinance as yf
 
 from utils.cache import cache_data
 from utils.market_data import YFINANCE_REQUEST_LOCK, get_listed_stocks
+from utils.treasury_data import TREASURY_SHARE_STEP, TREASURY_TITLES, latest_treasury_quote
 
 logger = logging.getLogger(__name__)
 
@@ -364,6 +365,19 @@ EXTRA_ASSETS_BY_TICKER: dict[str, dict[str, Any]] = {
     }
     for ticker, company, legal_name, sector, asset_class, currency, yahoo_symbol, ref_metrics in _CATALOG_ENTRIES
 }
+for ticker, (title, maturity) in TREASURY_TITLES.items():
+    company = f"{title} {maturity.year}"
+    EXTRA_ASSETS_BY_TICKER[ticker] = {
+        "ticker": ticker,
+        "company": company,
+        "legal_name": company,
+        "sector": "Tesouro Direto · Preços oficiais",
+        "asset_class": "titulo",
+        "currency": "BRL",
+        "yahoo_symbol": None,
+        "share_step": TREASURY_SHARE_STEP,
+        "ref_metrics": {},
+    }
 
 # Dynamic runtime registry for any user-searched or custom ticker discovered during the session
 _DYNAMIC_ASSETS_LOCK = threading.Lock()
@@ -493,7 +507,7 @@ def is_synthetic_fixed_income(symbol_or_ticker: str) -> bool:
     cleaned = str(symbol_or_ticker or "").strip().upper().removesuffix(".SA")
     entry = EXTRA_ASSETS_BY_TICKER.get(cleaned)
     if entry is not None:
-        return entry["yahoo_symbol"] is None
+        return entry["yahoo_symbol"] is None and cleaned not in TREASURY_TITLES
     return parse_fixed_income_asset(cleaned) is not None
 
 
@@ -642,7 +656,8 @@ def get_full_universe(b3_frame: pd.DataFrame | None = None) -> list[dict[str, An
             "sector": item["sector"],
             "asset_class": item["asset_class"],
             "currency": item["currency"],
-            "supports_shares": item["yahoo_symbol"] is not None and item["asset_class"] != "outros",
+            "supports_shares": supports_share_allocation(ticker),
+            **({"share_step": item["share_step"]} if "share_step" in item else {}),
         })
     with _DYNAMIC_ASSETS_LOCK:
         for ticker, item in _DYNAMIC_ASSETS.items():
@@ -901,6 +916,23 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
     """Load the market and fundamental data applicable to a non-Fundamentus asset."""
     canonical = normalize_ticker(ticker)
     meta = asset_metadata(canonical)
+    if canonical in TREASURY_TITLES:
+        try:
+            price, quote_date = latest_treasury_quote(canonical)
+        except ValueError:
+            logger.warning("Tesouro Transparente data unavailable for %s", canonical, exc_info=True)
+            price, quote_date = None, None
+        return {
+            "ticker": canonical,
+            "available": price is not None,
+            "company": meta["company"],
+            "sector": meta["sector"],
+            "asset_class": "titulo",
+            "currency": "BRL",
+            "price": price,
+            "last_quote_date": quote_date,
+            "source": "Tesouro Transparente · PU Compra Manhã",
+        }
     spec = parse_fixed_income_asset(canonical)
     if spec is not None:
         terms = {

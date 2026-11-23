@@ -23,8 +23,13 @@ function valueTrend(result: PortfolioResult): number[] | undefined {
 }
 
 /** Mirrors the API limits in backend/portfolio.py so invalid edits never reach the server. */
-function withinLimits(inputs: PortfolioInputs): boolean {
-  return inputs.capital >= 100 && inputs.capital <= 1000000 && inputs.lookback_days >= 60 && inputs.lookback_days <= 5000 && inputs.gamma >= 0 && inputs.gamma <= 3 && Object.values(inputs.manual_shares).every(value => Number.isInteger(value) && value >= 0);
+function withinLimits(inputs: PortfolioInputs, selection: readonly string[], shareStep: (ticker: string) => number): boolean {
+  return inputs.capital >= 100 && inputs.capital <= 1000000 && inputs.lookback_days >= 60 && inputs.lookback_days <= 5000 && inputs.gamma >= 0 && inputs.gamma <= 3 && selection.every(ticker => {
+    const quantity = inputs.manual_shares[ticker] ?? 0;
+    return Number.isFinite(quantity) && quantity >= 0 && (
+      shareStep(ticker) === 1 ? Number.isInteger(quantity) : Number(quantity.toFixed(2)) === quantity
+    );
+  });
 }
 
 function hasManualShares(inputs: PortfolioInputs, selection: readonly string[], supportsShares: (ticker: string) => boolean): boolean {
@@ -68,7 +73,9 @@ export default function PortfolioPage() {
   currentFingerprint.current = fingerprint;
   const stockByTicker = new Map(stocks.map(stock => [stock.ticker, stock]));
   const supportsShares = (ticker: string) => stockByTicker.get(ticker)?.supports_shares !== false;
-  const validInputs = withinLimits(inputs);
+  const shareStep = (ticker: string) => stockByTicker.get(ticker)?.share_step ?? 1;
+  const hasTreasury = session?.selection.some(ticker => shareStep(ticker) < 1);
+  const validInputs = withinLimits(inputs, session?.selection ?? [], shareStep);
   const manualValid = hasManualShares(inputs, session?.selection ?? [], supportsShares);
 
   useEffect(() => () => {
@@ -234,8 +241,8 @@ export default function PortfolioPage() {
             if (current.length >= MAX_SELECTION) throw new Error(SELECTION_FULL_MESSAGE);
             return [...current, ticker];
           })} />
-        {count ? <ol className="asset-list">{session.selection.map((ticker, index) => <li key={ticker}>
-          <i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><b>{ticker}</b><span>{companies.get(ticker) ?? "Fora da lista B3"}</span>
+        {count ? <ol className="asset-list">{session.selection.map((ticker, index) => <li key={ticker} data-market={shareStep(ticker) < 1 ? "TD" : undefined}>
+          <i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><b>{ticker}</b><span>{companies.get(ticker) ?? "Nome indisponível"}</span>
           <button type="button" className="icon-btn" disabled={selectionBusy || busy} aria-label={`Remover ${ticker}`} onClick={() => void changeSelection(current => current.filter(item => item !== ticker))}>×</button>
         </li>)}</ol> : null}
         {count < 2 && <p className="pane-lead">{count ? "Adicione mais um ativo para calcular a carteira." : "Adicione pelo menos dois ativos para calcular a carteira."}</p>}
@@ -256,10 +263,11 @@ export default function PortfolioPage() {
         <p id="strategy-help" className="param-hint">{strategies.find(strategy => strategy.value === inputs.strategy)?.description}</p>
         {inputs.strategy === "manual" && <>
           <p className="param-hint">O capital informado serve para calcular o histórico de valor.</p>
+          {hasTreasury && <p className="param-hint">Informe cotas de bolsa em números inteiros e títulos do Tesouro Direto em múltiplos de 0,01.</p>}
           {session.selection.some(ticker => !supportsShares(ticker)) && <p className="param-hint">Renda fixa modelada e cripto/commodities/câmbio não usam alocação por cotas (ficam com 0).</p>}
           <div className="param-pairs">{session.selection.map(ticker => {
             const eligible = supportsShares(ticker);
-            return <label key={ticker}>Cotas de {ticker}{eligible ? "" : " (sem cotas)"}<input type="number" disabled={busy || !eligible} min={0} step={1} value={eligible ? (inputs.manual_shares[ticker] ?? 0) : 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>;
+            return <label key={ticker}>Cotas de {ticker}{eligible ? "" : " (sem cotas)"}<input type="number" disabled={busy || !eligible} min={0} step={shareStep(ticker)} value={eligible ? (inputs.manual_shares[ticker] ?? 0) : 0} onChange={event => setInputs(previous => ({ ...previous, manual_shares: { ...previous.manual_shares, [ticker]: Number(event.target.value) } }))} /></label>;
           })}</div>
         </>}
         {inputs.strategy === "markowitz" && <>
@@ -268,7 +276,7 @@ export default function PortfolioPage() {
         </>}
       </div>
       {!manualValid && <Notice tone="warning">A alocação manual precisa ter ao menos uma cota positiva.</Notice>}
-      {!validInputs && <Notice tone="warning">Confira os limites de capital, histórico, cotas inteiras e diversificação.</Notice>}
+      {!validInputs && <Notice tone="warning">Confira os limites de capital, histórico, cotas e diversificação.</Notice>}
       <div className="param-run">
         <button type="button" className="primary" disabled={busy || count < 2 || !manualValid || !validInputs || selectionBusy} onClick={() => { void runAnalysis(); }}>{busy ? "Calculando…" : "Calcular carteira"}</button>
       </div>
@@ -305,14 +313,14 @@ export default function PortfolioPage() {
         <Pane id="pf-pesos" title="Pesos do portfólio" className="span-4" meta={activeResult.mode} actions={<ExportButton path={`/api/portfolio/${activeResult.id}/allocation.csv`}>CSV</ExportButton>}>
           <WeightList weights={activeResult.weights} selection={session.selection} />
         </Pane>
-        <Pane id="pf-valor" title="Evolução do valor" className="span-8" meta={activeResult.comparison_sample ? `vs IBOV em ${activeResult.comparison_sample.count} pregões comuns (${period(activeResult.comparison_sample)})` : undefined}>
+        <Pane id="pf-valor" title="Evolução do valor" className="span-8" meta={activeResult.comparison_sample ? `vs IBOV em ${activeResult.comparison_sample.count} datas comparadas (${period(activeResult.comparison_sample)})` : undefined}>
           <Chart figure={activeResult.charts.value} height={300} />
           <p className="pane-foot">Retornos hipotéticos, pesos fixos rebalanceados diariamente; sem taxas e impostos. {activeResult.strategy !== "manual" ? "Pesos otimizados e avaliados na mesma amostra (in-sample)." : "A alocação manual descreve a amostra histórica, não uma previsão."}</p>
         </Pane>
         <Pane id="pf-compra" title="Sugestão de compra de cotas" className={activeResult.charts.frontier ? "span-8" : "span-12"} actions={<ExportButton path={`/api/portfolio/${activeResult.id}/trades.csv`}>CSV</ExportButton>} flush>
-          <Table caption="Sugestão de compra" swatch={row => tickerColor(session.selection.indexOf((row as { ticker: string }).ticker))} columns={[{ key: "ticker", label: "Ativo" }, { key: "price", label: "Preço unit.", unit: "money" }, { key: "quote_date", label: "Data cotação" }, { key: "shares", label: "Cotas", unit: "integer" }, { key: "effective_value", label: "Valor efetivo", unit: "money" }, { key: "suggested_value", label: "Valor sugerido", unit: "money" }, { key: "suggested_weight", label: "Peso sugerido", unit: "fraction" }, { key: "effective_weight", label: "Peso efetivo", unit: "fraction" }]} rows={activeResult.trade_suggestions} />
+          <Table caption="Sugestão de compra" swatch={row => tickerColor(session.selection.indexOf((row as { ticker: string }).ticker))} columns={[{ key: "ticker", label: "Ativo" }, { key: "price", label: "Preço unit.", unit: "money" }, { key: "quote_date", label: "Data cotação" }, { key: "shares", label: "Cotas", unit: hasTreasury ? "number" : "integer" }, { key: "effective_value", label: "Valor efetivo", unit: "money" }, { key: "suggested_value", label: "Valor sugerido", unit: "money" }, { key: "suggested_weight", label: "Peso sugerido", unit: "fraction" }, { key: "effective_weight", label: "Peso efetivo", unit: "fraction" }]} rows={activeResult.trade_suggestions} />
           {activeResult.trade_totals && <Metrics items={[{ label: "Total alocado efetivo", value: activeResult.trade_totals.allocated, unit: "money" }, { label: "Saldo restante (caixa)", value: activeResult.trade_totals.cash, unit: "money" }, { label: "Eficiência da alocação", value: activeResult.trade_totals.efficiency, unit: "fraction" }]} />}
-          <p className="pane-foot">Último fechamento bruto por ativo (pode haver atraso); confirme o preço de execução. Retornos usam preços ajustados. Arredondamento para baixo, sem completar com o caixa.</p>
+          <p className="pane-foot">Fechamento bruto para ativos de bolsa{hasTreasury ? " e preço oficial de compra para títulos do Tesouro Direto" : ""}. Confirme o preço de execução. As quantidades são arredondadas para baixo.</p>
         </Pane>
         {activeResult.charts.frontier && <Pane id="pf-fronteira" title="Fronteira eficiente" className="span-4"><Chart figure={activeResult.charts.frontier} height={300} /></Pane>}
         {activeResult.charts.drawdown && <Pane id="pf-drawdown" title="Drawdown" className="span-8"><Chart figure={activeResult.charts.drawdown} height={260} /></Pane>}
