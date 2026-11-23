@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import "./screener.css";
 import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp } from "../../components/AppProvider";
 import { ExportButton, formatCompactValue, formatValue, Idle, Loading, Notice, Pane, ScrollX } from "../../components/ui";
@@ -15,6 +16,7 @@ const liquidityMax = 100_000_000;
 
 export default function ScreenerPage() {
   const {session,stocks,loading,error:appError,setSelection,toggleFavorite,refreshSession} = useApp();
+  const router=useRouter();
   const [config,setConfig]=useState<Config|null>(null);
   const [controls,setControls]=useState<Controls>(defaults);
   const [sort,setSort]=useState<Sort>({field:"liq2m",direction:"desc"});
@@ -23,9 +25,11 @@ export default function ScreenerPage() {
   const [selected,setSelected]=useState<string|null>(null);
   const [busy,setBusy]=useState(false);
   const [actionBusy,setActionBusy]=useState(false);
+  const [navigating,startNavigation]=useTransition();
   const [error,setError]=useState<string|null>(null);
+  const [actionError,setActionError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
-  const [undoSelection,setUndoSelection]=useState<{before:string[];ticker:string;mode:"add"|"only"}|null>(null);
+  const [undoSelection,setUndoSelection]=useState<{before:string[];ticker:string;mode:"add"|"only";revision:number}|null>(null);
   const [reload,setReload]=useState(0);
   const barRef=useRef<HTMLDivElement>(null);
   const generation=useRef(0);
@@ -66,25 +70,40 @@ export default function ScreenerPage() {
     catch(exc){setError((exc as Error).message);}
     finally{setActionBusy(false);}
   }
-  async function handoff(mode: "add" | "only", ticker = selected) {
-    if(!ticker)return;
-    setActionBusy(true);setError(null);setUndoSelection(null);
+  async function handoff(mode: "add" | "only" | "analyze", ticker = selected) {
+    if (!ticker || !session || actionBusy || navigating) return;
+    setActionBusy(true);
+    setActionError(null);
+    setUndoSelection(null);
     try {
-      const known=stocks.some(stock=>stock.ticker===ticker);
-      if(!known){setError(`${ticker} está fora da lista local B3 e não pode entrar na seleção.`);return;}
-      const before=[...session!.selection];
-      if(mode==="add" && before.includes(ticker)){setUndoSelection(null);setNotice(`${ticker} já está na seleção.`);return;}
-      if(mode==="add" && before.length>=MAX_SELECTION){setError(SELECTION_FULL_MESSAGE);return;}
-      await setSelection(mode==="only" ? [ticker]:current=>current.includes(ticker) ? [...current]:[...current,ticker]);
-      setNotice(null);
-      setUndoSelection({before,ticker,mode});
-    } catch(exc){setError((exc as Error).message);}finally{setActionBusy(false);}
+      if (!stocks.some(stock => stock.ticker === ticker)) throw new Error(`${ticker} está fora da lista local B3.`);
+      let before: string[] = [];
+      const updated = await setSelection(current => {
+        before = [...current];
+        if (mode === "only") return [ticker];
+        if (current.includes(ticker)) return before;
+        if (current.length >= MAX_SELECTION) throw new Error(SELECTION_FULL_MESSAGE);
+        return [...current, ticker];
+      });
+      if (mode === "analyze") {
+        const query = new URLSearchParams({ analisar: updated.selection.join(",") });
+        startNavigation(() => router.push(`/?${query}`));
+      } else {
+        setNotice(null);
+        setUndoSelection({ before, ticker, mode, revision: updated.revision });
+      }
+    } catch (cause) {
+      setActionError((cause as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
   }
   async function undoOnly() {
-    if(!undoSelection)return;
-    setActionBusy(true);setError(null);
-    try {await setSelection(undoSelection.before);setUndoSelection(null);}
-    catch(exc){setError((exc as Error).message);}finally{setActionBusy(false);}
+    if (!undoSelection || undoSelection.revision !== session?.revision) return;
+    setActionBusy(true); setActionError(null);
+    try { await setSelection(undoSelection.before); setUndoSelection(null); }
+    catch (cause) { setActionError((cause as Error).message); }
+    finally { setActionBusy(false); }
   }
   function sortBy(field:string) {
     setSort(current => current.field===field ? {field,direction:current.direction==="asc" ? "desc":"asc"} : {field,direction:"desc"});
@@ -97,8 +116,8 @@ export default function ScreenerPage() {
   }
   async function favorite() {
     if(!selected)return;
-    setActionBusy(true);setError(null);
-    try{await toggleFavorite(selected);}catch(exc){setError((exc as Error).message);}finally{setActionBusy(false);}
+    setActionBusy(true);setActionError(null);
+    try{await toggleFavorite(selected);}catch(exc){setActionError((exc as Error).message);}finally{setActionBusy(false);}
   }
   function removeCriterion(key:CriterionDef["enabled"]) {edit(key,false);barRef.current?.focus();}
   function edit<K extends keyof Controls>(key:K,value:Controls[K]) {setControls(current=>editControl(current,key,value));}
@@ -166,20 +185,22 @@ export default function ScreenerPage() {
         {chips.length ? <ul className="scr-chips">{chips.map(chip=><li key={chip.key} className="chip"><span title={chip.title}>{chip.label}</span><button type="button" aria-label={`Remover critério ${chip.label}`} onClick={()=>removeCriterion(chip.enabled)}>×</button></li>)}</ul>:<span className="muted">Nenhum critério ativo; todos os ativos são exibidos.</span>}
       </div>
       {notice && <Notice tone="positive">{notice}</Notice>}
-      {undoSelection && <Notice tone="positive"><span className="scr-undo">{undoSelection.mode==="only" ? `Seleção substituída por ${undoSelection.ticker} (eram ${undoSelection.before.length} ativos).` : `${undoSelection.ticker} adicionada à seleção (${undoSelection.before.length+1}/${MAX_SELECTION}).`}</span><button disabled={actionBusy} onClick={()=>void undoOnly()}>Desfazer</button><Link className="button-link" href="/"><kbd>F1</kbd> Analisar no Início</Link></Notice>}
-      {(busy || actionBusy || !config) && !error && <Loading>{actionBusy ? "Atualizando dados da Fundamentus…":"Carregando dados da B3…"}</Loading>}
+      {undoSelection && undoSelection.revision === session.revision && <Notice tone="positive"><span className="scr-undo">{undoSelection.mode==="only" ? `Seleção substituída por ${undoSelection.ticker} (eram ${undoSelection.before.length} ativos).` : `${undoSelection.ticker} adicionada à seleção (${undoSelection.before.length+1}/${MAX_SELECTION}).`}</span><button disabled={actionBusy} onClick={()=>void undoOnly()}>Desfazer</button><Link className="button-link" href={`/?${new URLSearchParams({ analisar: session.selection.join(",") })}`}>Analisar seleção →</Link></Notice>}
+      {actionError && <Notice tone="negative">{actionError}</Notice>}
+      {navigating && <Loading>Abrindo a análise de ações…</Loading>}
+      {(busy || !config || (actionBusy && !result)) && !error && <Loading>Carregando dados da Fundamentus…</Loading>}
       {error && <Notice tone="negative"><strong>Não foi possível exibir os resultados.</strong> {error}{!invalidCriteria && <button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button>}</Notice>}
       {result && !invalidCriteria && (!result.matched_count ? <Idle action={<button className="primary" onClick={()=>setControls({...defaults})}>Restaurar filtros iniciais</button>}>Nenhuma ação atende a todos os critérios. Ajuste os limites ou remova filtros para ampliar a busca.</Idle> : <>
         <div className="scr-actionbar" data-selected={selectedCurrent ? "true":"false"} role="region" aria-label="Ação selecionada" aria-live="polite">
           {selectedCurrent ? <>
             <b>{selectedCurrent}</b><span className="muted ell">{stocks.find(stock=>stock.ticker===selectedCurrent)?.company ?? ""}</span>
-            <button className="primary" disabled={actionBusy || selectionSet.has(selectedCurrent)} onClick={()=>void handoff("add")}>{selectionSet.has(selectedCurrent) ? "Já na seleção":"Adicionar à seleção"}</button>
+            <button disabled={actionBusy || navigating || selectionSet.has(selectedCurrent)} onClick={()=>void handoff("add")}>{selectionSet.has(selectedCurrent) ? "Já na seleção":"Adicionar à seleção"}</button>
             <button disabled={actionBusy} onClick={()=>void handoff("only")}>Manter só {selectedCurrent} na seleção</button>
             <button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favorito":"☆ Favoritar"}</button>
-          </> : <span className="muted">Escolha uma ação na tabela para adicioná-la à seleção do B3Lab. O símbolo ✓ indica que ela já foi adicionada.</span>}
+          </> : <span className="muted">Escolha uma ação na tabela para adicioná-la à seleção do B3Lab. Use “Analisar” ou “Comparar” junto ao código para abrir os fundamentos.</span>}
         </div>
         <ScrollX label="Ações que atendem aos critérios" className={`scr-scroll${busy ? " is-stale":""}`}>
-          <ScreenerTable columns={result.available_columns.filter(column=>visible?.includes(column.key))} rows={result.rows} sort={sort} onSort={sortBy} selectedKey={selectedCurrent ?? undefined} onSelect={setSelected} onActivate={ticker=>{setSelected(ticker);void handoff("add",ticker);}} inSelection={selectionSet}/>
+          <ScreenerTable working={actionBusy || busy || navigating} onAnalyze={ticker=>void handoff("analyze",ticker)} columns={result.available_columns.filter(column=>visible?.includes(column.key))} rows={result.rows} sort={sort} onSort={sortBy} selectedKey={selectedCurrent ?? undefined} onSelect={setSelected} inSelection={selectionSet}/>
         </ScrollX>
         <p className="pane-foot">{result.rows.length} ações · {result.fetched_at ? `Fundamentus coletado em ${new Date(result.fetched_at).toLocaleString("pt-BR")}`:"horário da coleta indisponível; a idade do dado não pode ser confirmada"}</p>
       </>)}

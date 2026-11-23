@@ -1,153 +1,212 @@
 "use client";
+
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import "./home.css";
-import { MAX_SELECTION, useApp } from "../components/AppProvider";
+import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp } from "../components/AppProvider";
 import type { SelectionUpdate } from "../components/AppProvider";
 import HomeResults from "../components/HomeResults";
+import StockPicker from "../components/StockPicker";
 import { Headlines, Macro, Monitor, SectorMap } from "./HomeBoard";
 import { Idle, Loading, Notice, Pane } from "../components/ui";
 import { analyzeHome, currentAnalysis, refreshConsensus, refreshFundamentus, suggestions } from "../lib/home";
-import type { HomeResult, Suggestions } from "../lib/home";
+import type { HomeResult } from "../lib/home";
+
+type AnalysisAction = "analyze" | "consensus" | "source";
 
 export default function HomePage() {
-  const {session,stocks,loading,error:appError,setSelection,toggleFavorite,refreshSession} = useApp();
-  const [sectors,setSectors] = useState<string[]>([]);
-  const [suggested,setSuggested] = useState<Suggestions|null>(null);
-  const [result,setResult] = useState<HomeResult|null>(null);
-  const [busy,setBusy] = useState(false);
-  const [sectorBusy,setSectorBusy] = useState(false);
-  const [error,setError] = useState<string|null>(null);
-  const [notice,setNotice] = useState<string|null>(null);
-  const [retryAction,setRetryAction] = useState<"analyze"|"consensus"|"source">("analyze");
-  const [stale,setStale] = useState(false);
-  const [sectorUndo,setSectorUndo] = useState<string[]|null>(null);
-  const pendingAnalysis = useRef<string[]|null>(null);
+  const { session, stocks, loading, error: appError, setSelection, toggleFavorite, refreshSession } = useApp();
+  const [result, setResult] = useState<HomeResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [mapNote, setMapNote] = useState<{ text: string; failed?: boolean } | null>(null);
+  const [retryAction, setRetryAction] = useState<AnalysisAction>("analyze");
+  const [sectorUndo, setSectorUndo] = useState<{ tickers: string[]; revision: number } | null>(null);
+  const [quickRevision, setQuickRevision] = useState<number | null>(null);
   const generation = useRef(0);
-  const sectorGeneration = useRef(0);
-  const analyzedRevision = useRef<number|null>(null);
+  const selectionPending = useRef(false);
+  const results = useRef<HTMLDivElement>(null);
   const revision = useRef(session?.revision);
   revision.current = session?.revision;
-  useEffect(() => {generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);},[session?.revision]);
-  useEffect(() => {
-    // Quick-start runs after the new selection is rendered, so the revision reset above does not discard it.
-    if(!pendingAnalysis.current || !session || JSON.stringify(session.selection)!==JSON.stringify(pendingAnalysis.current))return;
-    pendingAnalysis.current=null;
-    void run();
-  },[session]);
-  useEffect(() => {
-    const unavailable=new URLSearchParams(window.location.search).get("unavailable");
-    if(unavailable)setNotice(`${unavailable} está fora da lista local B3. A seleção foi removida; escolha outro ativo para analisar.`);
-    let active=true;
-    const request=++sectorGeneration.current;
-    suggestions([]).then(value => {if(active && request===sectorGeneration.current)setSuggested(value);}).catch(exc => {if(active && request===sectorGeneration.current)setError(String(exc.message));});
-    return () => {active=false;generation.current++;sectorGeneration.current++;};
-  },[]);
-  useEffect(() => {
-    const request=generation.current;
-    let active=true;
-    currentAnalysis().then(saved => {
-      if(active && saved && request===generation.current && saved.revision===session?.revision && JSON.stringify(saved.requested_tickers)===JSON.stringify(session?.selection ?? []))setResult(saved);
-    }).catch(() => {});
-    return () => {active=false;};
-  },[]);
 
-  async function updateSelection(tickers:SelectionUpdate) {
-    if(result)setStale(true);generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setSectorUndo(null);
-    await setSelection(tickers);
-  }
-  async function changeSelection(tickers:SelectionUpdate) {
-    try {await updateSelection(tickers);} catch(exc) {setError(exc instanceof Error ? exc.message : String(exc));}
-  }
-  async function startQuickAnalysis(ticker:string) {
-    generation.current++;analyzedRevision.current=null;setResult(null);setBusy(false);setError(null);setSectorUndo(null);
-    pendingAnalysis.current=[ticker];
-    try {await setSelection([ticker]);} catch(exc) {pendingAnalysis.current=null;setError((exc as Error).message);}
-  }
-  async function undoSectorChange() {
-    const previous=sectorUndo;
-    if(!previous)return;
-    setSectorUndo(null);
-    await changeSelection(previous);
-    setNotice(`Seleção anterior restaurada: ${previous.length} ${previous.length===1 ? "ativo":"ativos"}.`);
-  }
-  async function changeSectors(next:string[]) {
-    const gen=++sectorGeneration.current;
-    const previous=[...(session?.selection ?? [])];
-    setSectors(next);setSectorBusy(true);setError(null);
+  useEffect(() => {
+    generation.current++;
+    setBusy(false);
+    setAnalysisError(null);
+    return () => { generation.current++; };
+  }, [session?.revision]);
+
+  useEffect(() => {
+    if (!session || quickRevision === null || session.revision < quickRevision) return;
+    setQuickRevision(null);
+    if (session.revision === quickRevision) void run("analyze", true);
+  }, [session, quickRevision]);
+
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    const request = generation.current;
+    queueMicrotask(() => {
+      if (!active) return;
+      const url = new URL(window.location.href);
+      const handoff = url.searchParams.get("analisar");
+      const unavailable = url.searchParams.get("unavailable");
+      if (handoff !== null || unavailable !== null) {
+        url.searchParams.delete("analisar");
+        url.searchParams.delete("unavailable");
+        window.history.replaceState(null, "", url);
+      }
+      if (unavailable) setNotice(`${unavailable} está fora da lista local B3. Escolha outra ação para analisar.`);
+      if (handoff && handoff === session.selection.join(",")) {
+        void run("analyze", true);
+        return;
+      }
+      if (quickRevision === session.revision) return;
+      currentAnalysis().then(saved => {
+        if (active && saved && request === generation.current && saved.revision === revision.current) setResult(saved);
+      }).catch(() => {});
+    });
+    return () => { active = false; };
+  }, [session?.revision]);
+
+  async function editSelection(update: SelectionUpdate, analyze = false) {
+    if (selectionPending.current) return;
+    selectionPending.current = true;
+    setSelecting(true);
+    setSelectionError(null);
     try {
-      const value=await suggestions(next);
-      if(gen!==sectorGeneration.current)return;
-      setSuggested(value);
-      if(next.length && !next.includes("Todos")) {
-        await changeSelection(value.autopick);
-        setNotice(previous.length
-          ? `${next.join(", ")}: seleção de ${previous.length} ${previous.length===1 ? "ativo":"ativos"} substituída pelos ${value.autopick.length} mais líquidos de ${value.count}.`
-          : `${next.join(", ")}: ${value.autopick.length} ativos mais líquidos de ${value.count} selecionados.`);
-        if(previous.length)setSectorUndo(previous);
-      }
-    } catch(exc) {if(gen===sectorGeneration.current)setError((exc as Error).message);}
-    finally {if(gen===sectorGeneration.current)setSectorBusy(false);}
+      const updated = await setSelection(update);
+      setSectorUndo(null);
+      setMapNote(null);
+      if (analyze) setQuickRevision(updated.revision);
+    } catch (cause) {
+      setSelectionError((cause as Error).message);
+    } finally {
+      selectionPending.current = false;
+      setSelecting(false);
+    }
   }
-  async function run(action:"analyze"|"consensus"|"source"="analyze") {
-    if(!session)return;
-    const gen=++generation.current;
-    const rev=session.revision;
-    const tickers=[...session.selection];
-    setRetryAction(action);setBusy(true);setError(null);setStale(false);
-    if(action==="analyze")analyzedRevision.current=rev;
-    if(action!=="consensus")setResult(null);
+
+  function addStock(ticker: string, analyze = false) {
+    void editSelection(current => {
+      if (current.includes(ticker)) return [...current];
+      if (current.length >= MAX_SELECTION) throw new Error(SELECTION_FULL_MESSAGE);
+      return [...current, ticker];
+    }, analyze);
+  }
+
+  async function selectSector(sector: string) {
+    if (selectionPending.current) return;
+    selectionPending.current = true;
+    setSelecting(true);
+    setMapNote(null);
+    setSelectionError(null);
     try {
-      if(action==="source") {
-        const value=await refreshFundamentus();
-        if(gen!==generation.current || rev!==revision.current)return;
-        setNotice(`Cache Fundamentus atualizado (${value.removed} entradas removidas). ${value.scope}.`);
-        const options=await suggestions(sectors);
-        if(gen!==generation.current || rev!==revision.current)return;
-        setSuggested(options);
-        if(analyzedRevision.current!==rev)return;
-      }
-      if(action==="consensus") {
-        const value=await refreshConsensus(tickers,rev);
-        if(gen===generation.current && rev===revision.current)setResult(current => current ? {...current,consensus:value}:current);
-      } else if(tickers.length) {
-        const value=await analyzeHome(tickers,rev);
-        if(gen===generation.current && rev===revision.current)setResult(value);
-      }
-    } catch(exc) {if(gen===generation.current && rev===revision.current)setError((exc as Error).message);}
-    finally {if(gen===generation.current)setBusy(false);}
+      const options = await suggestions([sector]);
+      if (!options.autopick.length) { setMapNote({ text: "Nenhuma ação disponível neste setor." }); return; }
+      let before: string[] = [];
+      const updated = await setSelection(current => {
+        before = [...current];
+        return options.autopick;
+      });
+      setSectorUndo(before.join(",") === updated.selection.join(",") ? null : { tickers: before, revision: updated.revision });
+      setMapNote({ text: `${updated.selection.length} ações mais líquidas de ${sector}, entre ${options.count} disponíveis.` });
+    } catch (cause) {
+      setMapNote({ text: (cause as Error).message, failed: true });
+    } finally {
+      selectionPending.current = false;
+      setSelecting(false);
+    }
   }
-  async function favorite(ticker:string) {
-    try {await toggleFavorite(ticker);} catch(exc) {setError((exc as Error).message);}
+
+  async function run(action: AnalysisAction = "analyze", showResult = false) {
+    if (!session || selectionPending.current) return;
+    const request = ++generation.current;
+    const rev = session.revision;
+    const tickers = session.selection;
+    const isCurrent = () => request === generation.current && rev === revision.current;
+    setRetryAction(action);
+    setBusy(true);
+    setAnalysisError(null);
+    if (showResult) results.current?.scrollIntoView({ block: "nearest" });
+    let refreshingSource = action === "source";
+    if (refreshingSource) setMapNote(null);
+    try {
+      if (action === "source") {
+        await refreshFundamentus();
+        if (!isCurrent()) return;
+        setMapNote({ text: "Dados da Fundamentus atualizados." });
+        refreshingSource = false;
+        if (result?.revision !== rev) return;
+      }
+      if (action === "consensus") {
+        const consensus = await refreshConsensus(tickers, rev);
+        if (isCurrent()) setResult(current => current ? { ...current, consensus } : current);
+      } else if (tickers.length) {
+        const value = await analyzeHome(tickers, rev);
+        if (isCurrent()) setResult(value);
+      }
+    } catch (cause) {
+      if (isCurrent()) {
+        const text = (cause as Error).message;
+        if (refreshingSource) setMapNote({ text, failed: true });
+        else setAnalysisError(text);
+      }
+    } finally {
+      if (isCurrent()) setBusy(false);
+    }
   }
-  const selection=session?.selection ?? [];
-  const ready=session && result && result.revision===session.revision && JSON.stringify(result.requested_tickers)===JSON.stringify(selection) ? result:null;
-  if(loading || !session) return <div className="desk">{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice>:<Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
-  const analyzeLabel=busy ? "Analisando…" : selection.length===1 ? "Analisar ação" : `Analisar ${selection.length} ações`;
-  const resultSlot = ready ? <HomeResults ready={ready} selection={selection} busy={busy} onRefreshConsensus={()=>void run("consensus")}/> : <Pane title="Resultados da análise" area="res" className="pane-idle">
-    {busy ? <Loading>Buscando indicadores, comparação setorial e consensos de {selection.join(", ")}…</Loading>
-      : error ? null
-      : <Idle>{stale ? "A seleção mudou. Analise de novo para atualizar os indicadores." : "Indicadores, saúde financeira e preços-alvo aparecem aqui após a análise."}</Idle>}
-    {error && <Notice tone="negative">{error}<button disabled={busy} onClick={()=>void (selection.length ? run(retryAction) : suggestions(sectors).then(setSuggested).catch(exc=>setError(exc.message)))}>Tentar novamente</button></Notice>}
-  </Pane>;
-  return <div className={`desk desk-home${ready ? " is-analyzed":""}`}>
-    <Monitor selection={selection} stocks={stocks} watchlist={session.watchlist} ready={ready} busy={busy || sectorBusy}
-      analyze={<button type="button" className="primary" disabled={busy || sectorBusy || !selection.length} aria-busy={busy} onClick={()=>void run()}>{analyzeLabel}</button>}
-      onQuick={ticker=>void startQuickAnalysis(ticker)} onFavorite={ticker=>void favorite(ticker)}
-      onAdd={ticker=>{if(selection.length<MAX_SELECTION)void changeSelection(current=>Array.from(new Set([...current,ticker])));}}
-      onRemove={ticker=>void changeSelection(current=>current.filter(item=>item!==ticker))}
+
+  async function favorite(ticker: string) {
+    try { await toggleFavorite(ticker); }
+    catch (cause) { setSelectionError((cause as Error).message); }
+  }
+
+  if (loading || !session) return <div className="desk">{appError ? <Notice tone="negative">{appError}<button onClick={() => void refreshSession()}>Tentar novamente</button></Notice> : <Loading>Carregando sessão e lista de ações da B3…</Loading>}</div>;
+  const selection = session.selection;
+  const ready = result?.revision === session.revision && result.requested_tickers.join(",") === selection.join(",") ? result : null;
+  const disabled = busy || selecting;
+  const analyzeLabel = busy ? "Analisando…" : ready ? "Atualizar análise" : selection.length === 1 ? `Analisar ${selection[0]}` : `Comparar ${selection.length} ações`;
+  const undo = sectorUndo?.revision === session.revision ? sectorUndo : null;
+
+  return <div className={`desk desk-home${selection.length || busy ? " has-selection" : ""}`}>
+    <Monitor selection={selection} stocks={stocks} watchlist={session.watchlist} ready={ready} busy={disabled}
+      picker={<>
+        <StockPicker selection={selection} action={selection.length ? "Adicionar" : "Analisar"} disabled={disabled || selection.length >= MAX_SELECTION} onChoose={ticker => addStock(ticker, selection.length === 0)} />
+        {!!selection.length && <button type="button" className={ready ? undefined : "primary"} disabled={disabled} aria-busy={busy} onClick={() => void run("analyze", true)}>{analyzeLabel}</button>}
+      </>}
+      onQuick={ticker => addStock(ticker, true)} onFavorite={ticker => void favorite(ticker)}
+      onAdd={ticker => addStock(ticker, selection.length === 0)}
+      onRemove={ticker => void editSelection(current => current.filter(item => item !== ticker))}
       notices={<>
-        {session.restored && <Notice>Seleção da carteira salva carregada. Revise e clique em Analisar.</Notice>}
-        {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ação(ões) da carteira salva não estão na lista B3 e foram removidas.</Notice>}
-        {session.restored && !!session.restoration?.truncated_count && <Notice>A seleção salva tinha {session.restoration.original_count} ações; carregamos as 20 primeiras válidas.</Notice>}
-        {ready && !!ready.missing_tickers.length && <Notice tone="warning">Fundamentus indisponível para {ready.missing_tickers.join(", ")}.</Notice>}
-      </>}/>
-    {resultSlot}
-    <SectorMap stocks={stocks} selection={selection} busy={busy || sectorBusy} active={sectors} available={suggested?.count ?? stocks.length} onSector={sector=>void changeSectors([sector])} onAdd={ticker=>{if(selection.length<MAX_SELECTION)void changeSelection(current=>Array.from(new Set([...current,ticker])));}} onReset={()=>void changeSectors([])}
-      onRefresh={()=>void run("source")}
-      note={notice ? <Notice tone="positive">{notice}{sectorUndo && <> <button type="button" onClick={()=>void undoSectorChange()}>Desfazer</button></>}</Notice> : sectorBusy ? <Loading>Ordenando ações do setor por liquidez…</Loading> : null}/>
-    <Macro/>
-    <Headlines/>
-    {ready && <p className="desk-next">Próximo <Link href="/portfolio"><kbd>F2</kbd> Carteira</Link> com {selection.slice(0,4).join(", ")}{selection.length>4 ? "…":""} · <Link href="/screener"><kbd>F5</kbd> Screener</Link> para achar mais ativos</p>}
+        {notice && <Notice>{notice}</Notice>}
+        {selectionError && <Notice tone="negative">{selectionError}</Notice>}
+        {selecting && <p className="picker-status" role="status">Atualizando a seleção…</p>}
+        {session.restored && !!session.restoration?.invalid_count && <Notice tone="warning">{session.restoration.invalid_count} ações da carteira salva estão fora da lista B3 e foram removidas.</Notice>}
+        {session.restored && !!session.restoration?.truncated_count && <Notice>Das {session.restoration.original_count} ações salvas, foram carregadas as 20 primeiras válidas.</Notice>}
+      </>}
+    />
+    {(selection.length > 0 || busy || analysisError) && <div className="home-result" id="resultado-analise" ref={results}>
+      {analysisError && <Notice tone="negative">{analysisError}<button disabled={disabled} onClick={() => void run(retryAction)}>Tentar novamente</button></Notice>}
+      {ready ? <>
+        {ready.missing_tickers.length > 0 && <Notice tone="warning">Fundamentus indisponível para {ready.missing_tickers.join(", ")}.</Notice>}
+        <HomeResults ready={ready} selection={selection} busy={busy} onRefreshConsensus={() => void run("consensus")} />
+        <div className="flow-links">
+          <Link className="button-link" href="/portfolio">{selection.length === 1 ? "Montar carteira com esta ação" : "Montar carteira com estas ações"} <span aria-hidden="true">→</span></Link>
+          <Link className="button-link" href="/screener">Encontrar mais ações <span aria-hidden="true">→</span></Link>
+        </div>
+      </> : <Pane title="Resultado da análise" className="pane-idle">
+        {busy ? <Loading>Buscando indicadores, comparação setorial e preços-alvo para {selection.join(", ")}…</Loading>
+          : !analysisError && <Idle>{result ? "A seleção mudou. Faça uma nova análise para ver os indicadores atuais." : "Consulte os indicadores e os preços-alvo da seleção acima."}</Idle>}
+      </Pane>}
+    </div>}
+    <SectorMap stocks={stocks} selection={selection} busy={disabled} onSector={sector => void selectSector(sector)}
+      onAdd={ticker => addStock(ticker, selection.length === 0)} onRefresh={() => void run("source")}
+      note={mapNote && <Notice tone={mapNote.failed ? "negative" : "info"}>{mapNote.text} {undo && <button type="button" disabled={disabled} onClick={() => void editSelection(undo.tickers)}>Desfazer</button>}</Notice>} />
+    <Macro />
+    <Headlines />
   </div>;
 }

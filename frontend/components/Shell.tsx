@@ -28,7 +28,7 @@ export const tickerColor = (index: number) => comparisonColors[index % compariso
 type View = { key: string; href: string; label: string; title?: string; description: string; ready?: (session: Session) => boolean; requirement?: string };
 export const views: View[] = [
   { key: "F1", href: "/", label: "Início", title: "Análise de ações", description: "Busque ações da B3, consulte indicadores e compare empresas." },
-  { key: "F2", href: "/portfolio", label: "Carteira", description: "Monte uma carteira e veja como ela teria se saído no passado.", ready: session => session.portfolio_ready, requirement: "Carteira a calcular" },
+  { key: "F2", href: "/portfolio", label: "Carteira", description: "Monte uma carteira e veja como ela teria se saído no passado.", ready: session => session.portfolio_ready, requirement: "Aguardando cálculo" },
   { key: "F3", href: "/simulacao", label: "Simulação", description: "Explore cenários para o valor futuro da sua carteira.", ready: session => session.simulation_ready, requirement: "Requer histórico da carteira" },
   { key: "F4", href: "/noticias", label: "Notícias", description: "Acompanhe as notícias dos ativos da sua carteira e o tom das matérias.", ready: session => session.portfolio_ready, requirement: "Requer carteira calculada" },
   { key: "F5", href: "/screener", label: "Screener", title: "Screener de ações", description: "Encontre ações por critérios como dividendos, rentabilidade e liquidez." },
@@ -82,7 +82,7 @@ function Clock() {
   </span>;
 }
 
-type Flash = { text: string; tone: "positive" | "negative" | "info"; undo?: string[] };
+type Flash = { text: string; tone: "positive" | "negative" | "info"; undo?: { tickers: string[]; revision: number } };
 type Option = { kind: "view"; view: View } | { kind: "stock"; stock: Stock };
 
 function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; compact: boolean }) {
@@ -119,8 +119,8 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
     busy.current = true;
     setQuery(""); setActive(0); setOpen(false);
     try {
-      await setSelection(current => removing ? current.filter(item => item !== ticker) : current.includes(ticker) ? [...current] : [...current, ticker]);
-      onFlash({ text: removing ? `${ticker} removida da seleção.` : `${ticker} adicionada à seleção (${Math.min(before.length + 1, MAX_SELECTION)}/${MAX_SELECTION}).`, tone: "positive", undo: before });
+      const updated = await setSelection(current => removing ? current.filter(item => item !== ticker) : current.includes(ticker) ? [...current] : [...current, ticker]);
+      onFlash({ text: removing ? `${ticker} removida da seleção.` : `${ticker} adicionada à seleção (${updated.selection.length}/${MAX_SELECTION}).`, tone: "positive", undo: { tickers: before, revision: updated.revision } });
     } catch (reason) {
       onFlash({ text: reason instanceof Error ? reason.message : String(reason), tone: "negative" });
     } finally { busy.current = false; }
@@ -130,7 +130,7 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
     <span className="cmd-prompt" aria-hidden="true">&gt;</span>
     <input ref={input} type="search" role="combobox" aria-autocomplete="list" aria-expanded={expanded} autoComplete="off" spellCheck={false} value={query}
       aria-label="Buscar ações por código, empresa ou setor" aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-${current}` : undefined}
-      placeholder={compact ? "Buscar ações" : "Buscar código ou empresa"}
+      placeholder={compact ? "Busca rápida" : "Busca rápida de ações"}
       onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
       onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }}
       onKeyDown={event => {
@@ -165,6 +165,11 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
   </div>;
 }
 
+export function focusStockSearch() {
+  const local = document.querySelector(".stock-picker input:not([readonly])");
+  window.dispatchEvent(new Event(local ? "b3lab:focus-picker" : "b3lab:focus-search"));
+}
+
 function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
   const { session, stocks, setSelection } = useApp();
   const [open, setOpen] = useState(false);
@@ -197,7 +202,7 @@ function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
   }, [open]);
   async function update(next: string[], text: string) {
     const before = [...selection];
-    try { await setSelection(next); onFlash({ text, tone: "positive", undo: before }); }
+    try { const updated = await setSelection(next); onFlash({ text, tone: "positive", undo: { tickers: before, revision: updated.revision } }); }
     catch (reason) { onFlash({ text: reason instanceof Error ? reason.message : String(reason), tone: "negative" }); }
   }
   const remove = (ticker: string) => void update(selection.filter(item => item !== ticker), `${ticker} removida da seleção.`);
@@ -220,7 +225,7 @@ function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
         <button type="button" aria-label={`Remover ${ticker}`} onClick={() => remove(ticker)}>×</button>
       </li>)}</ol> : <p className="tray-empty">Nenhum ativo. Digite um ticker na busca (Ctrl+K) e pressione Enter.</p>}
       <div className="tray-foot">
-        <button type="button" onClick={() => { setOpen(false); window.dispatchEvent(new Event("b3lab:focus-search")); }}>+ Adicionar</button>
+        <button type="button" onClick={() => { setOpen(false); focusStockSearch(); }}>+ Adicionar</button>
         {selection.length > 0 && <button type="button" onClick={() => void update([], "Seleção limpa.")}>Limpar</button>}
       </div>
     </div>}
@@ -234,6 +239,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   const [market, setMarket] = useState<Market>({ strip: null, failed: false });
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const [compact, setCompact] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
   const view = views.find(item => item.href === pathname);
@@ -270,8 +276,8 @@ export default function Shell({ children }: { children: ReactNode }) {
       if (event.target instanceof Element && event.target.closest("dialog[open]")) return;
       const typing = event.target instanceof Element && !!event.target.closest("input, textarea, select, [contenteditable='true']");
       const viewIndex = /^F[1-5]$/.test(event.key) ? Number(event.key.slice(1)) - 1 : event.altKey && !event.ctrlKey && !event.metaKey && /^Digit[1-5]$/.test(event.code) ? Number(event.code.slice(5)) - 1 : -1;
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); window.dispatchEvent(new Event("b3lab:focus-search")); }
-      else if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); window.dispatchEvent(new Event("b3lab:focus-search")); }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); focusStockSearch(); }
+      else if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); focusStockSearch(); }
       else if (viewIndex >= 0 && !event.shiftKey) { event.preventDefault(); router.push(views[viewIndex].href); }
     };
     document.addEventListener("keydown", onKey);
@@ -281,7 +287,11 @@ export default function Shell({ children }: { children: ReactNode }) {
   useEffect(() => {
     const closeMenu = () => setMenu(false);
     window.addEventListener("b3lab:focus-search", closeMenu);
-    return () => window.removeEventListener("b3lab:focus-search", closeMenu);
+    window.addEventListener("b3lab:focus-picker", closeMenu);
+    return () => {
+      window.removeEventListener("b3lab:focus-search", closeMenu);
+      window.removeEventListener("b3lab:focus-picker", closeMenu);
+    };
   }, []);
   useEffect(() => {
     if (!flash) return;
@@ -300,8 +310,10 @@ export default function Shell({ children }: { children: ReactNode }) {
       <header className="cmd">
         <Link href="/" className="cmd-brand" aria-label="B3Lab, Início"><span>B3</span>LAB<i aria-hidden="true" /></Link>
         <CommandSearch onFlash={showFlash} compact={compact} />
-        <button type="button" className="cmd-menu" aria-expanded={menu} aria-controls="cmd-drawer" onClick={() => setMenu(value => !value)}>{menu ? "Fechar" : "Menu"}</button>
-        <div className="cmd-drawer" id="cmd-drawer">
+        <button ref={menuButton} type="button" className="cmd-menu" aria-expanded={menu} aria-controls="cmd-drawer" onClick={() => setMenu(value => !value)}>{menu ? "Fechar" : "Menu"}</button>
+        <div className="cmd-drawer" id="cmd-drawer" onKeyDown={event => {
+          if (menu && event.key === "Escape") { setMenu(false); menuButton.current?.focus(); }
+        }}>
           <nav className="cmd-views" aria-label="Páginas do B3Lab">{views.map(view => {
             const ready = !session || !view.ready || view.ready(session);
             return <Link key={view.href} href={view.href} onClick={() => setMenu(false)} aria-current={pathname === view.href ? "page" : undefined} aria-keyshortcuts={`${view.key} Alt+${view.key.slice(1)}`} title={`${view.label} (${view.key} ou Alt+${view.key.slice(1)})${ready ? "" : ` · ${view.requirement}`}`}>
@@ -314,6 +326,9 @@ export default function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <Tape />
+      <div className="shell-feedback" role="status">
+        {flash && <div className={`shell-message is-${flash.tone}`}><span>{flash.text}</span>{flash.undo && flash.undo.revision === session?.revision && <button type="button" onClick={() => void undo(flash.undo!.tickers)}>Desfazer</button>}</div>}
+      </div>
       <main id="conteudo" className="mesa-main" tabIndex={-1}>
         {!loading && view && <header className="workspace-intro">
           <div><h1>{view.title ?? view.label}</h1><p>{view.description}</p></div>
@@ -325,7 +340,7 @@ export default function Shell({ children }: { children: ReactNode }) {
         <span className={`status-activity${busy ? " is-busy" : ""}`}><span aria-hidden="true">{busy ? "◐" : "●"}</span>{busy ? "Processando" : "Pronto"}</span>
         <span><Link href="/guia" aria-current={pathname === "/guia" ? "page" : undefined}>Boas-vindas</Link></span>
         {!loading && <span><button type="button" className="status-link" onClick={openTutorial}>Tutorial</button></span>}
-        <span className="status-flash" role="status" aria-live="polite">{flash && <span className={`is-${flash.tone}`}><span>{flash.text}</span>{flash.undo && <button type="button" onClick={() => void undo(flash.undo!)}>Desfazer</button>}</span>}</span>
+        <span className="status-spacer" />
         <span className="status-note">Sessão anônima · resultados temporários</span>
         <span className="status-note">Dados para pesquisa, não recomendação de investimento</span>
       </footer>

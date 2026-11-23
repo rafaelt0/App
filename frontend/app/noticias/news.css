@@ -62,3 +62,10 @@
 .tone-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; }
 .tone-row:first-child { margin-top: 12px; }
 @media (max-width: 900px) { .tone-row { grid-template-columns: minmax(0, 1fr); } .tone-label { grid-row: auto; } }
+
+#feed-noticias { scroll-margin-top: calc(var(--cmd-h) + 12px); }
+.news-context-links { display: flex; flex-wrap: wrap; gap: 8px 14px; font: 13px var(--sans); }
+.news-filters { display: grid; gap: 8px; padding: 12px 10px; border-bottom: 1px solid var(--line); }
+.news-filters h3 { font: 600 14px var(--sans); }
+.news-filter-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 8px; }
+.news-filter-fields select { min-height: 36px; }

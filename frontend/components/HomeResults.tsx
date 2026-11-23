@@ -53,7 +53,8 @@ function ComparisonBars({ companies, indicator, color }: { companies: Company[];
       })}
       {missing.map(bar => <li key={bar.ticker} className="is-missing"><span className="cmp-tk"><i className="swatch" style={{ background: color(bar.ticker) ?? "#9aa2b4" }} aria-hidden="true" />{bar.ticker}</span><span className="cmp-track" aria-hidden="true" /><span className="cmp-val muted">sem dado</span></li>)}
     </ul>
-    <p className="cmp-scale" aria-hidden="true"><span>{low === 0 ? "0" : text(low)}</span>{mid !== null && <span className="cmp-scale-mid" style={{ left: `${at(mid)}%` }}>mediana {text(mid)}</span>}<span>{text(high)}</span></p>
+    <p className="cmp-scale" aria-hidden="true"><span>{low === 0 ? "0" : text(low)}</span><span>{text(high)}</span></p>
+    {mid !== null && <p className="tab-foot cmp-median">Mediana da seleção · {text(mid)}</p>}
     {outlier && <p className="tab-foot">Escala até {text(high)}, pelo segundo maior valor; a barra de {known[0].ticker} ({text(known[0].value)}) aparece cortada.</p>}
   </div>;
 }
@@ -129,7 +130,7 @@ const tabKeys = ["ArrowLeft", "ArrowRight", "Home", "End"];
 
 export default function HomeResults({ ready, selection, busy, onRefreshConsensus }: Props) {
   const [comparison, setComparison] = useState("pl");
-  const [selectedTab, setSelectedTab] = useState(resultTabs[0].id);
+  const [selectedTab, setSelectedTab] = useState(selection.length > 1 ? "comparacao" : "visao-geral");
   const single = selection.length === 1;
   const companies = ready.companies;
   const tabs = resultTabs.filter(tab => tab.available(ready, single));
@@ -142,7 +143,7 @@ export default function HomeResults({ ready, selection, busy, onRefreshConsensus
     setSelectedTab(tabs[next].id);
     document.getElementById(`home-tab-${tabs[next].id}`)?.focus();
   }
-  return <Pane title="Resultado da análise" area="res" className="pane-result" meta={`${companies.length} ${companies.length === 1 ? "ativo" : "ativos"} · Fundamentus`} actions={<ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>CSV</ExportButton>} flush>
+  return <Pane title="Resultado da análise" className="pane-result" meta={`${companies.length} ${companies.length === 1 ? "ativo" : "ativos"} · Fundamentus`} actions={<ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>CSV</ExportButton>} flush>
     <div className="tabs" role="tablist" aria-label="Seções da análise">{tabs.map((tab, index) => {
       const selected = tab.id === activeTab.id;
       return <button type="button" role="tab" key={tab.id} id={`home-tab-${tab.id}`} aria-controls={`home-panel-${tab.id}`} aria-selected={selected} tabIndex={selected ? 0 : -1} onClick={() => setSelectedTab(tab.id)} onKeyDown={event => moveFocus(event, index)}>{tab.label}</button>;

@@ -4,11 +4,11 @@ B3Lab analisa ações brasileiras com uma interface React em Next.js e uma API P
 
 ## Funcionalidades
 
-- **Fundamentos.** Seleção por empresa e setor, indicadores do Fundamentus, endividamento, comparação setorial, favoritos e consenso de preços-alvo do Yahoo Finance. A seleção exige a ação **Analisar** antes de buscar os detalhes.
-- **Portfólio.** Mínima volatilidade, Markowitz com regularização L2, HRP e cotas manuais. Inclui alocação, estimativa de compra por cotas, fronteira eficiente, desempenho histórico, retornos mensais, Sharpe, Sortino, drawdown, beta, alpha, VaR diário, concentração, regime recente e crises históricas. A ação **Carregar portfólio** libera as análises seguintes.
+- **Fundamentos.** Seleção por empresa e setor, indicadores do Fundamentus, endividamento, comparação setorial, favoritos e consenso de preços-alvo do Yahoo Finance. A busca da página carrega os indicadores ao escolher a primeira ação. Para comparar, adicione outros códigos e use **Comparar ações**.
+- **Portfólio.** Mínima volatilidade, Markowitz com regularização L2, HRP e cotas manuais. Inclui alocação, estimativa de compra por cotas, fronteira eficiente, desempenho histórico, retornos mensais, Sharpe, Sortino, drawdown, beta, alpha, VaR diário, concentração, regime recente e crises históricas. Escolha as ações na própria página. A ação **Calcular carteira** libera as análises seguintes.
 - **Simulação.** De 10 a 3.000 trajetórias, com até 10 anos de horizonte. Compara o modelo normal multivariado com a reamostragem conjunta dos dias históricos. Mostra trajetórias, percentis, distribuição final, sensibilidade da calibração e média da cauda inferior. P5 não é VaR nem perda máxima. Alterar o número de trajetórias exibidas não executa novamente os modelos.
 - **Notícias.** Feeds brasileiros dos últimos sete dias, até dez notícias por ativo, deduplicação, classificação com Jev via API e fallback léxico identificado. Filtros e paginação não alteram a nota ponderada da amostra completa. A nota mede tom textual, não retorno esperado.
-- **Screener.** Sete pontos de partida, critérios opcionais, ordenação, escolha de colunas, favoritos e envio de ativos para a análise fundamentalista. Os dados vêm do Fundamentus.
+- **Screener.** Sete pontos de partida, critérios opcionais, ordenação, escolha de colunas, favoritos e acesso à análise fundamentalista junto ao código de cada ativo. Os dados vêm do Fundamentus.
 
 As cinco exportações disponíveis são CSV de fundamentos, alocação, resumo da simulação, percentis por data e resultados completos do screener. Não há geração de relatório HTML.
 
