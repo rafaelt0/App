@@ -47,19 +47,19 @@ def simulate_portfolio(
     if chunk_size < 1:
         raise ValueError("chunk_size must be positive.")
     rng = np.random.default_rng(42)
-    portfolio_values = np.empty((days, simulations), dtype=float)
+    # Include the initial row in the allocation instead of copying the full matrix with vstack.
+    portfolio_values = np.empty((days + 1, simulations), dtype=float)
+    portfolio_values[0] = initial_value
     for first in range(0, simulations, chunk_size):
         count = min(chunk_size, simulations - first)
         log_returns = rng.multivariate_normal(mu, covariance, size=(days, count))
         daily_returns = np.expm1(log_returns) @ weights
-        portfolio_values[:, first:first + count] = initial_value * np.cumprod(
+        portfolio_values[1:, first:first + count] = initial_value * np.cumprod(
             1 + daily_returns, axis=0
         )
 
     dates = pd.date_range(start=start_date, periods=days + 1, freq="B")
-    result = pd.DataFrame(
-        np.vstack([np.full(simulations, initial_value), portfolio_values]), index=dates
-    )
+    result = pd.DataFrame(portfolio_values, index=dates)
     return result
 
 

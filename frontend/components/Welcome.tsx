@@ -5,10 +5,10 @@ import { useApp } from "./AppProvider";
 import { Loading } from "./ui";
 
 const overview = [
-  { num: "01", title: "Buscar ativos", detail: "Use Ctrl K ou a barra do topo para montar uma seleção sincronizada." },
-  { num: "02", title: "Analisar empresas", detail: "Compare indicadores, saúde financeira e preços-alvo no Início." },
-  { num: "03", title: "Filtrar no Screener", detail: "Aplique presets ou critérios de DY, ROE, P/L e liquidez." },
-  { num: "04", title: "Carteira e cenários", detail: "Otimize pesos, simule trajetórias Monte Carlo e acompanhe notícias." },
+  { href: "/screener", title: "Screener", detail: "Encontre ações por dividendos, rentabilidade, preço ou liquidez." },
+  { href: "/portfolio", title: "Carteira", detail: "Escolha ações, calcule a distribuição dos pesos e avalie o desempenho histórico." },
+  { href: "/simulacao", title: "Simulação", detail: "Explore cenários futuros para uma carteira calculada." },
+  { href: "/noticias", title: "Notícias", detail: "Leia as matérias recentes sobre os ativos da carteira e veja o tom da cobertura." },
 ];
 
 export default function Welcome() {
@@ -21,18 +21,16 @@ export default function Welcome() {
       {loading ? <Loading>Carregando a sessão e a lista de ativos…</Loading>
         : <>
           <div className="onboarding-actions">
-            <button type="button" className="primary" onClick={openTutorial}>Iniciar tutorial interativo</button>
-            <Link className="button-link" href="/">Ir para o Início <span aria-hidden="true">→</span></Link>
+            <Link className="button-link primary" href="/">Analisar ações <span aria-hidden="true">→</span></Link>
+            <button type="button" onClick={openTutorial}>Ver tutorial interativo</button>
           </div>
-          <ol className="welcome-steps" aria-label="Etapas do fluxo no B3Lab">
-            {overview.map(item => (
-              <li key={item.num}>
-                <span>{item.num}</span>
-                <strong>{item.title}</strong>
-                <p>{item.detail}</p>
-              </li>
-            ))}
-          </ol>
+          <nav aria-label="Ferramentas do B3Lab">
+            <ul className="welcome-steps">
+              {overview.map(item => <li key={item.href}>
+                <Link href={item.href}><strong>{item.title} <span aria-hidden="true">→</span></strong><p>{item.detail}</p></Link>
+              </li>)}
+            </ul>
+          </nav>
         </>}
     </div>
   </section>;

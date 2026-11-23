@@ -20,7 +20,7 @@ const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 const yearsLabel = (years: number) => `${number.format(years)} ${years === 1 ? "ano" : "anos"}`;
 
 export default function SimulationPage() {
-  const { session, stocks, loading, error: sessionError, refreshSession } = useApp();
+  const { session, loading, error: sessionError, refreshSession } = useApp();
   const [portfolio, setPortfolio] = useState<SimulationPortfolio | null>(null);
   const [inputs, setInputs] = useState<SimulationInputs>(initialInputs);
   const [result, setResult] = useState<SimulationResult | null>(null);
@@ -108,14 +108,13 @@ export default function SimulationPage() {
     const portfolioId = portfolio.id;
     const submitted = { ...inputs, revision, portfolio_id: portfolioId };
     setRunning(true);
-    setFoldParams(true);
     setError(null);
     setPortfolioChanged(false);
-    setResult(null);
     try {
       const calculated = await api<SimulationResult>("/api/simulation/run", submitted);
       if (token !== generation.current || activeRevision.current !== revision || calculated.portfolio_id !== portfolioId) return;
       setResult(calculated);
+      setFoldParams(true);
       setDisplayCount(Math.min(10, calculated.inputs.simulations));
       setDisplayDraft(String(Math.min(10, calculated.inputs.simulations)));
       await refreshSession();
@@ -142,7 +141,6 @@ export default function SimulationPage() {
   const individual = useMemo(() => visible ? displayedTrajectories(visible.charts.individual, displayCount) : null, [visible, displayCount]);
   const ready = !!portfolio?.id && portfolio.simulation_ready && portfolio.revision === session?.revision;
   const rawWeights = portfolio ? portfolio.tickers.map(ticker => ({ ticker, weight: portfolio.weights[ticker] })) : [];
-  const hasTreasury = stocks.some(stock => stock.asset?.market === "TD" && rawWeights.some(row => row.ticker === stock.ticker && row.weight > 0));
   const total = rawWeights.reduce((sum, row) => sum + row.weight, 0);
   const allocation = visible?.allocation ?? rawWeights.map(row => ({ ticker: row.ticker, weight: row.weight / total }));
 
@@ -172,24 +170,27 @@ export default function SimulationPage() {
   </details>;
   if (!ready) return <>
     {notes}
-    <PortfolioRequired count={session?.selection.length ?? 0} title={restoreFailed ? "Não foi possível carregar o histórico da carteira" : undefined}>{preview}</PortfolioRequired>
+    <PortfolioRequired count={session?.selection.length ?? 0} feature="simular cenários" title={restoreFailed ? "Não foi possível carregar o histórico da carteira" : undefined}>
+      {restoreFailed && <button type="button" onClick={() => { restoreRequest.current = null; setReloadKey(key => key + 1); }}>Tentar carregar novamente</button>}
+      {preview}
+    </PortfolioRequired>
   </>;
 
   // Keep the compact setup header above results.
   const folded = foldParams && (!!visible || running);
   const recap = `${yearsLabel(inputs.years)} · ${number.format(inputs.simulations)} trajetórias · ${formatValue(inputs.initial_capital, "money", 0)}`;
   return <div className="desk desk-split">
-    <Pane title="Configurar simulação" className="pane-params" meta={folded && narrow ? recap : portfolio?.mode ?? undefined} narrowCollapsed={folded}>
+    <Pane title="Cenário da simulação" className="pane-params" meta={folded && narrow ? recap : portfolio?.mode ?? undefined} narrowCollapsed={folded}>
       {restoredNotice && <Notice>Carteira salva restaurada. Confira ativos e pesos antes de rodar.</Notice>}
       <form className="param-group param-fields" onSubmit={submit} aria-busy={running} noValidate>
-        <h3 className="pane-sub">Pontos de partida</h3>
-        <div className="presets" role="group" aria-label="Pontos de partida">
+        <h3 className="pane-sub">Escolha um cenário</h3>
+        <div className="presets" role="group" aria-label="Cenários prontos">
           {simulationPresets.map(preset => {
             const active = inputs.simulations === preset.simulations && inputs.initial_capital === preset.initial_capital && inputs.years === preset.years;
             return <button key={preset.label} type="button" disabled={running} aria-pressed={active} title={preset.description} onClick={() => setInputs(current => ({ ...current, simulations: preset.simulations, initial_capital: preset.initial_capital, years: preset.years }))}>{preset.label}</button>;
           })}
         </div>
-        <h3 className="pane-sub">Cenário</h3>
+        <h3 className="pane-sub">Parâmetros</h3>
         {field("n", "Número de simulações (trajetórias)", simulationsValid, "Entre 10 e 3.000.", "Use um número inteiro entre 10 e 3.000.", inputs.simulations, value => setInputs(current => ({ ...current, simulations: value })), { min: 10, max: 3000 })}
         {field("c", "Capital inicial (R$)", capitalValid, "Mínimo de R$ 100.", "Informe um valor de pelo menos R$ 100.", inputs.initial_capital, value => setInputs(current => ({ ...current, initial_capital: value })), { min: 100 })}
         {field("y", "Horizonte (anos)", yearsValid, "Entre 1 e 10 anos.", "Use um número inteiro entre 1 e 10 anos.", inputs.years, value => setInputs(current => ({ ...current, years: value })), { min: 1, max: 10 })}
@@ -201,17 +202,19 @@ export default function SimulationPage() {
         </label>
         <div className="param-run"><button type="submit" className="primary" disabled={running || !inputsValid}>{running ? "Simulando…" : "Simular carteira"}</button></div>
       </form>
-      <h3 className="pane-sub">Alocação usada</h3>
-      {hasTreasury && <p className="param-hint">O Tesouro entra com retornos históricos de marcação a mercado. A simulação mantém os pesos ao longo do horizonte, inclusive após o vencimento do título.</p>}
-      {sample && <p className="param-hint">Calibração: {calibrationText}. Histórico: {periodLabel(sample)} ({number.format(sample.count)} retornos diários).</p>}
-      {allocationList}
-      <p className="param-hint">Pesos normalizados da carteira carregada; peso zero permanece zerado.</p>
+      <details className="disclosure"><summary>Carteira usada · {allocation.length} ativos</summary><div>
+        {sample && <p className="param-hint">Calibração: {calibrationText}. Histórico: {periodLabel(sample)} ({number.format(sample.count)} retornos diários).</p>}
+        {allocationList}
+        <p className="param-hint">Pesos normalizados da carteira carregada; peso zero permanece zerado.</p>
+        <Link href="/portfolio">Editar carteira →</Link>
+      </div></details>
       <details className="disclosure"><summary>Premissas e calibração</summary><div><p>A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos.</p><p>O horizonte é independente da janela: 252 dias úteis por ano, até 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p></div></details>
     </Pane>
     <div className={`board${visible ? "" : " is-preview"}`}>
-      {(sessionError || error || portfolioChanged || stale || (visible && visible.warnings.length > 0)) && <div className="span-12 board-notes">
+      {(sessionError || error || portfolioChanged || stale || (running && visible) || (visible && visible.warnings.length > 0)) && <div className="span-12 board-notes">
         {notes}
-        {stale && <div role="status"><Notice tone="warning">O cenário mudou. Clique em “Simular carteira” para atualizar o resultado.</Notice></div>}
+        {running && visible && <ElapsedLoading>Calculando o novo cenário. Os dados abaixo são da simulação anterior.</ElapsedLoading>}
+        {stale && !running && <div role="status"><Notice tone="warning">Os dados abaixo são da última simulação. Clique em “Simular carteira” para aplicar o cenário atual.</Notice></div>}
         {visible?.warnings.map(warning => <Notice key={warning} tone="warning"><strong>Atenção: </strong>{warning}</Notice>)}
       </div>}
       {!visible && <Pane title="Resultado da simulação" className="span-12">

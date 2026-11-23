@@ -8,17 +8,19 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import Field
 
 from backend.serialization import StrictModel, clean_json, csv_response, figure
 from backend.state import artifact, begin, publish, require_portfolio, session
+from utils.assets import modeled_history_notice, provider_symbol
 from utils.charts import (
     CHART_MUTED, CHART_PRIMARY, CHART_PRIMARY_FILL, CHART_PRIMARY_FILL_STRONG,
     CHART_PRIMARY_LIGHT, CHART_PRIMARY_TRACE, CHART_TEXT,
     apply_plotly_theme,
 )
-from utils.assets import price_symbol
 from utils.portfolio_data import daily_returns, get_portfolio_prices
+from utils.treasury_data import TREASURY_TITLES
 from utils.simulation import annualized_log_return_stats, bootstrap_terminal_values, simulate_portfolio
 
 router = APIRouter(prefix="/api/simulation", tags=["simulation"])
@@ -60,9 +62,16 @@ def calibration_sample(portfolio, calibration, today):
         _invalid("Os pesos analisados devem ser finitos, não negativos e somar um valor positivo.")
     normalized = raw / total
     active = raw > 0
-    columns = [price_symbol(ticker) for ticker, included in zip(tickers, active) if included]
-    weights = normalized[active]
     returns = portfolio.returns
+    def _col(ticker: str) -> str:
+        if not returns.empty:
+            if f"{ticker}.SA" in returns.columns:
+                return f"{ticker}.SA"
+            if ticker in returns.columns:
+                return ticker
+        return provider_symbol(ticker)
+    columns = [_col(ticker) for ticker, included in zip(tickers, active) if included]
+    weights = normalized[active]
     if calibration != "portfolio":
         try:
             prices = get_portfolio_prices(tuple(columns), today - dt.timedelta(days=365 * calibration))
@@ -120,7 +129,10 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
                 calibration["sensitivity"].append({"years": years, "count": len(window), **_period(window),
                                                     "annual_log_mean": mean, "iid_standard_error": error})
     days = params.years * 252
-    warnings = []
+    modeled = modeled_history_notice(ticker for ticker, weight in portfolio.weights.items() if weight > 0)
+    warnings = [modeled] if modeled else []
+    if any(ticker in TREASURY_TITLES and weight > 0 for ticker, weight in portfolio.weights.items()):
+        warnings.append("O Tesouro Direto entra com retornos históricos de marcação a mercado. A simulação mantém os pesos, inclusive após o vencimento dos títulos.")
     if len(aligned) < 252 or days > len(aligned):
         warnings.append("A amostra histórica é curta para este horizonte. Médias e riscos estimados podem mudar muito com outra janela; estas trajetórias não são previsões.")
     if params.simulations < 1000:
@@ -152,19 +164,27 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
                     "standard_deviation": float(final.std(ddof=1))}
     fan = paths.quantile(q=np.array([5, 25, 50, 75, 95]) / 100, axis=1).T
     fan.columns = ["P5", "P25", "P50", "P75", "P95"]
+    # Plotly deep-copies each trace. Reusing ISO strings avoids copying and serializing
+    # tens of thousands of Python datetime objects for long simulation horizons.
+    chart_dates = paths.index.strftime("%Y-%m-%d").tolist()
     individual = go.Figure()
-    for i in range(min(50, params.simulations)):
-        individual.add_trace(go.Scatter(x=paths.index, y=paths.iloc[:, i], mode="lines", name=f"Simulação {i + 1}",
-                                        line={"width": 1, "color": CHART_PRIMARY_TRACE}))
     _themed(individual, "Exemplos de trajetórias simuladas (modelo normal)")
     individual.update_layout(showlegend=False, margin={"b": 55})
+    individual_chart = figure(individual)
+    # The paths were checked for finite values above. Attach native JSON arrays after
+    # serializing the layout so Plotly never copies/encodes the same long paths again.
+    individual_chart["data"] = [
+        {"type": "scatter", "x": chart_dates, "y": paths.iloc[:, i].tolist(), "mode": "lines",
+         "name": f"Simulação {i + 1}", "line": {"width": 1, "color": CHART_PRIMARY_TRACE}}
+        for i in range(min(50, params.simulations))
+    ]
     fan_figure = go.Figure()
     for name, fill, fillcolor, label in (
         ("P95", None, None, None), ("P5", "tonexty", CHART_PRIMARY_FILL, "Faixa 5%–95%"),
         ("P75", None, None, None), ("P25", "tonexty", CHART_PRIMARY_FILL_STRONG, "Faixa 25%–75%"),
         ("P50", None, None, "Mediana"),
     ):
-        fan_figure.add_trace(go.Scatter(x=fan.index, y=fan[name], fill=fill, fillcolor=fillcolor,
+        fan_figure.add_trace(go.Scatter(x=chart_dates, y=fan[name], fill=fill, fillcolor=fillcolor,
             name=label or name, showlegend=label is not None,
             line={"color": CHART_PRIMARY_LIGHT if name == "P50" else CHART_PRIMARY_FILL_STRONG, "width": 2 if name == "P50" else .75}))
     _themed(fan_figure, "Faixas de percentis (modelo normal)")
@@ -200,16 +220,17 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
         for label, value in (("Valor final P5 (R$)", row["p5"]), ("Valor final P95 (R$)", row["p95"]),
                              ("Ganho sobre o capital inicial (%)", row["gain_probability"] * 100)):
             summary_values.append((f"{row['model']} — {label}", round(float(value), 2)))
-    result = {
+    result = clean_json({
         "id": uuid4().hex, "portfolio_id": portfolio.id, "revision": params.revision,
         "inputs": params.model_dump(), "mode": portfolio.mode, "allocation": allocation, "calibration": calibration,
         "stats": stats, "comparison": comparison, "distribution": distribution, "warnings": warnings,
         "monte_carlo_error_pp": float(98 / np.sqrt(params.simulations)),
         "spread_fraction": float((p95 - p5) / capital),
-        "charts": {"individual": figure(individual), "fan": figure(fan_figure), "histogram": figure(histogram)},
-    }
+    })
+    # figure() already produces JSON-safe data; avoid traversing every chart point again.
+    result["charts"] = {"individual": individual_chart, "fan": figure(fan_figure), "histogram": figure(histogram)}
     fan.index = fan.index.strftime("%Y-%m-%d")
-    return SimulationArtifact(result["id"], params.revision, portfolio.id, clean_json(result),
+    return SimulationArtifact(result["id"], params.revision, portfolio.id, result,
                               pd.DataFrame(summary_values, columns=["Métrica", "Valor"]), fan, today)
 
 
@@ -223,7 +244,8 @@ def run_simulation(params: SimulationRequest, request: Request):
         generation = begin(ctx, "simulation", params.revision)
     calculated = compute_simulation(portfolio, params)
     publish(ctx, "simulation", params.revision, generation, calculated, portfolio_id=portfolio.id)
-    return calculated.result
+    # The artifact is already JSON-safe. Skip FastAPI's recursive encoder for this large payload.
+    return JSONResponse(calculated.result)
 
 
 @router.get("/current")
@@ -235,7 +257,7 @@ def current_simulation(request: Request):
         portfolio = ctx.portfolio
         if saved is None or portfolio is None or saved.portfolio_id != portfolio.id or saved.revision != ctx.revision:
             return None
-        return saved.result
+    return JSONResponse(saved.result)
 
 
 @router.get("/{simulation_id}/summary.csv")

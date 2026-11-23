@@ -13,7 +13,7 @@ from pydantic import Field, field_validator
 from backend.serialization import StrictModel, clean_json
 from backend.state import SESSION_COOKIE, release_session, replace_selection, resolve_session, session
 from utils import db
-from utils.assets import ASSETS
+from utils.assets import is_valid_asset_ticker, normalize_ticker
 from utils.market_data import get_listed_stocks
 
 
@@ -36,8 +36,8 @@ app = FastAPI(title="B3Lab", version="1.0.0", lifespan=lifespan)
 _capacity = asyncio.Semaphore(2)
 # Shared market data with no owner state: answering them never needs a session,
 # so a first visit's parallel requests do not each mint their own cookie.
-PUBLIC_ROUTES = {("GET", "/api/universe"), ("GET", "/api/universe/liquidity"), ("GET", "/api/universe/changes"),
-                 ("GET", "/api/market/strip"), ("POST", "/api/news/market")}
+PUBLIC_ROUTES = {("GET", "/api/universe"), ("GET", "/api/universe/search"), ("GET", "/api/universe/liquidity"),
+                 ("GET", "/api/universe/changes"), ("GET", "/api/market/strip"), ("POST", "/api/news/market")}
 
 
 def allowed_origin(origin: str | None) -> bool:
@@ -158,7 +158,7 @@ class SelectionRequest(StrictModel):
     @field_validator("tickers")
     @classmethod
     def normalized_tickers(cls, values):
-        normalized = [value.strip().upper().removesuffix(".SA") for value in values]
+        normalized = [normalize_ticker(value) for value in values]
         if len(set(normalized)) != len(normalized):
             raise ValueError("Selecione cada ativo apenas uma vez.")
         return normalized
@@ -167,8 +167,8 @@ class SelectionRequest(StrictModel):
 @app.put("/api/session/selection")
 def select_stocks(body: SelectionRequest, request: Request):
     universe = set(get_listed_stocks()["Ticker"])
-    if any(ticker not in universe and ticker not in ASSETS for ticker in body.tickers):
-        raise HTTPException(422, "A seleção contém ativos fora do catálogo.")
+    if any(not is_valid_asset_ticker(ticker, universe) for ticker in body.tickers):
+        raise HTTPException(422, "A seleção contém códigos de ativos inválidos.")
     ctx = session(request)
     replace_selection(ctx, body.tickers, body.revision)
     with ctx.lock:
@@ -182,9 +182,10 @@ def read_watchlist(request: Request):
 
 @app.put("/api/watchlist/{ticker}")
 def add_favorite(ticker: str, request: Request):
-    ticker = ticker.strip().upper().removesuffix(".SA")
-    if ticker not in ASSETS and ticker not in set(get_listed_stocks()["Ticker"]):
-        raise HTTPException(422, "Ativo indisponível no catálogo.")
+    ticker = normalize_ticker(ticker)
+    universe = set(get_listed_stocks()["Ticker"])
+    if not is_valid_asset_ticker(ticker, universe):
+        raise HTTPException(422, "Ativo indisponível ou código inválido.")
     ctx = session(request)
     if not db.wl_add(ctx.uid, ticker):
         raise HTTPException(503, "Não foi possível salvar o favorito.")
@@ -194,7 +195,7 @@ def add_favorite(ticker: str, request: Request):
 @app.delete("/api/watchlist/{ticker}")
 def remove_favorite(ticker: str, request: Request):
     ctx = session(request)
-    if not db.wl_remove(ctx.uid, ticker.strip().upper().removesuffix(".SA")):
+    if not db.wl_remove(ctx.uid, normalize_ticker(ticker)):
         raise HTTPException(503, "Não foi possível remover o favorito.")
     return {"watchlist": db.wl_get(ctx.uid)}
 

@@ -12,12 +12,13 @@ type Props = {
   onSort: (field: string) => void;
   selectedKey?: string;
   onSelect: (ticker: string) => void;
-  onActivate: (ticker: string) => void;
+  onAnalyze: (ticker: string) => void;
+  working: boolean;
   inSelection: Set<string>;
 };
 
-/** Whole-row activation with roving focus: a click or Enter adds the row to the selection, ↑↓ only move the highlight. */
-export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey, onSelect, onActivate, inSelection }: Props) {
+/** Arrow keys move through rows. The row action opens the analysis for the current selection. */
+export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey, onSelect, onAnalyze, working, inSelection }: Props) {
   const body = useRef<HTMLTableSectionElement>(null);
   const tickers = rows.map(row => String(row.ticker));
   const focusIndex = Math.max(0, selectedKey ? tickers.indexOf(selectedKey) : 0);
@@ -28,7 +29,7 @@ export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey
     button?.focus();
     button?.closest("tr")?.scrollIntoView({ block: "nearest" });
   }
-  return <table className="grid scr-grid" aria-label="Ações que atendem aos critérios"><thead><tr>
+  return <table className="grid scr-grid" aria-label="Ativos que atendem aos critérios"><thead><tr>
     <th scope="col">Papel</th>
     {columns.map(column => {
       const active = sort.field === column.key;
@@ -44,14 +45,16 @@ export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey
     else if (event.key === "ArrowUp") { event.preventDefault(); move(index - 1); }
     else if (event.key === "Home") { event.preventDefault(); move(0); }
     else if (event.key === "End") { event.preventDefault(); move(tickers.length - 1); }
-    else if (event.key === "Enter") { event.preventDefault(); onActivate(tickers[index]); }
   }}>{rows.map((row, index) => {
     const ticker = tickers[index];
     const selected = selectedKey === ticker;
-    return <tr key={ticker} data-ticker={ticker} className={`scr-row${selected ? " selected-row" : ""}`} onClick={() => onActivate(ticker)}>
-      <th scope="row"><button type="button" className="scr-row-select row-btn" tabIndex={index === focusIndex ? 0 : -1} aria-label={`Adicionar ${ticker} à seleção${inSelection.has(ticker) ? " (já está)" : ""}`} aria-pressed={selected}>
+    const comparing = inSelection.size > (inSelection.has(ticker) ? 1 : 0);
+    return <tr key={ticker} data-ticker={ticker} className={`scr-row${selected ? " selected-row" : ""}`} onClick={() => onSelect(ticker)}>
+      <th scope="row"><div className="scr-stock"><button type="button" className="scr-row-select row-btn" tabIndex={index === focusIndex ? 0 : -1} aria-label={`Selecionar linha de ${ticker}${inSelection.has(ticker) ? " (já está na seleção)" : ""}`} aria-pressed={selected}>
         <span className="scr-mark" aria-hidden="true">{inSelection.has(ticker) ? "✓" : selected ? "▸" : ""}</span><span className="scr-ticker">{ticker}</span>
-      </button></th>
+      </button><button type="button" className="scr-analyze" tabIndex={index === focusIndex ? 0 : -1} disabled={working}
+        aria-label={comparing ? `Comparar seleção com ${ticker}` : `Analisar ${ticker}`}
+        onClick={event => { event.stopPropagation(); onSelect(ticker); onAnalyze(ticker); }}>{comparing ? "Comparar" : "Analisar"}</button></div></th>
       {columns.map(column => {
         const currency = column.currency ?? (typeof row.currency === "string" ? row.currency : "BRL");
         const isCompactMoney = column.unit === "money" && compactMoneyColumns.has(column.key);

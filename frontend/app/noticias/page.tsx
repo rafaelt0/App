@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Chart, { type PlotFigure } from "../../components/Chart";
 import { useApp } from "../../components/AppProvider";
@@ -98,6 +99,7 @@ export default function NewsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<NewsFilters>(initialFilters);
   const [limit, setLimit] = useState(15);
+  const [restoreKey, setRestoreKey] = useState(0);
   const generation = useRef(0);
   const current = useRef(session);
   const refresh = useRef(refreshSession);
@@ -108,7 +110,6 @@ export default function NewsPage() {
     if (!context?.portfolio_ready) return;
     const request = ++generation.current;
     setBusy(true); setError(null);
-    setFilters(initialFilters); setLimit(15);
     try {
       const result = await api<NewsSnapshot>(`/api/news/${refresh ? "refresh" : "analyze"}`, {revision: context.revision});
       if (request === generation.current && current.current?.revision === context.revision && current.current.portfolio_ready) setSnapshot(result);
@@ -120,19 +121,24 @@ export default function NewsPage() {
   }, []);
   useEffect(() => {
     if (bootstrapLoading || !session) return;
-    setSnapshot(null); setError(null);
-    if (session.portfolio_ready) { void execute(); }
-    else if (session.restored) {
-      const request = ++generation.current;
-      setBusy(true);
-      void api("/api/portfolio/restore", {target: "news", revision: session.revision}).then(async () => {
-        if (request === generation.current) await refresh.current();
-      }).catch(cause => {
-        if (request === generation.current) setError(cause instanceof Error ? cause.message : String(cause));
-      }).finally(() => { if (request === generation.current) setBusy(false); });
-    } else setBusy(false);
-    return () => { generation.current += 1; };
-  }, [bootstrapLoading, session?.revision, session?.portfolio_ready, session?.restored, execute]);
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setSnapshot(null); setError(null);
+      setFilters(initialFilters); setLimit(15);
+      if (session.portfolio_ready) { void execute(); }
+      else if (session.restored) {
+        const request = ++generation.current;
+        setBusy(true);
+        void api("/api/portfolio/restore", {target: "news", revision: session.revision}).then(async () => {
+          if (request === generation.current) await refresh.current();
+        }).catch(cause => {
+          if (request === generation.current) setError(cause instanceof Error ? cause.message : String(cause));
+        }).finally(() => { if (request === generation.current) setBusy(false); });
+      } else setBusy(false);
+    });
+    return () => { active = false; generation.current += 1; };
+  }, [bootstrapLoading, session?.revision, session?.portfolio_ready, session?.restored, execute, restoreKey]);
 
   const changeFilter = (key: keyof NewsFilters, value: string) => {
     setFilters(previous => ({...previous, [key]: value})); setLimit(15);
@@ -143,7 +149,8 @@ export default function NewsPage() {
   const positive = articles.filter(article => article.sentiment === "Otimista").length;
   const negative = articles.filter(article => article.sentiment === "Pessimista").length;
   const failed = snapshot?.feeds.filter(feed => !feed.ok).map(feed => feed.ticker) ?? [];
-  const allFailed = !!snapshot && failed.length === snapshot.feeds.length;
+  const coveredFeeds = snapshot?.feeds.filter(feed => !feed.modeled).length ?? 0;
+  const allFailed = coveredFeeds > 0 && failed.length === coveredFeeds;
   const retryAt = snapshot?.model.retry_after ? snapshot.model.retry_after * 1000 : 0;
   const jevPaused = !!snapshot && snapshot.model.lexicon_count > 0 && retryAt > Date.now();
   const stale = !!snapshot && Date.now() - Date.parse(snapshot.as_of) > staleAfterMs;
@@ -152,7 +159,8 @@ export default function NewsPage() {
   if (bootstrapLoading || (busy && !session?.portfolio_ready)) return <div className="desk"><Loading>Recuperando a carteira…</Loading></div>;
   if (!session?.portfolio_ready) return <>
     {error && <Notice tone="negative">{error}</Notice>}
-    <PortfolioRequired count={session?.selection.length ?? 0}>
+    <PortfolioRequired count={session?.selection.length ?? 0} feature="acompanhar as notícias dos ativos">
+      {error && session?.restored && <button type="button" onClick={() => setRestoreKey(key => key + 1)}>Tentar carregar novamente</button>}
       <details className="disclosure"><summary>Ver exemplo de lista de notícias</summary>
         <div className="example">{examples.map(([time, title, tone]) => <div className="feed-row is-example" key={time}><time>{time}</time><span className="feed-tickers">ABCD3</span><span className={`feed-tone is-${tone}`}>{tone === "positive" ? "Otimista" : tone === "negative" ? "Pessimista" : "Neutro"}</span><span className="feed-score">—</span><div className="feed-body"><h3>{title}</h3></div></div>)}
           <p>Cada notícia traz horário, ativos citados, avaliação do tom e link para a fonte.</p></div>
@@ -160,34 +168,28 @@ export default function NewsPage() {
     </PortfolioRequired>
   </>;
   return <div className="desk desk-split">
-    <Pane title="Carteira e filtros" className="pane-params" narrowCollapsed={!!snapshot} meta={snapshot ? `${snapshot.tickers.length} ativos · ${activeFilters.length ? `${activeFilters.length} ${activeFilters.length === 1 ? "filtro" : "filtros"}` : "sem filtros"}` : undefined}>
-      {snapshot && <ul className="weights" aria-label="Carteira e pesos">{snapshot.tickers.map((ticker, index) => <li key={ticker}><i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><b>{ticker}</b><span className="weights-track" aria-hidden="true"><span style={{ width: `${Math.min(1, snapshot.weights[ticker]) * 100}%` }} /></span><span className="weights-value">{formatPercent(snapshot.weights[ticker], 1)}</span></li>)}</ul>}
-      {snapshot && <p className="param-hint">Amostra {formatBrasilia(snapshot.as_of)} · {relativeAge(snapshot.as_of)}</p>}
-      {snapshot && <p className={`engine ${!snapshot.articles.length ? "is-none" : snapshot.model.lexicon_count ? "is-fallback" : ""}`}><span aria-hidden="true">●</span>{snapshot.articles.length ? engineSplit(snapshot.model, snapshot.articles.length) : "Sem notícias classificadas"}</p>}
+    <Pane title="Carteira acompanhada" className="pane-params" meta={snapshot ? `${snapshot.tickers.length} ativos` : undefined}>
       <div className="param-run"><button className="primary" onClick={() => void execute(true)} disabled={busy}>{busy ? "Atualizando…" : "Atualizar notícias"}</button></div>
       {snapshot && <>
-        <h3 className="pane-sub">Filtros do feed</h3>
-        <div className="param-group">
-          <label>Ativo<select value={filters.ticker} onChange={event => changeFilter("ticker", event.target.value)}><option value="Todos">Todos os ativos</option>{snapshot.tickers.map(ticker => <option key={ticker} value={ticker}>{ticker} ({snapshot.articles.filter(article => article.tickers.includes(ticker)).length})</option>)}</select></label>
-          <label>Ordenar por<select value={filters.sort} onChange={event => changeFilter("sort", event.target.value)}>{sortModes.map(sort => <option key={sort}>{sort}</option>)}</select></label>
-          <label>Sentimento<select value={filters.sentiment} onChange={event => changeFilter("sentiment", event.target.value)}><option>Todos</option><option value="Otimista">Otimistas</option><option value="Neutro">Neutras</option><option value="Pessimista">Pessimistas</option></select></label>
-          <label>Intensidade<select value={filters.intensity} onChange={event => changeFilter("intensity", event.target.value)}><option>Todos</option>{intensityLevels.filter(level => level !== "Evidência limitada" || snapshot.articles.some(article => !article.is_jev)).map(level => <option key={level}>{level}</option>)}</select></label>
+        <div className="news-context-links">
+          <a href="#feed-noticias">Ler notícias ↓</a>
+          <Link href="/portfolio">Editar carteira →</Link>
         </div>
-        {activeFilters.length > 0 && <div className="filter-chips" aria-label="Filtros ativos">
-          {activeFilters.map(key => <button type="button" className="chip" key={key} aria-label={`Remover filtro ${filterNames[key]}: ${filters[key]}`} onClick={() => changeFilter(key, initialFilters[key])}>{filterNames[key]}: {filters[key]} <span aria-hidden="true">×</span></button>)}
-          <button type="button" onClick={clearFilters}>Limpar filtros</button>
-        </div>}
-        <p className="param-hint">Filtros e “Ver mais” mudam só a lista; nota, gráfico e síntese não mudam.</p>
+        <p className="param-hint">Amostra de {formatBrasilia(snapshot.as_of)} · {relativeAge(snapshot.as_of)}</p>
+        <p className={`engine ${!snapshot.articles.length ? "is-none" : snapshot.model.lexicon_count ? "is-fallback" : ""}`}><span aria-hidden="true">●</span>{snapshot.articles.length ? engineSplit(snapshot.model, snapshot.articles.length) : "Sem notícias classificadas"}</p>
+        <details className="disclosure"><summary>Ativos e pesos</summary><div>
+          <ul className="weights" aria-label="Carteira e pesos">{snapshot.tickers.map((ticker, index) => <li key={ticker}><i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" /><b>{ticker}</b><span className="weights-track" aria-hidden="true"><span style={{ width: `${Math.min(1, snapshot.weights[ticker]) * 100}%` }} /></span><span className="weights-value">{formatPercent(snapshot.weights[ticker], 1)}</span></li>)}</ul>
+        </div></details>
         <details className="disclosure"><summary>Fontes e metodologia</summary><div>
           <p>Até {snapshot.max_per_ticker} notícias únicas mais recentes por ativo nos últimos {snapshot.window_days} dias, antes dos filtros: {snapshot.articles.length} artigos únicos · {snapshot.summary.observation_count} observações artigo-ativo. Feeds indisponíveis: {failed.join(", ") || "nenhum"}.</p>
-          <p>A cobertura depende do Google News e dos feeds acessíveis. Sem texto acessível usamos descrição RSS ou título. Importância é triagem por palavras-chave, não materialidade. No léxico, menos de dois termos implica evidência limitada; essas notícias não entram na nota agregada.</p>
+          <p>A cobertura usa somente veículos financeiros validados (como Valor Econômico, Valor Investe, InfoMoney, Money Times, Seu Dinheiro, Suno, Investidor10, E-Investidor, Estadão, Exame, Brazil Journal, NeoFeed, Bloomberg Línea, Forbes Brasil e Investing.com) via Google News e filtra menções sem relação com as ações ou a atividade econômica da companhia. Sem texto acessível usamos descrição RSS ou título. Importância é triagem por palavras-chave, não materialidade. No léxico, menos de dois termos implica evidência limitada; essas notícias não entram na nota agregada.</p>
         </div></details>
       </>}
     </Pane>
     <div className="board">
       {error && <div className="span-12"><Notice tone="negative">{error} <button type="button" disabled={busy} onClick={() => void execute(true)}>Tentar novamente</button></Notice></div>}
       {snapshot && (failed.length > 0 || jevPaused || stale || snapshot.feeds.some(feed => feed.ok && !feed.recent_count)) && <div className="span-12 board-notes">
-        {snapshot.feeds.map(feed => !feed.ok ? <Notice key={feed.ticker} tone="warning">Feed indisponível para {feed.ticker}; nenhum item foi usado na análise.</Notice> : !feed.recent_count ? <Notice key={feed.ticker}>Nenhuma notícia recente (7 dias) para {feed.ticker}.</Notice> : null)}
+        {snapshot.feeds.map(feed => feed.modeled ? <Notice key={feed.ticker}>{feed.ticker}: exposição modelada, sem feed de notícias próprio.</Notice> : !feed.ok ? <Notice key={feed.ticker} tone="warning">Feed indisponível para {feed.ticker}; nenhum item foi usado na análise.</Notice> : !feed.recent_count ? <Notice key={feed.ticker}>Nenhuma notícia recente (7 dias) para {feed.ticker}.</Notice> : null)}
         {jevPaused && <Notice>Análise avançada indisponível; nova tentativa após {formatBrasilia(new Date(retryAt).toISOString(), false)}.</Notice>}
         {stale && <Notice tone="warning">Amostra com mais de 15 minutos. Use “Atualizar notícias” para buscar os feeds de novo.</Notice>}
         {failed.length > 0 && <Notice tone="warning">Alguns feeds falharam. <button onClick={() => void execute(true)} disabled={busy}>Tentar feeds novamente</button></Notice>}
@@ -212,13 +214,27 @@ export default function NewsPage() {
             <Table caption="Observações artigo-ativo por ativo" columns={[{key: "ticker", label: "Ativo"}, {key: "positive", label: "Otim.", unit: "integer"}, {key: "neutral", label: "Neutr.", unit: "integer"}, {key: "negative", label: "Pessim.", unit: "integer"}]} rows={snapshot.summary.distribution} />
           </details>
         </Pane>
-        <Pane title="Feed de notícias" className="span-12" meta={<span role="status" aria-live="polite">{visible.length} de {articles.length} após filtros · {positive} otimistas · {articles.length - positive - negative} neutras · {negative} pessimistas</span>} flush>
-          {!articles.length && <Notice>{snapshot.articles.length ? "Nenhuma notícia corresponde aos filtros atuais." : allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : "Nenhuma notícia recente encontrada nos feeds disponíveis."}</Notice>}
+        <Pane id="feed-noticias" title="Feed de notícias" className="span-12" meta={<span role="status" aria-live="polite">{visible.length} de {articles.length} após filtros · {positive} {positive === 1 ? "otimista" : "otimistas"} · {articles.length - positive - negative} {articles.length - positive - negative === 1 ? "neutra" : "neutras"} · {negative} {negative === 1 ? "pessimista" : "pessimistas"}</span>} flush>
+          <div className="news-filters">
+            <h3>Filtrar notícias</h3>
+            <div className="news-filter-fields">
+              <label>Ativo<select value={filters.ticker} onChange={event => changeFilter("ticker", event.target.value)}><option value="Todos">Todos os ativos</option>{snapshot.tickers.map(ticker => <option key={ticker} value={ticker}>{ticker} ({snapshot.articles.filter(article => article.tickers.includes(ticker)).length})</option>)}</select></label>
+              <label>Ordenar por<select value={filters.sort} onChange={event => changeFilter("sort", event.target.value)}>{sortModes.map(sort => <option key={sort}>{sort}</option>)}</select></label>
+              <label>Sentimento<select value={filters.sentiment} onChange={event => changeFilter("sentiment", event.target.value)}><option>Todos</option><option value="Otimista">Otimistas</option><option value="Neutro">Neutras</option><option value="Pessimista">Pessimistas</option></select></label>
+              <label>Intensidade<select value={filters.intensity} onChange={event => changeFilter("intensity", event.target.value)}><option>Todos</option>{intensityLevels.filter(level => level !== "Evidência limitada" || filters.intensity === level || snapshot.articles.some(article => !article.is_jev)).map(level => <option key={level}>{level}</option>)}</select></label>
+            </div>
+            {activeFilters.length > 0 && <div className="filter-chips" aria-label="Filtros ativos">
+              {activeFilters.map(key => <button type="button" className="chip" key={key} aria-label={`Remover filtro ${filterNames[key]}: ${filters[key]}`} onClick={() => changeFilter(key, initialFilters[key])}>{filterNames[key]}: {filters[key]} <span aria-hidden="true">×</span></button>)}
+              <button type="button" onClick={clearFilters}>Limpar filtros</button>
+            </div>}
+            <p className="param-hint">A nota e os gráficos usam a amostra completa. Os filtros se aplicam à lista de notícias.</p>
+          </div>
+          {!articles.length && <Notice>{snapshot.articles.length ? <>Nenhuma notícia corresponde aos filtros atuais. <button type="button" onClick={clearFilters}>Limpar filtros</button></> : !coveredFeeds ? "A carteira contém apenas exposições modeladas, sem feed próprio." : allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : "Nenhuma notícia recente encontrada nos feeds disponíveis."}</Notice>}
           {visible.length > 0 && <ul className="feed">{visible.map(article => <li key={article.id}><Article article={article} /></li>)}</ul>}
           {articles.length > limit ? <div className="feed-more"><button onClick={() => setLimit(previous => previous + 15)}>Ver mais {Math.min(15, articles.length - limit)} notícias ({articles.length - limit} restantes)</button></div> : articles.length > 15 ? <p className="pane-foot">Todas as {articles.length} notícias carregadas.</p> : null}
         </Pane>
         <Pane title="Tom por ativo" className="span-12" meta={`nota da carteira ${snapshot.summary.score100 === null ? "— (sem peso coberto)" : `${snapshot.summary.score100}/100`} · cobertura ${formatPercent(snapshot.summary.coverage, 1)} do peso`} flush>
-          {!snapshot.articles.length && <Notice>{allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : failed.length ? "Nenhuma notícia recente nos feeds acessíveis; alguns feeds falharam." : "Nenhuma notícia recente retornada pelos feeds consultados."}</Notice>}
+          {!snapshot.articles.length && <Notice>{!coveredFeeds ? "A carteira contém apenas exposições modeladas, sem feed próprio." : allFailed ? "Feeds indisponíveis; não foi possível verificar notícias recentes." : failed.length ? "Nenhuma notícia recente nos feeds acessíveis; alguns feeds falharam." : "Nenhuma notícia recente retornada pelos feeds consultados."}</Notice>}
           <Table caption="Tom por ativo" sortable columns={[{key: "ticker", label: "Ativo"}, {key: "state", label: "Feed"}, {key: "count", label: "Artigos", unit: "integer"}, {key: "positive", label: "Otim. (+)", unit: "integer"}, {key: "neutral", label: "Neutr. (0)", unit: "integer"}, {key: "negative", label: "Pessim. (−)", unit: "integer"}, {key: "mean", label: "Média −1 a +1", unit: "number", digits: 2, plus: true}, {key: "covered_share", label: "% do peso coberto", unit: "fraction", digits: 1}, {key: "contribution", label: "Contribuição vs 50", unit: "number", digits: 2, plus: true}]}
             rows={snapshot.summary.tone} />
           <details className="disclosure flush-disclosure"><summary>Como são calculadas a nota e a cobertura</summary><div>

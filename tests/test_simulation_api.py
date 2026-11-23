@@ -287,3 +287,41 @@ def test_current_simulation_is_scoped_to_portfolio_and_selection():
     assert current["inputs"]["simulations"] == params().simulations
     replace_selection(ctx, ["CCC3", "BBB4"], 0)
     assert client.get("/api/simulation/current").json() is None
+
+
+@pytest.mark.parametrize("years, simulations", [(5, 2000), (10, 3000)])
+def test_long_horizon_api_preserves_all_chart_points_and_exported_percentiles(years, simulations):
+    x = np.arange(495)
+    returns = pd.DataFrame({
+        "PETR4.SA": .0005 + .01 * np.sin(x / 3),
+        "VALE3.SA": .0002 + .008 * np.cos(x / 5),
+        "BPAC11.SA": .0003 + .009 * np.sin(x / 7),
+    }, index=pd.bdate_range("2024-11-25", periods=len(x)))
+    portfolio = PortfolioSnapshot(
+        id="long-horizon", revision=0, tickers=["PETR4", "VALE3", "BPAC11"],
+        weights={"PETR4": .426, "VALE3": .484, "BPAC11": .09}, mode="markowitz",
+        returns=returns, prices=pd.DataFrame(), lookback_days=730, result={},
+    )
+    client = client_for(SessionState(uid="long-horizon-owner", selection=portfolio.tickers, portfolio=portfolio))
+    response = client.post("/api/simulation/run", json=params(
+        portfolio_id=portfolio.id, years=years, simulations=simulations,
+    ).model_dump())
+    assert response.status_code == 200
+    result = response.json()
+    current = client.get("/api/simulation/current")
+    assert current.status_code == 200
+    assert current.json() == result
+    fan = pd.read_csv(StringIO(client.get(
+        f"/api/simulation/{result['id']}/percentiles.csv",
+    ).content.decode("utf-8-sig")), index_col=0)
+    assert len(fan) == years * 252 + 1
+    assert len(result["charts"]["individual"]["data"]) == 50
+    assert len(result["charts"]["histogram"]["data"][0]["x"]) == simulations
+    for trace in result["charts"]["individual"]["data"] + result["charts"]["fan"]["data"]:
+        assert trace["x"] == fan.index.tolist()
+        assert len(trace["y"]) == len(fan)
+        assert trace["y"][0] == 10000
+        assert np.isfinite(trace["y"]).all()
+    for trace, name in zip(result["charts"]["fan"]["data"], ["P95", "P5", "P75", "P25", "P50"]):
+        np.testing.assert_allclose(trace["y"], fan[name])
+    assert fan.iloc[-1]["P5"] == pytest.approx(result["stats"]["p5_terminal"])

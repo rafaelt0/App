@@ -5,10 +5,13 @@ import pytest
 
 from utils.news import (
     TICKER_TO_COMPANY,
+    TRUSTED_NEWS_SOURCES,
     aggregate_ticker_sentiment,
     analise_sentimento_pln,
     build_news_query,
     has_scoring_evidence,
+    is_relevant_company_news,
+    is_trusted_news_source,
     merge_shared_articles,
     parse_rss_items,
     rank_news_importance,
@@ -375,3 +378,52 @@ def test_limited_evidence_items_stay_visible_but_do_not_drive_tone_rows():
     assert (rows[0]["covered_share"], rows[0]["contribution"]) == (None, None)
     assert rows[1]["covered_share"] == 1
     assert rows[1]["contribution"] == -50
+
+
+def test_trusted_news_sources_accept_only_validated_financial_publishers():
+    for domain, label in TRUSTED_NEWS_SOURCES.items():
+        assert is_trusted_news_source(source_url=f"https://{domain}")
+        assert is_trusted_news_source(source_url=f"https://www.{domain}")
+        assert is_trusted_news_source(provider=label)
+
+    assert not is_trusted_news_source(source_url="https://www.instagram.com", provider="Instagram")
+    assert not is_trusted_news_source(source_url="https://futebolpaulista.com.br", provider="Federação Paulista de Futebol")
+    assert not is_trusted_news_source(source_url="https://grudiario.com.br", provider="GRU Diário")
+    assert not is_trusted_news_source(source_url="https://evil.example", provider="Valor Econômico")
+
+    now = datetime.datetime(2025, 1, 8, 12, tzinfo=datetime.timezone.utc)
+    xml = b'''<rss><channel>
+      <item>
+        <title>Petrobras anuncia plano de investimentos - Valor Econ\xc3\xb4mico</title>
+        <link>https://news.google.com/rss/articles/1</link>
+        <source url="https://valor.globo.com">Valor Econ\xc3\xb4mico</source>
+        <pubDate>Wed, 08 Jan 2025 11:00:00 GMT</pubDate>
+      </item>
+      <item>
+        <title>Paulist\xc3\xa3o Feminino Sub-17 Petrobras - Federa\xc3\xa7\xc3\xa3o Paulista de Futebol</title>
+        <link>https://news.google.com/rss/articles/2</link>
+        <source url="https://futebolpaulista.com.br">Federa\xc3\xa7\xc3\xa3o Paulista de Futebol</source>
+        <pubDate>Wed, 08 Jan 2025 11:30:00 GMT</pubDate>
+      </item>
+    </channel></rss>'''
+    items = parse_rss_items(xml, now=now, trusted_only=True)
+    assert [item["provider"] for item in items] == ["Valor Econômico"]
+
+
+def test_company_relevance_keeps_stock_and_business_news_and_rejects_unrelated_mentions():
+    assert is_relevant_company_news("PETR4", "Novo plano da Petrobras ronda os US$ 115 bilhões, com dividendos no radar")
+    assert is_relevant_company_news("VALE3", "Vale (VALE3): ações caem 4% com minério na mínima em 16 meses")
+    assert is_relevant_company_news("BBAS3", "XP corta preço-alvo das ações do Banco do Brasil (BBAS3)")
+    assert is_relevant_company_news("ELET3", "Axia Energia (AXIA3) aprova 15ª emissão de debêntures de até R$ 1,2 bi")
+    assert is_relevant_company_news("SBSP3", "Agenda de empresas: Sabesp aprova R$ 2,64 bi em proventos")
+
+    # Rejects sports, cultural sponsorship, generic macro stories, and comparative company-size mentions.
+    assert not is_relevant_company_news("PETR4", "Futebol feminino: São Paulo é campeão do Paulistão F Petrobras Sub-17")
+    assert not is_relevant_company_news("PETR4", "Dona do Claude estreia na Nasdaq valendo quase 14 Petrobras e 69% do PIB")
+    assert not is_relevant_company_news("BBDC4", "IPO da Anthropic captou mais que o valor do Itaú — e quer um Bradesco")
+    assert not is_relevant_company_news("BBDC4", "Fórum Longevidade Bradesco: Vida de Edith Piaf inspira reflexões sobre envelhecimento")
+    assert not is_relevant_company_news("BBDC4", "Evento da Bradesco Seguros aborda como viver mais e melhor")
+    assert not is_relevant_company_news("VALE3", "Vale a pena comprar a queda nas ações de memória? Citi avalia")
+    assert not is_relevant_company_news("VALE3", "Dólar supera R$ 5,77 e bate maior valor desde abril de 2025; Ibovespa cai mais de 1,8%")
+    assert not is_relevant_company_news("SUZB3", "Suzano Vôlei admite atrasos salariais após protesto do elenco na Superliga")
+    assert not is_relevant_company_news("ABEV3", "Cerveja Original vai investir na revitalização de 15 bares em 2027")

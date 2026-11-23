@@ -13,6 +13,7 @@ type TabContext = { ready: HomeResult; companies: Company[]; single: boolean; bu
 type ResultTab = { id: string; label: string; available: (ready: HomeResult, single: boolean) => boolean; render: (context: TabContext) => ReactNode };
 
 const always = () => true;
+const isEquity = (company: Company) => company.asset_class === "acao_br" || company.asset_class === "acao_us";
 const median = (values: number[]) => { const sorted = [...values].sort((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2; };
 
 type Bar = { ticker: string; value: number | null };
@@ -21,8 +22,8 @@ type Bar = { ticker: string; value: number | null };
  * second largest and that bar is drawn broken with its value spelled out, so it does not flatten the others.
  */
 function ComparisonBars({ companies, indicator, color }: { companies: Company[]; indicator: { key: string; label: string; unit: "multiple" | "percent" }; color: (ticker: string) => string | undefined }) {
-  const bars: Bar[] = companies.map(company => {
-    const raw = company.indicators_available ? company.indicators[indicator.key] : null;
+  const bars: Bar[] = companies.filter(company => indicator.key in company.indicators).map(company => {
+    const raw = company.indicator_available[indicator.key] ? company.indicators[indicator.key] : null;
     return { ticker: company.ticker, value: typeof raw === "number" && Number.isFinite(raw) ? raw : null };
   });
   const known = bars.filter((bar): bar is { ticker: string; value: number } => bar.value !== null).sort((a, b) => b.value - a.value);
@@ -53,34 +54,43 @@ function ComparisonBars({ companies, indicator, color }: { companies: Company[];
       })}
       {missing.map(bar => <li key={bar.ticker} className="is-missing"><span className="cmp-tk"><i className="swatch" style={{ background: color(bar.ticker) ?? "#9aa2b4" }} aria-hidden="true" />{bar.ticker}</span><span className="cmp-track" aria-hidden="true" /><span className="cmp-val muted">sem dado</span></li>)}
     </ul>
-    <p className="cmp-scale" aria-hidden="true"><span>{low === 0 ? "0" : text(low)}</span>{mid !== null && <span className="cmp-scale-mid" style={{ left: `${at(mid)}%` }}>mediana {text(mid)}</span>}<span>{text(high)}</span></p>
+    <p className="cmp-scale" aria-hidden="true"><span>{low === 0 ? "0" : text(low)}</span><span>{text(high)}</span></p>
+    {mid !== null && <p className="tab-foot cmp-median">Mediana da seleção · {text(mid)}</p>}
     {outlier && <p className="tab-foot">Escala até {text(high)}, pelo segundo maior valor; a barra de {known[0].ticker} ({text(known[0].value)}) aparece cortada.</p>}
   </div>;
 }
 
 const resultTabs: ResultTab[] = [
   { id: "visao-geral", label: "Visão geral", available: always, render: ({ ready, companies, single, color }) => <>
-    {single ? companies.map(company => company.indicators_available ? <div key={company.ticker} className="groups">{Object.entries(company.metric_groups).map(([group, metrics]) => <section className="group" key={group}><h4>{group}</h4><Metrics items={metrics} /></section>)}</div> : <Notice key={company.ticker}>Sem indicadores para {company.ticker}.</Notice>)
-      : <><h4 className="tab-sub">Indicadores <small>% para rentabilidade, margens e crescimento · × para múltiplos · negrito ▴▾ maior e menor da coluna</small></h4>
-        <Table caption="Indicadores financeiros" extremes swatch={row => color((row as { ticker: string }).ticker)} columns={[{ key: "ticker", label: "Ticker" }, ...ready.comparison_indicators.map(item => ({ key: item.key, label: item.label, unit: item.unit, digits: 2 } as Column))]} rows={companies.map(company => ({ ticker: company.ticker, ...company.indicators }))} /></>}
-    <h4 className="tab-sub">Mercado <small>Fundamentus</small></h4>
-    <Table caption="Informações de mercado" swatch={row => color((row as { ticker: string }).ticker)} columns={marketColumns} rows={companies.map(company => ({ ticker: company.ticker, ...company.market }))} />
+    {single ? companies.filter(company => Object.keys(company.indicators).length).map(company => company.indicators_available ? <div key={company.ticker} className="groups">{Object.entries(company.metric_groups).map(([group, metrics]) => <section className="group" key={group}><h4>{group}</h4><Metrics items={metrics} /></section>)}</div> : <Notice key={company.ticker}>Indicadores indisponíveis para {company.ticker}.</Notice>)
+      : ready.comparison_indicators.length > 0 && <><h4 className="tab-sub">Indicadores aplicáveis</h4>
+        <Table caption="Indicadores financeiros" extremes swatch={row => color((row as { ticker: string }).ticker)} columns={[{ key: "ticker", label: "Ticker" }, ...ready.comparison_indicators.map(item => ({ key: item.key, label: item.label, unit: item.unit, digits: 2 } as Column))]} rows={companies.filter(company => Object.keys(company.indicators).length).map(company => ({ ticker: company.ticker, ...company.indicators }))} /></>}
+    {companies.some(company => company.fixed_income) && <><h4 className="tab-sub">Premissas de renda fixa</h4>
+      <Table caption="Premissas de renda fixa" columns={[{key:"ticker",label:"Ativo"},{key:"label",label:"Remuneração"},{key:"rate",label:"Taxa do modelo"}]} rows={companies.flatMap(company => {
+        const terms = company.fixed_income;
+        return terms ? [{ticker: company.ticker, label: terms.label, rate: terms.rate === null ? "—" : `${formatValue(terms.rate, "number", 2)} ${terms.unit ?? ""}`}] : [];
+      })} />
+      <Notice>O modelo não fornece cotação, taxa de mercado nem recomendação de compra.</Notice></>}
+    {companies.some(company => !company.fixed_income) && <><h4 className="tab-sub">Mercado</h4>
+      <Table caption="Informações de mercado" swatch={row => color((row as { ticker: string }).ticker)} columns={[...marketColumns.filter(column => column.key === "ticker" || companies.some(company => !company.fixed_income && company.market[column.key as keyof Company["market"]] != null)), {key:"source",label:"Fonte"}]} rows={companies.filter(company => !company.fixed_income).map(company => ({ ticker: company.ticker, ...company.market, source: company.source }))} />
+      {companies.filter(company => !company.available).map(company => <Notice key={company.ticker}>Dados indisponíveis para {company.ticker}.</Notice>)}</>}
   </> },
-  { id: "saude", label: "Saúde financeira", available: always, render: ({ ready, companies }) => <>
+  { id: "saude", label: "Saúde financeira", available: ready => ready.companies.some(isEquity), render: ({ ready, companies }) => <>
     <p className="tab-lead">{ready.health_summary}</p>
-    <div className="health">{companies.map(company => <section key={company.ticker} className="health-row"><h4>{company.ticker}<small>{company.identity.company}</small></h4>
-      {company.health.metrics.length ? <><Metrics items={company.health.metrics} /><Diagnostics items={company.health.diagnostics} /></> : <Notice>Dados de endividamento não disponíveis via Fundamentus para este ticker.</Notice>}
+    <div className="health">{companies.filter(isEquity).map(company => <section key={company.ticker} className="health-row"><h4>{company.ticker}<small>{company.identity.company}</small></h4>
+      {company.health.metrics.length ? <><Metrics items={company.health.metrics} /><Diagnostics items={company.health.diagnostics} /></> : <Notice>Dados de saúde financeira indisponíveis para este ativo.</Notice>}
     </section>)}</div>
   </> },
-  { id: "comparacao", label: "Comparação", available: (_, single) => !single, render: ({ ready, companies, comparison, setComparison, color }) => {
-    const choice = ready.comparison_indicators.find(item => item.key === comparison) ?? ready.comparison_indicators[0];
+  { id: "comparacao", label: "Comparação", available: ready => ready.comparison_indicators.some(item => ready.companies.filter(company => item.key in company.indicators).length > 1), render: ({ ready, companies, comparison, setComparison, color }) => {
+    const options = ready.comparison_indicators.filter(item => companies.filter(company => item.key in company.indicators).length > 1);
+    const choice = options.find(item => item.key === comparison) ?? options[0];
     return <>
-      <div className="tab-tools"><label>Indicador<select value={choice.key} onChange={event => setComparison(event.target.value)}>{ready.comparison_indicators.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></label>
+      <div className="tab-tools"><label>Indicador<select value={choice.key} onChange={event => setComparison(event.target.value)}>{options.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></label>
         <span className="muted">Do maior para o menor · tracejado âmbar: mediana da seleção</span></div>
       <ComparisonBars companies={companies} indicator={choice} color={color} />
     </>;
   } },
-  { id: "preco-alvo", label: "Preço-alvo", available: always, render: ({ ready, busy, onRefreshConsensus }) => <>
+  { id: "preco-alvo", label: "Preço-alvo", available: ready => ready.consensus.rows.length > 0, render: ({ ready, busy, onRefreshConsensus }) => <>
     <div className="tab-tools"><button type="button" disabled={busy} onClick={onRefreshConsensus}>Atualizar consensos</button><span className="muted">Yahoo Finance · potencial sobre o alvo médio</span></div>
     {ready.consensus.has_targets && <ul className="ladder" aria-label="Faixas de preço-alvo por ativo">{ready.consensus.rows.map(row => {
       const upside = typeof row.upside === "number" && Number.isFinite(row.upside) ? row.upside : null;
@@ -97,7 +107,8 @@ const resultTabs: ResultTab[] = [
     {ready.consensus.failed_tickers.length ? <Notice tone="warning">Consenso indisponível para: {ready.consensus.failed_tickers.join(", ")}.</Notice> : !ready.consensus.has_targets && <Notice>O Yahoo Finance não informa preços-alvo para as ações selecionadas.</Notice>}
     <p className="tab-foot">Opiniões e recomendações são agregadas pela fonte e não constituem recomendação de investimento.</p>
   </> },
-  { id: "sintese", label: "Síntese", available: always, render: ({ companies }) => {
+  { id: "sintese", label: "Síntese", available: ready => ready.companies.some(company => company.asset_class === "acao_br"), render: ({ companies }) => {
+    companies = companies.filter(company => company.asset_class === "acao_br");
     const categories = Array.from(new Set(companies.flatMap(company => Object.keys(company.synthesis.categorias))));
     const name = (category: string) => category === "Yield" ? "Dividendos" : category;
     return <>
@@ -129,7 +140,7 @@ const tabKeys = ["ArrowLeft", "ArrowRight", "Home", "End"];
 
 export default function HomeResults({ ready, selection, busy, onRefreshConsensus }: Props) {
   const [comparison, setComparison] = useState("pl");
-  const [selectedTab, setSelectedTab] = useState(resultTabs[0].id);
+  const [selectedTab, setSelectedTab] = useState(selection.length > 1 ? "comparacao" : "visao-geral");
   const single = selection.length === 1;
   const companies = ready.companies;
   const tabs = resultTabs.filter(tab => tab.available(ready, single));
@@ -142,7 +153,7 @@ export default function HomeResults({ ready, selection, busy, onRefreshConsensus
     setSelectedTab(tabs[next].id);
     document.getElementById(`home-tab-${tabs[next].id}`)?.focus();
   }
-  return <Pane title="Resultado da análise" area="res" className="pane-result" meta={`${companies.length} ${companies.length === 1 ? "ativo" : "ativos"} · Fundamentus`} actions={<ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>CSV</ExportButton>} flush>
+  return <Pane title="Resultado da análise" className="pane-result" meta={`${companies.length} ${companies.length === 1 ? "ativo" : "ativos"}`} actions={<ExportButton path={`/api/home/${ready.id}/fundamentals.csv`}>CSV</ExportButton>} flush>
     <div className="tabs" role="tablist" aria-label="Seções da análise">{tabs.map((tab, index) => {
       const selected = tab.id === activeTab.id;
       return <button type="button" role="tab" key={tab.id} id={`home-tab-${tab.id}`} aria-controls={`home-panel-${tab.id}`} aria-selected={selected} tabIndex={selected ? 0 : -1} onClick={() => setSelectedTab(tab.id)} onKeyDown={event => moveFocus(event, index)}>{tab.label}</button>;

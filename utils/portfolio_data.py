@@ -8,10 +8,9 @@ import time
 import numpy as np
 import pandas as pd
 import requests
-from utils.assets import is_treasury, is_us_asset
 from utils.cache import cache_data
-from utils.treasury_data import treasury_prices
 from utils.market_data import YFINANCE_REQUEST_LOCK
+from utils.treasury_data import TREASURY_TITLES, treasury_prices
 import yfinance as yf
 from bcb import sgs
 from pypfopt import expected_returns, risk_models
@@ -23,6 +22,7 @@ _BCB_CDI_DAILY_SERIES = 12
 _BCB_TIMEOUT_SECONDS = 15
 # The BCB daily SGS endpoint rejects long date ranges, so CDI is requested in chunks.
 _BCB_MAX_WINDOW_DAYS = 1825
+_FX_MAX_AGE = datetime.timedelta(days=4)
 
 
 def _download_close(tickers_yf, start_date, auto_adjust=True):
@@ -185,77 +185,114 @@ def historical_var_cvar(returns, confidence=0.95):
     return var, float(tail.mean())
 
 
-_USD_BRL = "BRL=X"
-_FX_MAX_AGE = datetime.timedelta(days=4)
-
-
-def _portfolio_closes(symbols, start_date, adjusted):
-    treasury = tuple(symbol for symbol in symbols if is_treasury(symbol))
-    listed = tuple(symbol for symbol in symbols if not is_treasury(symbol))
-    american = [symbol for symbol in listed if is_us_asset(symbol)]
-    if not treasury and not american:
-        close = _download_close(listed, start_date, auto_adjust=adjusted)
-        return close.to_frame(name=listed[0]) if not adjusted and isinstance(close, pd.Series) else close
-
-    treasury_close = pd.DataFrame()
-    if treasury:
-        try:
-            treasury_close = treasury_prices(treasury, start_date, adjusted)
-        except Exception:
-            if adjusted or not listed:
-                raise
-            logger.warning("Tesouro Transparente purchase prices unavailable", exc_info=True)
-    if not listed:
-        return treasury_close
-
-    yahoo_symbols = (*listed, _USD_BRL) if american else listed
-    download_start = pd.Timestamp(start_date).date() - _FX_MAX_AGE if american and adjusted else start_date
+def _convert_usd_columns_to_brl(prices: pd.DataFrame, usd_symbols: list[str], start_date, auto_adjust: bool) -> pd.DataFrame:
+    """Convert USD series into BRL; unavailable FX must not pass off USD as BRL."""
+    if not usd_symbols or prices.empty:
+        return prices
     try:
-        close = _download_close(yahoo_symbols, download_start, auto_adjust=adjusted)
+        fx_start = pd.Timestamp(start_date).date() - _FX_MAX_AGE if auto_adjust else start_date
+        fx = _download_close("BRL=X", fx_start, auto_adjust=auto_adjust)
+        if isinstance(fx, pd.DataFrame):
+            fx = fx.iloc[:, 0]
     except Exception:
-        if adjusted or not treasury:
-            raise
-        logger.warning("Yahoo Finance purchase prices unavailable", exc_info=True)
-        return treasury_close.reindex(columns=symbols)
-    if isinstance(close, pd.Series):
-        close = close.to_frame(name=listed[0])
-    exchange = close.reindex(columns=listed).dropna(how="all")
-    prices = pd.concat([exchange, treasury_close], axis=1).sort_index()
-    if american:
-        fx_source = close.reindex(columns=[_USD_BRL])[_USD_BRL]
-        fx_source = fx_source.loc[fx_source.gt(0) & fx_source.lt(float("inf"))].sort_index()
-        usd_prices = prices[american]
-        if adjusted:
-            # Mark the last USD close in reais on days when only the local market trades.
-            usd_prices = usd_prices.ffill().where(usd_prices.bfill().notna())
-            # The FX feed can be closed while US equities trade. Value with the last
-            # published FX within a long holiday weekend, and surface longer gaps.
-            fx = fx_source.reindex(prices.index, method="ffill", tolerance=_FX_MAX_AGE)
-            coverage_gaps = usd_prices.loc[fx.isna() & (prices.index >= pd.Timestamp(start_date))].dropna(how="all")
-            if not coverage_gaps.empty:
-                affected = ", ".join(coverage_gaps.columns[coverage_gaps.notna().any()])
-                dates = ", ".join(f"{day:%d/%m/%Y}" for day in coverage_gaps.index[:5])
-                remainder = f" (+{len(coverage_gaps) - 5} datas)" if len(coverage_gaps) > 5 else ""
-                raise ValueError(f"Câmbio USD/BRL indisponível para {affected} em {dates}{remainder}")
-        else:
-            fx = fx_source.reindex(prices.index)
-        prices[american] = usd_prices.mul(fx, axis=0)
-        prices = prices.loc[prices.index >= pd.Timestamp(start_date)]
-    return prices.reindex(columns=symbols)
+        logger.warning("USD/BRL exchange rate unavailable; USD prices cannot be valued in BRL", exc_info=True)
+        return prices.drop(columns=usd_symbols, errors="ignore")
+    fx = fx.loc[fx.gt(0) & fx.lt(float("inf"))].sort_index()
+    usd_prices = prices.loc[:, prices.columns.intersection(usd_symbols)]
+    if fx.empty or usd_prices.empty:
+        return prices.drop(columns=usd_symbols, errors="ignore")
+    if auto_adjust:
+        from utils.assets import is_synthetic_fixed_income
+
+        usd_prices = usd_prices.ffill().where(usd_prices.bfill().notna())
+        aligned_fx = fx.reindex(prices.index, method="ffill", tolerance=_FX_MAX_AGE)
+        listed = [symbol for symbol in usd_prices.columns if not is_synthetic_fixed_income(symbol)]
+        gaps = usd_prices.loc[aligned_fx.isna(), listed].dropna(how="all")
+        if not gaps.empty:
+            affected = ", ".join(gaps.columns[gaps.notna().any()])
+            dates = ", ".join(f"{day:%d/%m/%Y}" for day in gaps.index[:5])
+            raise ValueError(f"Câmbio USD/BRL indisponível para {affected} em {dates}")
+    else:
+        aligned_fx = fx.reindex(prices.index)
+    result = prices.copy()
+    result[usd_prices.columns] = usd_prices.mul(aligned_fx, axis=0)
+    return result
 
 
 @cache_data(ttl=3600)
 def get_portfolio_prices(tickers_yf, start_date):
-    return _portfolio_closes(tickers_yf, start_date, adjusted=True)
+    from utils.assets import build_synthetic_fixed_income_prices, is_synthetic_fixed_income, is_usd_symbol
+
+    symbols = tuple(tickers_yf)
+    synthetic = [s for s in symbols if is_synthetic_fixed_income(s)]
+    treasury = [s for s in symbols if s in TREASURY_TITLES]
+    yahoo_syms = [s for s in symbols if s not in synthetic and s not in TREASURY_TITLES]
+    usd_syms = [s for s in symbols if is_usd_symbol(s)]
+
+    if not synthetic and not usd_syms and not treasury:
+        return _download_close(tickers_yf, start_date)
+
+    y_prices = pd.DataFrame()
+    if yahoo_syms:
+        raw = _download_close(tuple(yahoo_syms), start_date)
+        if isinstance(raw, pd.Series):
+            raw = raw.to_frame(name=yahoo_syms[0])
+        y_prices = raw
+
+    treasury_close = treasury_prices(treasury, start_date, adjusted=True) if treasury else pd.DataFrame()
+    combined = pd.concat([y_prices, treasury_close], axis=1).sort_index()
+    if synthetic:
+        cdi_rates = None
+        try:
+            cdi_rates = get_cdi_daily_rates(start_date)
+        except Exception:
+            logger.debug("CDI daily rates unavailable for synthetic prices; using fallback rate", exc_info=True)
+        s_prices = build_synthetic_fixed_income_prices(
+            synthetic, start_date, index=combined.index if not combined.empty else None, cdi_rates=cdi_rates
+        )
+        combined = pd.concat([combined, s_prices], axis=1)
+
+    combined = _convert_usd_columns_to_brl(combined, usd_syms, start_date, auto_adjust=True)
+    return combined.loc[:, [s for s in symbols if s in combined.columns]]
 
 
 @cache_data(ttl=900)
 def get_portfolio_trade_prices(tickers_yf):
-    """Fetch recent purchase references in reais, independently of adjusted returns."""
+    """Fetch recent unadjusted purchase references in reais."""
     if not tickers_yf:
         return pd.DataFrame()
+    from utils.assets import is_usd_symbol, supports_share_allocation
+
+    symbols = tuple(symbol for symbol in tickers_yf if supports_share_allocation(symbol))
+    if not symbols:
+        return pd.DataFrame()
+    usd_syms = [s for s in symbols if is_usd_symbol(s)]
     start_date = datetime.date.today() - datetime.timedelta(days=14)
-    return _portfolio_closes(tickers_yf, start_date, adjusted=False)
+
+    treasury = [s for s in symbols if s in TREASURY_TITLES]
+    listed = tuple(s for s in symbols if s not in TREASURY_TITLES)
+    treasury_close = pd.DataFrame()
+    if treasury:
+        try:
+            treasury_close = treasury_prices(treasury, start_date, adjusted=False)
+        except ValueError:
+            if not listed:
+                raise
+            logger.warning("Tesouro Transparente purchase prices unavailable", exc_info=True)
+    if not listed:
+        return treasury_close
+    try:
+        prices = _download_close(listed, start_date, auto_adjust=False)
+    except Exception:
+        if treasury_close.empty:
+            raise
+        logger.warning("Yahoo Finance purchase prices unavailable", exc_info=True)
+        return treasury_close
+    if isinstance(prices, pd.Series):
+        prices = prices.to_frame(name=listed[0])
+    prices = _convert_usd_columns_to_brl(prices, usd_syms, start_date, auto_adjust=False)
+    combined = pd.concat([prices, treasury_close], axis=1).sort_index()
+    return combined.loc[:, [s for s in symbols if s in combined.columns]]
 
 
 @cache_data(ttl=3600)
@@ -294,8 +331,17 @@ def align_weights_to_columns(weights, columns):
     return [weights[column] for column in columns]
 
 
+_PT_MONTHS = ("", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez")
+
+
+def _format_month_year(stamp) -> str:
+    return f"{_PT_MONTHS[stamp.month]}/{stamp.year}"
+
+
 def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, crises):
     """Calculate fixed-weight portfolio returns for crises with enough shared data."""
+    from utils.assets import is_usd_symbol
+
     if portfolio_prices is None or portfolio_prices.empty:
         return []
     active_columns = [
@@ -304,6 +350,7 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
     if not active_columns:
         return []
     portfolio_prices = portfolio_prices.loc[:, active_columns]
+    mixed_calendar = any(column in TREASURY_TITLES or is_usd_symbol(column) for column in active_columns)
 
     benchmark_closes = (
         benchmark_prices.dropna()
@@ -334,22 +381,20 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
         portfolio_return = (
             1 + period_returns.dot(aligned_weights / weight_sum)
         ).prod() - 1
-        base = period_prices.index[period_prices.index.get_loc(period_returns.index[0]) - 1]
-        last = period_returns.index[-1]
-        period_benchmark = benchmark_returns.loc[
-            (benchmark_returns.index > base) & (benchmark_returns.index <= last)
-        ]
-        benchmark_covers_window = (
-            len(period_benchmark) >= 5
-            and benchmark_closes.index[0] <= base
-            and benchmark_closes.index[-1] >= last
-        )
+        if mixed_calendar:
+            base = period_prices.index[period_prices.index.get_loc(period_returns.index[0]) - 1]
+            last = period_returns.index[-1]
+            period_benchmark = benchmark_returns.loc[(benchmark_returns.index > base) & (benchmark_returns.index <= last)]
+            benchmark_covers_window = len(period_benchmark) >= 5 and benchmark_closes.index[0] <= base and benchmark_closes.index[-1] >= last
+        else:
+            period_benchmark = benchmark_returns.loc[(benchmark_returns.index >= start) & (benchmark_returns.index <= end)]
+            benchmark_covers_window = len(period_benchmark) >= 5
         results.append(
             {
                 "Crise": name,
                 "Período": (
-                    f"{period_returns.index.min().strftime('%b/%Y')} → "
-                    f"{period_returns.index.max().strftime('%b/%Y')}"
+                    f"{_format_month_year(period_returns.index.min())} → "
+                    f"{_format_month_year(period_returns.index.max())}"
                 ),
                 "Portfólio": portfolio_return,
                 "IBOV": (1 + period_benchmark).prod() - 1

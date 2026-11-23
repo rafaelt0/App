@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { focusStockSearch } from "./Shell";
 import TutorialCursor, { idleCursor, type CursorState } from "./TutorialCursor";
 import {
   AnalyzeScene,
@@ -29,7 +30,7 @@ const steps: StepDef[] = [
     id: "search",
     shortLabel: "Buscar",
     title: "Busque e monte sua seleção",
-    body: <>Na barra do topo, digite o nome de uma empresa ou um código como <strong>PETR4</strong> e clique para adicionar. A seleção fica sincronizada entre todas as telas — clique na prévia abaixo para testar.</>,
+    body: <>No <strong>Início</strong>, digite o nome da empresa ou um código como <strong>PETR4</strong> no campo de busca. Escolha o resultado para abrir os indicadores da primeira ação.</>,
     hint: "Atalho: Ctrl K ou /",
     beats: ["Abrir busca", "Digitar código", "Selecionar ativos", "Favoritar ★"],
     tryAction: { label: "Abrir busca agora", href: "/", focusSearch: true },
@@ -39,9 +40,9 @@ const steps: StepDef[] = [
     id: "analyze",
     shortLabel: "Analisar",
     title: "Analise e compare empresas",
-    body: <>No <strong>Início</strong>, clique em <strong>Analisar</strong> para carregar indicadores, saúde financeira e preços-alvo. Com mais de uma ação, abra a aba <strong>Comparação</strong> para ver o ranking contra a mediana.</>,
+    body: <>Para comparar empresas, adicione outras ações e clique em <strong>Comparar ações</strong> ao lado da busca. Abra a aba <strong>Comparação</strong> para ver cada indicador em relação à mediana.</>,
     hint: "Tela: F1 Início",
-    beats: ["Clicar em Analisar", "Ver indicadores", "Comparar ações", "Consultar preço-alvo"],
+    beats: ["Comparar ações", "Ver indicadores", "Comparar ações", "Consultar preço-alvo"],
     tryAction: { label: "Ir para o Início", href: "/" },
     Scene: AnalyzeScene,
   },
@@ -49,7 +50,7 @@ const steps: StepDef[] = [
     id: "screener",
     shortLabel: "Screener",
     title: "Filtre o mercado no Screener",
-    body: <>Use presets prontos ou combine filtros de <strong>Dividend Yield</strong>, <strong>ROE</strong>, <strong>P/L</strong> e liquidez. Clique em uma linha da tabela e envie o ativo direto para a sua seleção.</>,
+    body: <>Use conjuntos prontos ou combine filtros de <strong>Dividend Yield</strong>, <strong>ROE</strong>, <strong>P/L</strong> e liquidez. Use <strong>Analisar</strong> junto ao código para abrir os fundamentos da ação.</>,
     hint: "Tela: F5 Screener",
     beats: ["Aplicar preset", "Refinar filtros", "Selecionar linha", "Enviar para seleção"],
     tryAction: { label: "Abrir Screener", href: "/screener" },
@@ -158,7 +159,7 @@ export default function Tutorial({ onDismiss }: { onDismiss: () => void }) {
     router.push(href);
     if (focusSearch) {
       window.setTimeout(() => {
-        window.dispatchEvent(new Event("b3lab:focus-search"));
+        focusStockSearch();
       }, 120);
     }
   }, [dismiss, router, step.tryAction]);

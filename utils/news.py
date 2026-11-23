@@ -1,6 +1,9 @@
+import csv
 import datetime
+import functools
 import http.client
 import ipaddress
+from pathlib import Path
 import socket
 import time
 
@@ -11,8 +14,9 @@ import unicodedata
 import urllib.parse
 import xml.etree.ElementTree as ET
 
+from utils.assets import asset_metadata
+from utils.treasury_data import TREASURY_TITLES
 
-from utils.assets import ASSETS
 
 # Use issuer names rather than ambiguous shorthand in Google News searches.
 TICKER_TO_COMPANY = {
@@ -43,19 +47,345 @@ TICKER_TO_COMPANY = {
     "SBSP3": "Sabesp",
     "TAEE11": "Taesa",
     "KLBN11": "Klabin",
+    # FIIs, US Stocks, REITs, Bonds & Fixed Income
+    "HGLG11": "CSHG Logística FII",
+    "KNRI11": "Kinea Renda Imobiliária",
+    "MXRF11": "Maxi Renda FII",
+    "XPML11": "XP Malls FII",
+    "VISC11": "Vinci Shopping Centers",
+    "BTLG11": "BTG Pactual Logística",
+    "KNCR11": "Kinea Rendimentos Imobiliários",
+    "KNIP11": "Kinea Índices de Preços",
+    "AAPL": "Apple",
+    "MSFT": "Microsoft",
+    "NVDA": "Nvidia",
+    "AMZN": "Amazon",
+    "GOOGL": "Alphabet Google",
+    "GOOG": "Alphabet Google",
+    "META": "Meta Platforms",
+    "TSLA": "Tesla",
+    "BRK-B": "Berkshire Hathaway",
+    "JPM": "JPMorgan Chase",
+    "V": "Visa Inc",
+    "MA": "Mastercard",
+    "LLY": "Eli Lilly",
+    "AVGO": "Broadcom",
+    "WMT": "Walmart",
+    "XOM": "Exxon Mobil",
+    "UNH": "UnitedHealth",
+    "O": "Realty Income REIT",
+    "PLD": "Prologis REIT",
+    "AMT": "American Tower REIT",
+    "EQIX": "Equinix REIT",
+    "SPG": "Simon Property Group",
+    "WELL": "Welltower REIT",
+    "PSA": "Public Storage REIT",
+    "DLR": "Digital Realty REIT",
+    "VICI": "VICI Properties REIT",
+    "VNQ": "Vanguard Real Estate ETF",
+    "TLT": "Treasury Bond ETF",
+    "IEF": "Treasury Bond ETF",
+    "SHY": "Treasury Bond ETF",
+    "SGOV": "Treasury Bill ETF",
+    "BND": "Vanguard Total Bond ETF",
+    "AGG": "US Aggregate Bond ETF",
+    "IMAB11": "IMA-B Tesouro IPCA",
+    "B5P211": "IMA-B5 Tesouro IPCA",
+    "IRFM11": "IRF-M Tesouro Prefixado",
+    "LFTS11": "Tesouro Selic ETF",
+    "CDI": "Taxa CDI Selic",
+    "SELIC": "Taxa Selic Copom",
+    "TESOURO-SELIC": "Tesouro Selic",
+    "TESOURO-IPCA": "Tesouro IPCA",
+    "TESOURO-IPCA-2035": "Tesouro IPCA",
+    "TESOURO-IPCA-2045": "Tesouro IPCA",
+    "TESOURO-PRE": "Tesouro Prefixado",
+    "POUPANCA": "Caderneta de Poupança",
+    "SPY": "S&P 500 ETF",
+    "VOO": "Vanguard S&P 500",
+    "QQQ": "Nasdaq 100 ETF",
+    "BOVA11": "Ibovespa BOVA11",
+    "IVVB11": "S&P 500 IVVB11",
+    "BTC-USD": "Bitcoin",
+    "ETH-USD": "Ethereum",
 }
+
+# Validated financial and business news outlets recognized by the Brazilian market.
+TRUSTED_NEWS_SOURCES = {
+    "valor.globo.com": "Valor Econômico",
+    "valorinveste.globo.com": "Valor Investe",
+    "infomoney.com.br": "InfoMoney",
+    "moneytimes.com.br": "Money Times",
+    "seudinheiro.com": "Seu Dinheiro",
+    "suno.com.br": "Suno",
+    "investidor10.com.br": "Investidor10",
+    "einvestidor.estadao.com.br": "E-Investidor",
+    "estadao.com.br": "Estadão",
+    "exame.com": "Exame",
+    "braziljournal.com": "Brazil Journal",
+    "neofeed.com.br": "NeoFeed",
+    "bloomberglinea.com.br": "Bloomberg Línea",
+    "forbes.com.br": "Forbes Brasil",
+    "investnews.com.br": "InvestNews",
+    "economia.uol.com.br": "UOL Economia",
+    "br.investing.com": "Investing.com",
+    "br.advfn.com": "ADVFN",
+    "conteudos.xpi.com.br": "XP Investimentos",
+    "borainvestir.b3.com.br": "Bora Investir",
+    "investalk.bb.com.br": "InvesTalk",
+    "analisa.genialinvestimentos.com.br": "Genial Analisa",
+    "timesbrasil.com.br": "Times Brasil",
+}
+
+
+def _fold_text(value):
+    text = unicodedata.normalize("NFKD", str(value or "")).casefold()
+    return "".join(char for char in text if not unicodedata.combining(char))
+
+
+_TRUSTED_PROVIDER_NAMES = {
+    **{_fold_text(name): name for name in TRUSTED_NEWS_SOURCES.values()},
+    "suno - investimentos inteligentes": "Suno",
+    "investing.com brasil - financas, cambio e investimentos": "Investing.com",
+    "investing.com brasil": "Investing.com",
+    "bloomberg linea brasil": "Bloomberg Línea",
+    "times brasil | cnbc": "Times Brasil",
+    "xp": "XP Investimentos",
+    "e-investidor": "E-Investidor",
+    "estadao e-investidor": "E-Investidor",
+}
+
+
+def is_trusted_news_source(source_url="", provider="", link=""):
+    """Accept only validated Brazilian financial and market news sources."""
+    for candidate in (source_url, link):
+        try:
+            host = (urllib.parse.urlsplit(str(candidate or "").strip()).hostname or "").lower().removeprefix("www.")
+        except ValueError:
+            host = ""
+        if host and any(host == domain or host.endswith(f".{domain}") for domain in TRUSTED_NEWS_SOURCES):
+            return True
+    if not str(source_url or "").strip():
+        return _fold_text(provider).strip() in _TRUSTED_PROVIDER_NAMES
+    return False
+
+
+_GENERIC_ISSUER_WORDS = {
+    "s/a", "s.a", "s.a.", "sa", "on", "pn", "pna", "pnb", "unt",
+    "cia", "companhia", "bco", "banco", "brasil", "brasileira",
+    "part", "participacoes", "holding", "holdings", "grupo",
+    "empreend", "empreendimentos", "investimentos", "invest",
+    "energia", "energ", "alimentos", "comercio", "com", "ind", "indl",
+    "servicos", "engenharia", "construcao", "industria", "industrias",
+    "nacional", "geral", "sul", "norte", "leste", "oeste", "estado", "est",
+    "realt", "realty", "prop", "tec", "tech", "educ", "educa", "log",
+    "seguri", "seguridade", "met", "armas", "modas", "par",
+}
+
+_ISSUER_ALIASES = {
+    "PETR": ("petrobras",),
+    "VALE": ("vale",),
+    "ITUB": ("itau", "itau unibanco"),
+    "BBDC": ("bradesco",),
+    "BBAS": ("banco do brasil",),
+    "BPAC": ("btg pactual", "btg"),
+    "SANB": ("santander",),
+    "WEGE": ("weg",),
+    "MGLU": ("magazine luiza", "magalu"),
+    "ABEV": ("ambev",),
+    "ELET": ("eletrobras", "axia", "axia3", "axia6"),
+    "AXIA": ("axia", "eletrobras", "elet3", "elet6"),
+    "RENT": ("localiza",),
+    "LREN": ("lojas renner", "renner"),
+    "PRIO": ("prio", "petrorio"),
+    "HAPV": ("hapvida",),
+    "VVAR": ("via varejo", "casas bahia", "bhia3"),
+    "BHIA": ("casas bahia",),
+    "GGBR": ("gerdau",),
+    "GOAU": ("gerdau", "metalurgica gerdau"),
+    "ITSA": ("itausa",),
+    "SUZB": ("suzano",),
+    "JBSS": ("jbs", "jbss32"),
+    "UGPA": ("ultrapar",),
+    "RADL": ("raia drogasil", "rd saude"),
+    "EQTL": ("equatorial",),
+    "CSAN": ("cosan",),
+    "CPFE": ("cpfl",),
+    "SBSP": ("sabesp",),
+    "TAEE": ("taesa",),
+    "KLBN": ("klabin",),
+    "RDOR": ("rede d'or", "rede dor", "rede d or"),
+    "VIVT": ("telefonica", "vivo"),
+    "TIMS": ("tim",),
+    "RAIL": ("rumo",),
+    "VBBR": ("vibra",),
+    "ASAI": ("assai",),
+    "B3SA": ("b3",),
+    "EMBR": ("embraer", "embj3"),
+    "CCRO": ("ccr", "motiva", "motv3"),
+    "MOTV": ("motiva", "ccr", "ccro3"),
+    "CPLE": ("copel",),
+    "CMIG": ("cemig",),
+    "CSNA": ("csn", "siderurgica nacional"),
+    "USIM": ("usiminas",),
+    "BBSE": ("bb seguridade",),
+    "CXSE": ("caixa seguridade",),
+    "IRBR": ("irb",),
+    "PSSA": ("porto seguro",),
+    "COGN": ("cogna",),
+    "YDUQ": ("yduqs",),
+    "TOTS": ("totvs",),
+    "LWSA": ("lwsa", "locaweb"),
+    "CYRE": ("cyrela",),
+    "MRVE": ("mrv",),
+    "EGIE": ("engie",),
+    "ENEV": ("eneva",),
+    "BRAV": ("brava", "brava energia"),
+}
+
+_NON_ECONOMIC_HEADLINE_TERMS = (
+    "futebol", "paulistao", "brasileirao", "campeonato", "torneio",
+    "copa do mundo", "olimpiada", "sub-17", "sub-20", "elenco", "superliga",
+    "volei", "basquete", "corrida de rua", "maratona", "show", "festival",
+    "teatro", "cinema", "exposicao", "carnaval", "forum longevidade",
+    "viver mais e melhor", "qualidade de vida", "saude fisica",
+    "envelhecer", "envelhecimento",
+)
+
+_FINANCIAL_CONTEXT_TERMS = (
+    "acao", "acoes", "papel", "papeis", "ibovespa", "ibov", "b3", "bolsa",
+    "adr", "adrs", "bdr", "bdrs", "dividendo", "dividendos", "jcp", "provento",
+    "proventos", "payout", "lucro", "lucra", "prejuizo", "balanco", "resultado",
+    "resultados", "trimestre", "1t", "2t", "3t", "4t", "receita", "faturamento",
+    "ebitda", "margem", "caixa", "divida", "alavancagem", "capex", "investimento",
+    "investimentos", "plano de negocios", "guidance", "projecao", "projecoes",
+    "preco-alvo", "recomendacao", "compra", "venda", "neutra", "neutro",
+    "analista", "analistas", "mercado", "cotacao", "cotacoes", "alta", "queda",
+    "sobe", "sobem", "cai", "caem", "recua", "recuam", "avanca", "avancam",
+    "dispara", "despenca", "salta", "tomba", "aquisicao", "fusao",
+    "joint venture", "debenture", "debentures", "emissao", "oferta", "ipo",
+    "follow-on", "recompra", "cvm", "cade", "aneel", "anp", "bndes",
+    "banco central", "selic", "juros", "credito", "inadimplencia", "provisao",
+    "provisoes", "tarifa", "leilao", "concessao", "privatizacao", "ceo",
+    "cfo", "presidente", "conselho", "diretoria", "governanca", "acordo",
+    "contrato", "operacao", "operacoes", "producao", "capacidade", "fabrica",
+    "unidade", "planta", "refinaria", "mineracao", "minerio", "petroleo",
+    "celulose", "aco", "energia", "saneamento", "varejo", "fii", "fundo",
+    "fundos", "carteira", "carteiras",
+)
+
+
+@functools.lru_cache(maxsize=1)
+def _listed_issuer_index():
+    path = Path(__file__).resolve().parent.parent / "acoes-listadas-b3.csv"
+    by_ticker, by_root = {}, {}
+    try:
+        with path.open(encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                ticker = (row.get("Ticker") or "").strip().upper()
+                if not ticker:
+                    continue
+                by_ticker[ticker] = (
+                    (row.get("Empresa") or "").strip(),
+                    (row.get("RazaoSocial") or "").strip(),
+                )
+                by_root.setdefault(ticker[:4], []).append(ticker.lower())
+    except OSError:
+        return {}, {}
+    return by_ticker, by_root
+
+
+def _ticker_aliases(ticker):
+    clean = (ticker or "").strip().upper()
+    if not clean:
+        return ()
+    by_ticker, by_root = _listed_issuer_index()
+    root = clean[:4]
+    aliases = {clean.lower()} if len(clean) > 2 else set()
+    if clean in by_ticker:
+        aliases.update(by_root.get(root, ()))
+    for alias in _ISSUER_ALIASES.get(root, ()) if clean in by_ticker or clean in TICKER_TO_COMPANY else ():
+        aliases.add(_fold_text(alias))
+    company = TICKER_TO_COMPANY.get(clean) or asset_metadata(clean)["company"].split(" (")[0]
+    empresa, _ = by_ticker.get(clean, ("", ""))
+    for raw_name in (company, empresa):
+        folded = _fold_text(raw_name)
+        stripped = " ".join(re.sub(r"\b(?:s/a|s\.a\.?|sa|on|pn|pna|pnb|unt)\b", " ", folded).split())
+        if clean not in by_ticker:
+            stripped = re.sub(r"\b(?:corporation|corp|inc|ltd|reit)\.?$", "", stripped).strip()
+        if stripped and stripped not in _GENERIC_ISSUER_WORDS and len(stripped) >= 3:
+            aliases.add(stripped)
+        words = [word for word in re.findall(r"[a-z0-9]+", stripped)
+                 if word not in _GENERIC_ISSUER_WORDS and len(word) >= 4]
+        if len(words) == 1:
+            aliases.add(words[0])
+    return tuple(sorted(aliases, key=len, reverse=True))
+
+
+def _contains_term(folded_text, term):
+    pattern = rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])"
+    return re.search(pattern, folded_text) is not None
+
+
+_VALE_VERBAL_RE = re.compile(
+    r"\b(?:nao\s+|ainda\s+|ja\s+|quanto\s+|mais\s+|menos\s+)?vale\s+"
+    r"(?:a\s+pena|mais|menos|quanto|comprar|vender|investir|apostar|entrar|manter|segurar|esperar|conferir|lembrar|destacar|ressaltar|notar|citar|mencionar|encarar|r\$|us\$|\d)"
+)
+
+
+def _contains_alias(folded_text, alias):
+    text = _VALE_VERBAL_RE.sub(" ", folded_text) if alias == "vale" else folded_text
+    return _contains_term(text, alias)
+
+
+def is_relevant_company_news(ticker, title, summary=""):
+    """Keep only articles whose headline or snippet ties to the issuer and its economic activity."""
+    clean = (ticker or "").strip().upper()
+    if not clean:
+        return False
+    folded_title = _fold_text(title)
+    if not folded_title:
+        return False
+    folded_summary = _fold_text(summary)
+    combined = f"{folded_title} {folded_summary}".strip()
+    def ticker_mentioned(text):
+        if len(clean) > 2:
+            return _contains_term(text, clean.lower())
+        return bool(re.search(rf"\${re.escape(clean.lower())}\b|\({re.escape(clean.lower())}\)", text))
+
+    # Reject comparative mentions such as "valendo 14 Petrobras" or "quer um Bradesco".
+    for alias in _ticker_aliases(clean):
+        if re.search(rf"\b(?:\d+|um|uma|novo|nova)\s+{re.escape(alias)}\b", folded_title):
+            if not ticker_mentioned(folded_title):
+                return False
+
+    aliases = _ticker_aliases(clean)
+    mentioned_in_title = ticker_mentioned(folded_title) or any(_contains_alias(folded_title, alias) for alias in aliases)
+    ticker_in_summary = ticker_mentioned(folded_summary)
+    if not mentioned_in_title and not ticker_in_summary:
+        return False
+
+    has_financial_context = (
+        ticker_mentioned(combined)
+        or any(_contains_term(combined, term) for term in _FINANCIAL_CONTEXT_TERMS)
+    )
+    if any(_contains_term(combined, term) for term in _NON_ECONOMIC_HEADLINE_TERMS):
+        if not any(_contains_term(folded_title, term) for term in (
+            "acao", "acoes", "lucro", "prejuizo", "dividendo", "dividendos",
+            "balanco", "resultado", "cotacao", "preco-alvo", "recomendacao", "cvm",
+        )):
+            return False
+
+    return has_financial_context
 
 
 def build_news_query(ticker):
     """Search exact tickers and issuer names; unknown tickers stay ticker-only."""
     terms = [f'"{ticker}"']
-    asset = ASSETS.get(ticker)
-    if asset and asset.market == "TD":
-        return f'"Tesouro Direto" "{asset.company}"'
-    if asset and asset.market == "US":
-        return f'"{asset.company}"'
-    company = asset.company if asset else TICKER_TO_COMPANY.get(ticker)
-    if company:
+    company = TICKER_TO_COMPANY.get(ticker) or asset_metadata(ticker)["company"].split(" (")[0]
+    if ticker in TREASURY_TITLES:
+        return f'"Tesouro Direto" "{company}"'
+    if company != ticker:
         terms.append(f'"{company}"')
     return " OR ".join(terms)
 
@@ -129,7 +459,7 @@ def _article_url_key(url):
     ))
 
 
-def parse_rss_items(xml_data, now=None):
+def parse_rss_items(xml_data, now=None, trusted_only=False):
     """Parse all recent unique entries returned by the feed, newest first."""
     now = now or datetime.datetime.now(datetime.timezone.utc)
     cutoff = now - datetime.timedelta(days=7)
@@ -142,9 +472,13 @@ def parse_rss_items(xml_data, now=None):
 
     for item in root.findall(".//item"):
         title, link, raw_date = text(item, "title"), text(item, "link"), text(item, "pubDate")
-        source = text(item, "source")
+        source_node = item.find("source")
+        source = source_node.text.strip() if source_node is not None and source_node.text else ""
+        source_url = (source_node.attrib.get("url") or "").strip() if source_node is not None else ""
         if source and title.endswith(f" - {source}"):
             title = title[:-len(f" - {source}")]
+        if trusted_only and not is_trusted_news_source(source_url=source_url, provider=source, link=link):
+            continue
         try:
             published = email.utils.parsedate_to_datetime(raw_date)
             if published is None:
@@ -158,7 +492,8 @@ def parse_rss_items(xml_data, now=None):
             continue
         description = BeautifulSoup(text(item, "description"), "html.parser").get_text(" ", strip=True)
         candidates.append({"title": title, "link": link, "date": published.strftime("%d/%m/%Y %H:%M UTC"),
-                          "published": published, "provider": source, "summary": description[:1200]})
+                          "published": published, "provider": source, "source_url": source_url,
+                          "summary": description[:1200]})
 
     def normalized(value):
         return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", value).casefold()).strip()

@@ -1,12 +1,23 @@
 """Tesouro Direto unit prices for catalog titles with no intermediate payments."""
 
+from datetime import date, timedelta
 from io import BytesIO
 
 import pandas as pd
 import requests
 
-from utils.assets import ASSETS
 from utils.cache import cache_data
+
+# Stable catalog IDs for specific Tesouro Direto titles without intermediate payments.
+TREASURY_TITLES = {
+    "TD-SELIC-2029": ("Tesouro Selic", date(2029, 3, 1)),
+    "TD-SELIC-2031": ("Tesouro Selic", date(2031, 3, 1)),
+    "TD-PREFIXADO-2029": ("Tesouro Prefixado", date(2029, 1, 1)),
+    "TD-PREFIXADO-2032": ("Tesouro Prefixado", date(2032, 1, 1)),
+    "TD-IPCA-2035": ("Tesouro IPCA+", date(2035, 5, 15)),
+    "TD-IPCA-2040": ("Tesouro IPCA+", date(2040, 8, 15)),
+}
+TREASURY_SHARE_STEP = 0.01
 
 TREASURY_CSV = (
     "https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3"
@@ -34,8 +45,8 @@ def get_treasury_history():
             usecols=[_TYPE, _MATURITY, _DATE, _MARK, _BUY],
         )
         symbols = {
-            (asset.treasury_type, asset.maturity.strftime("%d/%m/%Y")): ticker
-            for ticker, asset in ASSETS.items() if asset.maturity
+            (title, maturity.strftime("%d/%m/%Y")): ticker
+            for ticker, (title, maturity) in TREASURY_TITLES.items()
         }
         frame["ticker"] = [symbols.get(pair) for pair in zip(frame[_TYPE], frame[_MATURITY])]
         frame = frame.dropna(subset=["ticker"]).copy()
@@ -54,3 +65,12 @@ def treasury_prices(tickers, start_date, adjusted):
     price = _MARK if adjusted else _BUY
     closes = matching.pivot(index=_DATE, columns="ticker", values=price).apply(pd.to_numeric, errors="coerce")
     return closes.where(closes.gt(0) & closes.lt(float("inf")))
+
+
+def latest_treasury_quote(ticker):
+    prices = treasury_prices((ticker,), date.today() - timedelta(days=14), adjusted=False)
+    if ticker in prices:
+        quotes = prices[ticker].dropna()
+        if not quotes.empty:
+            return float(quotes.iloc[-1]), quotes.index[-1].date().isoformat()
+    return None, None

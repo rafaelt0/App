@@ -78,11 +78,11 @@ def resolve_session(token: str | None) -> tuple[SessionState, str | None]:
                     raise HTTPException(503, "Todas as sessões estão ocupadas. Tente novamente após a conclusão das análises.")
                 del _states[min(idle, key=lambda key: _states[key].last_seen)]
             tickers, _ = db.portfolio_get(uid)
-            from utils.assets import ASSETS
+            from utils.assets import is_valid_asset_ticker, normalize_ticker
             from utils.market_data import get_listed_stocks
             universe = set(get_listed_stocks()["Ticker"])
-            candidates = list(dict.fromkeys(str(t).strip().upper().removesuffix(".SA") for t in tickers))
-            valid = [ticker for ticker in candidates if ticker in universe or ticker in ASSETS]
+            candidates = list(dict.fromkeys(normalize_ticker(t) for t in tickers))
+            valid = [ticker for ticker in candidates if is_valid_asset_ticker(ticker, universe)]
             selection = valid[:20]
             state = SessionState(
                 uid=uid, selection=selection, restored=bool(selection),

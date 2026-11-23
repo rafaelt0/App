@@ -4,9 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { subscribeActivity } from "../lib/api";
-import { comparisonColors } from "../lib/home";
-import { assetLabel } from "../lib/assets";
-import { rankStocks, sortStocks } from "../lib/tickerSearch";
+import { comparisonColors, searchUniverse } from "../lib/home";
+import { assetBadge, rankStocks, sortStocks, synthesizeCustomCandidate } from "../lib/tickerSearch";
 import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp, type Session, type Stock } from "./AppProvider";
 import { formatBrasilia, formatCompactValue, formatValue, type Unit } from "./ui";
 
@@ -28,11 +27,11 @@ export const tickerColor = (index: number) => comparisonColors[index % compariso
 
 type View = { key: string; href: string; label: string; title?: string; description: string; ready?: (session: Session) => boolean; requirement?: string };
 export const views: View[] = [
-  { key: "F1", href: "/", label: "Início", title: "Análise de ações", description: "Busque ações da B3, consulte indicadores e compare empresas." },
-  { key: "F2", href: "/portfolio", label: "Carteira", description: "Monte uma carteira e veja como ela teria se saído no passado.", ready: session => session.portfolio_ready, requirement: "Carteira a calcular" },
+  { key: "F1", href: "/", label: "Início", title: "Análise de ativos", description: "Busque ações da B3 e EUA, FIIs, REITs, títulos, renda fixa e ETFs." },
+  { key: "F2", href: "/portfolio", label: "Carteira", description: "Monte uma carteira multi-ativos e veja como ela teria se saído no passado.", ready: session => session.portfolio_ready, requirement: "Aguardando cálculo" },
   { key: "F3", href: "/simulacao", label: "Simulação", description: "Explore cenários para o valor futuro da sua carteira.", ready: session => session.simulation_ready, requirement: "Requer histórico da carteira" },
   { key: "F4", href: "/noticias", label: "Notícias", description: "Acompanhe as notícias dos ativos da sua carteira e o tom das matérias.", ready: session => session.portfolio_ready, requirement: "Requer carteira calculada" },
-  { key: "F5", href: "/screener", label: "Screener", title: "Screener de ações", description: "Encontre ações por critérios como dividendos, rentabilidade e liquidez." },
+  { key: "F5", href: "/screener", label: "Screener", title: "Screener de ativos", description: "Filtre ações B3, ações EUA, FIIs, REITs, títulos e ETFs por indicadores." },
 ];
 
 const refreshMs = 5 * 60 * 1000;
@@ -83,27 +82,57 @@ function Clock() {
   </span>;
 }
 
-type Flash = { text: string; tone: "positive" | "negative" | "info"; undo?: string[] };
+type Flash = { text: string; tone: "positive" | "negative" | "info"; undo?: { tickers: string[]; revision: number } };
 type Option = { kind: "view"; view: View } | { kind: "stock"; stock: Stock };
 
 function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; compact: boolean }) {
-  const { session, stocks, setSelection, toggleFavorite } = useApp();
+  const { session, stocks, setSelection, toggleFavorite, upsertStocks } = useApp();
   const router = useRouter();
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  const [remote, setRemote] = useState<Stock[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const busy = useRef(false);
   const selection = session?.selection ?? [];
   const watchlist = session?.watchlist ?? [];
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setRemote([]);
+      return;
+    }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      searchUniverse(trimmed).then(response => {
+        if (!live) return;
+        upsertStocks(response.items);
+        setRemote(response.items.map(item => ({ ...item, liquidity: null })));
+      }).catch(() => {});
+    }, 220);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [query, upsertStocks]);
   const options = useMemo<Option[]>(() => {
     const needle = query.trim().toLocaleLowerCase("pt-BR");
     const viewHits = needle ? views.filter(view => view.key.toLowerCase() === needle || view.label.toLocaleLowerCase("pt-BR").startsWith(needle)).map(view => ({ kind: "view" as const, view })) : [];
     const liquid = sortStocks(stocks, "liquidity");
     const pool = needle ? liquid : [...liquid.filter(stock => watchlist.includes(stock.ticker)), ...liquid.filter(stock => !watchlist.includes(stock.ticker))];
-    return [...viewHits, ...rankStocks(pool, query, 9).items.map(stock => ({ kind: "stock" as const, stock }))];
-  }, [query, stocks, watchlist]);
+    const localHits = rankStocks(pool, query, 9).items;
+    const seen = new Set(localHits.map(item => item.ticker));
+    const combined = [...localHits];
+    for (const item of remote) {
+      if (!seen.has(item.ticker)) {
+        seen.add(item.ticker);
+        combined.push(item);
+      }
+    }
+    const custom = query.trim() ? synthesizeCustomCandidate(query) : null;
+    if (custom && !seen.has(custom.ticker)) {
+      combined.push({ ...custom, liquidity: null });
+    }
+    return [...viewHits, ...combined.slice(0, 10).map(stock => ({ kind: "stock" as const, stock }))];
+  }, [query, stocks, remote, watchlist]);
   useEffect(() => {
     const focus = () => { input.current?.focus(); input.current?.select(); setOpen(true); };
     window.addEventListener("b3lab:focus-search", focus);
@@ -120,8 +149,8 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
     busy.current = true;
     setQuery(""); setActive(0); setOpen(false);
     try {
-      await setSelection(current => removing ? current.filter(item => item !== ticker) : current.includes(ticker) ? [...current] : [...current, ticker]);
-      onFlash({ text: removing ? `${ticker} removido da seleção.` : `${ticker} adicionado à seleção (${Math.min(before.length + 1, MAX_SELECTION)}/${MAX_SELECTION}).`, tone: "positive", undo: before });
+      const updated = await setSelection(current => removing ? current.filter(item => item !== ticker) : current.includes(ticker) ? [...current] : [...current, ticker]);
+      onFlash({ text: removing ? `${ticker} removida da seleção.` : `${ticker} adicionada à seleção (${updated.selection.length}/${MAX_SELECTION}).`, tone: "positive", undo: { tickers: before, revision: updated.revision } });
     } catch (reason) {
       onFlash({ text: reason instanceof Error ? reason.message : String(reason), tone: "negative" });
     } finally { busy.current = false; }
@@ -130,8 +159,8 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
   return <div className="cmd-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
     <span className="cmd-prompt" aria-hidden="true">&gt;</span>
     <input ref={input} type="search" role="combobox" aria-autocomplete="list" aria-expanded={expanded} autoComplete="off" spellCheck={false} value={query}
-      aria-label="Buscar ativos por código, nome, setor ou classe" aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-${current}` : undefined}
-      placeholder={compact ? "Buscar ativos" : "Buscar código, nome ou classe"}
+      aria-label="Buscar ativos por código, empresa ou setor" aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-${current}` : undefined}
+      placeholder={compact ? "Busca rápida" : "Busca rápida de ativos"}
       onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
       onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }}
       onKeyDown={event => {
@@ -141,20 +170,20 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
         else if (event.key === "Escape") { event.preventDefault(); if (open) setOpen(false); else input.current?.blur(); }
       }} />
     {!compact && <kbd className="cmd-kbd" aria-hidden="true">Ctrl K</kbd>}
-    {open && query.trim() && !options.length && <p className="cmd-results cmd-empty" role="status">Nenhum resultado. Tente outro código, nome ou classe.</p>}
+    {open && query.trim() && !options.length && <p className="cmd-results cmd-empty" role="status">Nenhum resultado. Tente outro código ou nome de empresa.</p>}
     {expanded && <ul className="cmd-results" id={`${id}-list`} role="listbox" aria-label="Resultados da busca">
       {options.map((option, index) => {
         const selected = option.kind === "stock" && selection.includes(option.stock.ticker);
         const favorite = option.kind === "stock" && watchlist.includes(option.stock.ticker);
-        return <li key={option.kind === "view" ? option.view.key : option.stock.ticker} id={`${id}-${index}`} role="option" aria-selected={index === current} data-market={option.kind === "stock" ? option.stock.asset?.market : undefined} className={`cmd-option${selected ? " is-selected" : ""}`}
+        return <li key={option.kind === "view" ? option.view.key : option.stock.ticker} id={`${id}-${index}`} role="option" aria-selected={index === current} data-market={option.kind === "stock" && option.stock.share_step ? "TD" : undefined} className={`cmd-option${selected ? " is-selected" : ""}`}
           onMouseMove={() => { if (index !== current) setActive(index); }} onMouseDown={event => event.preventDefault()} onClick={() => void choose(option)}>
           {option.kind === "view" ? <>
             <span className="cmd-option-mark" aria-hidden="true">↗</span><b>{option.view.key}</b><span className="cmd-option-name">Ir para {option.view.label}</span><span className="cmd-option-hint">abrir</span>
           </> : <>
             <span className="cmd-option-mark" aria-hidden="true">{selected ? "✓" : "+"}</span>
             <b>{option.stock.ticker}</b>
-            <span className="cmd-option-name">{option.stock.company || "Nome não informado"}<small>{option.stock.asset ? assetLabel(option.stock.asset) : option.stock.sector || "Ação · B3"}</small></span>
-            <span className="cmd-option-liq" title="Volume financeiro médio diário em 2 meses">{option.stock.liquidity === null ? "—" : formatCompactValue(option.stock.liquidity, "money", 1)}</span>
+            <span className="cmd-option-name">{option.stock.company || "Ativo"}<small>{assetBadge(option.stock)} · {option.stock.sector || "Mercado"}</small></span>
+            <span className="cmd-option-liq" title="Volume financeiro médio diário em 2 meses">{option.stock.liquidity === null ? option.stock.currency ?? "—" : formatCompactValue(option.stock.liquidity, "money", 1)}</span>
             <span className="cmd-option-hint">{selected ? "remover" : "adicionar"}</span>
             <button type="button" className="cmd-star" tabIndex={-1} aria-pressed={favorite} aria-label={favorite ? `Remover ${option.stock.ticker} dos favoritos` : `Adicionar ${option.stock.ticker} aos favoritos`}
               onClick={event => { event.stopPropagation(); void toggleFavorite(option.stock.ticker).catch(reason => onFlash({ text: String(reason instanceof Error ? reason.message : reason), tone: "negative" })); }}>{favorite ? "★" : "☆"}</button>
@@ -164,6 +193,11 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
       <li className="cmd-results-foot" role="presentation">↑↓ navegar · Enter adiciona ou remove · Esc fecha · a seleção vale para todas as telas</li>
     </ul>}
   </div>;
+}
+
+export function focusStockSearch() {
+  const local = document.querySelector(".stock-picker input:not([readonly])");
+  window.dispatchEvent(new Event(local ? "b3lab:focus-picker" : "b3lab:focus-search"));
 }
 
 function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
@@ -198,10 +232,10 @@ function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
   }, [open]);
   async function update(next: string[], text: string) {
     const before = [...selection];
-    try { await setSelection(next); onFlash({ text, tone: "positive", undo: before }); }
+    try { const updated = await setSelection(next); onFlash({ text, tone: "positive", undo: { tickers: before, revision: updated.revision } }); }
     catch (reason) { onFlash({ text: reason instanceof Error ? reason.message : String(reason), tone: "negative" }); }
   }
-  const remove = (ticker: string) => void update(selection.filter(item => item !== ticker), `${ticker} removido da seleção.`);
+  const remove = (ticker: string) => void update(selection.filter(item => item !== ticker), `${ticker} removida da seleção.`);
   return <div className="cmd-selection" ref={root}>
     <button type="button" className="cmd-count" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen(value => !value)} title="Editar a seleção de ativos">
       <span>Seleção</span><b>{selection.length}/{MAX_SELECTION}</b><span className="visually-hidden">{selection.length === 1 ? "ativo selecionado" : "ativos selecionados"}</span>
@@ -221,7 +255,7 @@ function SelectionChips({ onFlash }: { onFlash: (flash: Flash) => void }) {
         <button type="button" aria-label={`Remover ${ticker}`} onClick={() => remove(ticker)}>×</button>
       </li>)}</ol> : <p className="tray-empty">Nenhum ativo. Digite um ticker na busca (Ctrl+K) e pressione Enter.</p>}
       <div className="tray-foot">
-        <button type="button" onClick={() => { setOpen(false); window.dispatchEvent(new Event("b3lab:focus-search")); }}>+ Adicionar</button>
+        <button type="button" onClick={() => { setOpen(false); focusStockSearch(); }}>+ Adicionar</button>
         {selection.length > 0 && <button type="button" onClick={() => void update([], "Seleção limpa.")}>Limpar</button>}
       </div>
     </div>}
@@ -235,6 +269,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   const [market, setMarket] = useState<Market>({ strip: null, failed: false });
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const [compact, setCompact] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
   const view = views.find(item => item.href === pathname);
@@ -271,8 +306,8 @@ export default function Shell({ children }: { children: ReactNode }) {
       if (event.target instanceof Element && event.target.closest("dialog[open]")) return;
       const typing = event.target instanceof Element && !!event.target.closest("input, textarea, select, [contenteditable='true']");
       const viewIndex = /^F[1-5]$/.test(event.key) ? Number(event.key.slice(1)) - 1 : event.altKey && !event.ctrlKey && !event.metaKey && /^Digit[1-5]$/.test(event.code) ? Number(event.code.slice(5)) - 1 : -1;
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); window.dispatchEvent(new Event("b3lab:focus-search")); }
-      else if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); window.dispatchEvent(new Event("b3lab:focus-search")); }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); focusStockSearch(); }
+      else if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); focusStockSearch(); }
       else if (viewIndex >= 0 && !event.shiftKey) { event.preventDefault(); router.push(views[viewIndex].href); }
     };
     document.addEventListener("keydown", onKey);
@@ -282,7 +317,11 @@ export default function Shell({ children }: { children: ReactNode }) {
   useEffect(() => {
     const closeMenu = () => setMenu(false);
     window.addEventListener("b3lab:focus-search", closeMenu);
-    return () => window.removeEventListener("b3lab:focus-search", closeMenu);
+    window.addEventListener("b3lab:focus-picker", closeMenu);
+    return () => {
+      window.removeEventListener("b3lab:focus-search", closeMenu);
+      window.removeEventListener("b3lab:focus-picker", closeMenu);
+    };
   }, []);
   useEffect(() => {
     if (!flash) return;
@@ -301,8 +340,10 @@ export default function Shell({ children }: { children: ReactNode }) {
       <header className="cmd">
         <Link href="/" className="cmd-brand" aria-label="B3Lab, Início"><span>B3</span>LAB<i aria-hidden="true" /></Link>
         <CommandSearch onFlash={showFlash} compact={compact} />
-        <button type="button" className="cmd-menu" aria-expanded={menu} aria-controls="cmd-drawer" onClick={() => setMenu(value => !value)}>{menu ? "Fechar" : "Menu"}</button>
-        <div className="cmd-drawer" id="cmd-drawer">
+        <button ref={menuButton} type="button" className="cmd-menu" aria-expanded={menu} aria-controls="cmd-drawer" onClick={() => setMenu(value => !value)}>{menu ? "Fechar" : "Menu"}</button>
+        <div className="cmd-drawer" id="cmd-drawer" onKeyDown={event => {
+          if (menu && event.key === "Escape") { setMenu(false); menuButton.current?.focus(); }
+        }}>
           <nav className="cmd-views" aria-label="Páginas do B3Lab">{views.map(view => {
             const ready = !session || !view.ready || view.ready(session);
             return <Link key={view.href} href={view.href} onClick={() => setMenu(false)} aria-current={pathname === view.href ? "page" : undefined} aria-keyshortcuts={`${view.key} Alt+${view.key.slice(1)}`} title={`${view.label} (${view.key} ou Alt+${view.key.slice(1)})${ready ? "" : ` · ${view.requirement}`}`}>
@@ -315,6 +356,9 @@ export default function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <Tape />
+      <div className="shell-feedback" role="status">
+        {flash && <div className={`shell-message is-${flash.tone}`}><span>{flash.text}</span>{flash.undo && flash.undo.revision === session?.revision && <button type="button" onClick={() => void undo(flash.undo!.tickers)}>Desfazer</button>}</div>}
+      </div>
       <main id="conteudo" className="mesa-main" tabIndex={-1}>
         {!loading && view && <header className="workspace-intro">
           <div><h1>{view.title ?? view.label}</h1><p>{view.description}</p></div>
@@ -326,7 +370,7 @@ export default function Shell({ children }: { children: ReactNode }) {
         <span className={`status-activity${busy ? " is-busy" : ""}`}><span aria-hidden="true">{busy ? "◐" : "●"}</span>{busy ? "Processando" : "Pronto"}</span>
         <span><Link href="/guia" aria-current={pathname === "/guia" ? "page" : undefined}>Boas-vindas</Link></span>
         {!loading && <span><button type="button" className="status-link" onClick={openTutorial}>Tutorial</button></span>}
-        <span className="status-flash" role="status" aria-live="polite">{flash && <span className={`is-${flash.tone}`}><span>{flash.text}</span>{flash.undo && <button type="button" onClick={() => void undo(flash.undo!)}>Desfazer</button>}</span>}</span>
+        <span className="status-spacer" />
         <span className="status-note">Sessão anônima · resultados temporários</span>
         <span className="status-note">Dados para pesquisa, não recomendação de investimento</span>
       </footer>
