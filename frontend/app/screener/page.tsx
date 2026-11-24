@@ -193,7 +193,7 @@ export default function ScreenerPage() {
       <p className="param-hint">{isB3 || assetClass === "fii"
         ? "Dados da Fundamentus, com atraso."
         : assetClass === "acao_us"
-          ? "Dados do Yahoo Finance, com atraso. Valores monetários e limites usam USD, sem conversão."
+          ? "Cotação do Yahoo Finance, com atraso. Se o Yahoo não entrega P/L, P/VP, ROE ou EV/EBITDA, esses indicadores vêm do último exercício anual na Nasdaq; proventos são os pagos nos últimos 12 meses. Valores em USD, sem conversão."
           : `${assetClass === "all" ? "Cotações por linha: B3 e FIIs na Fundamentus, ações EUA no Yahoo Finance e demais ativos com cotação do Yahoo quando disponível. " : "Cotação do Yahoo Finance quando disponível. "}Os demais indicadores vêm do catálogo de referência. Valores monetários e limites usam a moeda de cada ativo, sem conversão.`}</p>
     </Pane>
     <Pane title="Resultados" className="pane-screener" flush

@@ -46,10 +46,10 @@ CRITERION_FIELDS = {"pl_min": "pl", "pl_max": "pl", "pl_min_exclusive": "pl", "r
 # Plain-language definitions for each column; shown in the Screener glossary, not used in calculations.
 GLOSSARY = {
     "cotacao": "Último preço negociado da ação, em reais.",
-    "pl": "Preço dividido pelo lucro por ação dos últimos 12 meses. Negativo indica prejuízo.",
+    "pl": "Preço dividido pelo lucro por ação dos últimos 12 meses. Negativo indica prejuízo. Quando a linha indica Nasdaq, o lucro é o do último exercício anual.",
     "pvp": "Preço dividido pelo valor patrimonial por ação. Abaixo de 1 pode indicar desconto contábil.",
     "dy": "Proventos pagos nos últimos 12 meses divididos pelo preço atual. Retorno passado; não garante proventos futuros.",
-    "roe": "Lucro dos últimos 12 meses dividido pelo patrimônio líquido.",
+    "roe": "Lucro dividido pelo patrimônio líquido. No Yahoo, o lucro é o dos últimos 12 meses; na Nasdaq, o do último exercício anual.",
     "roic": "Retorno sobre o capital investido, somando patrimônio e dívida.",
     "evebitda": "Valor da empresa, com dívida líquida, dividido pelo EBITDA dos últimos 12 meses.",
     "evebit": "Valor da empresa, com dívida líquida, dividido pelo EBIT dos últimos 12 meses.",
@@ -369,7 +369,7 @@ def query(body: Query, request: Request):
                 us = _load_us()
             except Exception as exc:
                 raise HTTPException(503, "Os dados de ações americanas no Yahoo Finance estão indisponíveis. Tente novamente.") from exc
-            result, exported = screen(us, body, source="Yahoo Finance · Ações EUA", normalized=True)
+            result, exported = screen(us, body, source=us.attrs.get("source") or "Yahoo Finance · Ações EUA", normalized=True)
             result["unavailable_indicators"] = [
                 column["label"] for column in result["available_columns"]
                 if column["key"] in CRITERION_FIELDS.values() and us[column["key"]].isna().all()

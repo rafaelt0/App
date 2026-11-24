@@ -99,21 +99,30 @@ def test_yahoo_chart_liquidity_uses_recent_daily_volume(monkeypatch):
     day = 86_400
     latest = 1_795_127_400
     volumes = [90_000, 100, None, 300]
+    dividends = {
+        "old": {"amount": 2.0, "date": latest - 400 * day},
+        "recent": {"amount": 0.25, "date": latest - 20 * day},
+        "also": {"amount": 0.75, "date": latest - 200 * day},
+    }
 
     def fetch(url, *, params):
         assert url.endswith("/v8/finance/chart/BRK-B")
-        assert params == {"range": "3mo", "interval": "1d"}
+        assert params == {"range": "1y", "interval": "1d", "events": "div"}
         return SimpleNamespace(json=lambda: {"chart": {"result": [{
             "meta": {"symbol": "BRK-B", "regularMarketVolume": 900_000},
             "timestamp": [latest - 75 * day, latest - 58 * day, latest - day, latest],
             "indicators": {"quote": [{"volume": volumes}]},
+            "events": {"dividends": dividends},
         }]}})
 
     monkeypatch.setattr(market_data, "_fetch_public_market_data", fetch)
-    assert market_data._fetch_public_chart_liquidity("BRK-B") == ("BRK-B", 200)
+    assert market_data._fetch_public_chart_stats("BRK-B") == ("BRK-B", {"volume": 200, "dividend_rate": 1.0})
 
     volumes[1] = None
-    assert market_data._fetch_public_chart_liquidity("BRK-B") == ("BRK-B", None)
+    assert market_data._fetch_public_chart_stats("BRK-B") == ("BRK-B", {"volume": None, "dividend_rate": 1.0})
+
+    dividends.clear()
+    assert market_data._fetch_public_chart_stats("BRK-B")[1]["dividend_rate"] == 0.0
 
 
 def test_fundamentus_fii_feed_keeps_yield_points_and_brl_turnover(monkeypatch):

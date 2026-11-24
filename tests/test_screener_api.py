@@ -238,30 +238,79 @@ def test_us_screener_uses_public_quotes_when_authenticated_yahoo_fails(screener_
         assert symbols == (symbol,)
         return {symbol: {"price": 100, "currency": "USD", "last_quote_date": "2026-11-23"}}
 
+    def nasdaq(requested):
+        assert requested == symbol
+        return {"trailingPE": 21.0, "priceToBook": 40.0, "returnOnEquity": 1.5,
+                "profitMargins": 0.25, "operatingMargins": 0.32, "enterpriseToEbitda": 22.0, "marketCap": 1.0}
+
     monkeypatch.setattr(market_data.yf.data, "YfData", lambda: SimpleNamespace(get_raw_json=denied))
     monkeypatch.setattr(market_data, "get_yahoo_quotes", public_quotes)
-    monkeypatch.setattr(market_data, "_fetch_public_chart_liquidity", lambda symbol: (symbol, 20_000))
+    monkeypatch.setattr(market_data, "_fetch_public_chart_stats", lambda requested: (requested, {"volume": 20_000, "dividend_rate": 0.5}))
+    monkeypatch.setattr(assets, "nasdaq_equity_indicators", nasdaq)
 
     response = client.post("/api/screener/query", json={"asset_class": "acao_us", "criteria": {"liq2m_min": 1_000_000}})
     assert response.status_code == 200
     result = response.json()
     assert result["total_count"] == result["matched_count"] == 1
+    assert result["source"] == "Yahoo Finance · cotação com atraso + Nasdaq · indicadores anuais"
     row, = result["rows"]
     assert (row["ticker"], row["currency"], row["cotacao"], row["liq2m"]) == (symbol, "USD", 100, 2_000_000)
-    assert row["source"] == "Yahoo Finance · cotação pública" and row["quote_date"] == "2026-11-23"
-    assert row["pl"] is None and row["dy"] is None and row["roe"] is None
-    assert "ROE (%)" in result["unavailable_indicators"]
+    assert row["source"] == "Yahoo Finance · cotação pública + Nasdaq · indicadores anuais"
+    assert row["quote_date"] == "2026-11-23"
+    assert row["pl"] == 21.0 and row["pvp"] == 40.0 and row["evebitda"] == 22.0
+    assert row["dy"] == pytest.approx(0.005) and row["roe"] == pytest.approx(1.5)
+    assert row["mrgliq"] == pytest.approx(0.25) and row["mrgebit"] == pytest.approx(0.32)
+    assert result["unavailable_indicators"] == []
 
     export = client.get(f"/api/screener/{result['id']}/results.csv")
     assert export.status_code == 200
     exported = pd.read_csv(io.BytesIO(export.content), index_col=0)
     assert exported.loc[symbol, "Moeda"] == "USD"
     assert exported.loc[symbol, "Data da cotação"] == row["quote_date"]
-    assert pd.isna(exported.loc[symbol, "ROE (%)"])
+    assert exported.loc[symbol, "ROE (%)"] == pytest.approx(150)
 
     filtered = client.post("/api/screener/query", json={"asset_class": "acao_us", "criteria": {"roe_min": 0.1}})
-    assert filtered.status_code == 200 and filtered.json()["matched_count"] == 0
-    assert "ROE (%)" in filtered.json()["unavailable_indicators"]
+    assert filtered.status_code == 200 and filtered.json()["matched_count"] == 1
+    assert filtered.json()["unavailable_indicators"] == []
+
+    monkeypatch.setattr(assets, "nasdaq_equity_indicators", lambda requested: {})
+    monkeypatch.setattr(market_data, "_fetch_public_chart_stats", lambda requested: (requested, {"volume": 20_000, "dividend_rate": None}))
+    blank = client.post("/api/screener/query", json={"asset_class": "acao_us"}).json()
+    blank_row, = blank["rows"]
+    assert blank_row["pl"] is None and blank_row["dy"] is None and blank_row["roe"] is None
+    assert "ROE (%)" in blank["unavailable_indicators"]
+    assert "Nasdaq" not in blank_row["source"]
+
+
+def test_us_screener_keeps_yahoo_fundamentals_when_the_summary_succeeds(screener_api, monkeypatch):
+    client, _ = screener_api
+    symbol = "AAPL"
+    monkeypatch.setattr(assets, "EXTRA_ASSETS_BY_TICKER", {symbol: assets.EXTRA_ASSETS_BY_TICKER[symbol]})
+    monkeypatch.setattr(screener, "get_us_market_data", market_data.get_us_market_data.__wrapped__)
+    calls = []
+
+    def raw_json(url, params, timeout):
+        if "quoteSummary" in url:
+            return {"quoteSummary": {"result": [{"defaultKeyStatistics": {
+                "trailingPE": 11, "priceToBook": 3, "trailingAnnualDividendYield": 0.02,
+            }, "financialData": {"returnOnEquity": 0.18, "profitMargins": 0.1, "operatingMargins": 0.2}}]}}
+        return {"quoteResponse": {"result": [{
+            "symbol": symbol, "regularMarketPrice": 100, "currency": "USD",
+            "regularMarketTime": 1_795_120_200, "exchangeTimezoneName": "America/New_York",
+            "averageDailyVolume3Month": 1_000_000,
+        }]}}
+
+    monkeypatch.setattr(market_data.yf.data, "YfData", lambda: SimpleNamespace(get_raw_json=raw_json))
+    monkeypatch.setattr(assets, "nasdaq_equity_indicators", lambda requested: calls.append(requested))
+    monkeypatch.setattr(market_data, "_fetch_public_chart_stats", lambda requested: calls.append(("chart", requested)))
+
+    result = client.post("/api/screener/query", json={"asset_class": "acao_us"}).json()
+    row, = result["rows"]
+    assert calls == []
+    assert row["pl"] == 11 and row["pvp"] == 3 and row["roe"] == pytest.approx(0.18)
+    assert row["dy"] == pytest.approx(0.02) and row["liq2m"] == 100_000_000
+    assert row["source"] == "Yahoo Finance · Ações EUA"
+    assert "Nasdaq" not in result["source"]
 
 
 def test_combined_rows_and_csv_keep_per_row_source_class_currency_and_quote_date(screener_api, monkeypatch):
