@@ -1206,6 +1206,75 @@ def _get_nasdaq_quote(symbol: str, asset_class: str, currency: str) -> dict[str,
     return quote
 
 
+def _nasdaq_summary_value(summary: dict[str, Any], key: str) -> Any:
+    summary_data = summary.get("summaryData") if isinstance(summary.get("summaryData"), dict) else {}
+    entry = summary_data.get(key)
+    return entry.get("value") if isinstance(entry, dict) else None
+
+
+@cache_data(ttl=900, max_entries=128, cache_if=bool)
+def nasdaq_equity_indicators(symbol: str) -> dict[str, float]:
+    """Annual Nasdaq ratios in Yahoo units: multiples, and ROE/margins as fractions.
+
+    Dividend yield is left out. Nasdaq publishes it only for Nasdaq-listed names,
+    so the screener uses trailing dividends from Yahoo's public chart instead.
+    Banks and insurers do not get an EV/EBITDA; that multiple does not describe them.
+    """
+    if not re.fullmatch(r"[A-Z]+(?:-[A-Z])?", symbol):
+        return {}
+    nasdaq_symbol = symbol.replace("-", ".")
+    try:
+        summary = _fetch_nasdaq_json(f"quote/{nasdaq_symbol}/summary", {"assetclass": "stocks"})
+        financials = _fetch_nasdaq_json(f"company/{nasdaq_symbol}/financials", {"frequency": "1"})
+    except Exception:
+        logger.debug("Nasdaq screener indicators unavailable for %s", symbol, exc_info=True)
+        return {}
+    if not summary and not financials:
+        return {}
+
+    market_cap = _parse_nasdaq_number(_nasdaq_summary_value(summary, "MarketCap"))
+    sector = str(_nasdaq_summary_value(summary, "Sector") or "").strip()
+    industry = str(_nasdaq_summary_value(summary, "Industry") or "").strip()
+    ratios = _nasdaq_table_latest(financials.get("financialRatiosTable"))
+    income = _nasdaq_table_latest(financials.get("incomeStatementTable"))
+    balance = _nasdaq_table_latest(financials.get("balanceSheetTable"))
+    cashflow = _nasdaq_table_latest(financials.get("cashFlowTable"))
+
+    net_income_k = income.get("Net Income Applicable to Common Shareholders", income.get("Net Income"))
+    equity_k = balance.get("Total Equity")
+    info: dict[str, float] = {}
+    if market_cap and net_income_k and net_income_k != 0:
+        info["trailingPE"] = market_cap / (net_income_k * 1000.0)
+    if market_cap and equity_k and equity_k != 0:
+        info["priceToBook"] = market_cap / (equity_k * 1000.0)
+    if market_cap:
+        info["marketCap"] = market_cap
+
+    def fraction(label: str) -> float | None:
+        value = ratios.get(label)
+        return None if value is None else value / 100.0
+
+    for label, key in (("After Tax ROE", "returnOnEquity"), ("Profit Margin", "profitMargins"), ("Operating Margin", "operatingMargins")):
+        value = fraction(label)
+        if value is not None:
+            info[key] = value
+
+    if not _is_financial_institution(sector, industry):
+        ebit_k = income.get("Operating Income")
+        depreciation_k = cashflow.get("Depreciation")
+        cash_k = balance.get("Cash and Cash Equivalents")
+        short_debt = balance.get("Short-Term Debt / Current Portion of Long-Term Debt")
+        long_debt = balance.get("Long-Term Debt")
+        if (market_cap and ebit_k is not None and depreciation_k is not None and cash_k is not None
+                and (short_debt is not None or long_debt is not None)):
+            ebitda = (ebit_k + depreciation_k) * 1000.0
+            net_debt = ((short_debt or 0.0) + (long_debt or 0.0) - cash_k - (balance.get("Short-Term Investments") or 0.0)) * 1000.0
+            enterprise = market_cap + net_debt
+            if ebitda != 0 and enterprise > 0:
+                info["enterpriseToEbitda"] = enterprise / ebitda
+    return info
+
+
 @cache_data(ttl=300, cache_if=bool)
 def _get_nasdaq_fundamentals(symbol: str, asset_class: str, currency: str) -> dict[str, Any]:
     """Fetch quote, summary, and annual financial statements from Nasdaq in parallel."""

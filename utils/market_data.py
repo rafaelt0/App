@@ -143,21 +143,56 @@ def _average_daily_volume(result) -> float | None:
     return sum(window) / len(window) if len(window) > 1 else None
 
 
-def _fetch_public_chart_liquidity(symbol):
-    """Two-month average daily volume from Yahoo's public chart history, never one session."""
+def _trailing_dividend_rate(result) -> float | None:
+    """Cash dividends per share over the 365 days ending at the chart's last session.
+
+    A missing events block is unknown. An empty dividend map means the window
+    paid nothing, which is a real yield of zero rather than a blank.
+    """
+    events = result.get("events")
+    if not isinstance(events, dict) or "dividends" not in events:
+        return None
+    dividends = events.get("dividends")
+    if not isinstance(dividends, dict):
+        return None
+    latest = None
+    for stamp in result.get("timestamp") or []:
+        stamp = _positive_number(stamp)
+        if stamp is not None and (latest is None or stamp > latest):
+            latest = stamp
+    if latest is None:
+        return None
+    cutoff = latest - 365 * DAY_SECONDS
+    total = 0.0
+    for item in dividends.values():
+        if not isinstance(item, dict):
+            continue
+        stamp = _positive_number(item.get("date"))
+        try:
+            amount = float(item.get("amount"))
+        except (TypeError, ValueError):
+            continue
+        if stamp is not None and stamp >= cutoff and math.isfinite(amount) and amount > 0:
+            total += amount
+    return total
+
+
+def _fetch_public_chart_stats(symbol):
+    """Two-month average daily volume and trailing dividends from Yahoo's public chart."""
+    empty = {"volume": None, "dividend_rate": None}
     try:
         response = _fetch_public_market_data(
             YAHOO_CHART_URL.format(symbol=url_quote(symbol, safe="")),
-            params={"range": "3mo", "interval": "1d"},
+            params={"range": "1y", "interval": "1d", "events": "div"},
         )
         results = (response.json().get("chart") or {}).get("result") or []
         result = results[0] if results and isinstance(results[0], dict) else None
         if not isinstance(result, dict) or (result.get("meta") or {}).get("symbol") != symbol:
-            return symbol, None
-        return symbol, _average_daily_volume(result)
+            return symbol, empty
+        return symbol, {"volume": _average_daily_volume(result), "dividend_rate": _trailing_dividend_rate(result)}
     except (requests.RequestException, AttributeError, KeyError, TypeError, ValueError):
         logger.debug("Yahoo Finance chart history unavailable for %s", symbol, exc_info=True)
-        return symbol, None
+        return symbol, empty
 
 
 @cache_data(ttl=120, cache_if=bool)
@@ -231,15 +266,36 @@ def get_fii_market_data() -> pd.DataFrame:
     return frame
 
 
-@cache_data(ttl=900, stale=DAY_SECONDS, cache_if=lambda frame: not frame.empty)
-def get_us_market_data() -> pd.DataFrame:
-    """Load live Yahoo Finance fundamentals for catalog US equities; ratios/margins are fractions.
+_DIVIDEND_KEYS = ("trailingAnnualDividendYield", "dividendYield", "trailingAnnualDividendRate")
+_NASDAQ_INDICATOR_KEYS = {"trailingPE", "priceToBook", "returnOnEquity", "profitMargins", "operatingMargins", "enterpriseToEbitda"}
 
-    If the authenticated endpoints fail, use public quotes and daily volume
-    history. Report the source and quote date per row, with unavailable
-    fundamentals left blank.
+
+def _us_frame_has_fundamentals(frame: pd.DataFrame) -> bool:
+    """Cache a US screen only when at least one valuation or return column arrived."""
+    if frame is None or frame.empty:
+        return False
+    return any(column in frame.columns and frame[column].notna().any() for column in ("pl", "roe", "dy"))
+
+
+def _missing_statement(info: dict) -> bool:
+    has_earnings = info.get("trailingPE") is not None or info.get("trailingEps") is not None
+    return not has_earnings or info.get("priceToBook") is None or info.get("returnOnEquity") is None
+
+
+def _missing_dividend(info: dict) -> bool:
+    return all(info.get(key) is None for key in _DIVIDEND_KEYS)
+
+
+@cache_data(ttl=900, stale=DAY_SECONDS, cache_if=_us_frame_has_fundamentals)
+def get_us_market_data() -> pd.DataFrame:
+    """Load catalog US equities; ratios and margins stay fractions.
+
+    Authenticated Yahoo quotes and summaries are preferred. When they are
+    rejected, prices come from the public spark feed, trailing dividends from
+    the public chart, and P/L, P/VP, ROE, margins and EV/EBITDA from Nasdaq's
+    latest annual statements. A row says which of those filled it.
     """
-    from utils.assets import EXTRA_ASSETS_BY_TICKER, yahoo_equity_screener_row
+    from utils.assets import EXTRA_ASSETS_BY_TICKER, nasdaq_equity_indicators, yahoo_equity_screener_row
 
     entries = [
         (ticker, item)
@@ -298,30 +354,55 @@ def get_us_market_data() -> pd.DataFrame:
     missing_price = tuple(sym for sym in symbols if usable_price(quotes.get(sym, {})) is None)
     public_quotes = get_yahoo_quotes(missing_price) if missing_price else {}
     public_quotes = {sym: quote for sym, quote in public_quotes.items() if quote["currency"].upper() == "USD"}
-    average_volumes = {}
     if public_quotes:
         logger.info("Yahoo Finance US quotes: %d of %d symbols via public spark", len(public_quotes), len(symbols))
-        with ThreadPoolExecutor(max_workers=min(LIQUIDITY_WORKERS, len(public_quotes))) as pool:
-            average_volumes = dict(pool.map(_fetch_public_chart_liquidity, public_quotes))
+
+    def base_info(sym: str) -> dict:
+        return {**quotes.get(sym, {}), **summaries.get(sym, {})}
+
+    priced = [sym for sym in symbols if usable_price(base_info(sym)) is not None or sym in public_quotes]
+    chart_symbols = [sym for sym in priced if _missing_dividend(base_info(sym)) or (
+        _positive_number(base_info(sym).get("averageDailyVolume3Month")) is None
+        and _positive_number(base_info(sym).get("averageVolume")) is None)]
+    statement_symbols = [sym for sym in priced if _missing_statement(base_info(sym))]
+    chart_stats: dict[str, dict] = {}
+    nasdaq_info: dict[str, dict] = {}
+    jobs = len(chart_symbols) + len(statement_symbols)
+    if jobs:
+        with ThreadPoolExecutor(max_workers=min(LIQUIDITY_WORKERS, jobs)) as pool:
+            chart_futures = {sym: pool.submit(_fetch_public_chart_stats, sym) for sym in chart_symbols}
+            nasdaq_futures = {sym: pool.submit(nasdaq_equity_indicators, sym) for sym in statement_symbols}
+            chart_stats = {sym: future.result()[1] for sym, future in chart_futures.items()}
+            nasdaq_info = {sym: future.result() for sym, future in nasdaq_futures.items()}
 
     rows = []
+    nasdaq_rows = 0
     for ticker, item in entries:
         sym = item["yahoo_symbol"]
-        quote = quotes.get(sym, {})
-        combined = {**quote, **summaries.get(sym, {})}
+        combined = base_info(sym)
         public_quote = public_quotes.get(sym)
         if public_quote:
             combined.update(regularMarketPrice=public_quote["price"], currency=public_quote["currency"])
             quote_date = public_quote.get("last_quote_date")
             source = "Yahoo Finance · cotação pública"
-            average = average_volumes.get(sym)
-            if average is not None and _positive_number(combined.get("averageDailyVolume3Month")) is None:
-                combined.update(averageDailyVolume3Month=None, averageVolume=average)
         else:
             combined["regularMarketPrice"] = usable_price(combined)
-            stamp = _positive_number(quote.get("regularMarketTime"))
-            quote_date = _quote_date(stamp, quote.get("exchangeTimezoneName")) if stamp is not None else None
+            stamp = _positive_number(quotes.get(sym, {}).get("regularMarketTime"))
+            quote_date = _quote_date(stamp, quotes.get(sym, {}).get("exchangeTimezoneName")) if stamp is not None else None
             source = "Yahoo Finance · Ações EUA"
+        supplemented = False
+        for key, value in (nasdaq_info.get(sym) or {}).items():
+            if key in _NASDAQ_INDICATOR_KEYS and combined.get(key) is None and value is not None:
+                combined[key] = value
+                supplemented = True
+        stats = chart_stats.get(sym) or {}
+        if stats.get("volume") is not None and _positive_number(combined.get("averageDailyVolume3Month")) is None and _positive_number(combined.get("averageVolume")) is None:
+            combined["averageVolume"] = stats["volume"]
+        if stats.get("dividend_rate") is not None and _missing_dividend(combined):
+            combined["trailingAnnualDividendRate"] = stats["dividend_rate"]
+        if supplemented:
+            source += " + Nasdaq · indicadores anuais"
+            nasdaq_rows += 1
         row = yahoo_equity_screener_row(ticker, item, combined)
         if row is not None:
             row.update(source=source, quote_date=quote_date)
@@ -330,6 +411,8 @@ def get_us_market_data() -> pd.DataFrame:
         raise ValueError("Yahoo Finance não retornou dados para as ações americanas.")
     frame = pd.DataFrame(rows).set_index("ticker")
     frame.attrs["fetched_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    if nasdaq_rows:
+        frame.attrs["source"] = "Yahoo Finance · cotação com atraso + Nasdaq · indicadores anuais"
     return frame
 
 

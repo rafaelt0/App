@@ -191,6 +191,60 @@ def test_yahoo_classification_uses_instrument_type_before_theme(symbol, quote_ty
     assert entry["asset_class"] == expected
 
 
+def test_nasdaq_equity_indicators_convert_annual_statements_to_yahoo_units(monkeypatch):
+    def fetch(path, params):
+        if path.endswith("/summary"):
+            assert params == {"assetclass": "stocks"}
+        elif path.endswith("/financials"):
+            assert params == {"frequency": "1"}
+        if path.endswith("/summary"):
+            sector = "Finance" if path.startswith("quote/JPM/") else "Technology"
+            industry = "Major Banks" if sector == "Finance" else "Computer Manufacturing"
+            return {"summaryData": {
+                "Sector": {"value": sector},
+                "Industry": {"value": industry},
+                "MarketCap": {"value": "4,000,000,000,000"},
+            }}
+        if path.endswith("/financials"):
+            return {
+                "financialRatiosTable": {"rows": [
+                    {"value1": "Operating Margin", "value2": "30.0%"},
+                    {"value1": "Profit Margin", "value2": "25.0%"},
+                    {"value1": "After Tax ROE", "value2": "100.0%"},
+                ]},
+                "incomeStatementTable": {"rows": [
+                    {"value1": "Operating Income", "value2": "$120,000,000"},
+                    {"value1": "Net Income Applicable to Common Shareholders", "value2": "$100,000,000"},
+                ]},
+                "balanceSheetTable": {"rows": [
+                    {"value1": "Cash and Cash Equivalents", "value2": "$40,000,000"},
+                    {"value1": "Short-Term Investments", "value2": "$10,000,000"},
+                    {"value1": "Short-Term Debt / Current Portion of Long-Term Debt", "value2": "$20,000,000"},
+                    {"value1": "Long-Term Debt", "value2": "$80,000,000"},
+                    {"value1": "Total Equity", "value2": "$100,000,000"},
+                ]},
+                "cashFlowTable": {"rows": [{"value1": "Depreciation", "value2": "$10,000,000"}]},
+            }
+        raise AssertionError(path)
+
+    monkeypatch.setattr(assets, "_fetch_nasdaq_json", fetch)
+    assets.nasdaq_equity_indicators.clear()
+    info = assets.nasdaq_equity_indicators("AAPL")
+    assert info["trailingPE"] == pytest.approx(40)
+    assert info["priceToBook"] == pytest.approx(40)
+    assert info["returnOnEquity"] == pytest.approx(1)
+    assert info["profitMargins"] == pytest.approx(0.25)
+    assert info["operatingMargins"] == pytest.approx(0.30)
+    assert info["enterpriseToEbitda"] == pytest.approx(4.05e12 / 130e9)
+    assert "dividendYield" not in info and "trailingAnnualDividendYield" not in info
+
+    bank = assets.nasdaq_equity_indicators("JPM")
+    assert bank["returnOnEquity"] == pytest.approx(1)
+    assert "enterpriseToEbitda" not in bank
+    assert assets.nasdaq_equity_indicators("BRK.B") == {}
+    assets.nasdaq_equity_indicators.clear()
+
+
 def test_home_uses_nasdaq_quote_when_yahoo_is_unavailable(client, monkeypatch):
     market_data.get_yahoo_info.clear()
     assets._get_nasdaq_quote.clear()
