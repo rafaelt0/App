@@ -1,4 +1,5 @@
 import io
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -8,6 +9,7 @@ from pydantic import ValidationError
 
 from backend import screener
 from backend.state import SessionState, replace_selection
+from utils import assets, market_data
 
 
 @pytest.fixture
@@ -221,6 +223,45 @@ def us_frame():
                          index=["AAPL"])
     frame.attrs["fetched_at"] = "2026-01-02T18:05:00+00:00"
     return frame
+
+
+def test_us_screener_uses_public_quotes_when_authenticated_yahoo_fails(screener_api, monkeypatch):
+    client, _ = screener_api
+    symbol = "AAPL"
+    monkeypatch.setattr(assets, "EXTRA_ASSETS_BY_TICKER", {symbol: assets.EXTRA_ASSETS_BY_TICKER[symbol]})
+    monkeypatch.setattr(screener, "get_us_market_data", market_data.get_us_market_data.__wrapped__)
+
+    def denied(*args, **kwargs):
+        raise PermissionError("Yahoo HTTP 401")
+
+    def public_quotes(symbols):
+        assert symbols == (symbol,)
+        return {symbol: {"price": 100, "currency": "USD", "last_quote_date": "2026-11-23"}}
+
+    monkeypatch.setattr(market_data.yf.data, "YfData", lambda: SimpleNamespace(get_raw_json=denied))
+    monkeypatch.setattr(market_data, "get_yahoo_quotes", public_quotes)
+    monkeypatch.setattr(market_data, "_fetch_public_chart_liquidity", lambda symbol: (symbol, 20_000))
+
+    response = client.post("/api/screener/query", json={"asset_class": "acao_us", "criteria": {"liq2m_min": 1_000_000}})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["total_count"] == result["matched_count"] == 1
+    row, = result["rows"]
+    assert (row["ticker"], row["currency"], row["cotacao"], row["liq2m"]) == (symbol, "USD", 100, 2_000_000)
+    assert row["source"] == "Yahoo Finance · cotação pública" and row["quote_date"] == "2026-11-23"
+    assert row["pl"] is None and row["dy"] is None and row["roe"] is None
+    assert "ROE (%)" in result["unavailable_indicators"]
+
+    export = client.get(f"/api/screener/{result['id']}/results.csv")
+    assert export.status_code == 200
+    exported = pd.read_csv(io.BytesIO(export.content), index_col=0)
+    assert exported.loc[symbol, "Moeda"] == "USD"
+    assert exported.loc[symbol, "Data da cotação"] == row["quote_date"]
+    assert pd.isna(exported.loc[symbol, "ROE (%)"])
+
+    filtered = client.post("/api/screener/query", json={"asset_class": "acao_us", "criteria": {"roe_min": 0.1}})
+    assert filtered.status_code == 200 and filtered.json()["matched_count"] == 0
+    assert "ROE (%)" in filtered.json()["unavailable_indicators"]
 
 
 def test_combined_rows_and_csv_keep_per_row_source_class_currency_and_quote_date(screener_api, monkeypatch):

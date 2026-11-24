@@ -208,6 +208,7 @@ export default function ScreenerPage() {
       {navigating && <Loading>Abrindo a análise de ativos…</Loading>}
       {(busy || !config || (actionBusy && !result)) && !error && <Loading>Carregando dados do screener…</Loading>}
       {error && <Notice tone="negative"><strong>Não foi possível exibir os resultados.</strong> {error}{!invalidCriteria && <button disabled={actionBusy} onClick={()=>setReload(value=>value+1)}>Tentar novamente</button>}</Notice>}
+      {!busy && !!result?.unavailable_indicators?.length && <Notice tone="warning">Indicadores indisponíveis nesta coleta do Yahoo Finance ({result.unavailable_indicators.join(", ")}). Sem esses dados, os filtros correspondentes retornam zero ativos.</Notice>}
       {result && !invalidCriteria && (!result.matched_count ? <Idle action={<button className="primary" onClick={clearFilters}>Restaurar filtros iniciais</button>}>Nenhum ativo atende a todos os critérios. Ajuste os limites ou remova filtros para ampliar a busca.</Idle> : <>
         <div className="scr-actionbar" data-selected={selectedCurrent ? "true":"false"} role="region" aria-label="Ação selecionada" aria-live="polite">
           {selectedCurrent ? <>
