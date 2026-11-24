@@ -36,10 +36,13 @@ const starterTabs: { key: AssetClass; label: string }[] = [
   { key: "outros", label: "Outros" },
 ];
 
-type MonitorQuote = { price: number; change: number | null; currency: string; digits: number; as_of: string };
+type MonitorQuote = {
+  price: number; change: number | null; currency?: string | null; digits?: number; as_of?: string | null;
+  source?: string; unit?: "money" | "percent"; change_unit?: "fraction" | "pp" | null; note?: string | null;
+};
 type QuoteBook = { kind: "loading" | "ready" | "error"; quotes: Record<string, MonitorQuote>; unquoted: Set<string>; pending: boolean };
 
-/** Delayed Yahoo last price and daily change for the empty-selection quick list. */
+/** Delayed quotes, Tesouro PUs and modeled rates for the empty-selection quick list. */
 function useQuickQuotes(enabled: boolean, tickers: string): QuoteBook {
   const [book, setBook] = useState<QuoteBook>({ kind: "loading", quotes: {}, unquoted: new Set(), pending: true });
   useEffect(() => {
@@ -53,7 +56,12 @@ function useQuickQuotes(enabled: boolean, tickers: string): QuoteBook {
         const quotes: Record<string, MonitorQuote> = {};
         for (const [ticker, quote] of Object.entries<MonitorQuote>(data.quotes ?? {})) {
           if (!quote || typeof quote.price !== "number" || !Number.isFinite(quote.price)) continue;
-          quotes[ticker] = { ...quote, change: typeof quote.change === "number" && Number.isFinite(quote.change) ? quote.change : null };
+          quotes[ticker] = {
+            ...quote,
+            unit: quote.unit === "percent" ? "percent" : "money",
+            change: typeof quote.change === "number" && Number.isFinite(quote.change) ? quote.change : null,
+            change_unit: quote.change_unit === "pp" ? "pp" : quote.change_unit === "fraction" ? "fraction" : null,
+          };
         }
         setBook({ kind: "ready", quotes, unquoted: new Set<string>(data.unquoted ?? []), pending: false });
       })
@@ -136,20 +144,24 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
         <tbody>{shownStarters.map(stock => {
           const modeled = quotes.unquoted.has(stock.ticker);
           const live = modeled ? undefined : quotes.quotes[stock.ticker];
-          const tape = modeled ? undefined : stripQuote(strip, stock.ticker);
+          const tape = modeled || live ? undefined : stripQuote(strip, stock.ticker);
           const price = live?.price ?? (typeof tape?.value === "number" ? tape.value : null);
           const change = live ? live.change : tape?.change ?? null;
-          const currency = live?.currency ?? tape?.currency ?? stock.currency ?? "BRL";
+          const currency = live?.currency || tape?.currency || stock.currency || "BRL";
           const digits = live?.digits ?? tape?.digits ?? 2;
           const asOf = live?.as_of ?? tape?.as_of;
           const pending = price === null && !modeled && (quotes.kind === "loading" || quotes.pending);
-          const source = asOf ? `Yahoo Finance com atraso, ${shortDate(asOf)}` : modeled ? "Sem cotação de mercado" : pending ? "Carregando cotação" : "Cotação indisponível no momento";
+          const yahoo = !live?.source || live.source === "Yahoo Finance";
+          const source = live?.source && !yahoo
+            ? (live.as_of ? `${live.source}, ${shortDate(live.as_of)}` : live.source)
+            : asOf ? `Yahoo Finance com atraso, ${shortDate(asOf)}` : modeled ? "Sem cotação de mercado" : pending ? "Carregando cotação" : "Cotação indisponível no momento";
+          const rate = live?.unit === "percent";
           return <tr key={stock.ticker}>
             <th scope="row"><button type="button" className="row-btn" disabled={busy} aria-label={`Analisar ${stock.ticker} agora`} onClick={() => onQuick(stock.ticker)}><span className="tk"><StockLogo ticker={stock.ticker} company={stock.company} size={16} />{stock.ticker}</span><span className="quick-action" aria-hidden="true">Analisar</span></button></th>
             <td className="ell">{stock.company || "—"} <small className="muted">· {stock.sector}</small></td>
             <td className="num"><span className="asset-badge">{assetBadge(stock)}</span></td>
-            <td className="num" title={source}>{price === null ? <span className="muted">{pending ? "…" : "—"}</span> : formatValue(price, "money", digits, currency)}</td>
-            <td className="num" title={source}>{change === null ? <span className="muted">{pending ? "…" : "—"}</span> : <Change value={change} />}</td>
+            <td className="num" title={source}>{price === null ? <span className="muted">{pending ? "…" : "—"}</span> : rate ? <>{formatValue(price, "percent", digits)}{live?.note ? <span className="value-unit is-suffix"> {live.note}</span> : null}</> : formatValue(price, "money", digits, currency)}</td>
+            <td className="num" title={source}>{change === null ? <span className="muted">{pending ? "…" : "—"}</span> : <Change value={change} unit={live?.change_unit === "pp" ? "pp" : "fraction"} />}</td>
           </tr>;
         })}</tbody>
       </table></ScrollX>
@@ -167,7 +179,7 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
         </li>;
       })}</ul>
     </>}
-    <p className="pane-foot">Últ./Var.: Yahoo Finance com atraso. Títulos modelados, como CDI, CDB e IPCA+, não têm cotação de mercado; o preço oficial dos demais aparece na análise.</p>
+    <p className="pane-foot">Últ./Var. na lista rápida: Yahoo Finance com atraso. Tesouro Direto: PU de compra do Tesouro Transparente. CDI: taxa anual do BCB, variação em p.p. CDB e IPCA+: taxa do contrato, não um preço de mercado.</p>
   </Pane>;
 }
 

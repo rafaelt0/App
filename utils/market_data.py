@@ -7,6 +7,7 @@ tickers), so route callers through this module's shared cache.
 import datetime
 import logging
 import math
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
@@ -331,35 +332,129 @@ def get_yahoo_moves(symbols: tuple[str, ...]) -> dict[str, dict]:
     return moves
 
 
-def monitor_quotes(tickers: tuple[str, ...]) -> dict:
-    """Delayed quotes for listed B3 names and catalog assets that have a Yahoo symbol.
+def _rate_token(rate: float) -> str:
+    return str(int(rate)) if float(rate).is_integer() else f"{rate:g}"
 
-    Modeled rates and other titles without a market symbol are returned in
-    `unquoted`. A symbol the provider does not quote is listed in `missing`
-    and is not replaced with a catalog reference price.
+
+def _rate_digits(rate: float) -> int:
+    if abs(rate - round(rate)) < 1e-9:
+        return 0
+    if abs(rate * 10 - round(rate * 10)) < 1e-6:
+        return 1
+    return 2
+
+
+def _contract_rate_quote(ticker: str) -> dict | None:
+    """Contract rate written into the ticker, or None when the ticker does not name one.
+
+    The number is the contracted percent of CDI or the contracted rate in
+    percent a year. It is not a unit price, and it has no daily change.
+    """
+    from utils.assets import parse_fixed_income_asset
+
+    spec = parse_fixed_income_asset(ticker)
+    if spec is None or spec.get("ticker") != ticker:
+        return None
+    try:
+        rate = float(spec["rate"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not math.isfinite(rate):
+        return None
+    kind = spec.get("kind")
+    token = _rate_token(rate)
+    if kind == "cdi_pct" and re.search(rf"(?:^|-){re.escape(token)}CDI$", ticker):
+        note, detail = "do CDI", "percentual contratado do CDI"
+    elif kind == "ipca_plus" and re.search(rf"IPCA\+{re.escape(token)}$", ticker):
+        note, detail = "a.a.", "taxa real contratada, IPCA+"
+    elif kind == "cdi_spread" and "CDI+" in ticker:
+        note, detail = "a.a.", "adicional contratado sobre o CDI"
+    elif kind == "prefixado" and ticker.startswith("PRE-"):
+        note, detail = "a.a.", "taxa prefixada contratada"
+    else:
+        return None
+    return {
+        "price": rate,
+        "change": None,
+        "currency": None,
+        "digits": _rate_digits(rate),
+        "as_of": None,
+        "unit": "percent",
+        "change_unit": None,
+        "note": note,
+        "source": f"Taxa contratada do título · {detail}, não é preço de mercado",
+    }
+
+
+def monitor_quotes(tickers: tuple[str, ...]) -> dict:
+    """Delayed quotes for the home monitor.
+
+    Listed names and catalog assets with a Yahoo symbol keep the delayed spark
+    quote. Tesouro Direto titles that this app prices use the Tesouro
+    Transparente buy PU. CDI uses the BCB annualized rate. A ticker that names
+    its own contract, such as CDB % do CDI or IPCA+, shows that rate. Nothing
+    is filled from a catalog reference price. A provider that fails leaves the
+    ticker in `missing`. Titles with no market symbol and no rate stay in
+    `unquoted`.
     """
     from utils.assets import EXTRA_ASSETS_BY_TICKER
+    from utils.fund_data import get_cdi_annual_move
+    from utils.treasury_data import resolve_treasury_ticker, treasury_moves
 
     listed = set(get_listed_stocks()["Ticker"])
     symbol_for = {}
+    treasury_for = {}
     unquoted = []
+    wants_cdi = False
+    contract_quotes = {}
     for ticker in tickers:
+        official = resolve_treasury_ticker(ticker)
+        if official:
+            treasury_for[ticker] = official
+            continue
         if ticker in EXTRA_ASSETS_BY_TICKER:
             symbol = EXTRA_ASSETS_BY_TICKER[ticker].get("yahoo_symbol")
         elif ticker in listed:
             symbol = f"{ticker}.SA"
         else:
-            continue
+            symbol = None
         if symbol:
             symbol_for[ticker] = symbol
-        else:
+            continue
+        if ticker == "CDI":
+            wants_cdi = True
+            continue
+        contract = _contract_rate_quote(ticker)
+        if contract is not None:
+            contract_quotes[ticker] = contract
+            continue
+        if ticker in EXTRA_ASSETS_BY_TICKER:
             unquoted.append(ticker)
     found = get_yahoo_moves(tuple(sorted(symbol_for.values()))) if symbol_for else {}
     quotes = {}
     for ticker, symbol in symbol_for.items():
         move = found.get(symbol)
         if move is not None:
-            quotes[ticker] = {**move, "symbol": symbol}
+            quotes[ticker] = {**move, "symbol": symbol, "unit": "money", "note": None}
+    if treasury_for:
+        try:
+            official_moves = treasury_moves(tuple(treasury_for.values()))
+        except ValueError:
+            logger.warning("Tesouro Transparente PU unavailable for the home monitor", exc_info=True)
+            official_moves = {}
+        for ticker, official in treasury_for.items():
+            move = official_moves.get(official)
+            if move is not None:
+                quotes[ticker] = {**move, "symbol": official, "note": None}
+    if wants_cdi:
+        try:
+            cdi = get_cdi_annual_move()
+        except (OSError, ValueError, TypeError):
+            logger.warning("BCB CDI unavailable for the home monitor", exc_info=True)
+            cdi = None
+        if cdi:
+            quotes["CDI"] = cdi
+    quotes.update(contract_quotes)
     missing = [ticker for ticker in tickers if ticker not in quotes and ticker not in unquoted]
     return {"source": "Yahoo Finance", "quotes": quotes, "unquoted": unquoted, "missing": missing}
 

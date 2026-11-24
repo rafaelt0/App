@@ -267,23 +267,72 @@ def test_yahoo_moves_quote_the_last_session_and_drop_invalid_rows(monkeypatch):
     assert moves["HGLG11.SA"]["as_of"] == "2026-11-19"
 
 
-def test_monitor_quotes_keep_market_prices_and_leave_modeled_rates_blank(monkeypatch):
+def test_monitor_quotes_keep_market_prices_and_fill_treasury_and_rates(monkeypatch):
     def moves(symbols):
         assert "HGLG11.SA" in symbols and "AAPL" in symbols and "BRL=X" in symbols and "BTC-USD" in symbols
         assert "CDI" not in symbols and "CDB-110CDI" not in symbols and "IPCA+6" not in symbols
+        assert "TESOURO-SELIC" not in symbols and "TD-SELIC-2029" not in symbols
         return {
             "HGLG11.SA": {"price": 141.68, "change": 0.007, "currency": "BRL", "digits": 2, "as_of": "2026-11-24", "source": "Yahoo Finance"},
             "AAPL": {"price": 351.03, "change": -0.002, "currency": "USD", "digits": 2, "as_of": "2026-11-24", "source": "Yahoo Finance"},
             "BTC-USD": {"price": 59716.1, "change": 0.01, "currency": "USD", "digits": 2, "as_of": "2026-11-24", "source": "Yahoo Finance"},
         }
 
+    def treasury(tickers):
+        assert "TD-SELIC-2029" in tickers and "TD-IPCA-2035" in tickers and "TD-PREFIXADO-2029" in tickers
+        return {
+            "TD-SELIC-2029": {"price": 20320.65, "change": 20320.65 / 20310.33 - 1, "currency": "BRL", "digits": 2, "as_of": "2026-11-19", "unit": "money", "change_unit": "fraction", "source": "Tesouro Transparente · PU Compra Manhã · Tesouro Selic 01/03/2029"},
+            "TD-IPCA-2035": {"price": 2526.53, "change": None, "currency": "BRL", "digits": 2, "as_of": "2026-11-19", "unit": "money", "change_unit": None, "source": "Tesouro Transparente · PU Compra Manhã · Tesouro IPCA+ 15/05/2035"},
+            "TD-PREFIXADO-2029": {"price": 746.01, "change": 746.01 / 746.96 - 1, "currency": "BRL", "digits": 2, "as_of": "2026-11-19", "unit": "money", "change_unit": "fraction", "source": "Tesouro Transparente · PU Compra Manhã · Tesouro Prefixado 01/01/2029"},
+        }
+
     monkeypatch.setattr(market_data, "get_yahoo_moves", moves)
-    result = market_data.monitor_quotes(("HGLG11", "AAPL", "BTC-USD", "USDBRL=X", "CDI", "CDB-110CDI", "IPCA+6", "TESOURO-SELIC", "NOTREAL"))
+    monkeypatch.setattr("utils.treasury_data.treasury_moves", treasury)
+    monkeypatch.setattr("utils.fund_data.get_cdi_annual_move", lambda: {
+        "price": 14.15, "change": 0.02, "currency": None, "digits": 2, "as_of": "2026-11-19",
+        "unit": "percent", "change_unit": "pp", "note": "a.a.",
+        "source": "BCB SGS 4389 · taxa ao ano, não é preço de mercado",
+    })
+    result = market_data.monitor_quotes((
+        "HGLG11", "AAPL", "BTC-USD", "USDBRL=X", "CDI", "CDB-110CDI", "IPCA+6",
+        "TESOURO-SELIC", "TESOURO-IPCA-2035", "TESOURO-PRE", "NOTREAL",
+    ))
     assert result["quotes"]["HGLG11"]["price"] == 141.68
     assert result["quotes"]["HGLG11"]["symbol"] == "HGLG11.SA"
     assert result["quotes"]["AAPL"]["currency"] == "USD"
     assert result["quotes"]["BTC-USD"]["price"] == 59716.1
-    assert "USDBRL=X" not in result["quotes"]
-    assert result["unquoted"] == ["CDI", "CDB-110CDI", "IPCA+6", "TESOURO-SELIC"]
+    assert result["quotes"]["TESOURO-SELIC"]["price"] == 20320.65
+    assert result["quotes"]["TESOURO-SELIC"]["price"] != 15850
+    assert result["quotes"]["TESOURO-IPCA-2035"]["price"] == 2526.53
+    assert result["quotes"]["TESOURO-IPCA-2035"]["change"] is None
+    assert result["quotes"]["TESOURO-PRE"]["price"] == 746.01
+    assert result["quotes"]["CDI"]["price"] == 14.15
+    assert result["quotes"]["CDI"]["change"] == 0.02
+    assert result["quotes"]["CDI"]["unit"] == "percent"
+    assert "não é preço de mercado" in result["quotes"]["CDI"]["source"]
+    assert result["quotes"]["CDB-110CDI"] == {
+        "price": 110.0, "change": None, "currency": None, "digits": 0, "as_of": None,
+        "unit": "percent", "change_unit": None, "note": "do CDI",
+        "source": "Taxa contratada do título · percentual contratado do CDI, não é preço de mercado",
+    }
+    assert result["quotes"]["IPCA+6"]["price"] == 6
+    assert result["quotes"]["IPCA+6"]["note"] == "a.a."
+    assert result["quotes"]["IPCA+6"]["change"] is None
+    assert result["unquoted"] == []
     assert result["missing"] == ["USDBRL=X", "NOTREAL"]
-    assert all("price" not in result or ticker not in result["quotes"] for ticker in result["unquoted"] + result["missing"])
+    placeholders = {15850, 2515, 780, 100, 13.75}
+    assert placeholders.isdisjoint(quote["price"] for quote in result["quotes"].values())
+
+
+def test_monitor_quotes_leave_a_failed_provider_blank(monkeypatch):
+    monkeypatch.setattr(market_data, "get_yahoo_moves", lambda symbols: {
+        "IMAB11.SA": {"price": 98.4, "change": 0.001, "currency": "BRL", "digits": 2, "as_of": "2026-11-19", "source": "Yahoo Finance"},
+    })
+    monkeypatch.setattr("utils.treasury_data.treasury_moves", lambda tickers: (_ for _ in ()).throw(ValueError("Tesouro offline")))
+    monkeypatch.setattr("utils.fund_data.get_cdi_annual_move", lambda: None)
+    result = market_data.monitor_quotes(("IMAB11", "CDI", "CDB-110CDI", "IPCA+6", "TESOURO-SELIC", "TESOURO-IPCA-2035", "TESOURO-PRE"))
+    assert result["quotes"]["IMAB11"]["price"] == 98.4
+    assert result["quotes"]["CDB-110CDI"]["price"] == 110
+    assert result["quotes"]["IPCA+6"]["price"] == 6
+    assert result["missing"] == ["CDI", "TESOURO-SELIC", "TESOURO-IPCA-2035", "TESOURO-PRE"]
+    assert {15850, 2515, 780, 100, 13.75}.isdisjoint(quote["price"] for quote in result["quotes"].values())

@@ -169,8 +169,8 @@ def get_fii_detail(ticker: str) -> dict[str, Any] | None:
 # ── Fixed-income reference rates ───────────────────────────────────────────────
 
 
-def _bcb_series(series: int, window_days: int) -> dict[str, Any] | None:
-    """Latest published point of an SGS series, in percent, or None."""
+def _bcb_points(series: int, window_days: int) -> list[tuple[dt.date, float]]:
+    """Published SGS points in the window, oldest first. Empty when the source fails."""
     today = dt.date.today()
     start = today - dt.timedelta(days=window_days)
     try:
@@ -185,20 +185,61 @@ def _bcb_series(series: int, window_days: int) -> dict[str, Any] | None:
             raise ValueError("formato inesperado")
     except (requests.RequestException, ValueError, TypeError) as exc:
         logger.warning("BCB series %s unavailable: %s", series, exc)
-        return None
+        return []
     points = []
     for row in rows:
         try:
-            date = dt.datetime.strptime(str(row["data"]), "%d/%m/%Y").date()
+            observed = dt.datetime.strptime(str(row["data"]), "%d/%m/%Y").date()
             value = _finite(str(row["valor"]).replace(",", "."))
         except (KeyError, TypeError, ValueError):
             continue
-        if value is not None and date <= today:
-            points.append((date, value))
+        if value is not None and observed <= today:
+            points.append((observed, value))
+    return sorted(points)
+
+
+def _bcb_series(series: int, window_days: int) -> dict[str, Any] | None:
+    """Latest published point of an SGS series, in percent, or None."""
+    points = _bcb_points(series, window_days)
     if not points:
         return None
-    date, value = sorted(points)[-1]
-    return {"percent": value, "date": date.isoformat(), "source": f"BCB SGS {series}"}
+    observed, value = points[-1]
+    return {"percent": value, "date": observed.isoformat(), "source": f"BCB SGS {series}"}
+
+
+# Friday to Tuesday still covers a weekend plus one holiday.
+_CDI_SESSION_GAP_DAYS = 4
+
+
+@cache_data(ttl=3600, stale=86400, cache_if=bool)
+def get_cdi_annual_move() -> dict[str, Any] | None:
+    """Annualized CDI in percent and its move in percentage points, or None.
+
+    The BCB series is the only source. A failed request is None, never the
+    model fallback. The change stays None when the prior print is not the
+    previous session.
+    """
+    points = _bcb_points(BCB_CDI_SERIES, 21)
+    if not points:
+        return None
+    observed, value = points[-1]
+    change = None
+    if len(points) >= 2:
+        previous_day, previous = points[-2]
+        gap = (observed - previous_day).days
+        if 0 < gap <= _CDI_SESSION_GAP_DAYS:
+            change = round(value - previous, 4)
+    return {
+        "price": value,
+        "change": change,
+        "currency": None,
+        "digits": 2,
+        "as_of": observed.isoformat(),
+        "unit": "percent",
+        "change_unit": "pp" if change is not None else None,
+        "note": "a.a.",
+        "source": f"BCB SGS {BCB_CDI_SERIES} · taxa ao ano, não é preço de mercado",
+    }
 
 
 @cache_data(ttl=3600, stale=86400, max_entries=4)

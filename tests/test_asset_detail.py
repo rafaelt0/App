@@ -125,6 +125,29 @@ def test_treasury_detail_exposes_buy_sell_rates_maturity_and_quote_date(monkeypa
         treasury_data.get_treasury_history.clear()
 
 
+def test_treasury_moves_keep_a_price_without_an_adjacent_prior(monkeypatch):
+    index = pd.to_datetime(["2026-11-13", "2026-11-18", "2026-11-19"])
+    frame = pd.DataFrame({
+        "TD-IPCA-2035": [2500.0, 2542.31, 2526.53],
+        "TD-SELIC-2029": [20300.0, None, 20320.65],
+        "TD-PREFIXADO-2029": [746.01, None, None],
+    }, index=index)
+    monkeypatch.setattr(treasury_data, "treasury_prices", lambda tickers, start_date, adjusted: frame)
+    moves = treasury_data.treasury_moves(("TD-IPCA-2035", "TD-SELIC-2029", "TD-PREFIXADO-2029"))
+    assert moves["TD-IPCA-2035"]["price"] == pytest.approx(2526.53)
+    assert moves["TD-IPCA-2035"]["change"] == pytest.approx(2526.53 / 2542.31 - 1)
+    assert moves["TD-IPCA-2035"]["as_of"] == "2026-11-19"
+    assert "Tesouro IPCA+ 15/05/2035" in moves["TD-IPCA-2035"]["source"]
+    assert moves["TD-SELIC-2029"]["price"] == pytest.approx(20320.65)
+    assert moves["TD-SELIC-2029"]["change"] is None
+    assert moves["TD-PREFIXADO-2029"]["price"] == pytest.approx(746.01)
+    assert moves["TD-PREFIXADO-2029"]["change"] is None
+    assert treasury_data.resolve_treasury_ticker("TESOURO-IPCA-2035") == "TD-IPCA-2035"
+    assert treasury_data.resolve_treasury_ticker("TESOURO-SELIC") == "TD-SELIC-2029"
+    assert treasury_data.resolve_treasury_ticker("TESOURO-PRE") == "TD-PREFIXADO-2029"
+    assert treasury_data.resolve_treasury_ticker("TESOURO-SELIC-2027") is None
+
+
 def test_synthetic_fixed_income_surfaces_indexer_and_observed_rate(monkeypatch):
     cdi = assets.get_extra_asset_fundamentals("CDB-110CDI")
     assert cdi["fixed_income"]["indexer"] == "CDI"
