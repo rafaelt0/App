@@ -44,6 +44,7 @@ export default function SimulationPage() {
   const returnReady = session?.simulation_ready ?? false;
   const restoredContext = session?.restored ?? false;
   const portfolioReady = session?.portfolio_ready ?? false;
+  const hasPortfolioContext = returnReady || portfolioReady || restoredContext;
   const refreshSessionRef = useRef(refreshSession);
   refreshSessionRef.current = refreshSession;
 
@@ -57,6 +58,14 @@ export default function SimulationPage() {
     setError(null);
     setRestoreFailed(false);
     setRunning(false);
+    if (!hasPortfolioContext) {
+      restoreRequest.current = null;
+      setPreparing(false);
+      setPortfolioChanged(false);
+      setRestoredNotice(false);
+      setSample(null);
+      return;
+    }
     setPreparing(true);
     async function prepare() {
       try {
@@ -98,7 +107,7 @@ export default function SimulationPage() {
     void prepare();
     return () => { cancelled = true; };
     // Session readiness, not result or form state, controls portfolio restoration.
-  }, [loading, contextRevision, returnReady, portfolioReady, restoredContext, reloadKey]);
+  }, [loading, contextRevision, hasPortfolioContext, returnReady, portfolioReady, restoredContext, reloadKey]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -139,7 +148,7 @@ export default function SimulationPage() {
   const inputsValid = simulationsValid && capitalValid && yearsValid;
   const calibrationText = inputs.calibration === "portfolio" ? "histórico do portfólio" : `últimos ${inputs.calibration} anos até hoje`;
   const individual = useMemo(() => visible ? displayedTrajectories(visible.charts.individual, displayCount) : null, [visible, displayCount]);
-  const ready = !!portfolio?.id && portfolio.simulation_ready && portfolio.revision === session?.revision;
+  const ready = hasPortfolioContext && !!portfolio?.id && portfolio.simulation_ready && portfolio.revision === session?.revision;
   const rawWeights = portfolio ? portfolio.tickers.map(ticker => ({ ticker, weight: portfolio.weights[ticker] })) : [];
   const total = rawWeights.reduce((sum, row) => sum + row.weight, 0);
   const allocation = visible?.allocation ?? rawWeights.map(row => ({ ticker: row.ticker, weight: row.weight / total }));
@@ -164,14 +173,17 @@ export default function SimulationPage() {
     {portfolioChanged && <Notice tone="warning">A carteira mudou em outra aba ou página. <button type="button" onClick={() => { setPortfolioChanged(false); setError(null); setReloadKey(key => key + 1); void refreshSession(); }}>Atualizar carteira</button></Notice>}
   </>;
 
-  if (loading || preparing) return <div className="desk">{notes}<Loading>Restaurando contexto da carteira…</Loading></div>;
+  if (loading || (hasPortfolioContext && preparing)) return <div className="desk">{notes}<Loading>Restaurando contexto da carteira…</Loading></div>;
   const preview = <details className="disclosure"><summary>Ver prévia da simulação</summary>
     <div className="board is-preview"><SimulationPreview /></div>
   </details>;
+  const canRetryRestore = hasPortfolioContext && restoreFailed;
   if (!ready) return <>
     {notes}
-    <PortfolioRequired count={session?.selection.length ?? 0} feature="simular cenários" title={restoreFailed ? "Não foi possível carregar o histórico da carteira" : undefined}>
-      {restoreFailed && <button type="button" onClick={() => { restoreRequest.current = null; setReloadKey(key => key + 1); }}>Tentar carregar novamente</button>}
+    <PortfolioRequired count={session?.selection.length ?? 0} feature="simular cenários"
+      allowSetup={contextRevision !== undefined && !hasPortfolioContext}
+      title={canRetryRestore ? "Não foi possível carregar o histórico da carteira" : undefined}>
+      {canRetryRestore && <button type="button" onClick={() => { restoreRequest.current = null; setReloadKey(key => key + 1); }}>Tentar carregar novamente</button>}
       {preview}
     </PortfolioRequired>
   </>;

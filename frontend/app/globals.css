@@ -176,6 +176,8 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .workspace-intro button, .workspace-start summary, .flow-links .button-link { min-height: 44px; }
 .mesa-main :is(button, a).primary { min-height: 44px; }
 .flow-links { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 10px; }
+.portfolio-setup { display: grid; gap: 8px; width: min(100%, 480px); min-width: 0; }
+.portfolio-setup .flow-links { padding: 0; }
 .status { display: flex; align-items: center; gap: 0; height: var(--status-h); border-top: 1px solid var(--line-2); background: #000; color: var(--text-3); font: 10.5px var(--mono); }
 .status > span { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 10px; border-right: 1px solid var(--line); white-space: nowrap; }
 .status-activity { color: var(--text-3); }
@@ -483,6 +485,8 @@ tr.is-clickable { cursor: pointer; }
 .asset-list li[data-market="TD"] { grid-template-columns: 6px 132px minmax(0, 1fr) 20px; }
 .asset-list b { font-weight: 600; }
 .asset-list span { overflow: hidden; color: var(--text-3); font: 11.5px var(--sans); white-space: nowrap; text-overflow: ellipsis; }
+.portfolio-setup .asset-list li { grid-template-columns: 6px max-content minmax(0, 1fr) 44px; height: auto; }
+.portfolio-setup .asset-list .icon-btn { width: 44px; height: 44px; }
 .segmented { display: flex; }
 .segmented button { flex: 1; border-radius: 0; }
 .segmented button + button { border-left: 0; }

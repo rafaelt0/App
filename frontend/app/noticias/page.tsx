@@ -159,7 +159,7 @@ export default function NewsPage() {
   if (bootstrapLoading || (busy && !session?.portfolio_ready)) return <div className="desk"><Loading>Recuperando a carteira…</Loading></div>;
   if (!session?.portfolio_ready) return <>
     {error && <Notice tone="negative">{error}</Notice>}
-    <PortfolioRequired count={session?.selection.length ?? 0} feature="acompanhar as notícias dos ativos">
+    <PortfolioRequired count={session?.selection.length ?? 0} feature="acompanhar as notícias dos ativos" allowSetup={!!session && !session.restored}>
       {error && session?.restored && <button type="button" onClick={() => setRestoreKey(key => key + 1)}>Tentar carregar novamente</button>}
       <details className="disclosure"><summary>Ver exemplo de lista de notícias</summary>
         <div className="example">{examples.map(([time, title, tone]) => <div className="feed-row is-example" key={time}><time>{time}</time><span className="feed-tickers">ABCD3</span><span className={`feed-tone is-${tone}`}>{tone === "positive" ? "Otimista" : tone === "negative" ? "Pessimista" : "Neutro"}</span><span className="feed-score">—</span><div className="feed-body"><h3>{title}</h3></div></div>)}
