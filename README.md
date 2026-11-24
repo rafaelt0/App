@@ -4,11 +4,11 @@ B3Lab analisa ativos e carteiras com várias classes de investimento. A interfac
 
 ## Funcionalidades
 
-- **Análise de ativos.** Ações da B3 usam Fundamentus para indicadores e comparação setorial; ações dos EUA usam indicadores equivalentes quando o Yahoo Finance os fornece. FIIs e REITs mostram P/VP e rendimentos quando disponíveis; ETFs e BDRs mostram proventos, não múltiplos de empresas. Renda fixa listada, cripto, commodities e câmbio mostram dados de mercado, não fundamentos corporativos. Exposições modeladas (como CDI, CDB personalizado e Tesouro no modelo) mostram suas premissas, não cotações ou taxas de mercado.
+- **Análise de ativos.** Ações B3 usam Fundamentus, com Yahoo Finance quando falta a ficha do ativo. FIIs compartilham um painel próprio do Fundamentus; ações dos EUA, REITs, ETFs e BDRs exibem apenas os indicadores aplicáveis. Renda fixa listada, cripto, commodities, índices e câmbio usam cotações em lote, sem pedir fundamentos corporativos. Exposições modeladas (como CDI, CDB personalizado e Tesouro no modelo) mostram suas premissas, não cotações ou taxas de mercado.
 - **Portfólio.** Mínima volatilidade, Markowitz com regularização L2, HRP e cotas manuais. Inclui alocação, estimativa de compra por cotas, fronteira eficiente, desempenho histórico, retornos mensais, Sharpe, Sortino, drawdown, beta, alpha, VaR diário, concentração, regime recente e crises históricas. Escolha as ações na própria página. A ação **Calcular carteira** libera as análises seguintes.
 - **Simulação.** De 10 a 3.000 trajetórias, com até 10 anos de horizonte. Compara o modelo normal multivariado com a reamostragem conjunta dos dias históricos. Mostra trajetórias, percentis, distribuição final, sensibilidade da calibração e média da cauda inferior. P5 não é VaR nem perda máxima. Alterar o número de trajetórias exibidas não executa novamente os modelos.
 - **Notícias.** Feeds brasileiros dos últimos sete dias, até dez notícias por ativo, deduplicação, classificação com Jev via API e fallback léxico identificado. Filtros e paginação não alteram a nota ponderada da amostra completa. A nota mede tom textual, não retorno esperado.
-- **Screener.** Presets de ações B3 com dados do Fundamentus e filtros por classe no catálogo de referência. Valores do catálogo não são cotações ao vivo; valores monetários são exibidos e ordenados por moeda, sem conversão. Indicadores e critérios não aplicáveis à classe são omitidos.
+- **Screener.** Presets de ações B3 e filtros de FIIs usam painéis separados do Fundamentus. As demais classes mantêm valores de referência, não cotações ao vivo. Valores monetários são exibidos e ordenados por moeda; indicadores e critérios não aplicáveis são omitidos.
 
 Exposições modeladas podem compor carteiras e simulações, mas suas séries não são cotações históricas. O B3Lab não estima compras em cotas para essas exposições nem para a classe de criptoativos, commodities e câmbio.
 
@@ -31,6 +31,8 @@ python run.py
 Abra http://localhost:3000. O comando inicia o Next.js e a API privada em http://127.0.0.1:8000. Ao encerrar o comando, os dois processos terminam.
 
 O catálogo inicial é local. Fundamentus, Yahoo Finance, Nasdaq, Tesouro Transparente, Banco Central, Google News e a API do Jev precisam de acesso à rede. A interface identifica falhas de fonte e resultados da classificação léxica.
+
+Veja a [matriz de fontes e os critérios de adoção](docs/fontes-de-dados.md) para o benchmark com brapi, as alternativas de produção e as restrições de licenciamento.
 
 Exporte `TYPESAFE_API_KEY` no ambiente antes de iniciar a aplicação. O backend envia o título e até 12.000 caracteres do texto combinado à [API TypeSafe](https://docs.typesafe.ai/api), usando `jev-latest`. Probabilidades positivas menos negativas produzem o score. Resultados válidos ficam em cache por uma hora; falhas usam o léxico e suspendem novas chamadas por cinco minutos na sessão. “Atualizar notícias” libera nova tentativa imediatamente.
 

@@ -12,7 +12,7 @@ import time
 from zoneinfo import ZoneInfo
 
 from backend.news import _market_headlines
-from utils.market_data import get_listed_stocks, get_liquidity_by_ticker, get_universe_changes
+from utils.market_data import get_fii_market_data, get_listed_stocks, get_liquidity_by_ticker, get_universe_changes
 from utils.market_strip import market_strip
 from utils.treasury_data import get_treasury_history
 
@@ -25,6 +25,7 @@ TASKS = (
     ("universe changes", lambda: get_universe_changes(tuple(get_listed_stocks()["Ticker"]))),
     ("market strip", market_strip),
     ("liquidity", get_liquidity_by_ticker),
+    ("FIIs", get_fii_market_data),
     ("headlines", _market_headlines),
     ("Tesouro Direto", get_treasury_history),
 )

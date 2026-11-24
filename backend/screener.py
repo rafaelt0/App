@@ -10,7 +10,7 @@ from pydantic import Field, model_validator
 from backend.serialization import StrictModel, clean_json, csv_response
 from backend.state import artifact, begin, publish, session
 from utils.assets import ASSET_CLASSES, ASSET_CLASS_LABELS, ASSET_INDICATORS, EXTRA_ASSETS_BY_TICKER, catalog_screener_rows
-from utils.market_data import clean_numeric_column, get_full_market_data
+from utils.market_data import clean_numeric_column, get_fii_market_data, get_full_market_data
 from utils.screener import PRESET_FILTERS, filter_stocks, prepare_export
 
 router = APIRouter(prefix="/api/screener", tags=["screener"])
@@ -242,13 +242,27 @@ def query(body: Query, request: Request):
         if body.asset_class in {"b3", "acao_br"}:
             result, exported = screen(b3, body, normalized=True)
         else:
-            reference = catalog_screener_rows(body.asset_class, SCREEN_FIELDS)
-            frame = pd.concat([b3.assign(currency="BRL", asset_class="acao_br"), reference]) if not b3.empty else reference
+            fii = pd.DataFrame()
+            if body.asset_class in {"fii", "all"}:
+                try:
+                    fii = get_fii_market_data().rename(columns={"price": "cotacao"}).assign(currency="BRL", asset_class="fii")
+                    fii["dy"] /= 100
+                except Exception as exc:
+                    if body.asset_class == "fii":
+                        raise HTTPException(503, "O painel de FIIs da Fundamentus está indisponível. Tente novamente.") from exc
+            if body.asset_class == "fii":
+                frame, source = fii, "Fundamentus · FIIs"
+            else:
+                reference = catalog_screener_rows(body.asset_class, SCREEN_FIELDS)
+                source = f"Catálogo de referência · {ASSET_CLASS_LABELS.get(body.asset_class, 'Multi-Ativos')} (sem cotação ao vivo)"
+                frame = reference
             if body.asset_class == "all":
+                b3 = b3.loc[~b3.index.isin(fii.index)]
+                reference = reference.loc[reference["asset_class"] != "fii"]
+                frame = pd.concat([b3.assign(currency="BRL", asset_class="acao_br"), fii, reference])
                 frame = frame.reindex(columns=frame.columns.union(sorted(fields), sort=False))
-            source = f"Catálogo de referência · {ASSET_CLASS_LABELS.get(body.asset_class, 'Multi-Ativos')} (sem cotação ao vivo)"
-            if not b3.empty:
-                source += " + Fundamentus"
+                source += " + Fundamentus · ações B3" if not b3.empty else " (ações B3 indisponíveis)"
+                source += " + Fundamentus · FIIs" if not fii.empty else " (FIIs indisponíveis)"
             result, exported = screen(frame, body, source=source, normalized=True)
     except HTTPException:
         raise

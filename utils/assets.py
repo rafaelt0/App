@@ -26,10 +26,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import requests
-import yfinance as yf
 
 from utils.cache import cache_data
-from utils.market_data import YFINANCE_REQUEST_LOCK, get_listed_stocks
+from utils.market_data import get_fii_market_data, get_listed_stocks, get_yahoo_info, get_yahoo_quotes
 from utils.treasury_data import TREASURY_SHARE_STEP, TREASURY_TITLES, latest_treasury_quote
 
 logger = logging.getLogger(__name__)
@@ -384,7 +383,7 @@ _DYNAMIC_ASSETS_LOCK = threading.Lock()
 _DYNAMIC_ASSETS: dict[str, dict[str, Any]] = {}
 
 _B3_STOCK_PATTERN = re.compile(r"^[A-Z]{4}(?:3|4|5|6|11|31|32|33|34|35|39)$")
-_VALID_TICKER_PATTERN = re.compile(r"^[A-Z0-9][A-Z0-9.\-=+]{0,23}$")
+_VALID_TICKER_PATTERN = re.compile(r"^\^?[A-Z0-9][A-Z0-9.\-=+]{0,23}$")
 
 
 def register_dynamic_asset(entry: dict[str, Any]) -> dict[str, Any]:
@@ -558,14 +557,14 @@ def asset_metadata(ticker: str, b3_frame: pd.DataFrame | None = None) -> dict[st
             "currency": "BRL",
             "yahoo_symbol": f"{canonical}.SA",
         }
-    other_market = canonical.endswith(("=F", "=X", "-USD"))
+    other_market = canonical.startswith("^") or canonical.endswith(("=F", "=X", "-USD"))
     return {
         "ticker": canonical,
         "company": canonical,
         "legal_name": canonical,
         "sector": "Ativo Internacional / Global",
         "asset_class": "outros" if other_market else "acao_us",
-        "currency": "USD",
+        "currency": "BRL" if canonical == "^BVSP" else "USD",
         "yahoo_symbol": canonical,
     }
 
@@ -820,6 +819,7 @@ def _classify_yahoo_quote(quote: dict[str, Any]) -> dict[str, Any] | None:
         "asset_class": asset_class,
         "currency": str(quote.get("currency") or currency).upper(),
         "yahoo_symbol": yahoo_symbol,
+        "quote_type": qtype,
     }
 
 
@@ -910,12 +910,12 @@ def _get_nasdaq_quote(symbol: str, asset_class: str, currency: str) -> dict[str,
     return quote
 
 
-# Cache Nasdaq quotes on their own TTL and allow Yahoo fundamentals to recover on the next analysis.
-@cache_data(ttl=3600, cache_if=lambda data: data["available"] and data["source"] != "Nasdaq")
-def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
+def get_extra_asset_fundamentals(
+    ticker: str, *, fii_table: pd.DataFrame | None = None, b3_stock: dict | None = None,
+) -> dict[str, Any]:
     """Load the market and fundamental data applicable to a non-Fundamentus asset."""
     canonical = normalize_ticker(ticker)
-    meta = asset_metadata(canonical)
+    meta = b3_stock or asset_metadata(canonical)
     if canonical in TREASURY_TITLES:
         try:
             price, quote_date = latest_treasury_quote(canonical)
@@ -957,14 +957,21 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
         }
 
     symbol = provider_symbol(canonical)
+    if uses_market_quote(canonical):
+        return market_asset_detail(canonical, get_yahoo_quotes((symbol,)).get(symbol))
+
+    if meta["asset_class"] == "fii":
+        data = _fii_detail(canonical, meta, load_fii_market_data() if fii_table is None else fii_table)
+        if data:
+            return data
+
     info: dict[str, Any] = {}
     try:
-        with YFINANCE_REQUEST_LOCK:
-            info = yf.Ticker(symbol).info or {}
+        info = get_yahoo_info(symbol)
     except Exception:
         logger.warning("Yahoo Finance data unavailable for %s (%s)", canonical, symbol, exc_info=True)
 
-    if info.get("quoteType") and canonical not in EXTRA_ASSETS_BY_TICKER:
+    if info.get("quoteType") and not b3_stock and canonical not in EXTRA_ASSETS_BY_TICKER:
         classified = _classify_yahoo_quote({**info, "symbol": symbol})
         if classified is not None:
             meta = register_dynamic_asset(classified)
@@ -984,6 +991,10 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
     current_price = _num(info.get("regularMarketPrice")) or _num(info.get("currentPrice"))
     price = current_price or _num(info.get("previousClose"))
     quote_time = _num(info.get("regularMarketTime")) if current_price is not None else None
+    try:
+        quote_date = dt.datetime.fromtimestamp(quote_time, dt.timezone.utc).date().isoformat() if quote_time else None
+    except (OSError, ValueError, OverflowError):
+        quote_date = None
     low_52w = _num(info.get("fiftyTwoWeekLow"))
     high_52w = _num(info.get("fiftyTwoWeekHigh"))
     raw_dy = _pct("yield" if info.get("quoteType") in {"ETF", "MUTUALFUND"} else "trailingAnnualDividendYield")
@@ -1020,7 +1031,7 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
         "low_52w": low_52w,
         "high_52w": high_52w,
         "market_cap": market_cap,
-        "last_quote_date": dt.datetime.fromtimestamp(quote_time, dt.timezone.utc).date().isoformat() if quote_time else None,
+        "last_quote_date": quote_date,
         "indicators": indicators,
         "health": {"current_ratio": current_ratio} if asset_class in EQUITY_CLASSES else {},
         "source": "Yahoo Finance",
@@ -1030,6 +1041,53 @@ def get_extra_asset_fundamentals(ticker: str) -> dict[str, Any]:
         if quote:
             result.update(quote, available=True)
     return result
+
+
+def uses_market_quote(ticker: str) -> bool:
+    """Identify instruments that have market prices but no corporate indicators."""
+    return (ticker not in TREASURY_TITLES and not is_synthetic_fixed_income(ticker)
+            and asset_metadata(ticker)["asset_class"] in {"titulo", "outros"})
+
+
+def market_asset_detail(ticker: str, quote: dict | None, *, allow_nasdaq: bool = True, b3_stock: dict | None = None) -> dict[str, Any]:
+    """Build a quote-only result; do not substitute hard-coded catalog figures."""
+    meta = b3_stock or asset_metadata(ticker)
+    if not quote and allow_nasdaq and meta["asset_class"] == "titulo" and meta.get("quote_type") != "BOND":
+        quote = _get_nasdaq_quote(provider_symbol(ticker), meta["asset_class"], meta["currency"])
+    return {
+        "ticker": ticker,
+        "available": bool(quote),
+        "company": meta["company"],
+        "asset_class": meta["asset_class"],
+        "sector": meta["sector"],
+        "currency": meta["currency"],
+        "price": None,
+        "source": "Yahoo Finance",
+        **(quote or {}),
+    }
+
+
+def load_fii_market_data() -> pd.DataFrame:
+    """Allow analysis to fall back without retrying an outage for every fund."""
+    try:
+        return get_fii_market_data()
+    except Exception:
+        logger.warning("Fundamentus FII data unavailable", exc_info=True)
+        return pd.DataFrame()
+
+
+def _fii_detail(ticker: str, meta: dict, table: pd.DataFrame) -> dict[str, Any] | None:
+    if ticker not in table.index:
+        return None
+    row = table.loc[ticker, ["price", "pvp", "dy", "liq2m"]].dropna().to_dict()
+    if not row:
+        return None
+    return {
+        "ticker": ticker, "available": True, "company": meta["company"],
+        "asset_class": "fii", "sector": meta["sector"], "currency": "BRL", "volume_2m": row.get("liq2m"),
+        "price": row.get("price"), "indicators": {key: row.get(key) for key in ("pvp", "dy")},
+        "source": "Fundamentus · FIIs",
+    }
 
 
 def catalog_screener_rows(asset_class: str, fields_by_class: dict[str, set[str]]) -> pd.DataFrame:

@@ -81,7 +81,7 @@ export function rankStocks<T extends Searchable>(stocks: T[], query: string, lim
   return { items: ranked.slice(0, limit).map(item => item.stock), total: ranked.length };
 }
 
-const validCustomPattern = /^[A-Z0-9][A-Z0-9.\-=+]{0,23}$/;
+const validCustomPattern = /^\^?[A-Z0-9][A-Z0-9.\-=+]{0,23}$/;
 
 export function synthesizeCustomCandidate(rawQuery: string): Omit<Sortable, "liquidity"> | null {
   const cleaned = rawQuery.trim().toUpperCase().replace(/\.SA$/, "").replace(/,/g, ".");
@@ -109,11 +109,12 @@ export function synthesizeCustomCandidate(rawQuery: string): Omit<Sortable, "liq
   if (!validCustomPattern.test(compact)) return null;
   const isB3 = /^[A-Z]{4}(?:3|4|5|6|11|31|32|33|34|35|39)$/.test(compact);
   const isFii = isB3 && compact.endsWith("11");
+  const marketOnly = compact.startsWith("^") || /(?:=F|=X|-USD)$/.test(compact);
   return {
     ticker: compact,
     company: compact,
     sector: isFii ? "FII · Fundo Imobiliário B3" : isB3 ? "Ações / BDR B3" : "Ativo Global (Yahoo Finance)",
-    asset_class: isFii ? "fii" : isB3 ? "acao_br" : "acao_us",
-    currency: isB3 ? "BRL" : "USD",
+    asset_class: isFii ? "fii" : isB3 ? "acao_br" : marketOnly ? "outros" : "acao_us",
+    currency: isB3 || ["^BVSP","BRL=X","USDBRL=X"].includes(compact) ? "BRL" : "USD",
   };
 }

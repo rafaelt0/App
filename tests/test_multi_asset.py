@@ -68,7 +68,7 @@ def test_mixed_prices_use_same_day_fx_and_distinct_treasury_buy_price(monkeypatc
         assert detail["available"] and detail["price"] == pytest.approx(106.50)
         assert detail["source"] == "Tesouro Transparente · PU Compra Manhã"
     finally:
-        for fn in (assets.get_extra_asset_fundamentals, treasury_data.get_treasury_history, portfolio_data.get_portfolio_prices, portfolio_data.get_portfolio_trade_prices):
+        for fn in (treasury_data.get_treasury_history, portfolio_data.get_portfolio_prices, portfolio_data.get_portfolio_trade_prices):
             fn.clear()
 
 

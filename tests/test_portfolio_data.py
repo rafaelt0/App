@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -56,6 +58,18 @@ def test_trade_price_fetch_uses_unadjusted_close(monkeypatch):
     pd.testing.assert_frame_equal(result, raw_close)
     assert observed["tickers"] == ("AAA.SA",)
     assert observed["auto_adjust"] is False
+
+
+def test_fixed_rate_and_ipca_models_do_not_request_historical_cdi(monkeypatch):
+    from utils import portfolio_data
+
+    def unexpected_cdi(start_date):
+        pytest.fail("no asset in this request depends on CDI")
+
+    monkeypatch.setattr(portfolio_data, "get_cdi_daily_rates", unexpected_cdi)
+    symbols = ("PRE-13", "IPCA+6")
+    prices = portfolio_data.get_portfolio_prices.__wrapped__(symbols, date.today() - timedelta(days=30))
+    assert tuple(prices.columns) == symbols and len(prices) > 1
 
 
 def test_weights_align_to_return_columns_by_ticker_not_position():

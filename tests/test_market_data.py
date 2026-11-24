@@ -1,6 +1,7 @@
 import contextlib
 import threading
 import time
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -70,6 +71,39 @@ def test_compute_target_upside_rejects_invalid_prices():
     assert compute_target_upside(0, 125) is None
     assert compute_target_upside(100, float("nan")) is None
     assert compute_target_upside(None, 125) is None
+
+
+def test_yahoo_bulk_quotes_keep_correct_symbols_and_native_units(monkeypatch):
+    def row(symbol, currency, stamp, price, provider_symbol=None):
+        return {"symbol": symbol, "response": [{"meta": {"symbol": provider_symbol or symbol, "currency": currency,
+                "regularMarketTime": stamp, "regularMarketPrice": price, "exchangeTimezoneName": "America/Sao_Paulo"}}]}
+
+    def fetch(url, *, params, **kwargs):
+        assert params["symbols"] == "BRL=X,BTC-USD,INVALID,STALE"
+        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"spark": {"result": [
+            row("BTC-USD", "USD", 1795120200, 100_000),
+            row("BRL=X", "BRL", 1795120200, 5.5),
+            row("INVALID", "USD", 1795120200, 42, provider_symbol="WRONG"),
+            row("STALE", "USD", None, 20),
+            row("UNREQUESTED", "BRL", 1795120200, 12),
+        ]}})
+
+    monkeypatch.setattr(market_data, "_fetch_public_market_data", fetch)
+    quotes = market_data.get_yahoo_quotes.__wrapped__(("BTC-USD", "BRL=X", "STALE", "INVALID"))
+    assert set(quotes) == {"BTC-USD", "BRL=X"}
+    assert quotes["BRL=X"]["currency"] == "BRL" and quotes["BRL=X"]["price"] == 5.5
+    assert quotes["BTC-USD"]["last_quote_date"] == "2026-11-19"
+
+
+def test_fundamentus_fii_feed_keeps_yield_points_and_brl_turnover(monkeypatch):
+    content = """<table id="tabelaResultado"><tr><th>Papel</th><th>Segmento</th><th>Cotação</th><th>P/VP</th>
+      <th>Dividend Yield</th><th>Liquidez</th></tr><tr><td>HGLG11</td><td>Logística</td><td>140,50</td>
+      <td>0,89</td><td>9,90%</td><td>715.027</td></tr></table>""".encode("iso-8859-1")
+    monkeypatch.setattr(market_data, "_fetch_public_market_data", lambda *args, **kwargs: SimpleNamespace(
+        raise_for_status=lambda: None, content=content))
+    table = market_data.get_fii_market_data.__wrapped__()
+    assert table.loc["HGLG11"].to_dict() == {"setor": "Logística", "price": 140.5, "pvp": .89, "dy": 9.9, "liq2m": 715_027}
+    assert table.attrs["fetched_at"].endswith("+00:00")
 
 
 def test_full_market_fetch_records_successful_fetch_time(monkeypatch):

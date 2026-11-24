@@ -15,6 +15,8 @@ def home_api(monkeypatch):
     ctx = SessionState(uid="home-test", selection=["AAA3", "BBB4"])
     universe = pd.DataFrame({"Ticker": ["AAA3", "BBB4", "CCC3", "DDD3"], "Setor": ["Banco"] * 4})
     monkeypatch.setattr(home, "get_listed_stocks", lambda: universe)
+    monkeypatch.setattr(home, "get_yahoo_quotes", lambda symbols: {})
+    monkeypatch.setattr(home, "get_extra_asset_fundamentals", lambda ticker, **kwargs: {"available": False})
     app = FastAPI()
 
     @app.middleware("http")
@@ -267,6 +269,31 @@ def test_empty_detail_source_reports_failure_not_zero_cards(home_api, monkeypatc
     response = client.post("/api/home/analyze", json={"tickers": ctx.selection, "revision": 0})
     assert response.status_code == 503 and "não retornou dados" in response.json()["detail"]
     assert "home" not in ctx.artifacts
+
+
+def test_b3_detail_falls_back_to_yahoo_with_source_and_units(home_api, monkeypatch):
+    client, ctx, _ = home_api
+    monkeypatch.setattr(home, "get_fundamentus_data", lambda tickers: detail_frame())
+    monkeypatch.setattr(home, "get_sector_peers", pd.DataFrame)
+    monkeypatch.setattr(home, "clear_fundamentus_cache", lambda: 0)
+    monkeypatch.setattr(home, "get_market_target_data", lambda ticker: {})
+    monkeypatch.setattr(home, "get_extra_asset_fundamentals", lambda ticker, **kwargs: {
+        "available": True, "asset_class": "acao_br", "source": "Yahoo Finance", "currency": "BRL",
+        "price": 42, "indicators": {"pl": 12.4, "roe": 8.5},
+    })
+
+    response = client.post("/api/home/analyze", json={"tickers": ctx.selection, "revision": 0})
+
+    assert response.status_code == 200
+    result = response.json()
+    primary, fallback = result["companies"]
+    assert primary["source"] == "Fundamentus"
+    assert fallback["source"] == "Yahoo Finance"
+    assert fallback["market"]["price"] == 42
+    assert fallback["indicators"]["pl"] == 12.4 and fallback["indicators"]["roe"] == 8.5
+    assert result["missing_tickers"] == []
+    exported = client.get(f"/api/home/{result['id']}/fundamentals.csv")
+    assert "Yahoo Finance" in exported.text
 
 
 def test_universe_liquidity_maps_brazilian_values_and_nulls_missing_tickers(home_api, monkeypatch):
