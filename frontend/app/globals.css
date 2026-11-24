@@ -475,6 +475,15 @@ tr.is-clickable { cursor: pointer; }
 .param-group { display: grid; gap: 7px; }
 .param-group > .pane-sub, .param-fields > .pane-sub { padding: 4px 0 0; }
 .param-hint { color: var(--text-3); font: 12px/1.4 var(--sans); }
+.capital-input { display: grid; gap: 4px; min-width: 0; }
+.capital-input-control { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; border: 1px solid var(--line-3); border-radius: 2px; background: var(--input); }
+.capital-input-control:has(input[aria-invalid="true"]) { border-color: var(--neg); }
+.capital-input-control:focus-within { outline: 1px solid var(--amber); outline-offset: 1px; }
+.capital-input-prefix { padding-left: 8px; color: var(--text-2); }
+.capital-input-control input { min-width: 0; height: 36px; border: 0; background: transparent; font-size: 14px; }
+.capital-input-control input:disabled { color: var(--text-3); }
+.capital-input-additions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.capital-input-additions button { min-width: 0; min-height: 32px; padding-inline: 4px; background: var(--bar); }
 .param-pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .param-run { display: grid; gap: 6px; padding-top: 4px; border-top: 1px solid var(--line); }
 .param-run button { width: 100%; height: 30px; }
@@ -502,6 +511,8 @@ tr.is-clickable { cursor: pointer; }
 @media (max-width: 900px) {
   .split { grid-template-columns: minmax(0, 1fr); }
   .param-run { position: sticky; bottom: 0; z-index: 5; padding: 8px 0; background: var(--pane); }
+  .capital-input-control input { height: 42px; font-size: 16px; }
+  .capital-input-additions button { min-height: 44px; }
 }
 .plain-list { display: grid; gap: 5px; margin: 0; padding: 0 0 0 14px; color: var(--text-2); font-size: 12px; }
 .plain-list li::marker { color: var(--amber); }
