@@ -38,7 +38,9 @@
     "company": "Bradesco",
     "tickers": [
       "BBDC3",
-      "BBDC4"
+      "BBDC4",
+      "B5MB11",
+      "IMBB11"
     ],
     "commonsFile": "Banco Bradesco logo (horizontal).png",
     "asset": "bradesco.png",
@@ -3208,7 +3210,8 @@
   {
     "company": "JPMorgan Chase & Co.",
     "tickers": [
-      "JPM"
+      "JPM",
+      "JEPI"
     ],
     "asset": "jpm.svg",
     "author": "JPMorgan Chase & Co.",
@@ -4003,7 +4006,12 @@
   {
     "company": "Itaú Asset",
     "tickers": [
-      "RURA11"
+      "RURA11",
+      "B5P211",
+      "DIVO11",
+      "IB5M11",
+      "IMAB11",
+      "IRFM11"
     ],
     "asset": "rura11.svg",
     "author": "Itaú Asset",
@@ -4194,12 +4202,686 @@
       "MXRF11",
       "XPCI11",
       "XPLG11",
-      "XPML11"
+      "XPML11",
+      "GOLD11",
+      "NASD11",
+      "XFIX11"
     ],
     "asset": "xp-asset.svg",
     "author": "XP Asset",
     "license": "Trademark; no reuse license stated by the asset source",
     "source": "https://brapi.dev/docs/acoes/list",
     "sourceAssetUrl": "https://icons.brapi.dev/icons/XPML11.svg"
+  },
+  {
+    "company": "Realty Income Corporation",
+    "tickers": [
+      "O"
+    ],
+    "asset": "o.png",
+    "author": "Realty Income Corporation",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/O.png"
+  },
+  {
+    "company": "Prologis Inc.",
+    "tickers": [
+      "PLD"
+    ],
+    "asset": "pld.png",
+    "author": "Prologis Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/PLD.png"
+  },
+  {
+    "company": "American Tower Corporation",
+    "tickers": [
+      "AMT"
+    ],
+    "asset": "amt.png",
+    "author": "American Tower Corporation",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/AMT.png"
+  },
+  {
+    "company": "Equinix Inc.",
+    "tickers": [
+      "EQIX"
+    ],
+    "asset": "eqix.png",
+    "author": "Equinix Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/EQIX.png"
+  },
+  {
+    "company": "Welltower Inc.",
+    "tickers": [
+      "WELL"
+    ],
+    "asset": "well.png",
+    "author": "Welltower Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/WELL.png"
+  },
+  {
+    "company": "Simon Property Group Inc.",
+    "tickers": [
+      "SPG"
+    ],
+    "asset": "spg.png",
+    "author": "Simon Property Group Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/SPG.png"
+  },
+  {
+    "company": "Public Storage",
+    "tickers": [
+      "PSA"
+    ],
+    "asset": "psa.png",
+    "author": "Public Storage",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/PSA.png"
+  },
+  {
+    "company": "Digital Realty Trust Inc.",
+    "tickers": [
+      "DLR"
+    ],
+    "asset": "dlr.png",
+    "author": "Digital Realty Trust Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/DLR.png"
+  },
+  {
+    "company": "Crown Castle Inc.",
+    "tickers": [
+      "CCI"
+    ],
+    "asset": "cci.png",
+    "author": "Crown Castle Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/CCI.png"
+  },
+  {
+    "company": "VICI Properties Inc.",
+    "tickers": [
+      "VICI"
+    ],
+    "asset": "vici.png",
+    "author": "VICI Properties Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/VICI.png"
+  },
+  {
+    "company": "Extra Space Storage Inc.",
+    "tickers": [
+      "EXR"
+    ],
+    "asset": "exr.png",
+    "author": "Extra Space Storage Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/EXR.png"
+  },
+  {
+    "company": "AvalonBay Communities Inc.",
+    "tickers": [
+      "AVB"
+    ],
+    "asset": "avb.svg",
+    "author": "AvalonBay Communities Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/avalonbay-communities--big.svg"
+  },
+  {
+    "company": "Equity Residential",
+    "tickers": [
+      "EQR"
+    ],
+    "asset": "eqr.png",
+    "author": "Equity Residential",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/EQR.png"
+  },
+  {
+    "company": "Invitation Homes Inc.",
+    "tickers": [
+      "INVH"
+    ],
+    "asset": "invh.png",
+    "author": "Invitation Homes Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/INVH.png"
+  },
+  {
+    "company": "Alexandria Real Estate Equities",
+    "tickers": [
+      "ARE"
+    ],
+    "asset": "are.svg",
+    "author": "Alexandria Real Estate Equities",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/alexandria-real-estate-equities--big.svg"
+  },
+  {
+    "company": "Ventas Inc.",
+    "tickers": [
+      "VTR"
+    ],
+    "asset": "vtr.svg",
+    "author": "Ventas Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/ventas--big.svg"
+  },
+  {
+    "company": "Mid-America Apartment Communities",
+    "tickers": [
+      "MAA"
+    ],
+    "asset": "maa.png",
+    "author": "Mid-America Apartment Communities",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/MAA.png"
+  },
+  {
+    "company": "Essex Property Trust Inc.",
+    "tickers": [
+      "ESS"
+    ],
+    "asset": "ess.png",
+    "author": "Essex Property Trust Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/ESS.png"
+  },
+  {
+    "company": "Iron Mountain Incorporated",
+    "tickers": [
+      "IRM"
+    ],
+    "asset": "irm.png",
+    "author": "Iron Mountain Incorporated",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/IRM.png"
+  },
+  {
+    "company": "SBA Communications Corp.",
+    "tickers": [
+      "SBAC"
+    ],
+    "asset": "sbac.png",
+    "author": "SBA Communications Corp.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/SBAC.png"
+  },
+  {
+    "company": "Weyerhaeuser Company",
+    "tickers": [
+      "WY"
+    ],
+    "asset": "wy.png",
+    "author": "Weyerhaeuser Company",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/WY.png"
+  },
+  {
+    "company": "Kimco Realty Corporation",
+    "tickers": [
+      "KIM"
+    ],
+    "asset": "kim.png",
+    "author": "Kimco Realty Corporation",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/KIM.png"
+  },
+  {
+    "company": "Regency Centers Corporation",
+    "tickers": [
+      "REG"
+    ],
+    "asset": "reg.png",
+    "author": "Regency Centers Corporation",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/REG.png"
+  },
+  {
+    "company": "Federal Realty Investment Trust",
+    "tickers": [
+      "FRT"
+    ],
+    "asset": "frt.png",
+    "author": "Federal Realty Investment Trust",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/FRT.png"
+  },
+  {
+    "company": "BXP Inc. (Boston Properties)",
+    "tickers": [
+      "BXP"
+    ],
+    "asset": "bxp.png",
+    "author": "BXP Inc. (Boston Properties)",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/BXP.png"
+  },
+  {
+    "company": "Gaming and Leisure Properties",
+    "tickers": [
+      "GLPI"
+    ],
+    "asset": "glpi.svg",
+    "author": "Gaming and Leisure Properties",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/gaming-and-leisure-properties--big.svg"
+  },
+  {
+    "company": "STAG Industrial Inc.",
+    "tickers": [
+      "STAG"
+    ],
+    "asset": "stag.png",
+    "author": "STAG Industrial Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/STAG.png"
+  },
+  {
+    "company": "NNN REIT Inc.",
+    "tickers": [
+      "NNN"
+    ],
+    "asset": "nnn.png",
+    "author": "NNN REIT Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/NNN.png"
+  },
+  {
+    "company": "W. P. Carey Inc.",
+    "tickers": [
+      "WPC"
+    ],
+    "asset": "wpc.svg",
+    "author": "W. P. Carey Inc.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/w-p-carey--big.svg"
+  },
+  {
+    "company": "Agree Realty Corporation",
+    "tickers": [
+      "ADC"
+    ],
+    "asset": "adc.svg",
+    "author": "Agree Realty Corporation",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/agree-realty-depositary-shares-each-representing-1-1000th-of-a-4250-series-a-cumulative-redeemable-preferred-stock--big.svg"
+  },
+  {
+    "company": "AGNC Investment Corp.",
+    "tickers": [
+      "AGNC"
+    ],
+    "asset": "agnc.png",
+    "author": "AGNC Investment Corp.",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/AGNC.png"
+  },
+  {
+    "company": "Annaly Capital Management",
+    "tickers": [
+      "NLY"
+    ],
+    "asset": "nly.svg",
+    "author": "Annaly Capital Management",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/annaly-capital-management--big.svg"
+  },
+  {
+    "company": "BTG Pactual Asset Management",
+    "tickers": [
+      "DEBB11"
+    ],
+    "asset": "debb11.svg",
+    "author": "BTG Pactual Asset Management",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/DEBB11.svg"
+  },
+  {
+    "company": "Hashdex",
+    "tickers": [
+      "BITH11",
+      "HASH11"
+    ],
+    "asset": "hashdex.svg",
+    "author": "Hashdex",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/HASH11.svg"
+  },
+  {
+    "company": "Investo",
+    "tickers": [
+      "ALUG11",
+      "LFTB11",
+      "LFTS11",
+      "NTNS11",
+      "WRLD11"
+    ],
+    "asset": "investo.svg",
+    "author": "Investo",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/LFTS11.svg"
+  },
+  {
+    "company": "iShares",
+    "tickers": [
+      "AGG",
+      "BOVA11",
+      "EMB",
+      "GOVT",
+      "HYG",
+      "IAU",
+      "IEI",
+      "IEF",
+      "IVV",
+      "IVVB11",
+      "LQD",
+      "REET",
+      "SGOV",
+      "SHY",
+      "SLV",
+      "SMAL11",
+      "STIP",
+      "TFLO",
+      "TIP",
+      "TLH",
+      "TLT",
+      "EWZ"
+    ],
+    "asset": "ishares.svg",
+    "author": "iShares",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/BOVA11.svg"
+  },
+  {
+    "company": "Mirae Asset Global Investments",
+    "tickers": [
+      "FIXA11"
+    ],
+    "asset": "mirae-asset.png",
+    "author": "Mirae Asset Global Investments",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.asifma.org/members/mirae-asset-global-investments/",
+    "sourceAssetUrl": "https://www.asifma.org/wp-content/uploads/2023/12/mirae-logo.png"
+  },
+  {
+    "company": "Vanguard",
+    "tickers": [
+      "BND",
+      "BNDX",
+      "VCIT",
+      "VCSH",
+      "VEA",
+      "VGIT",
+      "VGLT",
+      "VGSH",
+      "VNQ",
+      "VOO",
+      "VT",
+      "VTI",
+      "VWO",
+      "VYM"
+    ],
+    "asset": "vanguard.svg",
+    "author": "Vanguard",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/vanguard--big.svg"
+  },
+  {
+    "company": "SPDR",
+    "tickers": [
+      "BIL",
+      "GLD",
+      "SPY",
+      "XLRE"
+    ],
+    "asset": "spdr.png",
+    "author": "State Street Global Advisors",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://site.financialmodelingprep.com/",
+    "sourceAssetUrl": "https://financialmodelingprep.com/image-stock/SPY.png"
+  },
+  {
+    "company": "Charles Schwab",
+    "tickers": [
+      "SCHD",
+      "SCHH"
+    ],
+    "asset": "schwab.svg",
+    "author": "Charles Schwab",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/schwab--big.svg"
+  },
+  {
+    "company": "Invesco",
+    "tickers": [
+      "QQQ"
+    ],
+    "asset": "invesco.svg",
+    "author": "Invesco",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/invesco--big.svg"
+  },
+  {
+    "company": "WisdomTree",
+    "tickers": [
+      "USFR"
+    ],
+    "asset": "wisdomtree.svg",
+    "author": "WisdomTree",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/wisdomtree--big.svg"
+  },
+  {
+    "company": "Tesouro Direto",
+    "tickers": [
+      "TD-IPCA-2035",
+      "TD-IPCA-2040",
+      "TD-PREFIXADO-2029",
+      "TD-PREFIXADO-2032",
+      "TD-SELIC-2029",
+      "TD-SELIC-2031",
+      "TESOURO-EDUCA+",
+      "TESOURO-IPCA",
+      "TESOURO-IPCA-2029",
+      "TESOURO-IPCA-2035",
+      "TESOURO-IPCA-2045",
+      "TESOURO-IPCA-2050",
+      "TESOURO-PRE",
+      "TESOURO-PRE-2027",
+      "TESOURO-PRE-2031",
+      "TESOURO-RENDA+",
+      "TESOURO-SELIC",
+      "TESOURO-SELIC-2027",
+      "TESOURO-SELIC-2029"
+    ],
+    "asset": "tesouro-direto.png",
+    "author": "Tesouro Nacional",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://mwm.ai/apps/tesouro-direto/1331929575",
+    "sourceAssetUrl": "https://fastly.mwm-storage.mwmcdn.com/raw_files/4fae9a84-d1a8-4262-9d31-5e1eaed79f7c?height=128&format=png"
+  },
+  {
+    "company": "Taxas de referência",
+    "tickers": [
+      "CDI",
+      "SELIC"
+    ],
+    "asset": "reference-rate.svg",
+    "author": "Lucide Icons and Contributors",
+    "license": "ISC",
+    "source": "https://lucide.dev/icons/coins",
+    "sourceAssetUrl": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/coins.svg"
+  },
+  {
+    "company": "Renda fixa bancária",
+    "tickers": [
+      "CDB-100CDI",
+      "CDB-105CDI",
+      "CDB-110CDI",
+      "CDB-115CDI",
+      "CDB-120CDI",
+      "LCA-95CDI",
+      "LCI-90CDI",
+      "LCI-95CDI"
+    ],
+    "asset": "bank-deposit.svg",
+    "author": "Lucide Icons and Contributors",
+    "license": "ISC",
+    "source": "https://lucide.dev/icons/banknote",
+    "sourceAssetUrl": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/banknote.svg"
+  },
+  {
+    "company": "Renda fixa sem emissor especificado",
+    "tickers": [
+      "CRA-CDI+2",
+      "CRI-CDI+2",
+      "IPCA+6",
+      "IPCA+7",
+      "IPCA+8",
+      "PRE-12",
+      "PRE-13",
+      "PRE-14"
+    ],
+    "asset": "fixed-income.svg",
+    "author": "Lucide Icons and Contributors",
+    "license": "ISC",
+    "source": "https://lucide.dev/icons/receipt",
+    "sourceAssetUrl": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/receipt.svg"
+  },
+  {
+    "company": "Poupança",
+    "tickers": [
+      "POUPANCA"
+    ],
+    "asset": "savings.svg",
+    "author": "Lucide Icons and Contributors",
+    "license": "ISC",
+    "source": "https://lucide.dev/icons/vault",
+    "sourceAssetUrl": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/vault.svg"
+  },
+  {
+    "company": "Câmbio USD/BRL",
+    "tickers": [
+      "USDBRL=X",
+      "BRL=X"
+    ],
+    "asset": "currency-exchange.svg",
+    "author": "Lucide Icons and Contributors",
+    "license": "ISC",
+    "source": "https://lucide.dev/icons/arrow-left-right",
+    "sourceAssetUrl": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/arrow-left-right.svg"
+  },
+  {
+    "company": "Bitcoin",
+    "tickers": [
+      "BTC-USD"
+    ],
+    "asset": "bitcoin.png",
+    "author": "Bitcoin",
+    "license": "Network artwork; no reuse license stated by the asset source",
+    "source": "https://www.coingecko.com/en/coins/bitcoin",
+    "sourceAssetUrl": "https://assets.coingecko.com/coins/images/1/standard/bitcoin.png"
+  },
+  {
+    "company": "Ethereum",
+    "tickers": [
+      "ETH-USD"
+    ],
+    "asset": "ethereum.png",
+    "author": "Ethereum",
+    "license": "Network artwork; no reuse license stated by the asset source",
+    "source": "https://www.coingecko.com/en/coins/ethereum",
+    "sourceAssetUrl": "https://assets.coingecko.com/coins/images/279/standard/ethereum.png"
+  },
+  {
+    "company": "Solana",
+    "tickers": [
+      "SOL-USD"
+    ],
+    "asset": "solana.png",
+    "author": "Solana",
+    "license": "Network artwork; no reuse license stated by the asset source",
+    "source": "https://www.coingecko.com/en/coins/solana",
+    "sourceAssetUrl": "https://assets.coingecko.com/coins/images/4128/standard/solana.png"
+  },
+  {
+    "company": "Ouro futuro",
+    "tickers": [
+      "GC=F"
+    ],
+    "asset": "gold-futures.svg",
+    "author": "TradingView",
+    "license": "Instrument icon; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/metal/gold.svg"
+  },
+  {
+    "company": "Prata futura",
+    "tickers": [
+      "SI=F"
+    ],
+    "asset": "silver-futures.svg",
+    "author": "TradingView",
+    "license": "Instrument icon; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/metal/silver.svg"
+  },
+  {
+    "company": "Petróleo Brent futuro",
+    "tickers": [
+      "BZ=F"
+    ],
+    "asset": "brent-futures.svg",
+    "author": "TradingView",
+    "license": "Instrument icon; no reuse license stated by the asset source",
+    "source": "https://www.tradingview.com/",
+    "sourceAssetUrl": "https://s3-symbol-logo.tradingview.com/crude-oil.svg"
   }
 ]

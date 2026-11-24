@@ -1,5 +1,6 @@
 "use client";
 import { useRef } from "react";
+import StockLogo from "../../components/StockLogo";
 import { formatCompactValue, formatValue } from "../../components/ui";
 import type { ScreenerColumn, Sort } from "../../lib/screener";
 
@@ -51,7 +52,9 @@ export default function ScreenerTable({ columns, rows, sort, onSort, selectedKey
     const comparing = inSelection.size > (inSelection.has(ticker) ? 1 : 0);
     return <tr key={ticker} data-ticker={ticker} className={`scr-row${selected ? " selected-row" : ""}`} onClick={() => onSelect(ticker)}>
       <th scope="row"><div className="scr-stock"><button type="button" className="scr-row-select row-btn" tabIndex={index === focusIndex ? 0 : -1} aria-label={`Selecionar linha de ${ticker}${inSelection.has(ticker) ? " (já está na seleção)" : ""}`} aria-pressed={selected}>
-        <span className="scr-mark" aria-hidden="true">{inSelection.has(ticker) ? "✓" : selected ? "▸" : ""}</span><span className="scr-ticker">{ticker}</span>
+        <span className="scr-mark" aria-hidden="true">{inSelection.has(ticker) ? "✓" : selected ? "▸" : ""}</span>
+        <StockLogo ticker={ticker} company={ticker} size={18} />
+        <span className="scr-ticker">{ticker}</span>
       </button><button type="button" className="scr-analyze" tabIndex={index === focusIndex ? 0 : -1} disabled={working}
         aria-label={comparing ? `Comparar seleção com ${ticker}` : `Analisar ${ticker}`}
         onClick={event => { event.stopPropagation(); onSelect(ticker); onAnalyze(ticker); }}>{comparing ? "Comparar" : "Analisar"}</button></div></th>

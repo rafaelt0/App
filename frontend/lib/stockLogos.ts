@@ -9,5 +9,5 @@ for (const issuer of issuers) {
 }
 
 export function stockLogoForTicker(ticker: string): string | undefined {
-  return logoByTicker.get(ticker.trim().toUpperCase());
+  return logoByTicker.get(ticker.trim().toUpperCase().replace(/\.SA$/, ""));
 }

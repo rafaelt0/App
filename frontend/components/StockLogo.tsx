@@ -28,7 +28,7 @@ export default function StockLogo({ ticker, company, size = 32 }: StockLogoProps
       aria-hidden="true"
     >
       {showImage && src
-        ? <img className={styles.image} src={src} alt="" onError={() => setFailedSource(src)} />
+        ? <img className={styles.image} src={src} alt="" loading="lazy" onError={() => setFailedSource(src)} />
         : <span className={styles.initials}>{companyInitials(company, ticker)}</span>}
     </span>
   );
