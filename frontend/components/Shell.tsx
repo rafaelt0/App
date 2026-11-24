@@ -147,7 +147,7 @@ function CommandSearch({ onFlash, compact }: { onFlash: (flash: Flash) => void; 
     const removing = before.includes(ticker);
     if (!removing && before.length >= MAX_SELECTION) { onFlash({ text: SELECTION_FULL_MESSAGE, tone: "negative" }); return; }
     busy.current = true;
-    setQuery(""); setActive(0); setOpen(false);
+    setQuery(""); setActive(0);
     try {
       const updated = await setSelection(current => removing ? current.filter(item => item !== ticker) : current.includes(ticker) ? [...current] : [...current, ticker]);
       onFlash({ text: removing ? `${ticker} removida da seleção.` : `${ticker} adicionada à seleção (${updated.selection.length}/${MAX_SELECTION}).`, tone: "positive", undo: { tickers: before, revision: updated.revision } });

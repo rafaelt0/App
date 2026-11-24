@@ -67,8 +67,7 @@ export default function StockPicker({ selection, action, disabled, onChoose }: P
   }, [ordered, query, category, remote, selection, session?.watchlist]);
 
   const active = Math.min(index, matches.length - 1);
-  const visible = open && !disabled;
-  const expanded = visible && matches.length > 0;
+  const expanded = open && matches.length > 0;
 
   useEffect(() => {
     function focus() { input.current?.focus(); input.current?.select(); }
@@ -84,11 +83,15 @@ export default function StockPicker({ selection, action, disabled, onChoose }: P
   }
 
   function choose(stock: Stock) {
+    if (disabled) return;
     upsertStocks([stock]);
-    setOpen(false);
     setIndex(-1);
     setQuery("");
     onChoose(stock.ticker);
+  }
+
+  function openPicker() {
+    if (!disabled) setOpen(true);
   }
 
   return <div className="stock-picker" onBlur={event => {
@@ -99,24 +102,25 @@ export default function StockPicker({ selection, action, disabled, onChoose }: P
       aria-autocomplete="list" aria-expanded={expanded} aria-controls={expanded ? `${id}-matches` : undefined}
       aria-activedescendant={expanded && active >= 0 ? `${id}-option-${active}` : undefined}
       placeholder="Código, empresa ou classe, ex. PETR4, AAPL, HGLG11, O, TLT, CDI" value={query}
-      onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
+      onFocus={openPicker} onClick={openPicker}
       onChange={event => { setQuery(event.target.value); setOpen(true); setIndex(-1); }}
       onKeyDown={event => {
+        if (event.key === "Escape" && open) { event.preventDefault(); setOpen(false); setIndex(-1); return; }
         if (disabled) return;
-        if (event.key === "ArrowDown" && matches.length) { event.preventDefault(); move(visible ? active + 1 : 0); }
+        if (event.key === "ArrowDown" && matches.length) { event.preventDefault(); move(open ? active + 1 : 0); }
         else if (event.key === "ArrowUp" && matches.length) { event.preventDefault(); move(active < 0 ? matches.length - 1 : active - 1); }
         else if (event.key === "Enter" && expanded && (active >= 0 || query.trim())) {
           event.preventDefault();
           choose(matches[Math.max(0, active)]);
-        } else if (event.key === "Escape" && visible) { event.preventDefault(); setOpen(false); setIndex(-1); }
+        }
       }} />
-    {visible && <div className="stock-picker-dropdown">
+    {open && <div className="stock-picker-dropdown">
       <div className="picker-cats" role="group" aria-label="Filtrar por classe de ativo">
         {ASSET_CLASS_FILTERS.map(item => <button type="button" key={item.key || "all"} aria-pressed={category === item.key}
           onMouseDown={event => event.preventDefault()} onClick={() => { setCategory(item.key); setIndex(-1); input.current?.focus(); }}>{item.label}</button>)}
       </div>
       {expanded ? <ul ref={list} className="stock-picker-options" id={`${id}-matches`} role="listbox" aria-label="Ativos encontrados">
-        {matches.map((stock, position) => <li key={stock.ticker} id={`${id}-option-${position}`} role="option" aria-selected={active === position}
+        {matches.map((stock, position) => <li key={stock.ticker} id={`${id}-option-${position}`} role="option" aria-selected={active === position} aria-disabled={disabled || undefined}
           onMouseDown={event => event.preventDefault()} onClick={() => choose(stock)}>
           <StockLogo ticker={stock.ticker} company={stock.company} size={24} />
           <span className="stock-picker-company"><b>{stock.ticker} <small className="asset-badge">{assetBadge(stock)}</small></b><span>{stock.company || stock.sector || "Ativo"}</span></span>
