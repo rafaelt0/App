@@ -29,8 +29,10 @@ import pandas as pd
 import requests
 
 from utils.cache import cache_data
+from utils import fund_data
+from utils.equity_history import get_equity_history
 from utils.market_data import get_fii_market_data, get_listed_stocks, get_yahoo_info, get_yahoo_quotes
-from utils.treasury_data import TREASURY_SHARE_STEP, TREASURY_TITLES, latest_treasury_quote
+from utils.treasury_data import TREASURY_SHARE_STEP, TREASURY_TITLES, latest_treasury_detail, latest_treasury_quote
 
 logger = logging.getLogger(__name__)
 
@@ -385,6 +387,33 @@ _DYNAMIC_ASSETS: dict[str, dict[str, Any]] = {}
 
 _B3_STOCK_PATTERN = re.compile(r"^[A-Z]{4}(?:3|4|5|6|11|31|32|33|34|35|39)$")
 _VALID_TICKER_PATTERN = re.compile(r"^\^?[A-Z0-9][A-Z0-9.\-=+]{0,23}$")
+# Yahoo exchange codes (and their display names) for US listings; every other venue is a global listing.
+_US_EQUITY_EXCHANGES = frozenset({
+    "NYQ", "NYS", "NMS", "NGM", "NCM", "ASE", "PCX", "BTS", "PNK", "OQX", "OQB", "OQS",
+    "NYSE", "NASDAQ", "NYSEARCA", "NYSE ARCA", "AMEX", "NYSE AMERICAN", "BATS",
+    "NASDAQGS", "NASDAQGM", "NASDAQCM", "OTC",
+})
+# Foreign venue suffix such as 7203.T (Tokyo) or VOD.L (London); .SA is B3 and handled earlier.
+_FOREIGN_LISTING_PATTERN = re.compile(r"\.[A-Z]{1,3}$")
+
+
+def _is_us_equity_listing(quote: dict[str, Any]) -> bool:
+    """True only when the payload names a USD quote on a US venue.
+
+    Missing metadata keeps the previous behaviour (US equity) so hand-built
+    quotes and dynamic entries without exchange data are not reclassified.
+    """
+    currency = str(quote.get("currency") or "").strip().upper()
+    exchange = str(quote.get("exchange") or "").strip().upper()
+    if currency and currency != "USD":
+        return False
+    if exchange and exchange not in _US_EQUITY_EXCHANGES:
+        return False
+    return True
+
+
+def _is_foreign_listing(ticker: str) -> bool:
+    return bool(_FOREIGN_LISTING_PATTERN.search(ticker)) and not ticker.upper().endswith(".SA")
 
 
 def register_dynamic_asset(entry: dict[str, Any]) -> dict[str, Any]:
@@ -511,9 +540,25 @@ def is_synthetic_fixed_income(symbol_or_ticker: str) -> bool:
     return parse_fixed_income_asset(cleaned) is not None
 
 
+def _is_quoted_instrument(symbol: str) -> bool:
+    """Indices, FX, futures, crypto and modeled titles are quoted, not traded in share lots."""
+    cleaned = str(symbol or "").strip().upper()
+    return (cleaned.startswith("^") or cleaned.endswith(("=F", "=X"))
+            or cleaned.endswith("-USD") or "-USD" in cleaned)
+
+
 def supports_share_allocation(symbol_or_ticker: str) -> bool:
-    """Whether share-count allocation and purchase estimates apply to this asset."""
-    return not is_synthetic_fixed_income(symbol_or_ticker) and asset_metadata(symbol_or_ticker)["asset_class"] != "outros"
+    """Whether share-count allocation and purchase estimates apply to this asset.
+
+    Foreign exchange-listed equities are `outros` (Global) but still trade in
+    shares; only quoted instruments such as indices, FX, futures and crypto do not.
+    """
+    if is_synthetic_fixed_income(symbol_or_ticker):
+        return False
+    meta = asset_metadata(symbol_or_ticker)
+    if meta["asset_class"] != "outros":
+        return True
+    return not _is_quoted_instrument(meta.get("yahoo_symbol") or symbol_or_ticker)
 
 
 def asset_metadata(ticker: str, b3_frame: pd.DataFrame | None = None) -> dict[str, Any]:
@@ -558,7 +603,8 @@ def asset_metadata(ticker: str, b3_frame: pd.DataFrame | None = None) -> dict[st
             "currency": "BRL",
             "yahoo_symbol": f"{canonical}.SA",
         }
-    other_market = canonical.startswith("^") or canonical.endswith(("=F", "=X", "-USD"))
+    other_market = (canonical.startswith("^") or canonical.endswith(("=F", "=X", "-USD"))
+                    or _is_foreign_listing(canonical))
     return {
         "ticker": canonical,
         "company": canonical,
@@ -596,16 +642,66 @@ def provider_symbol(ticker: str, b3_universe: set[str] | None = None) -> str:
     return canonical
 
 
-def is_usd_symbol(symbol: str) -> bool:
-    """Return True when a Yahoo symbol is natively priced in USD and should convert to BRL."""
+# Yahoo exchange suffixes whose quotes are not in US dollars. The suffix is the only
+# reliable signal when a searched asset is not registered in this process yet, because
+# asset_metadata() falls back to USD for unknown tickers.
+_FOREIGN_SUFFIX_CURRENCIES = {
+    ".T": "JPY",
+    ".SW": "CHF",
+    ".TO": "CAD",
+    ".V": "CAD",
+    ".AX": "AUD",
+    ".PA": "EUR",
+    ".AS": "EUR",
+    ".DE": "EUR",
+    ".F": "EUR",
+    ".MI": "EUR",
+    ".MC": "EUR",
+    ".BR": "EUR",
+    ".HE": "EUR",
+    ".IR": "EUR",
+    ".LS": "EUR",
+    ".VI": "EUR",
+    ".L": "GBP",
+    ".HK": "HKD",
+    ".SI": "SGD",
+    ".KS": "KRW",
+    ".KQ": "KRW",
+    ".NS": "INR",
+    ".BO": "INR",
+    ".SS": "CNY",
+    ".SZ": "CNY",
+    ".TW": "TWD",
+    ".MX": "MXN",
+}
+
+
+def asset_currency(symbol: str) -> str:
+    """Return the native ISO currency of a Yahoo symbol; BRL when it already trades in reais."""
     cleaned = str(symbol or "").strip().upper()
+    if not cleaned:
+        return "BRL"
     if cleaned.endswith(".SA") or cleaned in {"BRL=X", "USDBRL=X", "^BVSP"}:
-        return False
+        return "BRL"
     if is_synthetic_fixed_income(cleaned):
         spec = parse_fixed_income_asset(cleaned)
-        return bool(spec and spec.get("currency") == "USD")
+        return str((spec or {}).get("currency") or "BRL").upper()
     meta = asset_metadata(cleaned)
-    return meta.get("currency", "USD") == "USD"
+    reported = str(meta.get("currency") or "").strip()
+    # Yahoo lists London shares in pence, not pounds; never scale them by the GBP rate.
+    if reported in {"GBp", "GBX"}:
+        return "GBX"
+    suffix = "." + cleaned.rsplit(".", 1)[-1] if "." in cleaned else None
+    suffix_currency = _FOREIGN_SUFFIX_CURRENCIES.get(suffix)
+    if suffix_currency == "GBP":
+        # Without reported metadata, a .L quote is assumed to be pence and excluded.
+        return "GBP" if reported == "GBP" else "GBX"
+    return suffix_currency or reported.upper() or "USD"
+
+
+def is_usd_symbol(symbol: str) -> bool:
+    """Return True when a Yahoo symbol is natively priced in USD and should convert to BRL."""
+    return asset_currency(symbol) == "USD"
 
 
 def is_valid_asset_ticker(ticker: str, b3_universe: set[str] | None = None) -> bool:
@@ -805,9 +901,13 @@ def _classify_yahoo_quote(quote: dict[str, Any]) -> dict[str, Any] | None:
         elif qtype == "EQUITY" and re.search(r"\bREITS?\b", description):
             asset_class = "reit"
             sector = f"REIT · {sector or 'Imobiliário EUA'}"
-        elif qtype == "EQUITY":
+        elif qtype == "EQUITY" and _is_us_equity_listing(quote):
             asset_class = "acao_us"
             sector = f"{sector} (EUA)" if sector else "Ações Americanas (EUA)"
+        elif qtype == "EQUITY":
+            # Tokyo, London, Toronto and other venues are global listings, never US equities.
+            asset_class = "outros"
+            sector = f"{sector} · Global" if sector else "Ações Internacionais (Global)"
         else:
             asset_class = "outros"
             sector = sector or "Criptoativos, moedas e índices"
@@ -866,6 +966,63 @@ def _finite_num(val: Any) -> float | None:
         return f if math.isfinite(f) else None
     except (TypeError, ValueError):
         return None
+
+
+def _safe_yahoo_info(symbol: str) -> dict[str, Any]:
+    """Shared Yahoo payload or {} — a failed lookup never blocks the quote."""
+    try:
+        return get_yahoo_info(symbol) or {}
+    except Exception:
+        logger.warning("Yahoo Finance info unavailable for %s", symbol, exc_info=True)
+        return {}
+
+
+def _quote_metadata(symbol: str, info: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Explicit quote unit and the conventions Yahoo actually publishes.
+
+    Indices are quoted in points, never currency. FX pairs expose the base/quote
+    convention, crypto and futures their own volume window, and futures the
+    contract expiry only when Yahoo returns it.
+    """
+    info = info if isinstance(info, dict) else {}
+    upper = str(symbol or "").upper()
+    pair = None
+    if upper.endswith("=X"):
+        code = upper[:-2]
+        if len(code) == 6 and code.isalpha():
+            pair = f"{code[:3]}/{code[3:]}"
+        elif len(code) == 3 and code.isalpha():
+            pair = f"USD/{code}"
+    volume_24h = _finite_num(info.get("volume24Hr"))
+    if volume_24h is not None and volume_24h <= 0:
+        volume_24h = None
+    session_volume = _finite_num(info.get("regularMarketVolume")) or _finite_num(info.get("volume"))
+    if session_volume is not None and session_volume <= 0:
+        session_volume = None
+    contract = None
+    if upper.endswith("=F"):
+        expiry = str(info.get("expireIsoDate") or "").strip()[:10] or None
+        if expiry is None:
+            epoch = _finite_num(info.get("expireDate"))
+            if epoch is not None and epoch > 0:
+                try:
+                    expiry = dt.datetime.fromtimestamp(epoch, dt.timezone.utc).date().isoformat()
+                except (OSError, OverflowError, ValueError):
+                    expiry = None
+        contract = {
+            "symbol": str(info.get("underlyingSymbol") or "").strip() or None,
+            "expiry": expiry,
+            "unit": str(info.get("contractUnit") or info.get("contractSize") or "").strip() or None,
+            "open_interest": _finite_num(info.get("openInterest")),
+        }
+    return {
+        "price_unit": "points" if upper.startswith("^") else "money",
+        "quote_pair": pair,
+        "volume_24h": volume_24h,
+        "session_volume": session_volume,
+        "volume_window": "24h" if volume_24h is not None else ("sessão" if session_volume is not None else None),
+        "contract": contract,
+    }
 
 
 def _is_financial_institution(sector: str | None, industry: str | None, *, ebitda: float | None = None, current_ratio: float | None = None) -> bool:
@@ -1150,7 +1307,12 @@ def get_extra_asset_fundamentals(
         except ValueError:
             logger.warning("Tesouro Transparente data unavailable for %s", canonical, exc_info=True)
             price, quote_date = None, None
-        return {
+        try:
+            treasury = latest_treasury_detail(canonical)
+        except (ValueError, KeyError):
+            logger.warning("Tesouro Transparente detail unavailable for %s", canonical, exc_info=True)
+            treasury = None
+        result = {
             "ticker": canonical,
             "available": price is not None,
             "company": meta["company"],
@@ -1160,7 +1322,11 @@ def get_extra_asset_fundamentals(
             "price": price,
             "last_quote_date": quote_date,
             "source": "Tesouro Transparente · PU Compra Manhã",
+            **_quote_metadata(canonical),
         }
+        if treasury:
+            result["treasury"] = treasury
+        return result
     spec = parse_fixed_income_asset(canonical)
     if spec is not None:
         terms = {
@@ -1179,14 +1345,20 @@ def get_extra_asset_fundamentals(
             "sector": meta["sector"],
             "asset_class": "titulo",
             "currency": meta["currency"],
-            "fixed_income": {"label": label, "rate": spec["rate"] if unit else None, "unit": unit},
+            "fixed_income": {
+                "label": label,
+                "rate": spec["rate"] if unit else None,
+                "unit": unit,
+                **fund_data.synthetic_income_reference(spec),
+            },
             "indicators": {},
             "source": "Premissas do modelo B3Lab",
+            **_quote_metadata(canonical),
         }
 
     symbol = provider_symbol(canonical)
     if uses_market_quote(canonical):
-        return market_asset_detail(canonical, get_yahoo_quotes((symbol,)).get(symbol))
+        return market_asset_detail(canonical, get_yahoo_quotes((symbol,)).get(symbol), info=_safe_yahoo_info(symbol))
 
     if meta["asset_class"] == "fii":
         data = _fii_detail(canonical, meta, load_fii_market_data() if fii_table is None else fii_table)
@@ -1292,6 +1464,12 @@ def get_extra_asset_fundamentals(
         )
         if fallback:
             result.update(fallback, available=True)
+    result.update(_quote_metadata(symbol, info))
+    fund_profile = fund_data.yahoo_fund_block(info, asset_class, distribution_yield=raw_dy)
+    if fund_profile:
+        result["fund"] = fund_profile
+    if asset_class in EQUITY_CLASSES | {"reit"}:
+        result["history"] = get_equity_history(canonical, symbol)
     return result
 
 
@@ -1301,12 +1479,14 @@ def uses_market_quote(ticker: str) -> bool:
             and asset_metadata(ticker)["asset_class"] in {"titulo", "outros"})
 
 
-def market_asset_detail(ticker: str, quote: dict | None, *, allow_nasdaq: bool = True, b3_stock: dict | None = None) -> dict[str, Any]:
+def market_asset_detail(ticker: str, quote: dict | None, *, allow_nasdaq: bool = True, b3_stock: dict | None = None,
+                        info: dict[str, Any] | None = None) -> dict[str, Any]:
     """Build a quote-only result; do not substitute hard-coded catalog figures."""
     meta = b3_stock or asset_metadata(ticker)
     if not quote and allow_nasdaq and meta["asset_class"] == "titulo" and meta.get("quote_type") != "BOND":
         quote = _get_nasdaq_quote(provider_symbol(ticker), meta["asset_class"], meta["currency"])
-    return {
+    info = info if isinstance(info, dict) else {}
+    result = {
         "ticker": ticker,
         "available": bool(quote),
         "company": meta["company"],
@@ -1317,6 +1497,13 @@ def market_asset_detail(ticker: str, quote: dict | None, *, allow_nasdaq: bool =
         "source": "Yahoo Finance",
         **(quote or {}),
     }
+    if info.get("currency") and not quote:
+        result["currency"] = str(info["currency"]).upper()
+    result.update(_quote_metadata(provider_symbol(ticker), info))
+    fund_profile = fund_data.yahoo_fund_block(info, meta["asset_class"], distribution_yield=_yahoo_dy_percent(info, result.get("price")))
+    if fund_profile:
+        result["fund"] = fund_profile
+    return result
 
 
 def load_fii_market_data() -> pd.DataFrame:
@@ -1334,12 +1521,20 @@ def _fii_detail(ticker: str, meta: dict, table: pd.DataFrame) -> dict[str, Any] 
     row = table.loc[ticker, ["price", "pvp", "dy", "liq2m"]].dropna().to_dict()
     if not row:
         return None
-    return {
+    result = {
         "ticker": ticker, "available": True, "company": meta["company"],
         "asset_class": "fii", "sector": meta["sector"], "currency": "BRL", "volume_2m": row.get("liq2m"),
         "price": row.get("price"), "indicators": {key: row.get(key) for key in ("pvp", "dy")},
         "source": "Fundamentus · FIIs",
+        **_quote_metadata(ticker),
     }
+    # Vacância, cap rate, FFO yield, imóveis, segmento e gestão vivem na página de detalhes.
+    # A falha na página detalhada mantém o resumo acima intacto.
+    detail = fund_data.get_fii_detail(ticker)
+    if detail:
+        result["fund"] = detail
+        result["detail_source"] = detail["source"]
+    return result
 
 
 def catalog_screener_rows(asset_class: str, fields_by_class: dict[str, set[str]]) -> pd.DataFrame:

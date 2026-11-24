@@ -28,6 +28,12 @@ _MATURITY = "Data Vencimento"
 _DATE = "Data Base"
 _MARK = "PU Base Manha"
 _BUY = "PU Compra Manha"
+# Published by Tesouro Transparente alongside the buy price. They are optional
+# so a trimmed CSV still loads instead of failing the whole history.
+_SELL = "PU Venda Manha"
+_BUY_RATE = "Taxa Compra Manha"
+_SELL_RATE = "Taxa Venda Manha"
+_NUMERIC = (_MARK, _BUY, _SELL, _BUY_RATE, _SELL_RATE)
 
 
 def _download_treasury_csv():
@@ -40,10 +46,14 @@ def _download_treasury_csv():
 def get_treasury_history():
     """Read the official CSV once and retain only the supported title/maturity pairs."""
     try:
+        wanted = {_TYPE, _MATURITY, _DATE, _MARK, _BUY, _SELL, _BUY_RATE, _SELL_RATE}
         frame = pd.read_csv(
             _download_treasury_csv(), sep=";", decimal=",", encoding="utf-8-sig",
-            usecols=[_TYPE, _MATURITY, _DATE, _MARK, _BUY],
+            usecols=lambda column: column in wanted,
         )
+        for column in (_SELL, _BUY_RATE, _SELL_RATE):
+            if column not in frame:
+                frame[column] = float("nan")
         symbols = {
             (title, maturity.strftime("%d/%m/%Y")): ticker
             for ticker, (title, maturity) in TREASURY_TITLES.items()
@@ -51,6 +61,8 @@ def get_treasury_history():
         frame["ticker"] = [symbols.get(pair) for pair in zip(frame[_TYPE], frame[_MATURITY])]
         frame = frame.dropna(subset=["ticker"]).copy()
         frame[_DATE] = pd.to_datetime(frame[_DATE], format="%d/%m/%Y", errors="coerce")
+        for column in _NUMERIC:
+            frame[column] = pd.to_numeric(frame[column], errors="coerce").replace([float("inf"), float("-inf")], float("nan"))
         frame = frame.dropna(subset=[_DATE]).drop_duplicates(subset=[_DATE, "ticker"])
         if frame.empty:
             raise ValueError("nenhum título do catálogo no CSV")
@@ -74,3 +86,32 @@ def latest_treasury_quote(ticker):
         if not quotes.empty:
             return float(quotes.iloc[-1]), quotes.index[-1].date().isoformat()
     return None, None
+
+
+def _scalar(value):
+    """Finite float from a CSV cell, or None for the source's missing marker."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if pd.notna(number) and abs(number) != float("inf") else None
+
+
+def latest_treasury_detail(ticker):
+    """Latest official buy/sell prices, buy/sell rates and maturity for one catalog title."""
+    frame = get_treasury_history()
+    rows = frame.loc[frame["ticker"] == ticker]
+    if rows.empty:
+        return None
+    row = rows.sort_values(_DATE).iloc[-1]
+    maturity = pd.to_datetime(str(row[_MATURITY]), format="%d/%m/%Y", errors="coerce")
+    return {
+        "buy_price": _scalar(row[_BUY]),
+        "sell_price": _scalar(row[_SELL]),
+        "buy_rate": _scalar(row[_BUY_RATE]),
+        "sell_rate": _scalar(row[_SELL_RATE]),
+        "rate_unit": "% a.a.",
+        "maturity": None if pd.isna(maturity) else maturity.date().isoformat(),
+        "quote_date": None if pd.isna(row[_DATE]) else row[_DATE].date().isoformat(),
+        "source": "Tesouro Transparente · Taxa e PU Compra/Venda Manhã",
+    }

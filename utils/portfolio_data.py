@@ -185,51 +185,115 @@ def historical_var_cvar(returns, confidence=0.95):
     return var, float(tail.mean())
 
 
-def _convert_usd_columns_to_brl(prices: pd.DataFrame, usd_symbols: list[str], start_date, auto_adjust: bool) -> pd.DataFrame:
-    """Convert USD series into BRL; unavailable FX must not pass off USD as BRL."""
-    if not usd_symbols or prices.empty:
-        return prices
-    try:
-        fx_start = pd.Timestamp(start_date).date() - _FX_MAX_AGE if auto_adjust else start_date
-        fx = _download_close("BRL=X", fx_start, auto_adjust=auto_adjust)
-        if isinstance(fx, pd.DataFrame):
-            fx = fx.iloc[:, 0]
-    except Exception:
-        logger.warning("USD/BRL exchange rate unavailable; USD prices cannot be valued in BRL", exc_info=True)
-        return prices.drop(columns=usd_symbols, errors="ignore")
-    fx = fx.loc[fx.gt(0) & fx.lt(float("inf"))].sort_index()
-    usd_prices = prices.loc[:, prices.columns.intersection(usd_symbols)]
-    if fx.empty or usd_prices.empty:
-        return prices.drop(columns=usd_symbols, errors="ignore")
-    if auto_adjust:
-        from utils.assets import is_synthetic_fixed_income
+# ISO currency -> Yahoo Finance pair quoted in BRL. Only pairs verified on Yahoo are
+# listed; a currency absent here is excluded instead of being valued as BRL.
+FX_BRL_SYMBOLS = {
+    "USD": "BRL=X",
+    "EUR": "EURBRL=X",
+    "GBP": "GBPBRL=X",
+    "JPY": "JPYBRL=X",
+    "CHF": "CHFBRL=X",
+    "CAD": "CADBRL=X",
+    "AUD": "AUDBRL=X",
+}
 
-        usd_prices = usd_prices.ffill().where(usd_prices.bfill().notna())
-        aligned_fx = fx.reindex(prices.index, method="ffill", tolerance=_FX_MAX_AGE)
-        listed = [symbol for symbol in usd_prices.columns if not is_synthetic_fixed_income(symbol)]
-        gaps = usd_prices.loc[aligned_fx.isna(), listed].dropna(how="all")
-        if not gaps.empty:
-            affected = ", ".join(gaps.columns[gaps.notna().any()])
-            dates = ", ".join(f"{day:%d/%m/%Y}" for day in gaps.index[:5])
-            raise ValueError(f"Câmbio USD/BRL indisponível para {affected} em {dates}")
-    else:
-        aligned_fx = fx.reindex(prices.index)
+
+def fx_brl_symbol(currency) -> str | None:
+    """Return the Yahoo BRL pair for an ISO currency, or None when it is not supported."""
+    return FX_BRL_SYMBOLS.get(str(currency or "").strip().upper())
+
+
+def foreign_currency_groups(symbols):
+    """Group Yahoo columns by native currency, excluding BRL and unsupported currencies."""
+    from utils.assets import asset_currency
+
+    groups: dict[str, list[str]] = {}
+    unsupported: list[str] = []
+    for symbol in symbols:
+        currency = asset_currency(symbol)
+        if currency == "BRL":
+            continue
+        if fx_brl_symbol(currency) is None:
+            unsupported.append(symbol)
+            continue
+        groups.setdefault(currency, []).append(symbol)
+    return groups, unsupported
+
+
+def _convert_foreign_columns_to_brl(
+    prices: pd.DataFrame,
+    currency_symbols: dict[str, list[str]],
+    unsupported_symbols: list[str],
+    start_date,
+    auto_adjust: bool,
+) -> pd.DataFrame:
+    """Convert each foreign currency group with its own FX series; unavailable FX never passes off foreign values as BRL."""
+    if prices.empty:
+        return prices
     result = prices.copy()
-    result[usd_prices.columns] = usd_prices.mul(aligned_fx, axis=0)
+    stale = [symbol for symbol in unsupported_symbols if symbol in result.columns]
+    if stale:
+        logger.warning(
+            "No supported BRL exchange rate for %s; these prices cannot be valued in BRL",
+            ", ".join(stale),
+        )
+        result = result.drop(columns=stale)
+    for currency, symbols in currency_symbols.items():
+        columns = result.columns.intersection(symbols)
+        if columns.empty:
+            continue
+        fx_symbol = fx_brl_symbol(currency)
+        if fx_symbol is None:
+            logger.warning("%s has no supported BRL exchange rate; dropping %s", currency, ", ".join(columns))
+            result = result.drop(columns=columns)
+            continue
+        try:
+            fx_start = pd.Timestamp(start_date).date() - _FX_MAX_AGE if auto_adjust else start_date
+            fx = _download_close(fx_symbol, fx_start, auto_adjust=auto_adjust)
+            if isinstance(fx, pd.DataFrame):
+                fx = fx.iloc[:, 0]
+        except Exception:
+            logger.warning(
+                "%s/BRL exchange rate unavailable; %s prices cannot be valued in BRL",
+                currency,
+                currency,
+                exc_info=True,
+            )
+            result = result.drop(columns=columns)
+            continue
+        fx = fx.loc[fx.gt(0) & fx.lt(float("inf"))].sort_index()
+        group_prices = prices.loc[:, columns]
+        if fx.empty or group_prices.empty:
+            result = result.drop(columns=columns)
+            continue
+        if auto_adjust:
+            from utils.assets import is_synthetic_fixed_income
+
+            group_prices = group_prices.ffill().where(group_prices.bfill().notna())
+            aligned_fx = fx.reindex(prices.index, method="ffill", tolerance=_FX_MAX_AGE)
+            listed = [symbol for symbol in group_prices.columns if not is_synthetic_fixed_income(symbol)]
+            gaps = group_prices.loc[aligned_fx.isna(), listed].dropna(how="all")
+            if not gaps.empty:
+                affected = ", ".join(gaps.columns[gaps.notna().any()])
+                dates = ", ".join(f"{day:%d/%m/%Y}" for day in gaps.index[:5])
+                raise ValueError(f"Câmbio {currency}/BRL indisponível para {affected} em {dates}")
+        else:
+            aligned_fx = fx.reindex(prices.index)
+        result[columns] = group_prices.mul(aligned_fx, axis=0)
     return result
 
 
 @cache_data(ttl=3600)
 def get_portfolio_prices(tickers_yf, start_date):
-    from utils.assets import build_synthetic_fixed_income_prices, is_synthetic_fixed_income, is_usd_symbol, parse_fixed_income_asset
+    from utils.assets import build_synthetic_fixed_income_prices, is_synthetic_fixed_income, parse_fixed_income_asset
 
     symbols = tuple(tickers_yf)
     synthetic = [s for s in symbols if is_synthetic_fixed_income(s)]
     treasury = [s for s in symbols if s in TREASURY_TITLES]
     yahoo_syms = [s for s in symbols if s not in synthetic and s not in TREASURY_TITLES]
-    usd_syms = [s for s in symbols if is_usd_symbol(s)]
+    currency_groups, unsupported = foreign_currency_groups(symbols)
 
-    if not synthetic and not usd_syms and not treasury:
+    if not synthetic and not currency_groups and not unsupported and not treasury:
         return _download_close(tickers_yf, start_date)
 
     y_prices = pd.DataFrame()
@@ -254,7 +318,7 @@ def get_portfolio_prices(tickers_yf, start_date):
         )
         combined = pd.concat([combined, s_prices], axis=1)
 
-    combined = _convert_usd_columns_to_brl(combined, usd_syms, start_date, auto_adjust=True)
+    combined = _convert_foreign_columns_to_brl(combined, currency_groups, unsupported, start_date, auto_adjust=True)
     return combined.loc[:, [s for s in symbols if s in combined.columns]]
 
 
@@ -263,12 +327,12 @@ def get_portfolio_trade_prices(tickers_yf):
     """Fetch recent unadjusted purchase references in reais."""
     if not tickers_yf:
         return pd.DataFrame()
-    from utils.assets import is_usd_symbol, supports_share_allocation
+    from utils.assets import supports_share_allocation
 
     symbols = tuple(symbol for symbol in tickers_yf if supports_share_allocation(symbol))
     if not symbols:
         return pd.DataFrame()
-    usd_syms = [s for s in symbols if is_usd_symbol(s)]
+    currency_groups, unsupported = foreign_currency_groups(symbols)
     start_date = datetime.date.today() - datetime.timedelta(days=14)
 
     treasury = [s for s in symbols if s in TREASURY_TITLES]
@@ -292,7 +356,7 @@ def get_portfolio_trade_prices(tickers_yf):
         return treasury_close
     if isinstance(prices, pd.Series):
         prices = prices.to_frame(name=listed[0])
-    prices = _convert_usd_columns_to_brl(prices, usd_syms, start_date, auto_adjust=False)
+    prices = _convert_foreign_columns_to_brl(prices, currency_groups, unsupported, start_date, auto_adjust=False)
     combined = pd.concat([prices, treasury_close], axis=1).sort_index()
     return combined.loc[:, [s for s in symbols if s in combined.columns]]
 
@@ -342,7 +406,7 @@ def _format_month_year(stamp) -> str:
 
 def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, crises):
     """Calculate fixed-weight portfolio returns for crises with enough shared data."""
-    from utils.assets import is_usd_symbol
+    from utils.assets import asset_currency
 
     if portfolio_prices is None or portfolio_prices.empty:
         return []
@@ -352,7 +416,10 @@ def calculate_historical_stress(portfolio_prices, benchmark_prices, weights, cri
     if not active_columns:
         return []
     portfolio_prices = portfolio_prices.loc[:, active_columns]
-    mixed_calendar = any(column in TREASURY_TITLES or is_usd_symbol(column) for column in active_columns)
+    mixed_calendar = any(
+        column in TREASURY_TITLES or asset_currency(column) != "BRL"
+        for column in active_columns
+    )
 
     benchmark_closes = (
         benchmark_prices.dropna()

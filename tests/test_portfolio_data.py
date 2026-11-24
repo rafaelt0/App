@@ -397,3 +397,162 @@ def test_stress_benchmark_keeps_move_across_missing_close():
     )
 
     assert result[0]["IBOV"] == pytest.approx(-0.10)
+
+
+def test_fx_brl_symbols_cover_only_verified_pairs():
+    from utils.portfolio_data import FX_BRL_SYMBOLS, fx_brl_symbol
+
+    assert FX_BRL_SYMBOLS == {
+        "USD": "BRL=X",
+        "EUR": "EURBRL=X",
+        "GBP": "GBPBRL=X",
+        "JPY": "JPYBRL=X",
+        "CHF": "CHFBRL=X",
+        "CAD": "CADBRL=X",
+        "AUD": "AUDBRL=X",
+    }
+    assert fx_brl_symbol("jpy") == "JPYBRL=X"
+    assert fx_brl_symbol("BRL") is None
+    assert fx_brl_symbol("HKD") is None
+
+
+def test_foreign_currency_groups_resolve_suffixes_and_flag_unsupported():
+    from utils.portfolio_data import foreign_currency_groups
+
+    groups, unsupported = foreign_currency_groups(
+        ("PETR4.SA", "AAPL", "7203.T", "SAP.DE", "0700.HK")
+    )
+
+    assert groups == {"USD": ["AAPL"], "JPY": ["7203.T"], "EUR": ["SAP.DE"]}
+    assert unsupported == ["0700.HK"]
+
+
+def test_london_pence_is_never_valued_as_pounds(monkeypatch):
+    from utils import assets
+
+    # Without registered metadata, .L quotes are assumed to be pence and left unsupported.
+    assert assets.asset_currency("VOD.L") == "GBX"
+    monkeypatch.setattr(assets, "asset_metadata", lambda symbol: {"currency": "GBp"})
+    assert assets.asset_currency("VOD.L") == "GBX"
+    assert assets.is_usd_symbol("VOD.L") is False
+    monkeypatch.setattr(assets, "asset_metadata", lambda symbol: {"currency": "GBP"})
+    assert assets.asset_currency("VOD.L") == "GBP"
+
+
+def _currency_download(prices, fx, requested, failing=()):
+    def download(symbols, start_date, auto_adjust=True):
+        if isinstance(symbols, str):
+            requested.append(symbols)
+            if symbols in failing:
+                raise ValueError(f"{symbols} indisponível")
+            return fx[symbols]
+        return prices.loc[:, list(symbols)]
+
+    return download
+
+
+def test_each_foreign_currency_uses_its_own_fx_and_brl_is_untouched(monkeypatch):
+    from utils import portfolio_data
+
+    dates = pd.bdate_range("2025-01-02", periods=3)
+    prices = pd.DataFrame(
+        {
+            "PETR4.SA": [30.0, 31.0, 32.0],
+            "AAPL": [10.0, 10.0, 10.0],
+            "7203.T": [3000.0, 3000.0, 3000.0],
+            "SAP.DE": [100.0, 100.0, 100.0],
+            "0700.HK": [400.0, 400.0, 400.0],
+        },
+        index=dates,
+    )
+    fx = {
+        "BRL=X": pd.Series([5.0, 5.0, 5.0], index=dates),
+        "EURBRL=X": pd.Series([6.0, 6.0, 6.0], index=dates),
+        "JPYBRL=X": pd.Series([0.035, 0.035, 0.035], index=dates),
+    }
+    requested = []
+    monkeypatch.setattr(
+        portfolio_data, "_download_close", _currency_download(prices, fx, requested)
+    )
+
+    result = portfolio_data.get_portfolio_prices.__wrapped__(
+        ("PETR4.SA", "AAPL", "7203.T", "SAP.DE", "0700.HK"), dates[0].date()
+    )
+
+    assert list(result.columns) == ["PETR4.SA", "AAPL", "7203.T", "SAP.DE"]
+    assert result["PETR4.SA"].tolist() == pytest.approx([30.0, 31.0, 32.0])
+    assert result["AAPL"].tolist() == pytest.approx([50.0, 50.0, 50.0])
+    assert result["7203.T"].tolist() == pytest.approx([105.0, 105.0, 105.0])
+    assert result["SAP.DE"].tolist() == pytest.approx([600.0, 600.0, 600.0])
+    assert sorted(requested) == ["BRL=X", "EURBRL=X", "JPYBRL=X"]
+
+
+def test_missing_currency_fx_drops_only_that_currency(monkeypatch):
+    from utils import portfolio_data
+
+    dates = pd.bdate_range("2025-01-02", periods=2)
+    prices = pd.DataFrame(
+        {"PETR4.SA": [30.0, 30.0], "AAPL": [10.0, 10.0], "7203.T": [3300.0, 3312.0]},
+        index=dates,
+    )
+    fx = {
+        "BRL=X": pd.Series([5.0, 5.0], index=dates),
+        "JPYBRL=X": pd.Series([0.035, 0.035], index=dates),
+    }
+    requested = []
+    monkeypatch.setattr(
+        portfolio_data,
+        "_download_close",
+        _currency_download(prices, fx, requested, failing={"JPYBRL=X"}),
+    )
+
+    result = portfolio_data.get_portfolio_prices.__wrapped__(
+        ("PETR4.SA", "AAPL", "7203.T"), dates[0].date()
+    )
+
+    assert list(result.columns) == ["PETR4.SA", "AAPL"]
+    assert result["AAPL"].tolist() == pytest.approx([50.0, 50.0])
+    assert 3312.0 not in result.values
+
+
+def test_trade_prices_convert_foreign_currencies_without_adjustment(monkeypatch):
+    from utils import portfolio_data
+
+    dates = pd.bdate_range(end=date.today() - timedelta(days=1), periods=2)
+    prices = pd.DataFrame(
+        {"PETR4.SA": [37.0, 38.0], "7203.T": [3300.0, 3312.0]}, index=dates
+    )
+    fx = {"JPYBRL=X": pd.Series([0.035, 0.036], index=dates)}
+    seen_adjust = []
+
+    def download(symbols, start_date, auto_adjust=True):
+        seen_adjust.append(auto_adjust)
+        if isinstance(symbols, str):
+            return fx[symbols]
+        return prices.loc[:, list(symbols)]
+
+    monkeypatch.setattr(portfolio_data, "_download_close", download)
+
+    result = portfolio_data.get_portfolio_trade_prices.__wrapped__(("PETR4.SA", "7203.T"))
+
+    assert result["PETR4.SA"].tolist() == pytest.approx([37.0, 38.0])
+    assert result["7203.T"].tolist() == pytest.approx([115.5, 119.232])
+    assert seen_adjust == [False, False]
+
+
+def test_foreign_fx_gap_raises_with_currency_and_ticker(monkeypatch):
+    from utils import portfolio_data
+
+    dates = pd.DatetimeIndex(["2025-05-05", "2025-05-12", "2025-05-13"])
+    prices = pd.DataFrame(
+        {"7203.T": [3000.0, np.nan, 3100.0], "PETR4.SA": [30.0, 31.0, 32.0]},
+        index=dates,
+    )
+    fx = {"JPYBRL=X": pd.Series([0.035, np.nan, 0.036], index=dates)}
+    monkeypatch.setattr(portfolio_data, "_download_close", _currency_download(prices, fx, []))
+
+    with pytest.raises(ValueError, match=r"JPY/BRL.*7203\.T.*12/05/2025"):
+        portfolio_data.get_portfolio_prices.__wrapped__(
+            ("7203.T", "PETR4.SA"), dates[0].date()
+        )
+

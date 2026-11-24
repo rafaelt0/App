@@ -18,7 +18,7 @@ from backend.serialization import StrictModel, clean_json, csv_response, figure
 from backend.state import PortfolioSnapshot, artifact, begin, publish, session
 from utils import db
 from utils.assets import (
-    is_synthetic_fixed_income, is_usd_symbol, is_valid_asset_ticker, modeled_history_notice,
+    asset_currency, is_synthetic_fixed_income, is_valid_asset_ticker, modeled_history_notice,
     normalize_ticker, provider_symbol, supports_share_allocation,
 )
 from utils.market_data import get_listed_stocks
@@ -303,8 +303,10 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
     start = date.today() - timedelta(days=payload.lookback_days)
     daily = returns.dot(align_weights_to_columns(weights, returns.columns))
     has_treasury = any(ticker in TREASURY_TITLES for ticker in returns.columns)
-    has_usd = any(is_usd_symbol(ticker) for ticker in returns.columns)
-    mixed_calendar = has_treasury or has_usd
+    foreign_currencies = sorted({
+        asset_currency(ticker) for ticker in returns.columns
+    } - {"BRL"})
+    mixed_calendar = has_treasury or bool(foreign_currencies)
     comparison_daily, benchmark_prices, benchmark = daily, None, None
     try:
         benchmark_prices = get_benchmark_prices(start)
@@ -378,10 +380,16 @@ def calculate_analysis(payload, prices, returns, weights, quotes, quote_failed, 
         adjusted_sources.append("Tesouro Transparente · PU Base Manhã (marcação a mercado)")
     if any(ticker in TREASURY_TITLES and weight > 0 for ticker, weight in weights.items()):
         trade_sources.append("Tesouro Transparente · PU Compra Manhã (últimos 14 dias)")
-    if has_usd:
-        adjusted_sources.append("USD/BRL do Yahoo Finance, com último câmbio de até 4 dias corridos")
-    if any(weight > 0 and is_usd_symbol(ticker) and supports_share_allocation(ticker) for ticker, weight in weights.items()):
-        trade_sources.append("USD/BRL da data da cotação")
+    if foreign_currencies:
+        adjusted_sources.append(
+            "Câmbio " + ", ".join(f"{currency}/BRL" for currency in foreign_currencies)
+            + " do Yahoo Finance, com último câmbio de até 4 dias corridos"
+        )
+    if any(
+        weight > 0 and asset_currency(ticker) != "BRL" and supports_share_allocation(ticker)
+        for ticker, weight in weights.items()
+    ):
+        trade_sources.append("Câmbio da moeda de origem na data da cotação")
     result = {"strategy": payload.strategy, "mode": MODES[payload.strategy], "allocation_label": label, "capital": payload.capital, "lookback_days": payload.lookback_days, "tickers": payload.tickers, "weights": [{"ticker": normalize_ticker(ticker), "weight": weight} for ticker, weight in weights.items()], "sample": {**sample_info(returns), "selected_count": len(payload.tickers), "zero_excluded": payload.strategy == "manual" and len(returns.columns) < len(payload.tickers)}, "comparison_sample": sample_info(comparison_daily) if available else None, "source": {"adjusted_prices": " + ".join(adjusted_sources), "trade_quotes": " + ".join(trade_sources) or "Não se aplica aos ativos da carteira", "selic_source": rf_source, "selic_daily": daily_rf, "selic_annual": rf, "historical_rf": historical_rf_source}, "trade_suggestions": purchases, "trade_totals": totals, "metrics": metrics, "metric_status": metric_status, "metric_signal": {key: signal_for(label) for key, label in metric_status.items()}, "metric_help": METRIC_HELP, "inputs": {"strategy": payload.strategy, "capital": payload.capital, "lookback_days": payload.lookback_days, "gamma": payload.gamma, "manual_shares": payload.manual_shares}, "monthly_returns": years, "benchmark_available": available, "charts": charts, "warnings": warnings, "health": None, "stress": None, "regime": None, "concentration": None, "asset_drawdowns": []}
     max_weight = max(weights.values()) * 100
     squares = sum(weight ** 2 for weight in weights.values())

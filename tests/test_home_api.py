@@ -145,6 +145,44 @@ def test_single_metric_exact_classification_and_health_boundaries():
     assert negative_ebit["metrics"][0]["status"] == "neutral" and "não interpretável" in negative_ebit["metrics"][0]["help"]
 
 
+def test_export_fields_cover_every_displayed_market_health_and_currency_column():
+    assert {"Data_ult_cot", "Vol_med_2m", "Valor_de_mercado", "Div_Liq_Patrim", "Liquidez_Corr",
+            "EV_EBIT", "Moeda", "Classe", "Fonte"} <= set(home.EXPORT_FIELDS)
+
+
+def test_export_keeps_market_health_currency_source_and_treasury_values(home_api, monkeypatch):
+    client, _, _ = home_api
+    frame = detail_frame().copy()
+    frame["Data_ult_cot"] = ["2026-11-20", "2026-11-21"]
+    frame["Vol_med_2m"] = [1_500_000, 2_500_000]
+    frame["Valor_de_mercado"] = [1_000_000_000, 2_000_000_000]
+    frame["Classe"] = ["acao_br", "acao_br"]
+    frame["Moeda"] = ["BRL", "BRL"]
+    frame["Fonte"] = ["Fundamentus", "Fundamentus"]
+    frame["Tesouro"] = [None, {"buy_price": 780.0, "sell_price": 775.0, "buy_rate": 13.2, "sell_rate": 13.4,
+                               "rate_unit": "% a.a.", "maturity": "2031-01-01", "quote_date": "2026-11-21",
+                               "source": "Tesouro Transparente · Taxa e PU Compra/Venda Manhã"}]
+    monkeypatch.setattr(home, "get_fundamentus_data", lambda tickers: frame)
+    monkeypatch.setattr(home, "get_sector_peers", lambda: pd.DataFrame())
+    monkeypatch.setattr(home, "get_market_target_data", lambda ticker: {"_error": "offline"})
+    monkeypatch.setattr(home, "clear_fundamentus_cache", lambda: 0)
+
+    result = client.post("/api/home/analyze", json={"tickers": ["AAA3", "BBB4"], "revision": 0}).json()
+    exported = pd.read_csv(io.BytesIO(client.get(f"/api/home/{result['id']}/fundamentals.csv").content), index_col=0)
+
+    assert {"Data_ult_cot", "Vol_med_2m", "Valor_de_mercado", "Div_Liq_Patrim", "Liquidez_Corr",
+            "EV_EBIT", "Moeda", "Classe", "Fonte"} <= set(exported.columns)
+    assert exported["Data_ult_cot"].tolist() == ["2026-11-20", "2026-11-21"]
+    assert exported["Vol_med_2m"].tolist() == [1_500_000, 2_500_000]
+    assert exported["Moeda"].tolist() == ["BRL", "BRL"]
+    assert exported["Fonte"].tolist() == ["Fundamentus", "Fundamentus"]
+    assert exported["EV_EBIT"].tolist() == [1200, 2000]
+    assert exported["Tesouro_Taxa_Compra"].notna().sum() == 1
+    assert exported["Tesouro_PU_Venda"].dropna().tolist() == [775.0]
+    assert exported["Tesouro_Vencimento"].dropna().tolist() == ["2031-01-01"]
+    assert exported["Tesouro_Fonte"].dropna().tolist() == ["Tesouro Transparente · Taxa e PU Compra/Venda Manhã"]
+
+
 def test_sector_percentiles_ties_and_minimum_observations():
     universe = pd.DataFrame({"Ticker": ["AAA3", "BBB3", "CCC3", "DDD3"], "Setor": ["Máquinas"] * 4})
     peers = pd.DataFrame({"PL": [1, 2, 3, 4], "ROE": [.4, .3, .2, .1], "Div_Yield": [.1, .1, .05, .02]}, index=universe.Ticker)

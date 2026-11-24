@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import app as api_module, home, news, portfolio, screener, simulation, state
-from utils import assets, db, market_data, portfolio_data
+from utils import assets, db, fund_data, market_data, portfolio_data
 from utils.news import is_relevant_company_news
 
 HEADERS = {"Origin": "http://localhost:3000", "X-B3Lab-Request": "1"}
@@ -21,6 +21,11 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(home, "search_yahoo_assets", lambda query: [])
     monkeypatch.setattr(home, "load_fii_market_data", pd.DataFrame)
     monkeypatch.setattr(home, "get_yahoo_quotes", lambda symbols: {})
+    monkeypatch.setattr(fund_data, "get_reference_rates", lambda: {
+        "cdi": {"percent": 13.65, "date": "2026-11-19", "source": "BCB SGS 4389"},
+        "ipca": {"percent": 4.63, "date": "2026-10-01", "source": "BCB SGS 13522"},
+    })
+    monkeypatch.setattr(fund_data, "get_fii_detail", lambda ticker: None)
     with TestClient(api_module.app) as test_client:
         yield test_client
 
@@ -99,7 +104,6 @@ def test_home_analysis_supports_mixed_b3_us_fii_reit_and_fixed_income(client, mo
 
     def yahoo_ticker(symbol):
         info_calls.append(symbol)
-        assert symbol not in {"TLT", "BTC-USD"}
         quote_type = "ETF" if symbol == "SPY" else "EQUITY"
         return SimpleNamespace(info={"quoteType": quote_type, "regularMarketPrice": 90, "totalAssets": 3000000,
                                      "trailingPE": 19, "priceToBook": 1.25, "returnOnEquity": .15, "returnOnAssets": .12,
@@ -134,7 +138,7 @@ def test_home_analysis_supports_mixed_b3_us_fii_reit_and_fixed_income(client, mo
 
     assert set(by_ticker) == set(tickers)
     assert quote_batches == [("BTC-USD", "TLT")]
-    assert sorted(info_calls) == ["AAPL", "AAPL34.SA", "HGLG11.SA", "O", "SPY"]
+    assert sorted(info_calls) == ["AAPL", "AAPL34.SA", "BTC-USD", "HGLG11.SA", "O", "SPY", "TLT"]
     assert by_ticker["AAPL"]["market"]["currency"] == "USD"
     assert by_ticker["O"]["market"]["currency"] == "USD"
     assert by_ticker["HGLG11"]["market"]["currency"] == "BRL"
@@ -153,7 +157,12 @@ def test_home_analysis_supports_mixed_b3_us_fii_reit_and_fixed_income(client, mo
         assert by_ticker[ticker]["indicators"] == by_ticker[ticker]["metric_groups"] == {}
         assert by_ticker[ticker]["indicators_available"] is False
         assert by_ticker[ticker]["health"]["metrics"] == []
-    assert by_ticker["CDI"]["fixed_income"] == {"label": "Percentual do CDI", "rate": 100, "unit": "% do CDI"}
+    assert by_ticker["CDI"]["fixed_income"]["label"] == "Percentual do CDI"
+    assert by_ticker["CDI"]["fixed_income"]["rate"] == 100
+    assert by_ticker["CDI"]["fixed_income"]["unit"] == "% do CDI"
+    assert by_ticker["CDI"]["fixed_income"]["indexer"] == "CDI"
+    assert by_ticker["CDI"]["fixed_income"]["index_rate"] == 13.65
+    assert by_ticker["CDI"]["fixed_income"]["index_rate_fallback"] is False
     assert by_ticker["TESOURO-IPCA-2035"]["fixed_income"]["rate"] == 6.5
     assert by_ticker["CDI"]["market"]["price"] is None
     assert by_ticker["TLT"]["market"]["price"] == 90
@@ -250,7 +259,8 @@ def test_home_uses_nasdaq_quote_when_yahoo_is_unavailable(client, monkeypatch):
         assert company["market"] == {
             "price": 237.51, "currency": "USD", "last_quote_date": "2026-11-20",
             "low_52w": 175.0, "high_52w": 260.25, "volume_2m": pytest.approx(2_375_100_000.0),
-            "market_cap": 4_000_000_000_000.0,
+            "market_cap": 4_000_000_000_000.0, "price_unit": "money", "quote_pair": None,
+            "volume_24h": None, "session_volume": None, "volume_window": None, "contract": None,
         }
         assert company["indicators_available"] is True
         assert company["indicators"]["pl"] == pytest.approx(40.0)
@@ -428,10 +438,13 @@ def test_screener_supports_all_multi_asset_classes(client, monkeypatch):
         if cls == "b3":
             assert [row["ticker"] for row in body["rows"]] == ["PETR4"]
         if cls == "fii":
-            assert body["source"] == "Fundamentus · FIIs"
+            # The live Fundamentus table is merged with the reference catalog and each row keeps its own source.
+            assert body["source"].startswith("Fundamentus · FIIs")
             assert body["fetched_at"] == fii.attrs["fetched_at"]
-            assert body["rows"][0]["dy"] == .125
-            assert body["rows"][0]["cotacao"] == 42.5
+            live = next(row for row in body["rows"] if row["ticker"] == "HGLG11")
+            assert live["source"] == "Fundamentus · FIIs"
+            assert live["dy"] == .125
+            assert live["cotacao"] == 42.5
         elif cls == "acao_us":
             assert body["source"] == "Yahoo Finance · Ações EUA"
             assert body["fetched_at"] == us.attrs["fetched_at"]
@@ -439,7 +452,9 @@ def test_screener_supports_all_multi_asset_classes(client, monkeypatch):
             assert body["rows"][0]["mrgliq"] == pytest.approx(0.276)
             assert body["rows"][0]["mrgebit"] == pytest.approx(0.33)
         elif cls != "b3":
-            assert body["fetched_at"] is None and "referência" in body["source"]
+            assert body["fetched_at"] is None
+            # Reference classes name their source; "all" mixes live and reference rows per row.
+            assert cls == "all" or "referência" in body["source"]
         if cls in {"titulo", "outros"}:
             assert {column["key"] for column in body["available_columns"]}.isdisjoint({"dy", "pvp", "pl", "roe"})
             invalid = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": cls, "criteria": {"dy_min": 0}})

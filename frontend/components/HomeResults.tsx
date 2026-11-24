@@ -5,7 +5,7 @@ import { Diagnostics, ExportButton, formatValue, Metrics, Notice, Pane, ScrollX,
 import { TargetRange } from "./RangeBar";
 import { tickerColor } from "./Shell";
 import type { Column } from "./ui";
-import { consensusColumns, marketColumns } from "../lib/home";
+import { consensusColumns, fundColumns, globalColumns, marketColumns, treasuryColumns } from "../lib/home";
 import type { Company, HomeResult } from "../lib/home";
 
 type Props = { ready: HomeResult; selection: string[]; busy: boolean; onRefreshConsensus: () => void };
@@ -15,6 +15,120 @@ type ResultTab = { id: string; label: string; available: (ready: HomeResult, sin
 const always = () => true;
 const isEquity = (company: Company) => company.asset_class === "acao_br" || company.asset_class === "acao_us";
 const median = (values: number[]) => { const sorted = [...values].sort((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2; };
+type Row = Record<string, unknown>;
+/** Columns whose whole selection is empty stay out, so unavailable source fields do not print a wall of dashes. */
+const visibleColumns = (columns: Column[], rows: Row[]) => columns.filter(column => column.key === "ticker" || rows.some(row => row[column.key] != null));
+const unitLabel = (company: Company) => company.market.price_unit === "points" ? "pontos" : company.market.currency;
+const swatch = (color: (ticker: string) => string | undefined) => (row: Row) => color(String(row.ticker));
+
+function FundTable({ companies, color }: { companies: Company[]; color: (ticker: string) => string | undefined }) {
+  const rows: Row[] = companies.filter(company => company.fund).map(company => {
+    const fund = company.fund!;
+    return {
+      ...fund, ticker: company.ticker, currency: company.market.currency,
+      net_debt_to_ebitda: fund.leverage?.net_debt_to_ebitda ?? null,
+      debt_to_market_cap: fund.leverage?.debt_to_market_cap ?? null,
+    };
+  });
+  if (!rows.length) return null;
+  return <><h4 className="tab-sub">Fundos</h4>
+    <Table caption="Fundos, FIIs e REITs" swatch={swatch(color)} columns={visibleColumns(fundColumns, rows)} rows={rows} />
+    <p className="tab-foot">FIIs: Fundamentus (página de detalhes do fundo). ETFs, REITs e BDRs: Yahoo Finance. FFO/AFFO, ocupação de REITs, gestor e subjacente de BDR aparecem apenas quando a fonte publica o campo.</p></>;
+}
+
+function FixedIncomeTable({ companies }: { companies: Company[] }) {
+  const rows: Row[] = companies.flatMap(company => {
+    const terms = company.fixed_income;
+    if (!terms) return [];
+    const source = terms.index_rate_source
+      ? `${terms.index_rate_source}${terms.index_rate_date ? ` · ${terms.index_rate_date.split("-").reverse().join("/")}` : ""}`
+      : null;
+    return [{
+      ticker: company.ticker, label: terms.label,
+      rate: terms.rate === null ? null : `${formatValue(terms.rate, "number", 2)} ${terms.unit ?? ""}`.trim(),
+      indexer: terms.indexer, index_rate: terms.index_rate, index_rate_source: source,
+    }];
+  });
+  if (!rows.length) return null;
+  const fallback = companies.some(company => company.fixed_income?.index_rate_fallback);
+  return <><h4 className="tab-sub">Premissas de renda fixa</h4>
+    <Table caption="Premissas de renda fixa" columns={[{key:"ticker",label:"Ativo"},{key:"label",label:"Remuneração"},{key:"rate",label:"Taxa do modelo"},{key:"indexer",label:"Indexador"},{key:"index_rate",label:"Taxa do indexador",unit:"percent"},{key:"index_rate_source",label:"Fonte da taxa"}]} rows={rows} />
+    <Notice>O modelo não fornece cotação, taxa de mercado nem recomendação de compra. A rentabilidade é simulada a partir do indexador informado.</Notice>
+    {fallback && <Notice tone="warning">CDI ou IPCA indisponível na fonte: a taxa do indexador exibida é a premissa de fallback do modelo.</Notice>}</>;
+}
+
+function TreasuryTable({ companies, color }: { companies: Company[]; color: (ticker: string) => string | undefined }) {
+  const rows: Row[] = companies.filter(company => company.treasury).map(company => ({ ticker: company.ticker, ...company.treasury! }));
+  if (!rows.length) return null;
+  return <><h4 className="tab-sub">Tesouro Direto</h4>
+    <Table caption="Tesouro Direto: PU e taxas oficiais" swatch={swatch(color)} columns={visibleColumns(treasuryColumns, rows)} rows={rows} />
+    <p className="tab-foot">PU e taxas de compra e venda da manhã, publicados pelo Tesouro Transparente. A cotação do título usa o PU de compra.</p></>;
+}
+
+function MarketTable({ companies, color }: { companies: Company[]; color: (ticker: string) => string | undefined }) {
+  const rows: Row[] = companies.filter(company => !company.fixed_income && company.asset_class !== "outros").map(company => ({
+    ticker: company.ticker, ...company.market, unit_label: unitLabel(company), source: company.source,
+  }));
+  if (!rows.length) return null;
+  return <><h4 className="tab-sub">Mercado</h4>
+    <Table caption="Informações de mercado" swatch={swatch(color)} columns={[...visibleColumns(marketColumns, rows), {key:"source",label:"Fonte"}]} rows={rows} /></>;
+}
+
+function GlobalTable({ companies, color }: { companies: Company[]; color: (ticker: string) => string | undefined }) {
+  const rows: Row[] = companies.filter(company => company.asset_class === "outros").map(company => ({
+    ticker: company.ticker, ...company.market, unit_label: unitLabel(company),
+    volume: company.market.volume_24h ?? company.market.session_volume ?? null,
+    volume_window: company.market.volume_window,
+    contract_label: company.market.contract?.symbol ?? null,
+    expiry: company.market.contract?.expiry ?? null,
+    source: company.source,
+  }));
+  if (!rows.length) return null;
+  return <><h4 className="tab-sub">Cotações globais</h4>
+    <Table caption="Cotações globais" swatch={swatch(color)} columns={visibleColumns([...globalColumns, {key:"source",label:"Fonte"}], rows)} rows={rows} />
+    <p className="tab-foot">Índices em pontos, nunca em moeda; câmbio na convenção base/cotação. Volume, janela e vencimento do contrato só aparecem quando o Yahoo Finance informa.</p></>;
+}
+
+function HistoryPanel({ companies }: { companies: Company[] }) {
+  const withHistory = companies.filter(company => company.history?.available);
+  if (!withHistory.length) return null;
+  return <>{withHistory.map(company => {
+    const history = company.history!;
+    const currency = company.market.currency;
+    const dividends = history.dividends;
+    const annual = dividends?.annual ?? [];
+    const periods = history.statements.map(period => ({
+      ...period, currency, period_label: period.period_end.split("-").reverse().join("/"),
+    }));
+    const summary = [
+      {label:"Proventos 12m", value: dividends?.total_12m ?? null, unit:"money" as const, currency},
+      {label:"Último pagamento", value: dividends?.last_payment ? dividends.last_payment.split("-").reverse().join("/") : "—"},
+      {label:"Pagamentos 12m", value: dividends?.payments_12m ?? null, unit:"integer" as const},
+      {label:"Crescimento receita", value: history.revenue_growth, unit:"percent" as const},
+      {label:"Crescimento lucro", value: history.earnings_growth, unit:"percent" as const},
+      {label:"Fim do exercício", value: history.fiscal_year_end ? history.fiscal_year_end.split("-").reverse().join("/") : "—"},
+    ];
+    const statementColumns: Column[] = [
+      {key:"period_label",label:"Período"},
+      {key:"revenue",label:"Receita",unit:"money",currency,digits:0,compact:true},
+      {key:"net_income",label:"Lucro líquido",unit:"money",currency,digits:0,compact:true},
+      {key:"operating_income",label:"Resultado operacional",unit:"money",currency,digits:0,compact:true},
+      {key:"operating_cash_flow",label:"Caixa operacional",unit:"money",currency,digits:0,compact:true},
+      {key:"free_cash_flow",label:"Caixa livre",unit:"money",currency,digits:0,compact:true},
+      {key:"total_assets",label:"Ativos totais",unit:"money",currency,digits:0,compact:true},
+      {key:"total_equity",label:"Patrimônio líquido",unit:"money",currency,digits:0,compact:true},
+    ];
+    return <section key={company.ticker} className="history-block">
+      <h4 className="tab-sub">{company.ticker} <small>{company.identity.company}</small></h4>
+      <Metrics items={summary} />
+      {annual.length > 0 && <Table caption={`Proventos anuais de ${company.ticker}`} rowKey="year"
+        columns={[{key:"year",label:"Ano",unit:"integer"},{key:"total",label:"Total por ação",unit:"money",currency}]} rows={annual} />}
+      {periods.length > 0 && <Table caption={`Demonstrações anuais de ${company.ticker}`} rowKey="period_end"
+        columns={visibleColumns(statementColumns, periods)} rows={periods} />}
+      <p className="tab-foot">Proventos e demonstrações anuais do Yahoo Finance, na moeda de cotação. Períodos e campos ausentes na fonte não são preenchidos.</p>
+    </section>;
+  })}</>;
+}
 
 type Bar = { ticker: string; value: number | null };
 /**
@@ -65,15 +179,12 @@ const resultTabs: ResultTab[] = [
     {single ? companies.filter(company => Object.keys(company.indicators).length).map(company => company.indicators_available ? <div key={company.ticker} className="groups">{Object.entries(company.metric_groups).map(([group, metrics]) => <section className="group" key={group}><h4>{group}</h4><Metrics items={metrics} /></section>)}</div> : <Notice key={company.ticker}>Indicadores indisponíveis para {company.ticker}.</Notice>)
       : ready.comparison_indicators.length > 0 && <><h4 className="tab-sub">Indicadores aplicáveis</h4>
         <Table caption="Indicadores financeiros" extremes swatch={row => color((row as { ticker: string }).ticker)} columns={[{ key: "ticker", label: "Ticker" }, ...ready.comparison_indicators.map(item => ({ key: item.key, label: item.label, unit: item.unit, digits: 2 } as Column))]} rows={companies.filter(company => Object.keys(company.indicators).length).map(company => ({ ticker: company.ticker, ...company.indicators }))} /></>}
-    {companies.some(company => company.fixed_income) && <><h4 className="tab-sub">Premissas de renda fixa</h4>
-      <Table caption="Premissas de renda fixa" columns={[{key:"ticker",label:"Ativo"},{key:"label",label:"Remuneração"},{key:"rate",label:"Taxa do modelo"}]} rows={companies.flatMap(company => {
-        const terms = company.fixed_income;
-        return terms ? [{ticker: company.ticker, label: terms.label, rate: terms.rate === null ? "—" : `${formatValue(terms.rate, "number", 2)} ${terms.unit ?? ""}`}] : [];
-      })} />
-      <Notice>O modelo não fornece cotação, taxa de mercado nem recomendação de compra.</Notice></>}
-    {companies.some(company => !company.fixed_income) && <><h4 className="tab-sub">Mercado</h4>
-      <Table caption="Informações de mercado" swatch={row => color((row as { ticker: string }).ticker)} columns={[...marketColumns.filter(column => column.key === "ticker" || companies.some(company => !company.fixed_income && company.market[column.key as keyof Company["market"]] != null)), {key:"source",label:"Fonte"}]} rows={companies.filter(company => !company.fixed_income).map(company => ({ ticker: company.ticker, ...company.market, source: company.source }))} />
-      {companies.filter(company => !company.available).map(company => <Notice key={company.ticker}>Dados indisponíveis para {company.ticker}.</Notice>)}</>}
+    <FundTable companies={companies} color={color} />
+    <FixedIncomeTable companies={companies} />
+    <TreasuryTable companies={companies} color={color} />
+    <MarketTable companies={companies} color={color} />
+    <GlobalTable companies={companies} color={color} />
+    {companies.filter(company => !company.available).map(company => <Notice key={company.ticker}>Dados indisponíveis para {company.ticker}.</Notice>)}
   </> },
   { id: "saude", label: "Saúde financeira", available: ready => ready.companies.some(isEquity), render: ({ ready, companies }) => <>
     <p className="tab-lead">{ready.health_summary}</p>
@@ -81,6 +192,7 @@ const resultTabs: ResultTab[] = [
       {company.health.metrics.length ? <><Metrics items={company.health.metrics} /><Diagnostics items={company.health.diagnostics} /></> : <Notice>Dados de saúde financeira indisponíveis para este ativo.</Notice>}
     </section>)}</div>
   </> },
+  { id: "historico", label: "Histórico", available: ready => ready.companies.some(company => company.history?.available), render: ({ companies }) => <HistoryPanel companies={companies} /> },
   { id: "comparacao", label: "Comparação", available: ready => ready.comparison_indicators.some(item => ready.companies.filter(company => item.key in company.indicators).length > 1), render: ({ ready, companies, comparison, setComparison, color }) => {
     const options = ready.comparison_indicators.filter(item => companies.filter(company => item.key in company.indicators).length > 1);
     const choice = options.find(item => item.key === comparison) ?? options[0];

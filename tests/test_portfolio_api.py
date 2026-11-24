@@ -71,6 +71,32 @@ def test_manual_missing_positive_quote_is_fatal_before_history(market, monkeypat
     assert market.saved == []
 
 
+def test_trade_quotes_convert_jpy_close_into_reais_before_csv(monkeypatch):
+    from utils import portfolio_data
+
+    dates = pd.bdate_range(end=date.today() - timedelta(days=1), periods=2)
+    prices = pd.DataFrame({"7203.T": [3300.0, 3312.0], "PETR4.SA": [37.0, 38.0]}, index=dates)
+    fx = pd.Series([0.035, 0.036], index=dates)
+
+    def download(symbols, start_date, auto_adjust=True):
+        assert auto_adjust is False
+        if isinstance(symbols, str):
+            assert symbols == "JPYBRL=X"
+            return fx
+        return prices.loc[:, list(symbols)]
+
+    monkeypatch.setattr(portfolio_data, "_download_close", download)
+    monkeypatch.setattr(
+        api, "get_portfolio_trade_prices", portfolio_data.get_portfolio_trade_prices.__wrapped__
+    )
+
+    quotes, failed = api.trade_quotes(("7203.T", "PETR4.SA"))
+
+    assert failed is False
+    assert quotes["7203.T"][0] == pytest.approx(3312.0 * 0.036)
+    assert quotes["PETR4.SA"][0] == pytest.approx(38.0)
+
+
 def test_partial_quotes_suppress_totals_without_losing_allocation():
     rows, totals, missing = api.purchase_suggestion({"AAA3.SA": .5, "BBB4.SA": .5, "CCC3.SA": 0.}, 1000., {"AAA3.SA": (37., pd.Timestamp("2025-01-02"))})
     assert totals is None
