@@ -108,11 +108,12 @@ export default function PortfolioPage() {
       setLoadedSelection(null);
       setResult(null);
       setStressResult(null);
+      setError(null);
       if (!analysisPending.current) setBusy(false);
       setStressBusy(false);
-      setNotice("A seleção mudou. Clique em Calcular carteira para atualizar a análise.");
+      setNotice(session && session.selection.length >= 2 ? "A seleção mudou. Clique em Calcular carteira para atualizar a análise." : null);
     }
-  }, [selectionKey, loadedSelection]);
+  }, [selectionKey, loadedSelection, session]);
 
   async function runAnalysis() {
     if (!session || selectionBusy || analysisPending.current) return;
@@ -138,11 +139,11 @@ export default function PortfolioPage() {
       setFoldParams(true);
       setResultKey(submittedKey);
       setStressResult(value.stress);
-      await refreshSession();
+      await refreshSession().catch(() => {});
     } catch (exc) {
       if (generation === requestGeneration.current && submittedKey === currentFingerprint.current) {
         setError(exc instanceof Error ? exc.message : String(exc));
-        await refreshSession();
+        await refreshSession().catch(() => {});
       }
     } finally {
       analysisPending.current = false;

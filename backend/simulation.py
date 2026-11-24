@@ -138,10 +138,11 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
     if params.simulations < 1000:
         tail_count = max(1, int(np.ceil(params.simulations * 0.05)))
         warnings.append(f"Com {params.simulations} trajetórias, apenas cerca de {tail_count} compõem os 5% inferiores; prefira 1.000 ou mais para comparar a cauda.")
-    paths = simulate_portfolio(tuple(mu), tuple(map(tuple, covariance)), tuple(weights), days,
-                               params.simulations, float(params.initial_capital), today.isoformat(), chunk_size=64)
+    # Finish the bootstrap before allocating the full matrix of normal paths.
     bootstrap = bootstrap_terminal_values(aligned.to_numpy(), weights, days, params.simulations,
                                          float(params.initial_capital), chunk_size=64)
+    paths = simulate_portfolio(tuple(mu), tuple(map(tuple, covariance)), tuple(weights), days,
+                               params.simulations, float(params.initial_capital), today.isoformat(), chunk_size=64)
     if not np.isfinite(paths.to_numpy()).all() or not np.isfinite(bootstrap).all():
         _invalid("Os parâmetros e o histórico produziram valores não finitos; não é possível apresentar estes cenários.")
     final = paths.iloc[-1]
@@ -162,8 +163,14 @@ def compute_simulation(portfolio, params: SimulationRequest, today=None):
     distribution = {"minimum": stats["minimum"], "q1": float(final.quantile(.25)), "median": float(final.quantile(.5)),
                     "q3": float(final.quantile(.75)), "maximum": stats["maximum"], "mean": stats["mean_terminal"],
                     "standard_deviation": float(final.std(ddof=1))}
-    fan = paths.quantile(q=np.array([5, 25, 50, 75, 95]) / 100, axis=1).T
-    fan.columns = ["P5", "P25", "P50", "P75", "P95"]
+    # Percentile selection copies its input. Limit each copy to 128 days, still using every path.
+    percentiles = [5, 25, 50, 75, 95]
+    path_values = paths.to_numpy()
+    fan_values = np.empty((len(paths), len(percentiles)))
+    for first in range(0, len(paths), 128):
+        rows = path_values[first:first + 128]
+        fan_values[first:first + len(rows)] = np.percentile(rows, percentiles, axis=1).T
+    fan = pd.DataFrame(fan_values, index=paths.index, columns=["P5", "P25", "P50", "P75", "P95"])
     # Plotly deep-copies each trace. Reusing ISO strings avoids copying and serializing
     # tens of thousands of Python datetime objects for long simulation horizons.
     chart_dates = paths.index.strftime("%Y-%m-%d").tolist()
