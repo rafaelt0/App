@@ -4,6 +4,7 @@ import time
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 from utils import market_data
 from utils.market_data import (
@@ -228,3 +229,61 @@ def test_yahoo_info_does_not_block_behind_download_lock(monkeypatch):
         worker.join(2.0)
     market_data.get_yahoo_info.clear()
     assert result["info"] == {"regularMarketPrice": 225.0}
+
+
+def test_session_change_uses_the_adjacent_close_and_skips_gaps():
+    closes = [142.99, 142.65, 141.8, 140.69, 141.68]
+    assert market_data.session_change(closes, 141.68) == pytest.approx(141.68 / 140.69 - 1)
+    assert market_data.session_change(closes, 141.70) == pytest.approx(141.70 / 141.68 - 1)
+    assert market_data.session_change([10.0, None, 12.0], 12.0) is None
+    assert market_data.session_change([10.0, None], 11.0) is None
+    assert market_data.session_change([10.0], 10.0) is None
+    assert market_data.session_change(None, 10.0) is None
+
+
+def test_yahoo_moves_quote_the_last_session_and_drop_invalid_rows(monkeypatch):
+    def row(symbol, price, closes, currency="BRL", hint=2, stamp=1795120200):
+        return {"symbol": symbol, "response": [{"meta": {
+            "symbol": symbol, "currency": currency, "regularMarketTime": stamp, "regularMarketPrice": price,
+            "chartPreviousClose": 1.0, "priceHint": hint, "exchangeTimezoneName": "America/Sao_Paulo",
+        }, "indicators": {"quote": [{"close": closes}]}}]}
+
+    def fetch(url, *, params, **kwargs):
+        assert params["range"] == "5d" and params["interval"] == "1d"
+        assert params["symbols"] == "HGLG11.SA,INVALID"
+        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"spark": {"result": [
+            row("HGLG11.SA", 141.68, [142.99, 140.69, 141.68]),
+            row("INVALID", 42, [40, 42], currency="US"),
+            row("UNREQUESTED", 9, [8, 9]),
+        ]}})
+
+    monkeypatch.setattr(market_data, "_fetch_public_market_data", fetch)
+    moves = market_data.get_yahoo_moves.__wrapped__(("HGLG11.SA", "INVALID"))
+    assert set(moves) == {"HGLG11.SA"}
+    assert moves["HGLG11.SA"]["price"] == 141.68
+    assert moves["HGLG11.SA"]["currency"] == "BRL"
+    assert moves["HGLG11.SA"]["digits"] == 2
+    assert moves["HGLG11.SA"]["change"] == pytest.approx(141.68 / 140.69 - 1)
+    assert moves["HGLG11.SA"]["as_of"] == "2026-11-19"
+
+
+def test_monitor_quotes_keep_market_prices_and_leave_modeled_rates_blank(monkeypatch):
+    def moves(symbols):
+        assert "HGLG11.SA" in symbols and "AAPL" in symbols and "BRL=X" in symbols and "BTC-USD" in symbols
+        assert "CDI" not in symbols and "CDB-110CDI" not in symbols and "IPCA+6" not in symbols
+        return {
+            "HGLG11.SA": {"price": 141.68, "change": 0.007, "currency": "BRL", "digits": 2, "as_of": "2026-11-24", "source": "Yahoo Finance"},
+            "AAPL": {"price": 351.03, "change": -0.002, "currency": "USD", "digits": 2, "as_of": "2026-11-24", "source": "Yahoo Finance"},
+            "BTC-USD": {"price": 59716.1, "change": 0.01, "currency": "USD", "digits": 2, "as_of": "2026-11-24", "source": "Yahoo Finance"},
+        }
+
+    monkeypatch.setattr(market_data, "get_yahoo_moves", moves)
+    result = market_data.monitor_quotes(("HGLG11", "AAPL", "BTC-USD", "USDBRL=X", "CDI", "CDB-110CDI", "IPCA+6", "TESOURO-SELIC", "NOTREAL"))
+    assert result["quotes"]["HGLG11"]["price"] == 141.68
+    assert result["quotes"]["HGLG11"]["symbol"] == "HGLG11.SA"
+    assert result["quotes"]["AAPL"]["currency"] == "USD"
+    assert result["quotes"]["BTC-USD"]["price"] == 59716.1
+    assert "USDBRL=X" not in result["quotes"]
+    assert result["unquoted"] == ["CDI", "CDB-110CDI", "IPCA+6", "TESOURO-SELIC"]
+    assert result["missing"] == ["USDBRL=X", "NOTREAL"]
+    assert all("price" not in result or ticker not in result["quotes"] for ticker in result["unquoted"] + result["missing"])

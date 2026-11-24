@@ -37,7 +37,8 @@ _capacity = asyncio.Semaphore(2)
 # Shared market data with no owner state: answering them never needs a session,
 # so a first visit's parallel requests do not each mint their own cookie.
 PUBLIC_ROUTES = {("GET", "/api/universe"), ("GET", "/api/universe/search"), ("GET", "/api/universe/liquidity"),
-                 ("GET", "/api/universe/changes"), ("GET", "/api/market/strip"), ("POST", "/api/news/market")}
+                 ("GET", "/api/universe/changes"), ("GET", "/api/market/strip"), ("GET", "/api/market/quotes"),
+                 ("POST", "/api/news/market")}
 
 
 def allowed_origin(origin: str | None) -> bool:
