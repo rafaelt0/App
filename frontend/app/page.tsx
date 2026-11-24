@@ -13,6 +13,7 @@ import { analyzeHome, currentAnalysis, refreshConsensus, refreshFundamentus, sug
 import type { HomeResult } from "../lib/home";
 
 type AnalysisAction = "analyze" | "consensus" | "source";
+type QuickAnalysis = "stay" | "scroll";
 
 export default function HomePage() {
   const { session, stocks, loading, error: appError, setSelection, toggleFavorite, refreshSession } = useApp();
@@ -25,7 +26,7 @@ export default function HomePage() {
   const [mapNote, setMapNote] = useState<{ text: string; failed?: boolean } | null>(null);
   const [retryAction, setRetryAction] = useState<AnalysisAction>("analyze");
   const [sectorUndo, setSectorUndo] = useState<{ tickers: string[]; revision: number } | null>(null);
-  const [quickRevision, setQuickRevision] = useState<number | null>(null);
+  const [quickAnalysis, setQuickAnalysis] = useState<{ revision: number; mode: QuickAnalysis } | null>(null);
   const generation = useRef(0);
   const selectionPending = useRef(false);
   const results = useRef<HTMLDivElement>(null);
@@ -40,10 +41,10 @@ export default function HomePage() {
   }, [session?.revision]);
 
   useEffect(() => {
-    if (!session || quickRevision === null || session.revision < quickRevision) return;
-    setQuickRevision(null);
-    if (session.revision === quickRevision) void run("analyze", true);
-  }, [session, quickRevision]);
+    if (!session || !quickAnalysis || session.revision < quickAnalysis.revision) return;
+    setQuickAnalysis(null);
+    if (session.revision === quickAnalysis.revision) void run("analyze", quickAnalysis.mode === "scroll");
+  }, [session, quickAnalysis]);
 
   useEffect(() => {
     if (!session) return;
@@ -64,7 +65,7 @@ export default function HomePage() {
         void run("analyze", true);
         return;
       }
-      if (quickRevision === session.revision) return;
+      if (quickAnalysis?.revision === session.revision) return;
       currentAnalysis().then(saved => {
         if (active && saved && request === generation.current && saved.revision === revision.current) setResult(saved);
       }).catch(() => {});
@@ -72,7 +73,7 @@ export default function HomePage() {
     return () => { active = false; };
   }, [session?.revision]);
 
-  async function editSelection(update: SelectionUpdate, analyze = false) {
+  async function editSelection(update: SelectionUpdate, analyze?: QuickAnalysis) {
     if (selectionPending.current) return;
     selectionPending.current = true;
     setSelecting(true);
@@ -81,7 +82,7 @@ export default function HomePage() {
       const updated = await setSelection(update);
       setSectorUndo(null);
       setMapNote(null);
-      if (analyze) setQuickRevision(updated.revision);
+      if (analyze) setQuickAnalysis({ revision: updated.revision, mode: analyze });
     } catch (cause) {
       setSelectionError((cause as Error).message);
     } finally {
@@ -90,7 +91,7 @@ export default function HomePage() {
     }
   }
 
-  function addStock(ticker: string, analyze = false) {
+  function addStock(ticker: string, analyze?: QuickAnalysis) {
     void editSelection(current => {
       if (current.includes(ticker)) return [...current];
       if (current.length >= MAX_SELECTION) throw new Error(SELECTION_FULL_MESSAGE);
@@ -175,11 +176,11 @@ export default function HomePage() {
   return <div className={`desk desk-home${selection.length || busy ? " has-selection" : ""}`}>
     <Monitor selection={selection} stocks={stocks} watchlist={session.watchlist} ready={ready} busy={disabled}
       picker={<>
-        <StockPicker selection={selection} action={selection.length ? "Adicionar" : "Analisar"} disabled={disabled || selection.length >= MAX_SELECTION} onChoose={ticker => addStock(ticker, selection.length === 0)} />
+        <StockPicker selection={selection} action={selection.length ? "Adicionar" : "Analisar"} disabled={disabled || selection.length >= MAX_SELECTION} onChoose={ticker => addStock(ticker, selection.length === 0 ? "stay" : undefined)} />
         {!!selection.length && <button type="button" className={ready ? undefined : "primary"} disabled={disabled} aria-busy={busy} onClick={() => void run("analyze", true)}>{analyzeLabel}</button>}
       </>}
-      onQuick={ticker => addStock(ticker, true)} onFavorite={ticker => void favorite(ticker)}
-      onAdd={ticker => addStock(ticker, selection.length === 0)}
+      onQuick={ticker => addStock(ticker, "scroll")} onFavorite={ticker => void favorite(ticker)}
+      onAdd={ticker => addStock(ticker, selection.length === 0 ? "scroll" : undefined)}
       onRemove={ticker => void editSelection(current => current.filter(item => item !== ticker))}
       notices={<>
         {notice && <Notice>{notice}</Notice>}
@@ -204,7 +205,7 @@ export default function HomePage() {
       </Pane>}
     </div>}
     <SectorMap stocks={stocks} selection={selection} busy={disabled} onSector={sector => void selectSector(sector)}
-      onAdd={ticker => addStock(ticker, selection.length === 0)} onRefresh={() => void run("source")}
+      onAdd={ticker => addStock(ticker, selection.length === 0 ? "scroll" : undefined)} onRefresh={() => void run("source")}
       note={mapNote && <Notice tone={mapNote.failed ? "negative" : "info"}>{mapNote.text} {undo && <button type="button" disabled={disabled} onClick={() => void editSelection(undo.tickers)}>Desfazer</button>}</Notice>} />
     <Macro />
     <Headlines />
