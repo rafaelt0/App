@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
+import { CapitalInput } from "../../components/CapitalInput";
 import { ElapsedLoading, PortfolioRequired } from "../../components/PortfolioParts";
 import { ExportButton, formatValue, Idle, Loading, Metrics, Notice, Pane, Table, useMedia } from "../../components/ui";
 import { SimulationPreview } from "../../components/Examples";
 import { tickerColor } from "../../components/Shell";
-import { api } from "../../lib/api";
+import { api, ApiError } from "../../lib/api";
 import type { PortfolioResult, Sample } from "../../lib/portfolio";
 import {
   displayedTrajectories, initialInputs, periodLabel, polishFigure, sameInputs, simulationPresets,
@@ -32,7 +33,8 @@ export default function SimulationPage() {
   const [restoreFailed, setRestoreFailed] = useState(false);
   const [restoredNotice, setRestoredNotice] = useState(false);
   const [sample, setSample] = useState<Sample | null>(null);
-  const [portfolioChanged, setPortfolioChanged] = useState(false);
+  const [canReloadPortfolio, setCanReloadPortfolio] = useState(false);
+  const [reloadingPortfolio, setReloadingPortfolio] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [foldParams, setFoldParams] = useState(false);
   const narrow = useMedia("(max-width: 900px)");
@@ -41,6 +43,7 @@ export default function SimulationPage() {
   const activeRevision = useRef(session?.revision);
   activeRevision.current = session?.revision;
   const contextRevision = session?.revision;
+  const contextPortfolioId = session?.portfolio_id ?? null;
   const returnReady = session?.simulation_ready ?? false;
   const restoredContext = session?.restored ?? false;
   const portfolioReady = session?.portfolio_ready ?? false;
@@ -56,12 +59,12 @@ export default function SimulationPage() {
     setPortfolio(null);
     setResult(null);
     setError(null);
+    setCanReloadPortfolio(false);
     setRestoreFailed(false);
     setRunning(false);
     if (!hasPortfolioContext) {
       restoreRequest.current = null;
       setPreparing(false);
-      setPortfolioChanged(false);
       setRestoredNotice(false);
       setSample(null);
       return;
@@ -75,8 +78,8 @@ export default function SimulationPage() {
           }
           await restoreRequest.current.promise;
           if (cancelled || activeRevision.current !== revision || token !== generation.current) return;
-          setRestoredNotice(true);
           await refreshSessionRef.current();
+          return;
         }
         // Reads only: the owned analysis and last run for this selection are shown, never recalculated.
         const [snapshot, analysis, run] = await Promise.all([
@@ -85,11 +88,22 @@ export default function SimulationPage() {
           api<SimulationResult | null>("/api/simulation/current"),
         ]);
         if (cancelled || activeRevision.current !== revision || token !== generation.current) return;
+        if (snapshot.revision !== revision || snapshot.id !== contextPortfolioId) {
+          await refreshSessionRef.current();
+          if (!cancelled && token === generation.current) {
+            setError("O contexto da carteira mudou. Atualize a carteira para continuar.");
+            setCanReloadPortfolio(true);
+          }
+          return;
+        }
         setPortfolio(snapshot);
         setSample(analysis?.sample ?? null);
+        setRestoredNotice(analysis?.restored === true);
         if (run) {
-          const { calibration, simulations, initial_capital, years } = run.inputs;
-          setInputs({ calibration, simulations, initial_capital, years });
+          if (reloadKey === 0) {
+            const { calibration, simulations, initial_capital, years } = run.inputs;
+            setInputs({ calibration, simulations, initial_capital, years });
+          }
           setResult(run);
           setFoldParams(true);
           setDisplayCount(Math.min(10, run.inputs.simulations));
@@ -99,6 +113,7 @@ export default function SimulationPage() {
         if (!cancelled && activeRevision.current === revision && token === generation.current) {
           setError(cause instanceof Error ? cause.message : String(cause));
           setRestoreFailed(!returnReady && (restoredContext || portfolioReady));
+          setCanReloadPortfolio(true);
         }
       } finally {
         if (!cancelled && token === generation.current) setPreparing(false);
@@ -107,18 +122,31 @@ export default function SimulationPage() {
     void prepare();
     return () => { cancelled = true; };
     // Session readiness, not result or form state, controls portfolio restoration.
-  }, [loading, contextRevision, hasPortfolioContext, returnReady, portfolioReady, restoredContext, reloadKey]);
+  }, [loading, contextRevision, contextPortfolioId, hasPortfolioContext, returnReady, portfolioReady, restoredContext, reloadKey]);
+
+  async function reloadPortfolio() {
+    setReloadingPortfolio(true);
+    try {
+      await refreshSession();
+      restoreRequest.current = null;
+      setReloadKey(key => key + 1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setReloadingPortfolio(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || !portfolio?.id || !portfolio.simulation_ready || !inputsValid) return;
+    if (!session || !portfolio?.id || !ready || !inputsValid || reloadingPortfolio) return;
     const token = ++generation.current;
     const revision = session.revision;
     const portfolioId = portfolio.id;
     const submitted = { ...inputs, revision, portfolio_id: portfolioId };
     setRunning(true);
     setError(null);
-    setPortfolioChanged(false);
+    setCanReloadPortfolio(false);
     try {
       const calculated = await api<SimulationResult>("/api/simulation/run", submitted);
       if (token !== generation.current || activeRevision.current !== revision || calculated.portfolio_id !== portfolioId) return;
@@ -126,12 +154,13 @@ export default function SimulationPage() {
       setFoldParams(true);
       setDisplayCount(Math.min(10, calculated.inputs.simulations));
       setDisplayDraft(String(Math.min(10, calculated.inputs.simulations)));
-      await refreshSession();
     } catch (cause) {
       if (token === generation.current && activeRevision.current === revision) {
         const message = cause instanceof Error ? cause.message : String(cause);
         setError(message);
-        setPortfolioChanged(/mudou/.test(message));
+        const recoverable = cause instanceof ApiError && [409, 502, 503, 504].includes(cause.status);
+        setCanReloadPortfolio(recoverable);
+        if (recoverable) await refreshSession().catch(() => {});
       }
     } finally {
       if (token === generation.current) setRunning(false);
@@ -148,7 +177,7 @@ export default function SimulationPage() {
   const inputsValid = simulationsValid && capitalValid && yearsValid;
   const calibrationText = inputs.calibration === "portfolio" ? "histórico do portfólio" : `últimos ${inputs.calibration} anos até hoje`;
   const individual = useMemo(() => visible ? displayedTrajectories(visible.charts.individual, displayCount) : null, [visible, displayCount]);
-  const ready = hasPortfolioContext && !!portfolio?.id && portfolio.simulation_ready && portfolio.revision === session?.revision;
+  const ready = hasPortfolioContext && !!portfolio?.id && portfolio.simulation_ready && portfolio.id === contextPortfolioId && portfolio.revision === contextRevision;
   const rawWeights = portfolio ? portfolio.tickers.map(ticker => ({ ticker, weight: portfolio.weights[ticker] })) : [];
   const total = rawWeights.reduce((sum, row) => sum + row.weight, 0);
   const allocation = visible?.allocation ?? rawWeights.map(row => ({ ticker: row.ticker, weight: row.weight / total }));
@@ -167,30 +196,30 @@ export default function SimulationPage() {
     <span className="weights-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(1, row.weight)) * 100}%` }} /></span>
     <span className="weights-value">{percent.format(row.weight)}</span>
   </li>)}</ul>;
+  const canRetryRestore = hasPortfolioContext && restoreFailed;
   const notes = <>
     {sessionError && <Notice tone="negative">{sessionError}</Notice>}
-    {error && <Notice tone="negative">{error}</Notice>}
-    {portfolioChanged && <Notice tone="warning">A carteira mudou em outra aba ou página. <button type="button" onClick={() => { setPortfolioChanged(false); setError(null); setReloadKey(key => key + 1); void refreshSession(); }}>Atualizar carteira</button></Notice>}
+    {error && <Notice tone="negative">{error}{canReloadPortfolio && <button type="button" disabled={reloadingPortfolio} onClick={() => void reloadPortfolio()}>
+      {reloadingPortfolio ? "Atualizando carteira…" : canRetryRestore ? "Tentar carregar novamente" : "Atualizar carteira"}
+    </button>}</Notice>}
   </>;
 
   if (loading || (hasPortfolioContext && preparing)) return <div className="desk">{notes}<Loading>Restaurando contexto da carteira…</Loading></div>;
   const preview = <details className="disclosure"><summary>Ver prévia da simulação</summary>
     <div className="board is-preview"><SimulationPreview /></div>
   </details>;
-  const canRetryRestore = hasPortfolioContext && restoreFailed;
   if (!ready) return <>
     {notes}
     <PortfolioRequired count={session?.selection.length ?? 0} feature="simular cenários"
       allowSetup={contextRevision !== undefined && !hasPortfolioContext}
       title={canRetryRestore ? "Não foi possível carregar o histórico da carteira" : undefined}>
-      {canRetryRestore && <button type="button" onClick={() => { restoreRequest.current = null; setReloadKey(key => key + 1); }}>Tentar carregar novamente</button>}
       {preview}
     </PortfolioRequired>
   </>;
 
   // Keep the compact setup header above results.
   const folded = foldParams && (!!visible || running);
-  const recap = `${yearsLabel(inputs.years)} · ${number.format(inputs.simulations)} trajetórias · ${formatValue(inputs.initial_capital, "money", 0)}`;
+  const recap = `${yearsLabel(inputs.years)} · ${number.format(inputs.simulations)} trajetórias · ${formatValue(inputs.initial_capital, "money", 2)}`;
   return <div className="desk desk-split">
     <Pane title="Cenário da simulação" className="pane-params" meta={folded && narrow ? recap : portfolio?.mode ?? undefined} narrowCollapsed={folded}>
       {restoredNotice && <Notice>Carteira salva restaurada. Confira ativos e pesos antes de rodar.</Notice>}
@@ -204,7 +233,7 @@ export default function SimulationPage() {
         </div>
         <h3 className="pane-sub">Parâmetros</h3>
         {field("n", "Número de simulações (trajetórias)", simulationsValid, "Entre 10 e 3.000.", "Use um número inteiro entre 10 e 3.000.", inputs.simulations, value => setInputs(current => ({ ...current, simulations: value })), { min: 10, max: 3000 })}
-        {field("c", "Capital inicial (R$)", capitalValid, "Mínimo de R$ 100.", "Informe um valor de pelo menos R$ 100.", inputs.initial_capital, value => setInputs(current => ({ ...current, initial_capital: value })), { min: 100 })}
+        <CapitalInput label="Capital inicial" value={inputs.initial_capital} disabled={running} help="Mínimo de R$ 100." error={capitalValid ? undefined : "Informe um valor de pelo menos R$ 100."} onChange={value => setInputs(current => ({ ...current, initial_capital: value }))} />
         {field("y", "Horizonte (anos)", yearsValid, "Entre 1 e 10 anos.", "Use um número inteiro entre 1 e 10 anos.", inputs.years, value => setInputs(current => ({ ...current, years: value })), { min: 1, max: 10 })}
         <label>Histórico de referência
           <select disabled={running} aria-describedby="sim-help-w" value={String(inputs.calibration)} onChange={event => setInputs(current => ({ ...current, calibration: (event.target.value === "portfolio" ? "portfolio" : Number(event.target.value)) as CalibrationWindow }))}>
@@ -212,7 +241,7 @@ export default function SimulationPage() {
           </select>
           <span className="param-hint" id="sim-help-w">Histórico usado para estimar retornos e risco.</span>
         </label>
-        <div className="param-run"><button type="submit" className="primary" disabled={running || !inputsValid}>{running ? "Simulando…" : "Simular carteira"}</button></div>
+        <div className="param-run"><button type="submit" className="primary" disabled={running || reloadingPortfolio || !inputsValid}>{running ? "Simulando…" : "Simular carteira"}</button></div>
       </form>
       <details className="disclosure"><summary>Carteira usada · {allocation.length} ativos</summary><div>
         {sample && <p className="param-hint">Calibração: {calibrationText}. Histórico: {periodLabel(sample)} ({number.format(sample.count)} retornos diários).</p>}
@@ -223,7 +252,7 @@ export default function SimulationPage() {
       <details className="disclosure"><summary>Premissas e calibração</summary><div><p>A janela de calibração não altera os pesos. Janelas maiores podem reduzir o erro-padrão estimado, mas incluem regimes mais antigos.</p><p>O horizonte é independente da janela: 252 dias úteis por ano, até 10 anos. As datas simuladas incluem dias de semana, não o calendário de feriados da B3.</p></div></details>
     </Pane>
     <div className={`board${visible ? "" : " is-preview"}`}>
-      {(sessionError || error || portfolioChanged || stale || (running && visible) || (visible && visible.warnings.length > 0)) && <div className="span-12 board-notes">
+      {(sessionError || error || stale || (running && visible) || (visible && visible.warnings.length > 0)) && <div className="span-12 board-notes">
         {notes}
         {running && visible && <ElapsedLoading>Calculando o novo cenário. Os dados abaixo são da simulação anterior.</ElapsedLoading>}
         {stale && !running && <div role="status"><Notice tone="warning">Os dados abaixo são da última simulação. Clique em “Simular carteira” para aplicar o cenário atual.</Notice></div>}

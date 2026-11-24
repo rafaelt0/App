@@ -19,6 +19,15 @@ export function api<T>(path: string, body?: unknown, method?: string): Promise<T
   return track(request<T>(path, body, method));
 }
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, body?: unknown, method?: string): Promise<T> {
   const response = await fetch(path, {
     method: method ?? (body === undefined ? "GET" : "POST"),
@@ -28,14 +37,16 @@ async function request<T>(path: string, body?: unknown, method?: string): Promis
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
-    let message = `Não foi possível concluir a solicitação (${response.status}).`;
+    let message = [502, 503, 504].includes(response.status)
+      ? "O serviço está temporariamente indisponível. Tente novamente em instantes."
+      : `Não foi possível concluir a solicitação (${response.status}).`;
     try {
       const problem: { detail?: string | { msg: string }[]; message?: string } = await response.json();
       if (typeof problem.detail === "string") message = problem.detail;
       else if (Array.isArray(problem.detail)) message = "Confira os dados informados e tente novamente.";
       else if (problem.message) message = problem.message;
     } catch {}
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
   return response.json() as Promise<T>;
 }
