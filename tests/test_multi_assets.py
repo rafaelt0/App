@@ -557,17 +557,17 @@ def test_historical_stress_uses_portuguese_month_names():
     assert rows[0]["Período"] == "Nov/2024 → Dez/2024"
 
 
-def test_all_catalog_us_stocks_have_bundled_logos():
+@pytest.mark.parametrize("asset_class", ["acao_us", "fii"])
+def test_catalog_assets_have_bundled_logos(asset_class):
     import json
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
     manifest = json.loads((root / "frontend/lib/stock-logo-manifest.json").read_text(encoding="utf-8"))
     by_ticker = {ticker: entry["asset"] for entry in manifest for ticker in entry["tickers"]}
-    us_tickers = [t for t, item in assets.EXTRA_ASSETS_BY_TICKER.items() if item["asset_class"] == "acao_us"]
-    missing = [t for t in us_tickers if t not in by_ticker]
-    assert missing == []
-    for ticker in us_tickers:
+    tickers = {ticker for ticker, item in assets.EXTRA_ASSETS_BY_TICKER.items() if item["asset_class"] == asset_class}
+    assert not (tickers - by_ticker.keys())
+    for ticker in tickers:
         asset_path = root / "frontend/public/stock-logos" / by_ticker[ticker]
         assert asset_path.is_file() and asset_path.stat().st_size > 100
 

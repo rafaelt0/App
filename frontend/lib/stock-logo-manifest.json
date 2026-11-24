@@ -655,7 +655,11 @@
     "tickers": [
       "BPAC11",
       "BPAC3",
-      "BPAC5"
+      "BPAC5",
+      "BCFF11",
+      "BRCR11",
+      "BTCI11",
+      "BTLG11"
     ],
     "asset": "bpac11.svg",
     "author": "BTGP BANCO",
@@ -3884,5 +3888,318 @@
     "license": "Issuer trademark; no reuse license stated by the asset source",
     "source": "https://parqet.com/",
     "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/MO?format=svg"
+  },
+  {
+    "company": "Alianza",
+    "tickers": [
+      "ALZR11"
+    ],
+    "asset": "alzr11.png",
+    "author": "Alianza",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://alianza.riweb.com.br/",
+    "sourceAssetUrl": "https://alianza.riweb.com.br/assets/img/favicon.png"
+  },
+  {
+    "company": "Bresco",
+    "tickers": [
+      "BRCO11"
+    ],
+    "asset": "brco11.png",
+    "author": "Bresco",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://bresco.com.br/",
+    "sourceAssetUrl": "https://bresco.com.br/wp-content/uploads/2023/11/cropped-favicon-192x192.png"
+  },
+  {
+    "company": "Capitânia",
+    "tickers": [
+      "CPTS11"
+    ],
+    "asset": "cpts11.svg",
+    "author": "Capitânia",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/CPTS11.svg"
+  },
+  {
+    "company": "Fator",
+    "tickers": [
+      "VRTA11"
+    ],
+    "asset": "vrta11.svg",
+    "author": "Fator",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VRTA11.svg"
+  },
+  {
+    "company": "FG/A",
+    "tickers": [
+      "FGAA11"
+    ],
+    "asset": "fgaa11.svg",
+    "author": "FG/A",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://fga.com.br/fgaa11/",
+    "sourceAssetUrl": "https://fga.com.br/assets/images/fga-logo.svg"
+  },
+  {
+    "company": "GGR Covepi Renda",
+    "tickers": [
+      "GGRC11"
+    ],
+    "asset": "ggrc11.png",
+    "author": "GGR Covepi Renda",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.ggrc11.com.br/",
+    "sourceAssetUrl": "https://cdn.prod.website-files.com/6257b0cf612d9f7699f4323c/625cfc1daa402b78074fb398_favicon-ggr.png"
+  },
+  {
+    "company": "Guardian Gestora",
+    "tickers": [
+      "GARE11"
+    ],
+    "asset": "gare11.png",
+    "author": "Guardian Gestora",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.guardian-asset.com/gare11",
+    "sourceAssetUrl": "https://www.guardian-asset.com/favicon.png?v=3"
+  },
+  {
+    "company": "Hedge Investments",
+    "tickers": [
+      "HFOF11",
+      "HGBS11"
+    ],
+    "asset": "hedge-investments.svg",
+    "author": "Hedge Investments",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/HGBS11.svg"
+  },
+  {
+    "company": "HSI",
+    "tickers": [
+      "HSML11"
+    ],
+    "asset": "hsml11.png",
+    "author": "HSI",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.hsinvest.com/fundos-listados/hsi-malls/",
+    "sourceAssetUrl": "https://cdn-sites-assets.mziq.com/wp-content/uploads/sites/1590/2026/05/180x180_6a01e7c43ce07.png"
+  },
+  {
+    "company": "Iridium Gestão de Recursos",
+    "tickers": [
+      "IRDM11"
+    ],
+    "asset": "irdm11.png",
+    "author": "Iridium Gestão de Recursos",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://iridiumgestao.com.br/recebiveis-imobiliarios/",
+    "sourceAssetUrl": "https://iridiumgestao.com.br/wp-content/uploads/2019/08/logo_iridium-1.png"
+  },
+  {
+    "company": "Itaú Asset",
+    "tickers": [
+      "RURA11"
+    ],
+    "asset": "rura11.svg",
+    "author": "Itaú Asset",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RURA11.svg"
+  },
+  {
+    "company": "JiveMauá",
+    "tickers": [
+      "MCCI11"
+    ],
+    "asset": "mcci11.svg",
+    "author": "JiveMauá",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://jivemaua.com.br/fundos/mcci11/",
+    "sourceAssetUrl": "https://jivemaua.com.br/icon.svg"
+  },
+  {
+    "company": "JS Real Estate",
+    "tickers": [
+      "JSRE11"
+    ],
+    "asset": "jsre11.svg",
+    "author": "JS Real Estate",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/JSRE11.svg"
+  },
+  {
+    "company": "Kilima Asset",
+    "tickers": [
+      "KISU11"
+    ],
+    "asset": "kisu11.svg",
+    "author": "Kilima Asset",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/KISU11.svg"
+  },
+  {
+    "company": "Kinea",
+    "tickers": [
+      "KDIF11",
+      "KFOF11",
+      "KNCA11",
+      "KNCR11",
+      "KNHY11",
+      "KNIP11",
+      "KNRI11",
+      "KNSC11",
+      "KNUQ11"
+    ],
+    "asset": "kinea.svg",
+    "author": "Kinea",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/KNRI11.svg"
+  },
+  {
+    "company": "Pátria Investimentos",
+    "tickers": [
+      "CVBI11",
+      "HGCR11",
+      "HGLG11",
+      "HGRE11",
+      "HGRU11",
+      "LVBI11",
+      "MALL11",
+      "PCIP11",
+      "PMLL11",
+      "PVBI11",
+      "RBRR11",
+      "RBRY11"
+    ],
+    "asset": "patria.svg",
+    "author": "Pátria Investimentos",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/HGLG11.svg"
+  },
+  {
+    "company": "RBR Asset",
+    "tickers": [
+      "RBRF11"
+    ],
+    "asset": "rbrf11.png",
+    "author": "RBR Asset",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://www.rbrasset.com.br/",
+    "sourceAssetUrl": "https://www.rbrasset.com.br/wp-content/uploads/2025/07/cropped-Clip-path-group-150x150.png"
+  },
+  {
+    "company": "REC Gestão de Recursos",
+    "tickers": [
+      "RECR11"
+    ],
+    "asset": "recr11.svg",
+    "author": "REC Gestão de Recursos",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RECR11.svg"
+  },
+  {
+    "company": "Rio Bravo",
+    "tickers": [
+      "RBVA11"
+    ],
+    "asset": "rbva11.svg",
+    "author": "Rio Bravo",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RBVA11.svg"
+  },
+  {
+    "company": "Riza Asset",
+    "tickers": [
+      "RZTR11"
+    ],
+    "asset": "rztr11.svg",
+    "author": "Riza Asset",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/RZTR11.svg"
+  },
+  {
+    "company": "Sparta",
+    "tickers": [
+      "CDII11",
+      "JURO11"
+    ],
+    "asset": "sparta.svg",
+    "author": "Sparta",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/JURO11.svg"
+  },
+  {
+    "company": "TG Core Asset",
+    "tickers": [
+      "TGAR11"
+    ],
+    "asset": "tgar11.svg",
+    "author": "TG Core Asset",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TGAR11.svg"
+  },
+  {
+    "company": "TRX",
+    "tickers": [
+      "TRXF11"
+    ],
+    "asset": "trxf11.svg",
+    "author": "TRX",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/TRXF11.svg"
+  },
+  {
+    "company": "Valora Investimentos",
+    "tickers": [
+      "VGHF11",
+      "VGIA11",
+      "VGIP11"
+    ],
+    "asset": "valora.svg",
+    "author": "Valora Investimentos",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VGIP11.svg"
+  },
+  {
+    "company": "Vinci",
+    "tickers": [
+      "VILG11",
+      "VISC11"
+    ],
+    "asset": "vinci.svg",
+    "author": "Vinci",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/VISC11.svg"
+  },
+  {
+    "company": "XP Asset",
+    "tickers": [
+      "MXRF11",
+      "XPCI11",
+      "XPLG11",
+      "XPML11"
+    ],
+    "asset": "xp-asset.svg",
+    "author": "XP Asset",
+    "license": "Trademark; no reuse license stated by the asset source",
+    "source": "https://brapi.dev/docs/acoes/list",
+    "sourceAssetUrl": "https://icons.brapi.dev/icons/XPML11.svg"
   }
 ]
