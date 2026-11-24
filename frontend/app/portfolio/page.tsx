@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp, type SelectionUpdate } from "../../components/AppProvider";
 import StockPicker from "../../components/StockPicker";
 import Chart from "../../components/Chart";
+import { CapitalInput } from "../../components/CapitalInput";
 import { Diagnostics, ExportButton, formatValue, Idle, Loading, Metrics, Notice, Pane, Table, useMedia } from "../../components/ui";
 import { PortfolioPreview } from "../../components/Examples";
 import { tickerColor } from "../../components/Shell";
@@ -51,6 +52,7 @@ export default function PortfolioPage() {
   const [result, setResult] = useState<PortfolioResult | null>(null);
   const [resultKey, setResultKey] = useState("");
   const [busy, setBusy] = useState(false);
+  const [capitalEditing, setCapitalEditing] = useState(false);
   const [selectionBusy, setSelectionBusy] = useState(false);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -179,9 +181,11 @@ export default function PortfolioPage() {
   }, [session?.revision, session?.portfolio_ready, session?.restored]);
   useEffect(() => {
     if (busy || !session || loadedSelection !== selectionKey || lastSubmitted.current === fingerprint || !validInputs || !manualValid) return;
+    // A capital field still focused keeps its focus: disabling the input mid-edit would blur it.
+    if (capitalEditing) return;
     const timer = window.setTimeout(() => void runAnalysisRef.current(), AUTO_RECALC_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [fingerprint, loadedSelection, selectionKey, session, busy, validInputs, manualValid]);
+  }, [fingerprint, loadedSelection, selectionKey, session, busy, validInputs, manualValid, capitalEditing]);
 
   async function changeSelection(tickers: SelectionUpdate) {
     if (selectionBusy || busy) return;
@@ -230,7 +234,7 @@ export default function PortfolioPage() {
   const sections: [string, string][] = activeResult ? [["pf-resumo", "Resumo"], ["pf-pesos", "Pesos"], ["pf-valor", "Valor"], ["pf-compra", "Compra"], ...(activeResult.charts.frontier ? [["pf-fronteira", "Fronteira"]] as [string, string][] : []), ...(activeResult.charts.drawdown ? [["pf-drawdown", "Drawdown"]] as [string, string][] : []), ["pf-mensal", "Mensal"], ...(activeResult.stress ? [["pf-stress", "Stress"]] as [string, string][] : []), ["pf-risco", "Risco"], ...(activeResult.charts.rolling_beta || activeResult.charts.rolling_sharpe ? [["pf-moveis", "Móveis"]] as [string, string][] : [])] : [];
   // The compact setup header stays above results so it is easy to find and reopen.
   const folded = foldParams && (!!activeResult || busy || staleResult);
-  const recap = [windowLabels[windowChoice] ?? `${inputs.lookback_days} dias`, strategyShort[inputs.strategy], formatValue(inputs.capital, "money", 0)].join(" · ");
+  const recap = [windowLabels[windowChoice] ?? `${inputs.lookback_days} dias`, strategyShort[inputs.strategy], formatValue(inputs.capital, "money", 2)].join(" · ");
 
   return <div className="desk desk-split">
     <Pane title="Montar carteira" className="pane-params" meta={folded && narrow ? recap : `${count}/${MAX_SELECTION} ativos`} narrowCollapsed={folded}>
@@ -256,7 +260,7 @@ export default function PortfolioPage() {
           <option value="730">2 Anos (Padrão)</option><option value="365">1 Ano</option><option value="1095">3 Anos</option><option value="1825">5 Anos</option><option value="180">6 Meses</option><option value="custom">Personalizado (Dias)</option>
         </select></label>
         {windowChoice === "custom" && <label>Dias de histórico<input type="number" disabled={busy} min={60} max={5000} step={10} value={customDays} onChange={event => { const days = Number(event.target.value); setCustomDays(days); setInputs(previous => ({ ...previous, lookback_days: days })); }} /></label>}
-        <label>Capital disponível (R$)<input type="number" disabled={busy} min={100} max={1000000} step={100} value={inputs.capital} onChange={event => setInputs(previous => ({ ...previous, capital: Number(event.target.value) }))} /></label>
+        <CapitalInput label="Capital disponível" value={inputs.capital} disabled={busy} max={1000000} help="Entre R$ 100 e R$ 1.000.000." error={Number.isFinite(inputs.capital) && inputs.capital >= 100 && inputs.capital <= 1000000 ? undefined : "Informe um capital entre R$ 100 e R$ 1.000.000."} onChange={value => setInputs(previous => ({ ...previous, capital: value }))} onEditingChange={setCapitalEditing} />
         <p className="param-hint">Dados a partir de {new Date(Date.now() - inputs.lookback_days * 86400000).toLocaleDateString("pt-BR")} · dias corridos.</p>
         <h3 className="pane-sub">Estratégia</h3>
         <label>Estratégia de alocação<select disabled={busy} value={inputs.strategy} aria-describedby="strategy-help" onChange={event => setInputs(previous => ({ ...previous, strategy: event.target.value as Strategy }))}>{strategies.map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}</select></label>

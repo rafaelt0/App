@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useApp } from "../../components/AppProvider";
 import Chart from "../../components/Chart";
+import { CapitalInput } from "../../components/CapitalInput";
 import { ElapsedLoading, PortfolioRequired } from "../../components/PortfolioParts";
 import { ExportButton, formatValue, Idle, Loading, Metrics, Notice, Pane, Table, useMedia } from "../../components/ui";
 import { SimulationPreview } from "../../components/Examples";
@@ -178,7 +179,7 @@ export default function SimulationPage() {
 
   // Keep the compact setup header above results.
   const folded = foldParams && (!!visible || running);
-  const recap = `${yearsLabel(inputs.years)} · ${number.format(inputs.simulations)} trajetórias · ${formatValue(inputs.initial_capital, "money", 0)}`;
+  const recap = `${yearsLabel(inputs.years)} · ${number.format(inputs.simulations)} trajetórias · ${formatValue(inputs.initial_capital, "money", 2)}`;
   return <div className="desk desk-split">
     <Pane title="Cenário da simulação" className="pane-params" meta={folded && narrow ? recap : portfolio?.mode ?? undefined} narrowCollapsed={folded}>
       {restoredNotice && <Notice>Carteira salva restaurada. Confira ativos e pesos antes de rodar.</Notice>}
@@ -192,7 +193,7 @@ export default function SimulationPage() {
         </div>
         <h3 className="pane-sub">Parâmetros</h3>
         {field("n", "Número de simulações (trajetórias)", simulationsValid, "Entre 10 e 3.000.", "Use um número inteiro entre 10 e 3.000.", inputs.simulations, value => setInputs(current => ({ ...current, simulations: value })), { min: 10, max: 3000 })}
-        {field("c", "Capital inicial (R$)", capitalValid, "Mínimo de R$ 100.", "Informe um valor de pelo menos R$ 100.", inputs.initial_capital, value => setInputs(current => ({ ...current, initial_capital: value })), { min: 100 })}
+        <CapitalInput label="Capital inicial" value={inputs.initial_capital} disabled={running} help="Mínimo de R$ 100." error={capitalValid ? undefined : "Informe um valor de pelo menos R$ 100."} onChange={value => setInputs(current => ({ ...current, initial_capital: value }))} />
         {field("y", "Horizonte (anos)", yearsValid, "Entre 1 e 10 anos.", "Use um número inteiro entre 1 e 10 anos.", inputs.years, value => setInputs(current => ({ ...current, years: value })), { min: 1, max: 10 })}
         <label>Histórico de referência
           <select disabled={running} aria-describedby="sim-help-w" value={String(inputs.calibration)} onChange={event => setInputs(current => ({ ...current, calibration: (event.target.value === "portfolio" ? "portfolio" : Number(event.target.value)) as CalibrationWindow }))}>
