@@ -8,6 +8,7 @@ import datetime
 import logging
 import math
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -25,10 +26,12 @@ logger = logging.getLogger(__name__)
 # ponytail: one global lock serializes Fundamentus' requests.Session patch;
 # use private sessions instead if the shared fetch needs more concurrency.
 FUNDAMENTUS_REQUEST_LOCK = threading.Lock()
-# yfinance keeps state shared by the whole process (`shared._DFS` and the error
-# table), and two downloads in flight corrupt it — "dictionary changed size
-# during iteration" — or drop columns. Serialize every Yahoo call on this lock,
-# including the ones in market_strip and portfolio_data.
+# yfinance.download keeps state shared by the whole process (`shared._DFS` and
+# the error table), and two downloads in flight corrupt it — "dictionary changed
+# size during iteration" — or drop columns. Serialize every yf.download call on
+# this lock, including the ones in market_strip and portfolio_data.
+# yf.Ticker(symbol).info does not touch shared._DFS and uses YfData's own
+# cookie lock, so it runs concurrently without blocking behind bulk downloads.
 YFINANCE_REQUEST_LOCK = threading.Lock()
 DAY_SECONDS = 86400
 # Covers a weekend plus a holiday. Within it a stale quote snapshot is served at
@@ -84,9 +87,8 @@ def clean_numeric_column(col):
 
 @cache_data(ttl=900, max_entries=512, cache_if=bool)
 def get_yahoo_info(symbol):
-    """Share the full Yahoo response between analysis and analyst consensus."""
-    with YFINANCE_REQUEST_LOCK:
-        return yf.Ticker(symbol).info or {}
+    """Share the full Yahoo response between analysis, screener, and analyst consensus."""
+    return yf.Ticker(symbol).info or {}
 
 
 def _positive_number(value):
@@ -177,6 +179,75 @@ def get_fii_market_data() -> pd.DataFrame:
     frame["liq2m"] = clean_numeric_column(frame["liq2m"].str.replace(".", "", regex=False))
     frame["price"] = frame["price"].where(frame["price"].gt(0))
     frame["pvp"] = frame["pvp"].where(frame["pvp"].gt(0))
+    frame.attrs["fetched_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return frame
+
+
+@cache_data(ttl=900, stale=DAY_SECONDS, cache_if=lambda frame: not frame.empty)
+def get_us_market_data() -> pd.DataFrame:
+    """Load live Yahoo Finance fundamentals for catalog US equities; ratios/margins are fractions."""
+    from utils.assets import EXTRA_ASSETS_BY_TICKER, yahoo_equity_screener_row
+
+    entries = [
+        (ticker, item)
+        for ticker, item in EXTRA_ASSETS_BY_TICKER.items()
+        if item["asset_class"] == "acao_us" and item.get("yahoo_symbol")
+    ]
+    if not entries:
+        raise ValueError("Nenhuma ação americana configurada no catálogo.")
+
+    yfd = yf.data.YfData()
+    symbols = [item["yahoo_symbol"] for _, item in entries]
+    quotes: dict[str, dict] = {}
+    for offset in range(0, len(symbols), 50):
+        batch = symbols[offset:offset + 50]
+        try:
+            payload = yfd.get_raw_json(
+                "https://query1.finance.yahoo.com/v7/finance/quote",
+                params={"symbols": ",".join(batch)},
+                timeout=8,
+            )
+            for row in (payload.get("quoteResponse") or {}).get("result") or []:
+                sym = row.get("symbol")
+                if isinstance(sym, str):
+                    quotes[sym] = row
+        except Exception:
+            logger.warning("Yahoo Finance US batch quote unavailable for offset=%d", offset, exc_info=True)
+
+    def _fetch_summary(symbol: str) -> tuple[str, dict]:
+        try:
+            payload = yfd.get_raw_json(
+                f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}",
+                params={"modules": "financialData,defaultKeyStatistics", "formatted": "false"},
+                timeout=6,
+            )
+            results = (payload.get("quoteSummary") or {}).get("result") or []
+            if not results or not isinstance(results[0], dict):
+                return symbol, {}
+            merged = {}
+            for module in ("defaultKeyStatistics", "financialData"):
+                data = results[0].get(module)
+                if isinstance(data, dict):
+                    merged.update({k: v for k, v in data.items() if v is not None})
+            return symbol, merged
+        except Exception:
+            logger.debug("Yahoo Finance US summary unavailable for %s", symbol, exc_info=True)
+            return symbol, {}
+
+    summary_symbols = [sym for sym in symbols if sym in quotes] or symbols
+    with ThreadPoolExecutor(max_workers=min(10, max(1, len(summary_symbols)))) as pool:
+        summaries = dict(pool.map(_fetch_summary, summary_symbols))
+
+    rows = []
+    for ticker, item in entries:
+        sym = item["yahoo_symbol"]
+        combined = {**quotes.get(sym, {}), **summaries.get(sym, {})}
+        row = yahoo_equity_screener_row(ticker, item, combined)
+        if row is not None:
+            rows.append(row)
+    if not rows:
+        raise ValueError("Yahoo Finance não retornou dados para as ações americanas.")
+    frame = pd.DataFrame(rows).set_index("ticker")
     frame.attrs["fetched_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     return frame
 

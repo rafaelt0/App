@@ -190,7 +190,9 @@ export default function ScreenerPage() {
       </>}
       <p className="param-hint">{isB3 || assetClass === "fii"
         ? "Dados da Fundamentus, com atraso."
-        : `${assetClass === "all" ? "Ações B3 e FIIs usam dados da Fundamentus, com atraso. As demais classes usam valores de referência." : "Valores de referência, sem cotação ao vivo."} Valores monetários e limites usam a moeda de cada ativo, sem conversão.`}</p>
+        : assetClass === "acao_us"
+          ? "Dados do Yahoo Finance, com atraso. Valores monetários e limites usam USD, sem conversão."
+          : `${assetClass === "all" ? "Ações B3 e FIIs usam dados da Fundamentus e ações EUA usam Yahoo Finance, com atraso. As demais classes usam valores de referência." : "Valores de referência, sem cotação ao vivo."} Valores monetários e limites usam a moeda de cada ativo, sem conversão.`}</p>
     </Pane>
     <Pane title="Resultados" className="pane-screener" flush
       meta={result && !busy && !invalidCriteria ? <span role="status"><b className="scr-count">{result.matched_count}</b> de {result.total_count}{result.metrics.mean_dy !== null ? ` · Proventos / preço médios ${formatValue(result.metrics.mean_dy,"percent",2)}` : ""}{result.metrics.mean_roe !== null ? ` · ROE médio ${formatValue(result.metrics.mean_roe,"percent",2)}` : ""}{result.fetched_at ? ` · coleta há ${result.age_minutes} min`:""}</span> : <span role="status">{error || invalidCriteria ? "Resultado indisponível":"Atualizando…"}</span>}

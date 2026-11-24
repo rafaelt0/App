@@ -178,3 +178,23 @@ def test_yahoo_downloads_never_run_at_the_same_time(monkeypatch):
         worker.join(5)
 
     assert overlaps == [1, 1, 1]
+
+
+def test_yahoo_info_does_not_block_behind_download_lock(monkeypatch):
+    """Bulk yf.download warmups must never stall single-ticker Yahoo info lookups."""
+    market_data.get_yahoo_info.clear()
+    monkeypatch.setattr(market_data.yf, "Ticker", lambda symbol: SimpleNamespace(info={"regularMarketPrice": 225.0}))
+    done = threading.Event()
+    result = {}
+
+    def fetch():
+        result["info"] = market_data.get_yahoo_info("AAPL")
+        done.set()
+
+    with market_data.YFINANCE_REQUEST_LOCK:
+        worker = threading.Thread(target=fetch)
+        worker.start()
+        assert done.wait(timeout=2.0)
+        worker.join(2.0)
+    market_data.get_yahoo_info.clear()
+    assert result["info"] == {"regularMarketPrice": 225.0}

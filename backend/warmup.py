@@ -12,7 +12,13 @@ import time
 from zoneinfo import ZoneInfo
 
 from backend.news import _market_headlines
-from utils.market_data import get_fii_market_data, get_listed_stocks, get_liquidity_by_ticker, get_universe_changes
+from utils.market_data import (
+    get_fii_market_data,
+    get_liquidity_by_ticker,
+    get_listed_stocks,
+    get_universe_changes,
+    get_us_market_data,
+)
 from utils.market_strip import market_strip
 from utils.treasury_data import get_treasury_history
 
@@ -21,9 +27,21 @@ BRASILIA = ZoneInfo("America/Sao_Paulo")
 INTERVAL_SECONDS = 240
 # Regular session with margin for the opening auction and the closing call.
 SESSION_HOURS = (datetime.time(9, 45), datetime.time(18, 30))
+
+
+def _warm_yahoo_downloads() -> None:
+    """Warm Yahoo caches in order: fast strip, US equities, then bulk B3 heatmap.
+
+    Running the bulk 332-ticker B3 download last keeps the market strip instant and
+    prevents crumb/401 contention while the 73 US equities prime in parallel.
+    """
+    _warm_one("market strip", market_strip)
+    _warm_one("US equities", get_us_market_data)
+    _warm_one("universe changes", lambda: get_universe_changes(tuple(get_listed_stocks()["Ticker"])))
+
+
 TASKS = (
-    ("universe changes", lambda: get_universe_changes(tuple(get_listed_stocks()["Ticker"]))),
-    ("market strip", market_strip),
+    ("yahoo caches", _warm_yahoo_downloads),
     ("liquidity", get_liquidity_by_ticker),
     ("FIIs", get_fii_market_data),
     ("headlines", _market_headlines),

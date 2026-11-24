@@ -1,4 +1,5 @@
 """Home fundamentals, consensus and source catalog. Detail units deliberately differ from peers."""
+from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
 import logging
 import math
@@ -83,16 +84,29 @@ def recommendation(key, score):
     return "Compra forte" if value <= 1.5 else "Compra" if value <= 2.5 else "Manter" if value <= 3.5 else "Abaixo da média" if value <= 4.5 else "Venda"
 
 
-def consensus(tickers, refresh=False, asset_classes=None):
-    rows, failed, has_targets = [], [], False
-    for ticker in tickers:
-        asset_class = asset_classes[ticker] if asset_classes is not None else asset_metadata(ticker)["asset_class"]
-        if asset_class not in EQUITY_CLASSES | {"reit"}:
-            continue
+def consensus(tickers, refresh=False, asset_classes=None, skip_yahoo=None):
+    eligible = [
+        ticker for ticker in tickers
+        if (asset_classes[ticker] if asset_classes is not None else asset_metadata(ticker)["asset_class"]) in EQUITY_CLASSES | {"reit"}
+    ]
+    skip_yahoo = set(skip_yahoo or ())
+
+    def _fetch_one(ticker):
         if refresh:
             get_market_target_data.clear(ticker)
             get_yahoo_info.clear(provider_symbol(ticker))
-        market = get_market_target_data(ticker) or {}
+        if not refresh and ticker in skip_yahoo:
+            return ticker, {"_error": "Yahoo Finance indisponível"}
+        return ticker, get_market_target_data(ticker) or {}
+
+    if len(eligible) > 1:
+        with ThreadPoolExecutor(max_workers=min(8, len(eligible))) as pool:
+            fetched = list(pool.map(_fetch_one, eligible))
+    else:
+        fetched = [_fetch_one(ticker) for ticker in eligible]
+
+    rows, failed, has_targets = [], [], False
+    for ticker, market in fetched:
         if "_error" in market:
             failed.append(ticker)
             market = {}
@@ -245,8 +259,16 @@ def _extra_fundamentals_frame(tickers: list[str], b3_stocks: dict[str, dict]) ->
     quote_only = {ticker for ticker in tickers if uses_market_quote(ticker)}
     needs_fii = any(ticker not in b3_stocks and asset_metadata(ticker)["asset_class"] == "fii" for ticker in tickers)
     fii_table = load_fii_market_data() if needs_fii else pd.DataFrame()
-    details = {ticker: get_extra_asset_fundamentals(ticker, fii_table=fii_table, b3_stock=b3_stocks.get(ticker))
-               for ticker in tickers if ticker not in quote_only}
+    detail_tickers = [ticker for ticker in tickers if ticker not in quote_only]
+
+    def _load_detail(ticker):
+        return ticker, get_extra_asset_fundamentals(ticker, fii_table=fii_table, b3_stock=b3_stocks.get(ticker))
+
+    if len(detail_tickers) > 1:
+        with ThreadPoolExecutor(max_workers=min(8, len(detail_tickers))) as pool:
+            details = dict(pool.map(_load_detail, detail_tickers))
+    else:
+        details = dict(_load_detail(ticker) for ticker in detail_tickers)
     fii_quotes = {ticker for ticker, detail in details.items() if detail.get("source") == "Fundamentus · FIIs"}
     quote_tickers = quote_only | fii_quotes | {ticker for ticker, data in details.items()
                                                if not data.get("available") and ticker not in TREASURY_TITLES
@@ -464,9 +486,24 @@ def analyze(body: HomeRequest, request: Request):
         universe_frame = get_listed_stocks()
         b3_set = set(universe_frame["Ticker"])
         b3_tickers = [ticker for ticker in tickers if ticker in b3_set and asset_metadata(ticker, universe_frame)["asset_class"] == "acao_br"]
+        non_b3_tickers = [ticker for ticker in tickers if ticker not in set(b3_tickers)]
         frames = []
         covered_b3 = set()
-        if b3_tickers:
+        non_b3_raw = pd.DataFrame()
+        if b3_tickers and non_b3_tickers:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                non_b3_future = pool.submit(_extra_fundamentals_frame, non_b3_tickers, {})
+                try:
+                    raw_b3 = get_fundamentus_data(b3_tickers)
+                    if raw_b3 is not None and not raw_b3.empty:
+                        frames.append(raw_b3)
+                        covered_b3.update(normalize_detail(raw_b3).index)
+                except OSError:
+                    raise
+                except Exception:
+                    logger.warning("Fundamentus detail unavailable for %s", ", ".join(b3_tickers), exc_info=True)
+                non_b3_raw = non_b3_future.result()
+        elif b3_tickers:
             try:
                 raw_b3 = get_fundamentus_data(b3_tickers)
                 if raw_b3 is not None and not raw_b3.empty:
@@ -476,21 +513,34 @@ def analyze(body: HomeRequest, request: Request):
                 raise
             except Exception:
                 logger.warning("Fundamentus detail unavailable for %s", ", ".join(b3_tickers), exc_info=True)
-        extra_tickers = [ticker for ticker in tickers if ticker not in covered_b3]
-        if extra_tickers:
-            fallback_b3 = {ticker: asset_metadata(ticker, universe_frame) for ticker in b3_tickers if ticker not in covered_b3}
-            extra_raw = _extra_fundamentals_frame(extra_tickers, fallback_b3)
-            if not extra_raw.empty:
-                frames.append(extra_raw)
+        elif non_b3_tickers:
+            non_b3_raw = _extra_fundamentals_frame(non_b3_tickers, {})
+        if not non_b3_raw.empty:
+            frames.append(non_b3_raw)
+        missing_b3 = [ticker for ticker in b3_tickers if ticker not in covered_b3]
+        if missing_b3:
+            fallback_b3 = {ticker: asset_metadata(ticker, universe_frame) for ticker in missing_b3}
+            fallback_raw = _extra_fundamentals_frame(missing_b3, fallback_b3)
+            if not fallback_raw.empty:
+                frames.append(fallback_raw)
         raw = pd.concat(frames) if frames else pd.DataFrame()
         if raw is None or raw.empty:
-            source = "A Fundamentus" if not extra_tickers else "A fonte de dados"
+            source = "A Fundamentus" if not non_b3_tickers and not missing_b3 else "A fonte de dados"
             raise HTTPException(503, f"{source} não retornou dados para os ativos selecionados. Tente novamente.")
         peers = get_sector_peers() if b3_tickers else pd.DataFrame()
         result = build_analysis(raw, peers, tickers, universe_frame)
         if set(b3_tickers) - covered_b3:
             clear_fundamentus_cache()
-        result["consensus"] = consensus(tickers, asset_classes={item["ticker"]: item["asset_class"] for item in result["companies"]})
+        skip_yahoo = {
+            company["ticker"]
+            for company in result["companies"]
+            if company["asset_class"] in EQUITY_CLASSES | {"reit"} and company["source"] == "Nasdaq"
+        }
+        result["consensus"] = consensus(
+            tickers,
+            asset_classes={item["ticker"]: item["asset_class"] for item in result["companies"]},
+            skip_yahoo=skip_yahoo,
+        )
         result["id"] = uuid.uuid4().hex
         result["revision"] = body.revision
         export_fields = EXPORT_FIELDS

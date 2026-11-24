@@ -185,24 +185,56 @@ def test_yahoo_classification_uses_instrument_type_before_theme(symbol, quote_ty
 def test_home_uses_nasdaq_quote_when_yahoo_is_unavailable(client, monkeypatch):
     market_data.get_yahoo_info.clear()
     assets._get_nasdaq_quote.clear()
+    assets._get_nasdaq_fundamentals.clear()
     home.get_market_target_data.clear()
     yahoo_info = {}
-    nasdaq_calls = []
+    info_calls = []
     monkeypatch.setattr(market_data.yf, "Ticker", lambda symbol: SimpleNamespace(info=yahoo_info))
 
-    def nasdaq_quote(url, *, params, **kwargs):
-        nasdaq_calls.append(url)
-        assert url.endswith("/AAPL/info")
-        assert params == {"assetclass": "stocks"}
-        if len(nasdaq_calls) == 1:
-            return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"data": None})
-        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"data": {
-            "symbol": "AAPL", "assetClass": "STOCKS",
-            "primaryData": {"lastSalePrice": "$237.51", "lastTradeTimestamp": "Nov 20, 2026 4:00 PM ET"},
-            "keyStats": {"fiftyTwoWeekHighLow": {"value": "175.00 - 260.25"}},
-        }})
+    def nasdaq_http(url, *, params, **kwargs):
+        if url.endswith("/AAPL/info"):
+            info_calls.append(url)
+            assert params == {"assetclass": "stocks"}
+            if len(info_calls) == 1:
+                return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"data": None})
+            return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"data": {
+                "symbol": "AAPL", "assetClass": "STOCKS",
+                "primaryData": {"lastSalePrice": "$237.51", "lastTradeTimestamp": "Nov 20, 2026 4:00 PM ET"},
+                "keyStats": {"fiftyTwoWeekHighLow": {"value": "175.00 - 260.25"}},
+            }})
+        if url.endswith("/AAPL/summary"):
+            return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"data": {
+                "summaryData": {
+                    "Sector": {"value": "Technology"},
+                    "Industry": {"value": "Computer Manufacturing"},
+                    "MarketCap": {"value": "4,000,000,000,000"},
+                    "ShareVolume": {"value": "10,000,000"},
+                    "Yield": {"value": "0.50%"},
+                },
+            }})
+        if url.endswith("/AAPL/financials"):
+            return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"data": {
+                "financialRatiosTable": {"rows": [
+                    {"value1": "Current Ratio", "value2": "125.0%"},
+                    {"value1": "Operating Margin", "value2": "30.0%"},
+                    {"value1": "Profit Margin", "value2": "25.0%"},
+                    {"value1": "After Tax ROE", "value2": "100.0%"},
+                ]},
+                "incomeStatementTable": {"rows": [
+                    {"value1": "Operating Income", "value2": "$120,000,000"},
+                    {"value1": "Net Income", "value2": "$100,000,000"},
+                ]},
+                "balanceSheetTable": {"rows": [
+                    {"value1": "Cash and Cash Equivalents", "value2": "$40,000,000"},
+                    {"value1": "Short-Term Investments", "value2": "$10,000,000"},
+                    {"value1": "Short-Term Debt / Current Portion of Long-Term Debt", "value2": "$20,000,000"},
+                    {"value1": "Long-Term Debt", "value2": "$80,000,000"},
+                    {"value1": "Total Equity", "value2": "$100,000,000"},
+                ]},
+            }})
+        raise AssertionError(f"unexpected url: {url}")
 
-    monkeypatch.setattr(assets.requests, "get", nasdaq_quote)
+    monkeypatch.setattr(assets.requests, "get", nasdaq_http)
     client.get("/api/session")
     selected = client.put("/api/session/selection", headers=HEADERS, json={"tickers": ["AAPL"], "revision": 0})
     payload = {"tickers": ["AAPL"], "revision": selected.json()["revision"]}
@@ -217,9 +249,20 @@ def test_home_uses_nasdaq_quote_when_yahoo_is_unavailable(client, monkeypatch):
         assert company["source"] == "Nasdaq"
         assert company["market"] == {
             "price": 237.51, "currency": "USD", "last_quote_date": "2026-11-20",
-            "low_52w": 175.0, "high_52w": 260.25, "volume_2m": None, "market_cap": None,
+            "low_52w": 175.0, "high_52w": 260.25, "volume_2m": pytest.approx(2_375_100_000.0),
+            "market_cap": 4_000_000_000_000.0,
         }
-        assert company["indicators_available"] is False
+        assert company["indicators_available"] is True
+        assert company["indicators"]["pl"] == pytest.approx(40.0)
+        assert company["indicators"]["pvp"] == pytest.approx(40.0)
+        assert company["indicators"]["roe"] == pytest.approx(100.0)
+        assert company["indicators"]["net_margin"] == pytest.approx(25.0)
+        assert company["indicators"]["ebit_margin"] == pytest.approx(30.0)
+        assert company["indicators"]["dy"] == pytest.approx(0.5)
+        health_by_label = {metric["label"]: metric["value"] for metric in company["health"]["metrics"]}
+        assert health_by_label["Liquidez Corrente"] == pytest.approx(1.25)
+        assert health_by_label["Dív. Líquida/PL"] == pytest.approx(0.5)
+        assert health_by_label["EV / EBIT"] == pytest.approx(4_050 / 120)
         assert result["consensus"]["failed_tickers"] == ["AAPL"]
         assert result["consensus"]["rows"][0]["currency"] == "USD"
         export = client.get(f"/api/home/{result['id']}/fundamentals.csv")
@@ -231,10 +274,11 @@ def test_home_uses_nasdaq_quote_when_yahoo_is_unavailable(client, monkeypatch):
         assert recovered["companies"][0]["source"] == "Yahoo Finance"
         assert recovered["companies"][0]["indicators"]["pl"] == 19
         assert recovered["consensus"]["has_targets"] is True
-        assert len(nasdaq_calls) == 2
+        assert len(info_calls) == 2
     finally:
         market_data.get_yahoo_info.clear()
         assets._get_nasdaq_quote.clear()
+        assets._get_nasdaq_fundamentals.clear()
         home.get_market_target_data.clear()
 
 
@@ -359,6 +403,13 @@ def test_screener_supports_all_multi_asset_classes(client, monkeypatch):
                         "setor": ["Logística"]}, index=["HGLG11"])
     fii.attrs["fetched_at"] = "2026-01-02T18:00:00+00:00"
     monkeypatch.setattr(screener, "get_fii_market_data", lambda: fii.copy())
+    us = pd.DataFrame({
+        "currency": ["USD"], "asset_class": ["acao_us"], "setor": ["Tecnologia (EUA)"],
+        "cotacao": [349.0], "pl": [38.5], "pvp": [45.0], "dy": [0.0032], "roe": [1.42],
+        "evebitda": [29.8], "mrgliq": [0.276], "mrgebit": [0.33], "liq2m": [15_000_000_000.0],
+    }, index=["AAPL"])
+    us.attrs["fetched_at"] = "2026-01-02T18:05:00+00:00"
+    monkeypatch.setattr(screener, "get_us_market_data", lambda: us.copy())
     client.get("/api/session")
     cfg = client.get("/api/screener/config").json()
     class_keys = {item["key"] for item in cfg["asset_classes"]}
@@ -381,6 +432,12 @@ def test_screener_supports_all_multi_asset_classes(client, monkeypatch):
             assert body["fetched_at"] == fii.attrs["fetched_at"]
             assert body["rows"][0]["dy"] == .125
             assert body["rows"][0]["cotacao"] == 42.5
+        elif cls == "acao_us":
+            assert body["source"] == "Yahoo Finance · Ações EUA"
+            assert body["fetched_at"] == us.attrs["fetched_at"]
+            assert body["rows"][0]["ticker"] == "AAPL"
+            assert body["rows"][0]["mrgliq"] == pytest.approx(0.276)
+            assert body["rows"][0]["mrgebit"] == pytest.approx(0.33)
         elif cls != "b3":
             assert body["fetched_at"] is None and "referência" in body["source"]
         if cls in {"titulo", "outros"}:
@@ -391,6 +448,8 @@ def test_screener_supports_all_multi_asset_classes(client, monkeypatch):
             listed = next(row for row in body["rows"] if row["ticker"] == "TLT")
             assert listed["asset_class"] == "titulo" and listed["currency"] == "USD"
             assert listed["pl"] is None and listed["pvp"] is None and listed["dy"] is None
+            aapl = next(row for row in body["rows"] if row["ticker"] == "AAPL")
+            assert aapl["cotacao"] == 349.0 and aapl["mrgliq"] == pytest.approx(0.276)
     unfiltered = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": "titulo"}).json()
     modeled = next(row for row in unfiltered["rows"] if row["ticker"] == "CDI")
     assert modeled["cotacao"] is None and modeled["liq2m"] is None
@@ -401,16 +460,21 @@ def test_screener_does_not_substitute_fii_reference_values_during_outage(client,
         raise RuntimeError("provider offline")
 
     monkeypatch.setattr(screener, "get_fii_market_data", offline)
+    monkeypatch.setattr(screener, "get_us_market_data", offline)
     monkeypatch.setattr(screener, "get_full_market_data", lambda: pd.DataFrame({"P/L": [10]}, index=["PETR4"]))
     client.get("/api/session")
 
     funds = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": "fii"})
+    us = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": "acao_us"})
     combined = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": "all"})
     assert funds.status_code == 503
     assert "Fundamentus" in funds.json()["detail"]
+    assert us.status_code == 503
+    assert "Yahoo Finance" in us.json()["detail"]
     assert combined.status_code == 200
     assert "FIIs indisponíveis" in combined.json()["source"]
-    assert all(row["asset_class"] != "fii" for row in combined.json()["rows"])
+    assert "ações EUA indisponíveis" in combined.json()["source"]
+    assert all(row["asset_class"] not in {"fii", "acao_us"} for row in combined.json()["rows"])
 
 
 def test_usd_fixed_income_history_includes_fx_but_does_not_quote_units(monkeypatch):
@@ -491,3 +555,59 @@ def test_historical_stress_uses_portuguese_month_names():
     )
     assert len(rows) == 1
     assert rows[0]["Período"] == "Nov/2024 → Dez/2024"
+
+
+def test_all_catalog_us_stocks_have_bundled_logos():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    manifest = json.loads((root / "frontend/lib/stock-logo-manifest.json").read_text(encoding="utf-8"))
+    by_ticker = {ticker: entry["asset"] for entry in manifest for ticker in entry["tickers"]}
+    us_tickers = [t for t, item in assets.EXTRA_ASSETS_BY_TICKER.items() if item["asset_class"] == "acao_us"]
+    missing = [t for t in us_tickers if t not in by_ticker]
+    assert missing == []
+    for ticker in us_tickers:
+        asset_path = root / "frontend/public/stock-logos" / by_ticker[ticker]
+        assert asset_path.is_file() and asset_path.stat().st_size > 100
+
+
+def test_us_equity_extracts_health_metrics_volume_and_guards_dual_class_pvp(monkeypatch):
+    payloads = {
+        "AAPL": {
+            "quoteType": "EQUITY", "currency": "USD", "sector": "Technology", "industry": "Consumer Electronics",
+            "regularMarketPrice": 350.0, "marketCap": 5_000_000_000_000.0, "priceToBook": 50.0,
+            "trailingPE": 35.0, "returnOnEquity": 1.4, "profitMargins": 0.28, "operatingMargins": 0.30,
+            "totalRevenue": 400_000_000_000.0, "enterpriseValue": 5_040_000_000_000.0, "ebitda": 150_000_000_000.0,
+            "totalDebt": 100_000_000_000.0, "totalCash": 60_000_000_000.0, "currentRatio": 1.05,
+            "averageDailyVolume3Month": 40_000_000, "trailingAnnualDividendYield": 0.003,
+        },
+        "BRK-B": {
+            "quoteType": "EQUITY", "currency": "USD", "sector": "Financial Services", "industry": "Insurance - Diversified",
+            "regularMarketPrice": 572.36, "bookValue": 536413.0, "priceToBook": 0.001067,
+            "marketCap": 1_215_989_809_152.0, "totalDebt": 130_783_002_624.0, "debtToEquity": 17.127,
+            "enterpriseValue": -243_581_337_600.0, "enterpriseToEbitda": -2.04, "trailingPE": 16.0,
+        },
+        "JPM": {
+            "quoteType": "EQUITY", "currency": "USD", "sector": "Financial Services", "industry": "Banks - Diversified",
+            "regularMarketPrice": 316.0, "marketCap": 840_000_000_000.0, "priceToBook": 2.4,
+            "totalDebt": 1_300_000_000_000.0, "totalCash": 1_500_000_000_000.0, "totalRevenue": 170_000_000_000.0,
+            "operatingMargins": 0.44, "enterpriseValue": 600_000_000_000.0,
+        },
+    }
+    monkeypatch.setattr(assets, "get_yahoo_info", lambda symbol: payloads[symbol])
+
+    aapl = assets.get_extra_asset_fundamentals("AAPL")
+    assert aapl["volume_2m"] == pytest.approx(14_000_000_000.0)
+    assert aapl["indicators"]["ev_ebitda"] == pytest.approx(5_040 / 150)
+    assert aapl["health"]["current_ratio"] == pytest.approx(1.05)
+    assert aapl["health"]["debt_equity"] == pytest.approx(0.4)
+    assert aapl["health"]["ev_ebit"] == pytest.approx(5_040 / 120)
+
+    brk = assets.get_extra_asset_fundamentals("BRK-B")
+    assert brk["indicators"]["pvp"] == pytest.approx(1.5924, rel=1e-3)
+    assert brk["indicators"]["ev_ebitda"] is None
+    assert "debt_equity" not in brk["health"] and "ev_ebit" not in brk["health"]
+
+    jpm = assets.get_extra_asset_fundamentals("JPM")
+    assert jpm["health"] == {}
