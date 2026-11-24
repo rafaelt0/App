@@ -1,5 +1,6 @@
 """Tesouro Direto unit prices for catalog titles with no intermediate payments."""
 
+import re
 from datetime import date, timedelta
 from io import BytesIO
 
@@ -86,6 +87,98 @@ def latest_treasury_quote(ticker):
         if not quotes.empty:
             return float(quotes.iloc[-1]), quotes.index[-1].date().isoformat()
     return None, None
+
+
+# Friday to Tuesday still covers a weekend plus one holiday. A wider hole is
+# not a one-session move.
+_SESSION_GAP_DAYS = 4
+_FAMILY = {"SELIC": "Tesouro Selic", "IPCA": "Tesouro IPCA+", "PRE": "Tesouro Prefixado"}
+
+
+def resolve_treasury_ticker(ticker, today=None):
+    """Catalog id of a title this module prices, or None when none matches.
+
+    A year in the ticker must match that maturity year. A family name without
+    a year uses the soonest outstanding title of that family. The returned id
+    is the one `treasury_prices` knows; callers show that maturity with the PU.
+    """
+    today = today or date.today()
+    if ticker in TREASURY_TITLES:
+        title, maturity = TREASURY_TITLES[ticker]
+        return ticker if maturity >= today else None
+    match = re.fullmatch(r"TESOURO-(SELIC|IPCA|PRE)(?:-(\d{4}))?", str(ticker or ""))
+    if not match:
+        return None
+    family = _FAMILY[match.group(1)]
+    year = int(match.group(2)) if match.group(2) else None
+    open_titles = [
+        (maturity, key)
+        for key, (title, maturity) in TREASURY_TITLES.items()
+        if title == family and maturity >= today and (year is None or maturity.year == year)
+    ]
+    if year is not None:
+        return open_titles[0][1] if len(open_titles) == 1 else None
+    return min(open_titles)[1] if open_titles else None
+
+
+def _positive_price(value):
+    number = _scalar(value)
+    return number if number is not None and number > 0 else None
+
+
+def _session_move(series):
+    """Latest positive print and the fractional move against the adjacent prior row.
+
+    A missing row between the last two prints is a longer span, so the change
+    stays None while the latest price is still returned.
+    """
+    if series is None or len(series) == 0:
+        return None
+    positions = [index for index, value in enumerate(series.tolist()) if _positive_price(value) is not None]
+    if not positions:
+        return None
+    last = positions[-1]
+    price = float(series.iloc[last])
+    as_of = pd.Timestamp(series.index[last]).date()
+    change = None
+    if len(positions) >= 2 and last - positions[-2] == 1:
+        previous = float(series.iloc[positions[-2]])
+        gap = (as_of - pd.Timestamp(series.index[positions[-2]]).date()).days
+        if 0 < gap <= _SESSION_GAP_DAYS and previous > 0:
+            change = price / previous - 1
+    return price, change, as_of.isoformat()
+
+
+def treasury_moves(tickers):
+    """Buy PU and one-session change for official titles, keyed by title id.
+
+    The price is PU Compra Manhã. A title the series does not print is absent.
+    A title with one print, or a hole before it, has a price and change None.
+    """
+    wanted = tuple(dict.fromkeys(ticker for ticker in tickers if ticker in TREASURY_TITLES))
+    if not wanted:
+        return {}
+    frame = treasury_prices(wanted, date.today() - timedelta(days=14), adjusted=False)
+    moves = {}
+    for ticker in wanted:
+        if ticker not in getattr(frame, "columns", ()):
+            continue
+        move = _session_move(frame[ticker])
+        if move is None:
+            continue
+        price, change, as_of = move
+        title, maturity = TREASURY_TITLES[ticker]
+        moves[ticker] = {
+            "price": price,
+            "change": change,
+            "currency": "BRL",
+            "digits": 2,
+            "as_of": as_of,
+            "unit": "money",
+            "change_unit": "fraction" if change is not None else None,
+            "source": f"Tesouro Transparente · PU Compra Manhã · {title} {maturity:%d/%m/%Y}",
+        }
+    return moves
 
 
 def _scalar(value):
