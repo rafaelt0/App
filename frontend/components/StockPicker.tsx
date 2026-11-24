@@ -10,10 +10,11 @@ type Props = {
   selection: readonly string[];
   action: "Analisar" | "Adicionar";
   disabled?: boolean;
+  closeOnChoose?: boolean;
   onChoose: (ticker: string) => void;
 };
 
-export default function StockPicker({ selection, action, disabled, onChoose }: Props) {
+export default function StockPicker({ selection, action, disabled, closeOnChoose = false, onChoose }: Props) {
   const { stocks, session, upsertStocks } = useApp();
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -87,6 +88,7 @@ export default function StockPicker({ selection, action, disabled, onChoose }: P
     upsertStocks([stock]);
     setIndex(-1);
     setQuery("");
+    if (closeOnChoose) setOpen(false);
     onChoose(stock.ticker);
   }
 

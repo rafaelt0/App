@@ -47,6 +47,7 @@ export default function SimulationPage() {
   const returnReady = session?.simulation_ready ?? false;
   const restoredContext = session?.restored ?? false;
   const portfolioReady = session?.portfolio_ready ?? false;
+  const hasPortfolioContext = returnReady || portfolioReady || restoredContext;
   const refreshSessionRef = useRef(refreshSession);
   refreshSessionRef.current = refreshSession;
 
@@ -61,6 +62,13 @@ export default function SimulationPage() {
     setCanReloadPortfolio(false);
     setRestoreFailed(false);
     setRunning(false);
+    if (!hasPortfolioContext) {
+      restoreRequest.current = null;
+      setPreparing(false);
+      setRestoredNotice(false);
+      setSample(null);
+      return;
+    }
     setPreparing(true);
     async function prepare() {
       try {
@@ -114,7 +122,7 @@ export default function SimulationPage() {
     void prepare();
     return () => { cancelled = true; };
     // Session readiness, not result or form state, controls portfolio restoration.
-  }, [loading, contextRevision, contextPortfolioId, returnReady, portfolioReady, restoredContext, reloadKey]);
+  }, [loading, contextRevision, contextPortfolioId, hasPortfolioContext, returnReady, portfolioReady, restoredContext, reloadKey]);
 
   async function reloadPortfolio() {
     setReloadingPortfolio(true);
@@ -169,7 +177,7 @@ export default function SimulationPage() {
   const inputsValid = simulationsValid && capitalValid && yearsValid;
   const calibrationText = inputs.calibration === "portfolio" ? "histórico do portfólio" : `últimos ${inputs.calibration} anos até hoje`;
   const individual = useMemo(() => visible ? displayedTrajectories(visible.charts.individual, displayCount) : null, [visible, displayCount]);
-  const ready = !!portfolio?.id && portfolio.simulation_ready && portfolio.id === contextPortfolioId && portfolio.revision === contextRevision;
+  const ready = hasPortfolioContext && !!portfolio?.id && portfolio.simulation_ready && portfolio.id === contextPortfolioId && portfolio.revision === contextRevision;
   const rawWeights = portfolio ? portfolio.tickers.map(ticker => ({ ticker, weight: portfolio.weights[ticker] })) : [];
   const total = rawWeights.reduce((sum, row) => sum + row.weight, 0);
   const allocation = visible?.allocation ?? rawWeights.map(row => ({ ticker: row.ticker, weight: row.weight / total }));
@@ -188,18 +196,23 @@ export default function SimulationPage() {
     <span className="weights-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(1, row.weight)) * 100}%` }} /></span>
     <span className="weights-value">{percent.format(row.weight)}</span>
   </li>)}</ul>;
+  const canRetryRestore = hasPortfolioContext && restoreFailed;
   const notes = <>
     {sessionError && <Notice tone="negative">{sessionError}</Notice>}
-    {error && <Notice tone="negative">{error}{canReloadPortfolio && <button type="button" disabled={reloadingPortfolio} onClick={() => void reloadPortfolio()}>{reloadingPortfolio ? "Atualizando carteira…" : "Atualizar carteira"}</button>}</Notice>}
+    {error && <Notice tone="negative">{error}{canReloadPortfolio && <button type="button" disabled={reloadingPortfolio} onClick={() => void reloadPortfolio()}>
+      {reloadingPortfolio ? "Atualizando carteira…" : canRetryRestore ? "Tentar carregar novamente" : "Atualizar carteira"}
+    </button>}</Notice>}
   </>;
 
-  if (loading || preparing) return <div className="desk">{notes}<Loading>Restaurando contexto da carteira…</Loading></div>;
+  if (loading || (hasPortfolioContext && preparing)) return <div className="desk">{notes}<Loading>Restaurando contexto da carteira…</Loading></div>;
   const preview = <details className="disclosure"><summary>Ver prévia da simulação</summary>
     <div className="board is-preview"><SimulationPreview /></div>
   </details>;
   if (!ready) return <>
     {notes}
-    <PortfolioRequired count={session?.selection.length ?? 0} feature="simular cenários" title={restoreFailed ? "Não foi possível carregar o histórico da carteira" : undefined}>
+    <PortfolioRequired count={session?.selection.length ?? 0} feature="simular cenários"
+      allowSetup={contextRevision !== undefined && !hasPortfolioContext}
+      title={canRetryRestore ? "Não foi possível carregar o histórico da carteira" : undefined}>
       {preview}
     </PortfolioRequired>
   </>;

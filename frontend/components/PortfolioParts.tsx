@@ -1,19 +1,93 @@
 import Link from "next/link";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { formatValue, Loading, ScrollX } from "./ui";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { MAX_SELECTION, SELECTION_FULL_MESSAGE, useApp, type SelectionUpdate } from "./AppProvider";
+import StockPicker from "./StockPicker";
+import { formatValue, Loading, Notice, ScrollX } from "./ui";
 import { tickerColor } from "./Shell";
+import { api } from "../lib/api";
 import type { PortfolioResult } from "../lib/portfolio";
 import { period } from "../lib/portfolio";
 
 const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-export function PortfolioRequired({ count, feature, title = "Calcule uma carteira primeiro", children }: { count: number; feature: string; title?: string; children?: ReactNode }) {
+function PortfolioSetup() {
+  const { session, stocks, setSelection, refreshSession } = useApp();
+  const [pending, setPending] = useState<"selection" | "analysis" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  if (!session) return null;
+  const { selection, revision } = session;
+  const full = selection.length >= MAX_SELECTION;
+  const stockByTicker = new Map(stocks.map(stock => [stock.ticker, stock]));
+
+  async function run(kind: "selection" | "analysis", action: () => Promise<unknown>) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPending(kind);
+    setError(null);
+    try {
+      await action();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      // Resync if another page changed the selection or the calculation already published.
+      await refreshSession().catch(() => {});
+    } finally {
+      inFlight.current = false;
+      setPending(null);
+    }
+  }
+
+  function changeSelection(update: SelectionUpdate) {
+    void run("selection", () => setSelection(update));
+  }
+
+  function calculate() {
+    if (selection.length < 2) return;
+    void run("analysis", async () => {
+      await api("/api/portfolio/analyze", { tickers: selection, revision });
+      await refreshSession();
+    });
+  }
+
+  return <div className="portfolio-setup">
+    <StockPicker selection={selection} action="Adicionar" disabled={!!pending || full} closeOnChoose
+      onChoose={ticker => changeSelection(current => {
+        if (current.includes(ticker)) return [...current];
+        if (current.length >= MAX_SELECTION) throw new Error(SELECTION_FULL_MESSAGE);
+        return [...current, ticker];
+      })} />
+    {selection.length > 0 && <ul className="asset-list" aria-label="Ativos da carteira">
+      {selection.map((ticker, index) => {
+        const stock = stockByTicker.get(ticker);
+        return <li key={ticker}>
+          <i className="swatch" style={{ background: tickerColor(index) }} aria-hidden="true" />
+          <b>{ticker}</b><span>{stock?.company ?? "Nome indisponível"}</span>
+          <button type="button" className="icon-btn" disabled={!!pending} aria-label={`Remover ${ticker}`}
+            onClick={() => changeSelection(current => current.filter(item => item !== ticker))}>×</button>
+        </li>;
+      })}
+    </ul>}
+    {full && <p className="param-hint">Remova um ativo para adicionar outro.</p>}
+    <div className="flow-links">
+      <button type="button" className="primary" disabled={!!pending || selection.length < 2} onClick={calculate}>
+        {pending === "analysis" ? "Calculando…" : "Calcular carteira"}
+      </button>
+      <Link className="button-link" href="/portfolio">Personalizar na Carteira <span aria-hidden="true">→</span></Link>
+    </div>
+    <p className="param-hint">Cálculo com a estratégia de mínima volatilidade e dois anos de histórico.</p>
+    {pending === "selection" && <Loading>Atualizando a seleção…</Loading>}
+    {pending === "analysis" && <ElapsedLoading>Baixando cotações e calculando a carteira…</ElapsedLoading>}
+    {error && <Notice tone="negative">{error}</Notice>}
+  </div>;
+}
+
+export function PortfolioRequired({ count, feature, title = "Calcule uma carteira primeiro", allowSetup = false, children }: { count: number; feature: string; title?: string; allowSetup?: boolean; children?: ReactNode }) {
   return <section className="workspace-start">
     <h2>{title}</h2>
-    <p>{count === 0 ? `Adicione pelo menos duas ações e calcule a carteira para ${feature}.`
-      : count === 1 ? `Adicione mais uma ação e calcule a carteira para ${feature}.`
-      : `Calcule a carteira com as ações já selecionadas para ${feature}.`}</p>
-    <Link className="button-link primary" href="/portfolio">{count >= 2 ? "Configurar carteira" : "Escolher ações da carteira"} <span aria-hidden="true">→</span></Link>
+    <p>{count === 0 ? `Adicione pelo menos dois ativos e calcule a carteira para ${feature}.`
+      : count === 1 ? `Adicione mais um ativo e calcule a carteira para ${feature}.`
+      : `Calcule a carteira com os ativos já selecionados para ${feature}.`}</p>
+    {allowSetup ? <PortfolioSetup /> : <Link className="button-link primary" href="/portfolio">{count >= 2 ? "Configurar carteira" : "Escolher ativos da carteira"} <span aria-hidden="true">→</span></Link>}
     {children}
   </section>;
 }
