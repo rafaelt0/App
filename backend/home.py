@@ -23,12 +23,22 @@ from utils.market_data import (clean_numeric_column, compute_target_upside, get_
                                get_listed_stocks, get_universe_changes, get_market_target_data, get_sorted_tickers_by_liquidity,
                                get_yahoo_info, get_yahoo_quotes)
 from utils.treasury_data import TREASURY_TITLES
+from utils.equity_history import get_equity_history
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/home", tags=["home"])
 catalog_router = APIRouter(prefix="/api", tags=["catalog"])
-EXPORT_FIELDS = ["Empresa", "Setor", "Subsetor", "Cotacao", "Min_52_sem", "Max_52_sem",
-                 "Marg_Liquida", "Marg_EBIT", "ROE", "ROIC", "Div_Yield", "Cres_Rec_5a", "PL", "EV_EBITDA", "PVP"]
+EXPORT_FIELDS = ["Empresa", "Setor", "Subsetor", "Classe", "Moeda", "Fonte",
+                 "Cotacao", "Data_ult_cot", "Min_52_sem", "Max_52_sem", "Vol_med_2m", "Valor_de_mercado",
+                 "Marg_Liquida", "Marg_EBIT", "ROE", "ROIC", "Div_Yield", "Cres_Rec_5a",
+                 "PL", "EV_EBITDA", "EV_EBIT", "PVP", "Div_Liq_Patrim", "Liquidez_Corr"]
+# Flattened from the detail frame's `Tesouro` mapping when at least one selected title has official data.
+TREASURY_EXPORT_FIELDS = {
+    "buy_price": "Tesouro_PU_Compra", "sell_price": "Tesouro_PU_Venda",
+    "buy_rate": "Tesouro_Taxa_Compra", "sell_rate": "Tesouro_Taxa_Venda",
+    "rate_unit": "Tesouro_Unidade_Taxa", "maturity": "Tesouro_Vencimento",
+    "quote_date": "Tesouro_Data_Cotacao", "source": "Tesouro_Fonte",
+}
 DEBT_ALERT = 3
 DEBT_WARNING = 1.5
 LIQUIDITY_ALERT = 1
@@ -236,11 +246,27 @@ def build_analysis(raw, peers, tickers, universe):
                                 "unit": "percent" if is_percent else "multiple", "median": detail["Mediana Setor"] * (100 if is_percent else 1),
                                 "mean": detail["Média Setor"] * (100 if is_percent else 1), "observations": detail["Peers (n)"],
                                 "percentile": detail["Percentil"], "verdict": detail["Veredicto"], "category": detail["Categoria"]})
+        price_unit = row.get("Unidade_cotacao")
+        quote_pair = row.get("Par_cotacao")
+        volume_window = row.get("Janela_volume")
+        contract = row.get("Contrato")
+        fund = row.get("Fundo")
+        treasury = row.get("Tesouro")
+        history = row.get("Historico")
         companies.append({"ticker": ticker, "available": present, "asset_class": asset_class, "source": source_name,
                           "fixed_income": row.get("fixed_income"),
                           "identity": {"company": row.get("Empresa", meta["company"]), "sector": sector or None, "subsector": row.get("Subsetor")},
                           "market": {**{key: numeric(row.get(source)) for key, source in MARKET}, "last_quote_date": row.get("Data_ult_cot"),
-                                     "currency": str(row["Moeda"]) if pd.notna(row.get("Moeda")) else meta["currency"]},
+                                     "currency": str(row["Moeda"]) if pd.notna(row.get("Moeda")) else meta["currency"],
+                                     "price_unit": price_unit if price_unit in {"money", "points"} else "money",
+                                     "quote_pair": quote_pair if isinstance(quote_pair, str) else None,
+                                     "volume_24h": numeric(row.get("Volume_24h")),
+                                     "session_volume": numeric(row.get("Volume_sessao")),
+                                     "volume_window": volume_window if isinstance(volume_window, str) else None,
+                                     "contract": contract if isinstance(contract, dict) else None},
+                          "fund": fund if isinstance(fund, dict) else None,
+                          "treasury": treasury if isinstance(treasury, dict) else None,
+                          "history": history if isinstance(history, dict) else None,
                           "indicators": indicators, "indicator_available": indicator_available,
                           "metric_groups": metric_groups, "indicators_available": any(indicator_available.values()),
                           "health": health(row) if asset_class in EQUITY_CLASSES else {"metrics": [], "diagnostics": []},
@@ -264,11 +290,25 @@ def _extra_fundamentals_frame(tickers: list[str], b3_stocks: dict[str, dict]) ->
     def _load_detail(ticker):
         return ticker, get_extra_asset_fundamentals(ticker, fii_table=fii_table, b3_stock=b3_stocks.get(ticker))
 
+    def _load_quote_info(ticker):
+        try:
+            return ticker, get_yahoo_info(provider_symbol(ticker)) or {}
+        except Exception as exc:
+            logger.warning("Yahoo Finance info unavailable for %s: %s", ticker, exc)
+            return ticker, {}
+
     if len(detail_tickers) > 1:
         with ThreadPoolExecutor(max_workers=min(8, len(detail_tickers))) as pool:
             details = dict(pool.map(_load_detail, detail_tickers))
     else:
         details = dict(_load_detail(ticker) for ticker in detail_tickers)
+    # Quote-only assets carry unit, volume and contract metadata in Yahoo's info payload;
+    # fetch it once per ticker in parallel instead of serially inside the row loop.
+    if len(quote_only) > 1:
+        with ThreadPoolExecutor(max_workers=min(8, len(quote_only))) as pool:
+            quote_info = dict(pool.map(_load_quote_info, sorted(quote_only)))
+    else:
+        quote_info = dict(_load_quote_info(ticker) for ticker in quote_only)
     fii_quotes = {ticker for ticker, detail in details.items() if detail.get("source") == "Fundamentus · FIIs"}
     quote_tickers = quote_only | fii_quotes | {ticker for ticker, data in details.items()
                                                if not data.get("available") and ticker not in TREASURY_TITLES
@@ -284,7 +324,8 @@ def _extra_fundamentals_frame(tickers: list[str], b3_stocks: dict[str, dict]) ->
             if quote and quote["currency"] == "BRL":
                 data = {**data, **quote, "source": "Fundamentus · FIIs / Yahoo Finance"}
         elif ticker in symbols:
-            data = market_asset_detail(ticker, quote, allow_nasdaq=ticker in quote_only, b3_stock=b3_stocks.get(ticker))
+            data = market_asset_detail(ticker, quote, allow_nasdaq=ticker in quote_only,
+                                       b3_stock=b3_stocks.get(ticker), info=quote_info.get(ticker))
         else:
             data = details[ticker]
         if not data.get("available"):
@@ -310,6 +351,15 @@ def _extra_fundamentals_frame(tickers: list[str], b3_stocks: dict[str, dict]) ->
             "Vol_med_2m": data.get("volume_2m"),
             "Valor_de_mercado": data.get("market_cap"),
             "Data_ult_cot": data.get("last_quote_date"),
+            "Unidade_cotacao": data.get("price_unit") or "money",
+            "Par_cotacao": data.get("quote_pair"),
+            "Volume_24h": data.get("volume_24h"),
+            "Volume_sessao": data.get("session_volume"),
+            "Janela_volume": data.get("volume_window"),
+            "Contrato": data.get("contract"),
+            "Fundo": data.get("fund"),
+            "Tesouro": data.get("treasury"),
+            "Historico": data.get("history"),
             "PL": _scaled(ind.get("pl")),
             "PVP": _scaled(ind.get("pvp")),
             "EV_EBITDA": _scaled(ind.get("ev_ebitda")),
@@ -529,6 +579,15 @@ def analyze(body: HomeRequest, request: Request):
             raise HTTPException(503, f"{source} não retornou dados para os ativos selecionados. Tente novamente.")
         peers = get_sector_peers() if b3_tickers else pd.DataFrame()
         result = build_analysis(raw, peers, tickers, universe_frame)
+        missing_history = [company["ticker"] for company in result["companies"]
+                           if company["asset_class"] in EQUITY_CLASSES | {"reit"} and not company.get("history")]
+        if missing_history:
+            with ThreadPoolExecutor(max_workers=min(8, len(missing_history))) as pool:
+                histories = dict(zip(missing_history, pool.map(
+                    lambda ticker: get_equity_history(ticker, provider_symbol(ticker)), missing_history)))
+            for company in result["companies"]:
+                if company["ticker"] in histories:
+                    company["history"] = histories[company["ticker"]]
         if set(b3_tickers) - covered_b3:
             clear_fundamentus_cache()
         skip_yahoo = {
@@ -543,18 +602,22 @@ def analyze(body: HomeRequest, request: Request):
         )
         result["id"] = uuid.uuid4().hex
         result["revision"] = body.revision
-        export_fields = EXPORT_FIELDS
-        if "Classe" in raw:
-            raw["Classe"] = raw["Classe"].fillna("acao_br") if "Classe" in raw else "acao_br"
-            raw["Moeda"] = raw["Moeda"].fillna("BRL") if "Moeda" in raw else "BRL"
-            raw["Fonte"] = raw["Fonte"].fillna("Fundamentus") if "Fonte" in raw else "Fundamentus"
-            indicator_fields = {source for _, source, *_ in INDICATORS}
-            applicable_fields = {source for key, source, *_ in INDICATORS
-                                 if any(key in company["indicators"] for company in result["companies"])}
-            export_fields = ["Classe", "Moeda", "Fonte", *(field for field in EXPORT_FIELDS
-                                                          if field not in indicator_fields or field in applicable_fields)]
-            if any(company["fixed_income"] for company in result["companies"]):
-                export_fields += ["Remuneracao_modelo", "Taxa_modelo", "Unidade_taxa_modelo"]
+        export_fields = list(EXPORT_FIELDS)
+        for column, default in (("Classe", "acao_br"), ("Moeda", "BRL"), ("Fonte", "Fundamentus")):
+            if column in raw:
+                raw[column] = raw[column].fillna(default)
+        indicator_fields = {source for _, source, *_ in INDICATORS}
+        applicable_fields = {source for key, source, *_ in INDICATORS
+                             if any(key in company["indicators"] for company in result["companies"])}
+        export_fields = [field for field in export_fields
+                         if field not in indicator_fields or field in applicable_fields]
+        if any(company["fixed_income"] for company in result["companies"]):
+            export_fields += ["Remuneracao_modelo", "Taxa_modelo", "Unidade_taxa_modelo"]
+        if "Tesouro" in raw and raw["Tesouro"].apply(lambda value: isinstance(value, dict) and bool(value)).any():
+            treasury = raw["Tesouro"].apply(lambda value: value if isinstance(value, dict) else {})
+            for key, column in TREASURY_EXPORT_FIELDS.items():
+                raw[column] = treasury.map(lambda value, key=key: value.get(key))
+            export_fields += list(TREASURY_EXPORT_FIELDS.values())
         raw_export = raw[[column for column in export_fields if column in raw]].copy()
         publish(ctx, "home", body.revision, generation, {"id": result["id"], "result": result, "export": raw_export})
         return clean_json(result)

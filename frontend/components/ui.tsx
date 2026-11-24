@@ -15,7 +15,7 @@ export type Signal = "positive" | "negative" | "warning" | "neutral" | "info";
  */
 export type Metric = { label: string; value: number | string | null; unit?: Unit; currency?: string; digits?: number; compact?: boolean; signed?: boolean; status?: Signal; classification?: string | null; help?: string; trend?: number[]; meter?: number };
 /** `signed` colours a change or return by its sign; `plus` only writes the + of a signed score that is not a price move. */
-export type Column = { key: string; label: string; unit?: Unit; currency?: string; digits?: number; signed?: boolean; plus?: boolean; compact?: boolean };
+export type Column = { key: string; label: string; unit?: Unit; unitKey?: string; currency?: string; digits?: number; signed?: boolean; plus?: boolean; compact?: boolean };
 
 const minus = "−";
 
@@ -150,8 +150,16 @@ export function ScrollX({ label, className, children }: { label: string; classNa
   }, []);
   return <div ref={ref} className={`grid-scroll${className ? ` ${className}` : ""}`} data-more={more || undefined} tabIndex={0} role="region" aria-label={label}>{children}</div>;
 }
-const isNumericColumn = (column: Column) => !!column.signed || !!column.plus || (!!column.unit && column.unit !== "text");
+const isNumericColumn = (column: Column) => !!column.signed || !!column.plus || !!column.unitKey || (!!column.unit && column.unit !== "text");
 const finiteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+/** A column may resolve its unit from the row: `"points"` renders a bare number, `"money"` renders the row currency. */
+function rowUnit(column: Column, values: Record<string, unknown>): Unit | undefined {
+  if (!column.unitKey) return column.unit;
+  const unit = values[column.unitKey];
+  if (unit === "points") return "number";
+  if (unit === "money") return "money";
+  return column.unit;
+}
 /** Missing values sort last in both directions; numbers compare numerically, text in pt-BR order. */
 function compareRows(a: object, b: object, key: string, direction: 1 | -1): number {
   const x = (a as Record<string, unknown>)[key], y = (b as Record<string, unknown>)[key];
@@ -187,10 +195,11 @@ export function Table<T extends object>({ columns, rows, rowKey = "ticker", capt
     const color = swatch?.(row);
     return <tr key={key}>{columns.map((column, columnIndex) => {
       const value = values[column.key];
+      const unit = rowUnit(column, values);
       const currency = column.currency ?? (typeof values.currency === "string" ? values.currency : "BRL");
-      const exactDigits = column.compact && column.unit === "money" ? Math.max(2, column.digits ?? 2) : column.digits;
-      const exact = formatValue(value, column.unit, exactDigits, currency, column.signed || column.plus);
-      const shown = column.compact ? formatCompactValue(value, column.unit, 1, currency, column.signed || column.plus) : exact;
+      const exactDigits = column.compact && unit === "money" ? Math.max(2, column.digits ?? 2) : column.digits;
+      const exact = formatValue(value, unit, exactDigits, currency, column.signed || column.plus);
+      const shown = column.compact ? formatCompactValue(value, unit, 1, currency, column.signed || column.plus) : exact;
       const bound = bounds.get(column.key);
       const extreme = bound && finiteNumber(value) && bound.max !== bound.min ? value === bound.max ? "max" : value === bound.min ? "min" : null : null;
       const signedTone = column.signed && finiteNumber(value) ? value > 0 ? " is-pos" : value < 0 ? " is-neg" : "" : "";

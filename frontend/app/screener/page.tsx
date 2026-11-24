@@ -124,6 +124,8 @@ export default function ScreenerPage() {
   function edit<K extends keyof Controls>(key:K,value:Controls[K]) {setControls(current=>editControl(current,key,value));}
   if(loading || !session)return <div className="desk">{appError ? <Notice tone="negative">{appError}<button onClick={()=>void refreshSession()}>Tentar novamente</button></Notice>:<Loading/>}</div>;
   const selectedCurrent=selected && result?.rows.some(row=>row.ticker===selected) ? selected:null;
+  const selectedRow=selectedCurrent ? result?.rows.find(row=>row.ticker===selectedCurrent) : undefined;
+  const selectedQuote=typeof selectedRow?.quote_date==="string" ? selectedRow.quote_date.split("-").reverse().join("/") : "";
   const isB3=assetClass === "b3";
   const fields=config?.asset_classes.find(item=>item.key===assetClass)?.fields ?? [];
   const clearFilters=()=>setControls(isB3 ? {...defaults} : {...unfiltered});
@@ -192,7 +194,7 @@ export default function ScreenerPage() {
         ? "Dados da Fundamentus, com atraso."
         : assetClass === "acao_us"
           ? "Dados do Yahoo Finance, com atraso. Valores monetários e limites usam USD, sem conversão."
-          : `${assetClass === "all" ? "Ações B3 e FIIs usam dados da Fundamentus e ações EUA usam Yahoo Finance, com atraso. As demais classes usam valores de referência." : "Valores de referência, sem cotação ao vivo."} Valores monetários e limites usam a moeda de cada ativo, sem conversão.`}</p>
+          : `${assetClass === "all" ? "Cotações por linha: B3 e FIIs na Fundamentus, ações EUA no Yahoo Finance e demais ativos com cotação do Yahoo quando disponível. " : "Cotação do Yahoo Finance quando disponível. "}Os demais indicadores vêm do catálogo de referência. Valores monetários e limites usam a moeda de cada ativo, sem conversão.`}</p>
     </Pane>
     <Pane title="Resultados" className="pane-screener" flush
       meta={result && !busy && !invalidCriteria ? <span role="status"><b className="scr-count">{result.matched_count}</b> de {result.total_count}{result.metrics.mean_dy !== null ? ` · Proventos / preço médios ${formatValue(result.metrics.mean_dy,"percent",2)}` : ""}{result.metrics.mean_roe !== null ? ` · ROE médio ${formatValue(result.metrics.mean_roe,"percent",2)}` : ""}{result.fetched_at ? ` · coleta há ${result.age_minutes} min`:""}</span> : <span role="status">{error || invalidCriteria ? "Resultado indisponível":"Atualizando…"}</span>}
@@ -210,6 +212,7 @@ export default function ScreenerPage() {
         <div className="scr-actionbar" data-selected={selectedCurrent ? "true":"false"} role="region" aria-label="Ação selecionada" aria-live="polite">
           {selectedCurrent ? <>
             <b>{selectedCurrent}</b><span className="muted ell">{stocks.find(stock=>stock.ticker===selectedCurrent)?.company ?? ""}</span>
+            {typeof selectedRow?.source==="string" && <span className="muted ell" title={`Fonte: ${selectedRow.source}${selectedQuote ? ` · cotação de ${selectedQuote}` : ""}`}>Fonte: {selectedRow.source}{selectedQuote ? ` · cotação de ${selectedQuote}` : ""}</span>}
             <button disabled={actionBusy || navigating || selectionSet.has(selectedCurrent)} onClick={()=>void handoff("add")}>{selectionSet.has(selectedCurrent) ? "Já na seleção":"Adicionar à seleção"}</button>
             <button disabled={actionBusy} onClick={()=>void handoff("only")}>Manter só {selectedCurrent} na seleção</button>
             <button disabled={actionBusy} aria-pressed={session.watchlist.includes(selectedCurrent)} onClick={()=>void favorite()}>{session.watchlist.includes(selectedCurrent) ? "★ Favorito":"☆ Favoritar"}</button>

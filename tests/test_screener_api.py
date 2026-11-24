@@ -205,3 +205,98 @@ def test_dividend_preset_is_labelled_as_trailing_twelve_month_yield():
     preset = presets["Renda atual (12m)"]
     assert preset["criteria"]["dy_min"] == 0.06
     assert "12 meses" in preset["description"] and "payout" in preset["description"]
+
+
+def fii_frame():
+    frame = pd.DataFrame({"price": [42.5], "pvp": [0.9], "dy": [12.5], "liq2m": [2_000_000],
+                          "setor": ["Logística"]}, index=["HGLG11"])
+    frame.attrs["fetched_at"] = "2026-01-02T18:00:00+00:00"
+    return frame
+
+
+def us_frame():
+    frame = pd.DataFrame({"currency": ["USD"], "asset_class": ["acao_us"], "setor": ["Tecnologia (EUA)"],
+                          "cotacao": [349.0], "pl": [38.5], "pvp": [45.0], "dy": [0.0032], "roe": [1.42],
+                          "evebitda": [29.8], "mrgliq": [0.276], "mrgebit": [0.33], "liq2m": [15_000_000_000.0]},
+                         index=["AAPL"])
+    frame.attrs["fetched_at"] = "2026-01-02T18:05:00+00:00"
+    return frame
+
+
+def test_combined_rows_and_csv_keep_per_row_source_class_currency_and_quote_date(screener_api, monkeypatch):
+    client, _ = screener_api
+    monkeypatch.setattr(screener, "get_full_market_data", market_frame)
+    monkeypatch.setattr(screener, "get_fii_market_data", lambda: fii_frame())
+    monkeypatch.setattr(screener, "get_us_market_data", lambda: us_frame())
+    monkeypatch.setattr(screener, "get_yahoo_quotes", lambda symbols: {})
+
+    response = client.post("/api/screener/query", json={
+        "asset_class": "all", "criteria": {"liq2m_min": 1_000_000},
+        "sort": {"field": "liq2m", "direction": "desc"}})
+    assert response.status_code == 200
+    result = response.json()
+    rows = {row["ticker"]: row for row in result["rows"]}
+
+    assert rows["ZERO3"]["source"] == "Fundamentus"
+    assert rows["ZERO3"]["asset_class"] == "acao_br" and rows["ZERO3"]["currency"] == "BRL"
+    assert rows["ZERO3"]["fetched_at"] == market_frame().attrs["fetched_at"]
+    assert rows["HGLG11"]["source"] == "Fundamentus · FIIs"
+    assert rows["HGLG11"]["fetched_at"] == fii_frame().attrs["fetched_at"]
+    assert rows["AAPL"]["source"] == "Yahoo Finance · Ações EUA" and rows["AAPL"]["currency"] == "USD"
+    assert rows["KDIF11"]["source"].startswith("Catálogo de referência")
+    assert rows["KDIF11"]["quote_date"] is None and rows["KDIF11"]["fetched_at"] is None
+
+    exported = pd.read_csv(io.BytesIO(client.get(f"/api/screener/{result['id']}/results.csv").content), index_col=0)
+    assert {"Fonte", "Classe", "Moeda", "Data da cotação", "Coleta"} <= set(exported.columns)
+    assert exported.loc["KDIF11", "Fonte"] == screener.FII_REFERENCE_SOURCE
+    assert exported.loc["ZERO3", "Fonte"] == "Fundamentus"
+    assert "screener_all_" in client.get(f"/api/screener/{result['id']}/results.csv").headers["content-disposition"]
+
+
+def test_catalog_live_quotes_replace_reference_prices_and_keep_reference_labels(screener_api, monkeypatch):
+    client, _ = screener_api
+    quote = {"price": 60505.0, "currency": "USD", "last_quote_date": "2026-11-23", "source": "Yahoo Finance"}
+    monkeypatch.setattr(screener, "get_yahoo_quotes", lambda symbols: {"BTC-USD": quote} if "BTC-USD" in symbols else {})
+
+    result = client.post("/api/screener/query", json={"asset_class": "outros"}).json()
+    rows = {row["ticker"]: row for row in result["rows"]}
+
+    assert rows["BTC-USD"]["cotacao"] == 60505.0
+    assert rows["BTC-USD"]["quote_date"] == "2026-11-23"
+    assert rows["BTC-USD"]["source"] == screener.LIVE_REFERENCE_SOURCE
+    assert rows["BTC-USD"]["fetched_at"] is not None
+    assert rows["ETH-USD"]["source"] == screener.REFERENCE_SOURCE
+    assert rows["ETH-USD"]["quote_date"] is None and rows["ETH-USD"]["fetched_at"] is None
+    assert "referência" in result["source"] and "cotação com atraso" in result["source"]
+    assert result["fetched_at"] is None  # no single provider snapshot for catalog classes
+
+    def failing(symbols):
+        raise RuntimeError("quote provider offline")
+
+    monkeypatch.setattr(screener, "get_yahoo_quotes", failing)
+    offline = client.post("/api/screener/query", json={"asset_class": "outros"}).json()
+    assert offline["source"] == screener.REFERENCE_SOURCE
+    assert all(row["source"] == screener.REFERENCE_SOURCE and row["quote_date"] is None for row in offline["rows"])
+
+
+def test_fii_screener_merges_catalog_funds_missing_from_live_table(screener_api, monkeypatch):
+    client, _ = screener_api
+    monkeypatch.setattr(screener, "get_fii_market_data", lambda: fii_frame())
+
+    response = client.post("/api/screener/query", json={
+        "asset_class": "fii", "criteria": {"liq2m_min": 1_000_000},
+        "sort": {"field": "liq2m", "direction": "desc"}})
+    assert response.status_code == 200
+    result = response.json()
+    rows = {row["ticker"]: row for row in result["rows"]}
+
+    assert rows["HGLG11"]["source"] == "Fundamentus · FIIs"
+    assert rows["HGLG11"]["cotacao"] == 42.5 and rows["HGLG11"]["dy"] == 0.125
+    for ticker in ("KDIF11", "JURO11", "CDII11"):
+        assert rows[ticker]["source"] == screener.FII_REFERENCE_SOURCE
+        assert rows[ticker]["asset_class"] == "fii" and rows[ticker]["currency"] == "BRL"
+        assert rows[ticker]["quote_date"] is None and rows[ticker]["fetched_at"] is None
+        assert rows[ticker]["cotacao"] is not None
+    assert "referência" in result["source"]
+    disposition = client.get(f"/api/screener/{result['id']}/results.csv").headers["content-disposition"]
+    assert "screener_fii_" in disposition

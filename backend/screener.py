@@ -1,6 +1,7 @@
 """Full-market screening retains source fractions; only presentation/export scales percentages."""
 from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
+import logging
 import uuid
 from typing import Literal
 
@@ -10,11 +11,13 @@ from pydantic import Field, model_validator
 
 from backend.serialization import StrictModel, clean_json, csv_response
 from backend.state import artifact, begin, publish, session
-from utils.assets import ASSET_CLASSES, ASSET_CLASS_LABELS, ASSET_INDICATORS, EXTRA_ASSETS_BY_TICKER, catalog_screener_rows
-from utils.market_data import clean_numeric_column, get_fii_market_data, get_full_market_data, get_us_market_data
+from utils.assets import ASSET_CLASSES, ASSET_INDICATORS, EXTRA_ASSETS_BY_TICKER, catalog_screener_rows
+from utils.market_data import (clean_numeric_column, get_fii_market_data, get_full_market_data, get_us_market_data,
+                               get_yahoo_quotes)
 from utils.screener import PRESET_FILTERS, filter_stocks, prepare_export
 
 router = APIRouter(prefix="/api/screener", tags=["screener"])
+logger = logging.getLogger(__name__)
 RENAMES = {"Cotação": "cotacao", "P/L": "pl", "P/VP": "pvp", "PSR": "psr", "Div.Yield": "dy",
            "P/Ativo": "pa", "P/Cap.Giro": "pcg", "P/EBIT": "pebit", "P/Ativ Circ.Liq": "pacl",
            "EV/EBIT": "evebit", "EV/EBITDA": "evebitda", "Mrg Ebit": "mrgebit", "Mrg. Líq.": "mrgliq",
@@ -25,6 +28,13 @@ COLUMN_MAP = {"cotacao": "Cotação (R$)", "pl": "P/L", "pvp": "P/VP", "dy": "Di
               "mrgliq": "Mrg. Líq. (%)", "liqc": "Liq. Corrente", "liq2m": "Liq. 2m (R$)",
               "divbpatr": "Dív. Líq./Patrim.", "c5y": "Cresc. Rec. 5a (%)", "patrliq": "Patrim. Líq. (R$)", "setor": "Setor"}
 PERCENT_FIELDS = {"dy", "roe", "roic", "mrgebit", "mrgliq", "c5y"}
+# Per-row provenance travels with each result (and the CSV) so mixed sources keep their own labels.
+PROVENANCE_LABELS = {"currency": "Moeda", "asset_class": "Classe", "source": "Fonte",
+                     "quote_date": "Data da cotação", "fetched_at": "Coleta"}
+EXPORT_LABELS = {**COLUMN_MAP, **PROVENANCE_LABELS}
+REFERENCE_SOURCE = "Catálogo de referência · sem cotação ao vivo"
+LIVE_REFERENCE_SOURCE = "Yahoo Finance · cotação com atraso; demais indicadores de referência"
+FII_REFERENCE_SOURCE = "Catálogo de referência · FIIs (sem cotação ao vivo)"
 SORTABLE_FIELDS = tuple(key for key in COLUMN_MAP if key != "setor")
 _HOME_TO_SCREEN = {"ev_ebitda": "evebitda", "growth": "c5y", "net_margin": "mrgliq", "ebit_margin": "mrgebit"}
 SCREEN_FIELDS = {category: {"cotacao", "liq2m", "setor"} | {_HOME_TO_SCREEN.get(key, key) for key in indicators}
@@ -168,6 +178,94 @@ def source_time(value):
         return {"fetched_at": None, "age_minutes": None}
 
 
+def _provenance(frame, source, *, asset_class=None, currency=None, fetched_at=None, quote_date=None):
+    """Attach per-row provenance without touching any financial value or filter input."""
+    result = frame.copy()
+    if asset_class is not None:
+        result["asset_class"] = asset_class
+    if currency is not None:
+        result["currency"] = currency
+    result["source"] = source
+    result["quote_date"] = quote_date
+    result["fetched_at"] = fetched_at
+    result.attrs = dict(frame.attrs)
+    return result
+
+
+def _ensure_provenance(frame, body, source):
+    """Guarantee provenance columns for callers that build frames outside the loaders."""
+    defaults = {"source": source, "quote_date": None, "fetched_at": frame.attrs.get("fetched_at")}
+    if body.asset_class in {"b3", "acao_br"}:
+        defaults.update(asset_class="acao_br", currency="BRL")
+    elif body.asset_class in {"fii", "etf", "titulo"}:
+        defaults.update(asset_class=body.asset_class, currency="BRL")
+    elif body.asset_class in {"acao_us", "reit", "outros"}:
+        defaults.update(asset_class=body.asset_class, currency="USD")
+    result = frame.copy()
+    for key, value in defaults.items():
+        if key not in result:
+            result[key] = value
+    result.attrs = dict(frame.attrs)
+    return result
+
+
+def _with_live_quotes(reference):
+    """Price catalog instruments with delayed Yahoo quotes, keeping reference indicators labelled."""
+    symbols = {ticker: EXTRA_ASSETS_BY_TICKER[ticker]["yahoo_symbol"]
+               for ticker in reference.index
+               if EXTRA_ASSETS_BY_TICKER.get(ticker, {}).get("yahoo_symbol")}
+    try:
+        quotes = get_yahoo_quotes(tuple(sorted(set(symbols.values())))) if symbols else {}
+    except Exception:
+        logger.warning("Yahoo Finance quotes unavailable for catalog screener rows", exc_info=True)
+        quotes = {}
+    fetched_at = dt.datetime.now(dt.timezone.utc).isoformat()
+    result = reference.copy()
+    sources, dates, stamps = [], [], []
+    live = 0
+    for ticker in result.index:
+        quote = quotes.get(symbols.get(ticker))
+        if quote:
+            live += 1
+            result.at[ticker, "cotacao"] = quote["price"]
+            result.at[ticker, "currency"] = quote["currency"]
+            sources.append(LIVE_REFERENCE_SOURCE)
+            dates.append(quote.get("last_quote_date"))
+            stamps.append(fetched_at)
+        else:
+            sources.append(REFERENCE_SOURCE)
+            dates.append(None)
+            stamps.append(None)
+    result["source"] = sources
+    result["quote_date"] = dates
+    result["fetched_at"] = stamps
+    result.attrs = dict(reference.attrs)
+    result.attrs["live_quotes"] = live
+    return result
+
+
+def _catalog_source(frame):
+    live = int(frame.attrs.get("live_quotes") or 0) if "source" in frame else 0
+    if live:
+        return f"Yahoo Finance · cotação com atraso e catálogo de referência ({live} de {len(frame)} com cotação)"
+    return "Catálogo de referência · sem cotação ao vivo"
+
+
+def _merge_reference_funds(live):
+    """Keep catalog FIIs absent from the live Fundamentus table, clearly marked as reference."""
+    reference = catalog_screener_rows("fii", SCREEN_FIELDS)
+    if reference.empty:
+        return live, 0
+    missing = reference.index.difference(live.index)
+    if missing.empty:
+        return live, 0
+    extra = _provenance(reference.loc[missing], FII_REFERENCE_SOURCE, asset_class="fii", currency="BRL")
+    combined = pd.concat([live, extra])
+    combined = combined[~combined.index.duplicated(keep="first")]
+    combined.attrs["fetched_at"] = live.attrs.get("fetched_at")
+    return combined, len(missing)
+
+
 def screen(raw, body, *, source="Fundamentus", normalized=False):
     if raw is None or raw.empty:
         raise HTTPException(503, "A fonte não retornou dados; isso é diferente de uma busca sem resultados.")
@@ -178,6 +276,7 @@ def screen(raw, body, *, source="Fundamentus", normalized=False):
         matched = filter_stocks(frame, criteria)
     except ValueError as exc:
         raise HTTPException(422, f"Os dados recebidos não atendem ao esquema do filtro selecionado: {exc}") from exc
+    matched = _ensure_provenance(matched, body, source)
     if body.sort.field not in matched:
         raise HTTPException(422, f"Não é possível ordenar: a coluna {body.sort.field} não está disponível.")
     by_amount = multi and body.sort.field in {"cotacao", "liq2m", "patrliq"}
@@ -185,18 +284,16 @@ def screen(raw, body, *, source="Fundamentus", normalized=False):
                                   ascending=[True, body.sort.direction == "asc"] if by_amount else body.sort.direction == "asc",
                                   na_position="last", kind="stable")
     available = [column for column in columns() if column["key"] in matched]
-    labels = dict(COLUMN_MAP)
+    labels = dict(EXPORT_LABELS)
     if multi:
         labels.update(cotacao="Cotação", liq2m="Liquidez 2m", patrliq="Patrim. Líq.", dy="Proventos / preço (12m) (%)")
         for column in available:
             column["label"] = labels[column["key"]]
-    display_frame = matched[[column["key"] for column in available]]
-    if multi:
-        display_frame = display_frame.assign(currency=matched["currency"], asset_class=matched["asset_class"])
-        labels.update(currency="Moeda", asset_class="Classe")
+    meta_keys = [key for key in PROVENANCE_LABELS if key in matched]
+    display_frame = matched[[column["key"] for column in available] + meta_keys]
     rows = [{"ticker": str(ticker), **row} for ticker, row in zip(display_frame.index, display_frame.to_dict("records"))]
     result = {"total_count": len(frame), "matched_count": len(matched), "criteria": criteria,
-              "active_filters": active_summary(criteria, multi), "source": source, **source_time(raw.attrs.get("fetched_at")),
+              "active_filters": active_summary(criteria, multi), "source": source, **source_time(frame.attrs.get("fetched_at")),
               "metrics": {"mean_dy": matched["dy"].mean() * 100 if "dy" in matched and not matched.empty else None,
                           "mean_roe": matched["roe"].mean() * 100 if "roe" in matched and not matched.empty else None},
               "available_columns": available, "default_columns": [key for key in DEFAULT_COLUMNS if key in matched], "rows": rows}
@@ -234,28 +331,42 @@ def query(body: Query, request: Request):
         b3 = pd.DataFrame()
         fii = pd.DataFrame()
         us = pd.DataFrame()
+        reference_funds = 0
 
         def _load_b3():
             raw = get_full_market_data()
-            return normalize_market(raw.loc[~raw.index.isin(EXTRA_ASSETS_BY_TICKER)]) if raw is not None else pd.DataFrame()
+            if raw is None:
+                return pd.DataFrame()
+            frame = normalize_market(raw.loc[~raw.index.isin(EXTRA_ASSETS_BY_TICKER)])
+            return _provenance(frame, "Fundamentus", asset_class="acao_br", currency="BRL",
+                               fetched_at=raw.attrs.get("fetched_at"))
 
         def _load_fii():
-            frame = get_fii_market_data().rename(columns={"price": "cotacao"}).assign(currency="BRL", asset_class="fii")
-            frame["dy"] /= 100
-            return frame
+            frame = get_fii_market_data()
+            fetched_at = frame.attrs.get("fetched_at")
+            frame = frame.rename(columns={"price": "cotacao"})
+            frame["dy"] = frame["dy"] / 100
+            return _provenance(frame, "Fundamentus · FIIs", asset_class="fii", currency="BRL", fetched_at=fetched_at)
+
+        def _load_us():
+            frame = get_us_market_data()
+            return _provenance(frame, "Yahoo Finance · Ações EUA", fetched_at=frame.attrs.get("fetched_at"))
 
         if body.asset_class in {"b3", "acao_br"}:
             b3 = _load_b3()
-            result, exported = screen(b3, body, normalized=True)
+            result, exported = screen(b3, body, source="Fundamentus", normalized=True)
         elif body.asset_class == "fii":
             try:
-                fii = _load_fii()
+                fii, reference_funds = _merge_reference_funds(_load_fii())
             except Exception as exc:
                 raise HTTPException(503, "O painel de FIIs da Fundamentus está indisponível. Tente novamente.") from exc
-            result, exported = screen(fii, body, source="Fundamentus · FIIs", normalized=True)
+            source = "Fundamentus · FIIs"
+            if reference_funds:
+                source += f" + {FII_REFERENCE_SOURCE} ({reference_funds} fundo{'s' if reference_funds != 1 else ''})"
+            result, exported = screen(fii, body, source=source, normalized=True)
         elif body.asset_class == "acao_us":
             try:
-                us = get_us_market_data()
+                us = _load_us()
             except Exception as exc:
                 raise HTTPException(503, "Os dados de ações americanas no Yahoo Finance estão indisponíveis. Tente novamente.") from exc
             result, exported = screen(us, body, source="Yahoo Finance · Ações EUA", normalized=True)
@@ -269,16 +380,20 @@ def query(body: Query, request: Request):
 
                 with ThreadPoolExecutor(max_workers=3) as pool:
                     b3_fut = pool.submit(_safe, _load_b3)
-                    fii_fut = pool.submit(_safe, _load_fii)
-                    us_fut = pool.submit(_safe, get_us_market_data)
+                    fii_fut = pool.submit(_safe, lambda: _merge_reference_funds(_load_fii())[0])
+                    us_fut = pool.submit(_safe, _load_us)
                     b3, fii, us = b3_fut.result(), fii_fut.result(), us_fut.result()
             reference = catalog_screener_rows(body.asset_class, SCREEN_FIELDS)
-            source = f"Catálogo de referência · {ASSET_CLASS_LABELS.get(body.asset_class, 'Multi-Ativos')} (sem cotação ao vivo)"
-            frame = reference
-            if body.asset_class == "all":
+            if body.asset_class == "all" and not reference.empty:
                 b3 = b3.loc[~b3.index.isin(fii.index)]
                 reference = reference.loc[~reference["asset_class"].isin({"fii", "acao_us"})]
-                frame = pd.concat([b3.assign(currency="BRL", asset_class="acao_br"), fii, us, reference])
+            if not reference.empty:
+                reference = _with_live_quotes(reference)
+            source = "Multi-Ativos · fonte por linha" if body.asset_class == "all" else _catalog_source(reference)
+            frame = reference
+            if body.asset_class == "all":
+                parts = [part for part in (b3, fii, us, reference) if not part.empty]
+                frame = pd.concat(parts) if parts else pd.DataFrame()
                 frame = frame.reindex(columns=frame.columns.union(sorted(fields), sort=False))
                 source += " + Fundamentus · ações B3" if not b3.empty else " (ações B3 indisponíveis)"
                 source += " + Fundamentus · FIIs" if not fii.empty else " (FIIs indisponíveis)"
@@ -289,11 +404,13 @@ def query(body: Query, request: Request):
     except Exception as exc:
         raise HTTPException(503, f"Não foi possível carregar os dados do screener: {exc}") from exc
     result["id"] = uuid.uuid4().hex
-    publish(ctx, "screener", revision, generation, {"id": result["id"], "result": result, "export": exported})
+    publish(ctx, "screener", revision, generation,
+            {"id": result["id"], "result": result, "export": exported, "asset_class": body.asset_class})
     return result
 
 
 @router.get("/{id}/results.csv")
 def results_csv(id: str, request: Request):
     saved = artifact(session(request), "screener", id)
-    return csv_response(saved["export"], f"screener_b3_{dt.date.today():%Y%m%d}.csv")
+    asset_class = saved.get("asset_class") or "b3"
+    return csv_response(saved["export"], f"screener_{asset_class}_{dt.date.today():%Y%m%d}.csv")
