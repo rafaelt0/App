@@ -240,3 +240,25 @@ def test_market_strip_route_returns_clean_json(monkeypatch):
         response = client.get("/api/market/strip")
     assert response.status_code == 200
     assert response.json()["items"][0]["value"] is None
+
+
+def test_market_quotes_route_returns_delayed_moves_without_placeholders(monkeypatch):
+    monkeypatch.setattr(market, "monitor_quotes", lambda tickers: {
+        "source": "Yahoo Finance",
+        "quotes": {"HGLG11": {"price": 141.68, "change": float("nan"), "currency": "BRL", "digits": 2, "as_of": "2026-11-24", "symbol": "HGLG11.SA"}},
+        "unquoted": ["CDI"],
+        "missing": ["USDBRL=X"],
+    })
+    app = FastAPI()
+    app.include_router(market.router)
+    with TestClient(app) as client:
+        empty = client.get("/api/market/quotes")
+        too_many = client.get("/api/market/quotes", params={"tickers": ",".join(f"T{i}" for i in range(101))})
+        response = client.get("/api/market/quotes", params={"tickers": "HGLG11,CDI,hglg11"})
+    assert empty.status_code == 422
+    assert too_many.status_code == 422
+    assert response.status_code == 200
+    body = response.json()
+    assert body["quotes"]["HGLG11"]["change"] is None
+    assert body["quotes"]["HGLG11"]["price"] == 141.68
+    assert body["unquoted"] == ["CDI"]

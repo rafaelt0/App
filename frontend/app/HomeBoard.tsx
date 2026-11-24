@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MAX_SELECTION, type AssetClass, type Stock } from "../components/AppProvider";
 import { Change, stripQuote, tickerColor, useMarket } from "../components/Shell";
 import StockLogo from "../components/StockLogo";
@@ -36,7 +36,34 @@ const starterTabs: { key: AssetClass; label: string }[] = [
   { key: "outros", label: "Outros" },
 ];
 
-/** Selection quote table: delayed Yahoo quote from the tape, Fundamentus/Yahoo/BCB indicators once analysed. */
+type MonitorQuote = { price: number; change: number | null; currency: string; digits: number; as_of: string };
+type QuoteBook = { kind: "loading" | "ready" | "error"; quotes: Record<string, MonitorQuote>; unquoted: Set<string>; pending: boolean };
+
+/** Delayed Yahoo last price and daily change for the empty-selection quick list. */
+function useQuickQuotes(enabled: boolean, tickers: string): QuoteBook {
+  const [book, setBook] = useState<QuoteBook>({ kind: "loading", quotes: {}, unquoted: new Set(), pending: true });
+  useEffect(() => {
+    if (!enabled || !tickers) return;
+    let live = true;
+    setBook(current => ({ ...current, pending: true, kind: current.kind === "ready" ? "ready" : "loading" }));
+    fetch(`/api/market/quotes?tickers=${encodeURIComponent(tickers)}`, { credentials: "same-origin", cache: "no-store" })
+      .then(response => { if (!response.ok) throw new Error(String(response.status)); return response.json(); })
+      .then(data => {
+        if (!live) return;
+        const quotes: Record<string, MonitorQuote> = {};
+        for (const [ticker, quote] of Object.entries<MonitorQuote>(data.quotes ?? {})) {
+          if (!quote || typeof quote.price !== "number" || !Number.isFinite(quote.price)) continue;
+          quotes[ticker] = { ...quote, change: typeof quote.change === "number" && Number.isFinite(quote.change) ? quote.change : null };
+        }
+        setBook({ kind: "ready", quotes, unquoted: new Set<string>(data.unquoted ?? []), pending: false });
+      })
+      .catch(() => { if (live) setBook(current => ({ ...current, kind: Object.keys(current.quotes).length ? "ready" : "error", pending: false })); });
+    return () => { live = false; };
+  }, [enabled, tickers]);
+  return book;
+}
+
+/** Selection quote table: delayed Yahoo quote, Fundamentus/Yahoo/BCB indicators once analysed. */
 export function Monitor({ selection, stocks, watchlist, ready, busy, picker, notices, onQuick, onFavorite, onAdd, onRemove }: MonitorProps) {
   const { strip } = useMarket();
   const [starterClass, setStarterClass] = useState<AssetClass>("acao_br");
@@ -46,6 +73,13 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
   const monitorIndicators = ([{key:"pl",label:"P/L"},{key:"roe",label:"ROE"},{key:"dy",label:"Proventos / preço"}]).filter(item => units.has(item.key));
   const showSynthesis = ready?.companies.some(company => company.asset_class === "acao_br");
   const liquid = stocks.filter(stock => (!stock.asset_class || stock.asset_class === "acao_br") && stock.liquidity !== null).sort((a, b) => (b.liquidity ?? 0) - (a.liquidity ?? 0));
+  const liquidKey = liquid.slice(0, 14).map(stock => stock.ticker).join(",");
+  const quoteKey = useMemo(() => {
+    const ordered = [...new Set(Object.values(quickTickersByClass).flat())];
+    for (const ticker of liquidKey.split(",").filter(Boolean)) if (!ordered.includes(ticker)) ordered.push(ticker);
+    return ordered.slice(0, 100).sort().join(",");
+  }, [liquidKey]);
+  const quotes = useQuickQuotes(selection.length === 0, quoteKey);
   const classList = quickTickersByClass[starterClass]?.map(ticker => byTicker.get(ticker)).filter((stock): stock is Stock => !!stock) ?? [];
   const starters = starterClass === "acao_br" && liquid.length ? liquid.slice(0, 14) : classList.length ? classList : quickTickers.map(ticker => byTicker.get(ticker)).filter((stock): stock is Stock => !!stock);
   const [showAll, setShowAll] = useState(false);
@@ -100,13 +134,22 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
       <ScrollX label="Ativos para análise rápida"><table className="grid monitor is-quick"><caption className="visually-hidden">Ativos para análise rápida</caption>
         <thead><tr><th scope="col">Ativo</th><th scope="col">Nome / Setor</th><th scope="col" className="num" title="Classe e moeda do ativo">Classe</th><th scope="col" className="num">Últ.</th><th scope="col" className="num">Var.</th></tr></thead>
         <tbody>{shownStarters.map(stock => {
-          const item = stripQuote(strip, stock.ticker);
+          const modeled = quotes.unquoted.has(stock.ticker);
+          const live = modeled ? undefined : quotes.quotes[stock.ticker];
+          const tape = modeled ? undefined : stripQuote(strip, stock.ticker);
+          const price = live?.price ?? (typeof tape?.value === "number" ? tape.value : null);
+          const change = live ? live.change : tape?.change ?? null;
+          const currency = live?.currency ?? tape?.currency ?? stock.currency ?? "BRL";
+          const digits = live?.digits ?? tape?.digits ?? 2;
+          const asOf = live?.as_of ?? tape?.as_of;
+          const pending = price === null && !modeled && (quotes.kind === "loading" || quotes.pending);
+          const source = asOf ? `Yahoo Finance com atraso, ${shortDate(asOf)}` : modeled ? "Sem cotação de mercado" : pending ? "Carregando cotação" : "Cotação indisponível no momento";
           return <tr key={stock.ticker}>
             <th scope="row"><button type="button" className="row-btn" disabled={busy} aria-label={`Analisar ${stock.ticker} agora`} onClick={() => onQuick(stock.ticker)}><span className="tk"><StockLogo ticker={stock.ticker} company={stock.company} size={16} />{stock.ticker}</span><span className="quick-action" aria-hidden="true">Analisar</span></button></th>
             <td className="ell">{stock.company || "—"} <small className="muted">· {stock.sector}</small></td>
             <td className="num"><span className="asset-badge">{assetBadge(stock)}</span></td>
-            <td className="num">{item ? formatValue(item.value, "money") : stock.liquidity !== null ? formatCompactValue(stock.liquidity, "money", 1) : <span className="muted">{stock.currency ?? "BRL"}</span>}</td>
-            <td className="num">{item ? <Change value={item.change} /> : <span className="muted">—</span>}</td>
+            <td className="num" title={source}>{price === null ? <span className="muted">{pending ? "…" : "—"}</span> : formatValue(price, "money", digits, currency)}</td>
+            <td className="num" title={source}>{change === null ? <span className="muted">{pending ? "…" : "—"}</span> : <Change value={change} />}</td>
           </tr>;
         })}</tbody>
       </table></ScrollX>
@@ -124,7 +167,7 @@ export function Monitor({ selection, stocks, watchlist, ready, busy, picker, not
         </li>;
       })}</ul>
     </>}
-    <p className="pane-foot">Últ./Var.: Yahoo Finance com atraso na faixa de cotações; para os demais ativos, consulte a fonte no resultado da análise.</p>
+    <p className="pane-foot">Últ./Var.: Yahoo Finance com atraso. Títulos modelados, como CDI, CDB e IPCA+, não têm cotação de mercado; o preço oficial dos demais aparece na análise.</p>
   </Pane>;
 }
 

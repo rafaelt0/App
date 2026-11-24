@@ -104,6 +104,32 @@ def _positive_number(value):
     return value if math.isfinite(value) and value > 0 else None
 
 
+def session_change(closes, price):
+    """One-session fractional move, or None when no adjacent prior close exists.
+
+    A hole between the last two valid closes is a longer span, not a daily
+    change, so it stays None. A delayed price that has moved past the last bar
+    is measured against that bar only when the bar is the series' final session.
+    """
+    if not isinstance(closes, list):
+        return None
+    valid = []
+    for index, value in enumerate(closes):
+        number = _positive_number(value)
+        if number is not None:
+            valid.append((index, number))
+    if not valid:
+        return None
+    last_index, last_close = valid[-1]
+    if price is not None and abs(price - last_close) / last_close > 1e-8:
+        if last_index != len(closes) - 1:
+            return None
+        return price / last_close - 1
+    if len(valid) < 2 or last_index - valid[-2][0] != 1:
+        return None
+    return last_close / valid[-2][1] - 1
+
+
 def _fetch_public_market_data(url, **kwargs):
     """Bypass the global HTTP cache installed by the Fundamentus stock scraper."""
     with UncachedSession() as session:
@@ -238,6 +264,104 @@ def get_yahoo_quotes(symbols: tuple[str, ...]) -> dict[str, dict]:
         except (requests.RequestException, AttributeError, KeyError, TypeError, ValueError):
             logger.warning("Yahoo Finance quotes unavailable for %s", ", ".join(sorted(batch)), exc_info=True)
     return quotes
+
+
+def _spark_move(symbol, meta, closes):
+    """Delayed last price and session change from one spark meta block, or None."""
+    if not isinstance(meta, dict):
+        return None
+    price = _positive_number(meta.get("regularMarketPrice"))
+    currency = meta.get("currency")
+    stamp = _positive_number(meta.get("regularMarketTime"))
+    if meta.get("symbol") != symbol or price is None or stamp is None:
+        return None
+    if not isinstance(currency, str) or len(currency) != 3 or not currency.isascii() or not currency.isalpha():
+        return None
+    quote_date = _quote_date(stamp, meta.get("exchangeTimezoneName"))
+    if quote_date is None:
+        return None
+    try:
+        digits = int(meta.get("priceHint"))
+    except (TypeError, ValueError):
+        digits = 2
+    return {
+        "price": price,
+        "change": session_change(closes, price),
+        "currency": currency,
+        "digits": min(6, max(0, digits)),
+        "as_of": quote_date,
+        "source": "Yahoo Finance",
+    }
+
+
+@cache_data(ttl=120, stale=QUOTE_STALE_SECONDS, cache_if=bool)
+def get_yahoo_moves(symbols: tuple[str, ...]) -> dict[str, dict]:
+    """Delayed last price and one-session change for Yahoo symbols.
+
+    A failed batch is skipped. Symbols missing from the response are missing
+    here too; nothing is filled in from a reference price.
+    """
+    moves = {}
+    for offset in range(0, len(symbols), 20):
+        batch = set(symbols[offset:offset + 20])
+        try:
+            response = _fetch_public_market_data(
+                "https://query1.finance.yahoo.com/v7/finance/spark",
+                params={"symbols": ",".join(sorted(batch)), "range": "5d", "interval": "1d"},
+            )
+            rows = response.json()["spark"]["result"]
+            if not isinstance(rows, list):
+                raise ValueError("Yahoo Finance não retornou uma lista de cotações.")
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                symbol = row.get("symbol")
+                items = row.get("response")
+                if not isinstance(symbol, str) or symbol not in batch or not isinstance(items, list) or not items:
+                    continue
+                item = items[0] if isinstance(items[0], dict) else {}
+                indicators = item.get("indicators") if isinstance(item, dict) else None
+                blocks = indicators.get("quote") if isinstance(indicators, dict) else None
+                closes = blocks[0].get("close") if isinstance(blocks, list) and blocks and isinstance(blocks[0], dict) else None
+                move = _spark_move(symbol, item.get("meta"), closes)
+                if move is not None:
+                    moves[symbol] = move
+        except (requests.RequestException, AttributeError, KeyError, TypeError, ValueError):
+            logger.warning("Yahoo Finance moves unavailable for %s", ", ".join(sorted(batch)), exc_info=True)
+    return moves
+
+
+def monitor_quotes(tickers: tuple[str, ...]) -> dict:
+    """Delayed quotes for listed B3 names and catalog assets that have a Yahoo symbol.
+
+    Modeled rates and other titles without a market symbol are returned in
+    `unquoted`. A symbol the provider does not quote is listed in `missing`
+    and is not replaced with a catalog reference price.
+    """
+    from utils.assets import EXTRA_ASSETS_BY_TICKER
+
+    listed = set(get_listed_stocks()["Ticker"])
+    symbol_for = {}
+    unquoted = []
+    for ticker in tickers:
+        if ticker in EXTRA_ASSETS_BY_TICKER:
+            symbol = EXTRA_ASSETS_BY_TICKER[ticker].get("yahoo_symbol")
+        elif ticker in listed:
+            symbol = f"{ticker}.SA"
+        else:
+            continue
+        if symbol:
+            symbol_for[ticker] = symbol
+        else:
+            unquoted.append(ticker)
+    found = get_yahoo_moves(tuple(sorted(symbol_for.values()))) if symbol_for else {}
+    quotes = {}
+    for ticker, symbol in symbol_for.items():
+        move = found.get(symbol)
+        if move is not None:
+            quotes[ticker] = {**move, "symbol": symbol}
+    missing = [ticker for ticker in tickers if ticker not in quotes and ticker not in unquoted]
+    return {"source": "Yahoo Finance", "quotes": quotes, "unquoted": unquoted, "missing": missing}
 
 
 @cache_data(ttl=900, stale=DAY_SECONDS)
