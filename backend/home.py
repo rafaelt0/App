@@ -12,13 +12,16 @@ from backend.serialization import StrictModel, clean_json, csv_response
 from backend.state import artifact, begin, publish, session
 from utils.assets import (
     ASSET_CLASSES, ASSET_INDICATORS, EQUITY_CLASSES, asset_metadata, get_extra_asset_fundamentals, get_full_universe,
-    is_valid_asset_ticker, normalize_ticker, parse_fixed_income_asset, search_yahoo_assets, supports_share_allocation,
+    is_valid_asset_ticker, load_fii_market_data, market_asset_detail, normalize_ticker, parse_fixed_income_asset, provider_symbol,
+    search_yahoo_assets, supports_share_allocation, uses_market_quote,
 )
 from utils.formatting import extract_debt_metric, get_ev_ebitda_context
 from utils.home_data import (build_analyst_synthesis, clear_fundamentus_cache,
                              compute_sector_ranking, get_fundamentus_data, get_sector_peers)
-from utils.market_data import (clean_numeric_column, compute_target_upside, get_liquidity_by_ticker,
-                               get_listed_stocks, get_universe_changes, get_market_target_data, get_sorted_tickers_by_liquidity)
+from utils.market_data import (clean_numeric_column, compute_target_upside, get_fii_market_data, get_liquidity_by_ticker,
+                               get_listed_stocks, get_universe_changes, get_market_target_data, get_sorted_tickers_by_liquidity,
+                               get_yahoo_info, get_yahoo_quotes)
+from utils.treasury_data import TREASURY_TITLES
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/home", tags=["home"])
@@ -88,6 +91,7 @@ def consensus(tickers, refresh=False, asset_classes=None):
             continue
         if refresh:
             get_market_target_data.clear(ticker)
+            get_yahoo_info.clear(provider_symbol(ticker))
         market = get_market_target_data(ticker) or {}
         if "_error" in market:
             failed.append(ticker)
@@ -230,18 +234,38 @@ def build_analysis(raw, peers, tickers, universe):
                           "favorable_categories": sum(c["veredicto"] == "Favorável" for c in synthesis["categorias"].values())}})
     shown = set().union(*(ASSET_INDICATORS[company["asset_class"]] for company in companies))
     fund_yields = any(company["asset_class"] in {"fii", "reit", "etf"} for company in companies)
+    sources = dict.fromkeys(company["source"] for company in companies if company["available"])
     return clean_json({"requested_tickers": tickers, "missing_tickers": [t for t in tickers if t not in latest.index],
                        "companies": companies, "health_summary": HEALTH_SUMMARY, "comparison_indicators": [{"key": key, "label": "Proventos / preço (12m)" if key == "dy" and fund_yields else label, "unit": unit} for key, _, label, unit, *_ in INDICATORS if key in shown],
-                       "sources": {"fundamentals": "Fundamentus / Yahoo Finance", "peer_units": "fractions", "detail_percentages": "percentage_points", "detail_multiples": "ratio (scraper /100 correction)"}})
+                       "sources": {"fundamentals": " / ".join(sources), "peer_units": "fractions", "detail_percentages": "percentage_points", "detail_multiples": "ratio (scraper /100 correction)"}})
 
 
-def _extra_fundamentals_frame(tickers: list[str]) -> pd.DataFrame:
+def _extra_fundamentals_frame(tickers: list[str], b3_stocks: dict[str, dict]) -> pd.DataFrame:
     """Convert non-Fundamentus assets (FIIs, US stocks, REITs, Títulos/RF, ETFs) into build_analysis detail schema."""
+    quote_only = {ticker for ticker in tickers if uses_market_quote(ticker)}
+    needs_fii = any(ticker not in b3_stocks and asset_metadata(ticker)["asset_class"] == "fii" for ticker in tickers)
+    fii_table = load_fii_market_data() if needs_fii else pd.DataFrame()
+    details = {ticker: get_extra_asset_fundamentals(ticker, fii_table=fii_table, b3_stock=b3_stocks.get(ticker))
+               for ticker in tickers if ticker not in quote_only}
+    fii_quotes = {ticker for ticker, detail in details.items() if detail.get("source") == "Fundamentus · FIIs"}
+    quote_tickers = quote_only | fii_quotes | {ticker for ticker, data in details.items()
+                                               if not data.get("available") and ticker not in TREASURY_TITLES
+                                               and parse_fixed_income_asset(ticker) is None}
+    symbols = {ticker: provider_symbol(ticker) for ticker in quote_tickers}
+    quotes = get_yahoo_quotes(tuple(sorted(set(symbols.values())))) if symbols else {}
     rows = []
     index = []
     for ticker in tickers:
-        data = get_extra_asset_fundamentals(ticker)
-        if not data or not data.get("available"):
+        quote = quotes.get(symbols.get(ticker))
+        if ticker in fii_quotes:
+            data = details[ticker]
+            if quote and quote["currency"] == "BRL":
+                data = {**data, **quote, "source": "Fundamentus · FIIs / Yahoo Finance"}
+        elif ticker in symbols:
+            data = market_asset_detail(ticker, quote, allow_nasdaq=ticker in quote_only, b3_stock=b3_stocks.get(ticker))
+        else:
+            data = details[ticker]
+        if not data.get("available"):
             continue
         ind = data.get("indicators") or {}
         hlth = data.get("health") or {}
@@ -426,6 +450,7 @@ def suggestions(body: SuggestionsRequest):
 @catalog_router.post("/fundamentus/refresh")
 def refresh_fundamentus():
     removed = clear_fundamentus_cache()
+    get_fii_market_data.clear()
     get_sorted_tickers_by_liquidity.clear()
     return {"removed": removed, "scope": "global Fundamentus; consenso Yahoo não alterado"}
 
@@ -439,20 +464,22 @@ def analyze(body: HomeRequest, request: Request):
         universe_frame = get_listed_stocks()
         b3_set = set(universe_frame["Ticker"])
         b3_tickers = [ticker for ticker in tickers if ticker in b3_set and asset_metadata(ticker, universe_frame)["asset_class"] == "acao_br"]
-        extra_tickers = [ticker for ticker in tickers if ticker not in b3_tickers]
         frames = []
+        covered_b3 = set()
         if b3_tickers:
             try:
                 raw_b3 = get_fundamentus_data(b3_tickers)
                 if raw_b3 is not None and not raw_b3.empty:
                     frames.append(raw_b3)
+                    covered_b3.update(normalize_detail(raw_b3).index)
             except OSError:
                 raise
             except Exception:
-                if not extra_tickers:
-                    raise
+                logger.warning("Fundamentus detail unavailable for %s", ", ".join(b3_tickers), exc_info=True)
+        extra_tickers = [ticker for ticker in tickers if ticker not in covered_b3]
         if extra_tickers:
-            extra_raw = _extra_fundamentals_frame(extra_tickers)
+            fallback_b3 = {ticker: asset_metadata(ticker, universe_frame) for ticker in b3_tickers if ticker not in covered_b3}
+            extra_raw = _extra_fundamentals_frame(extra_tickers, fallback_b3)
             if not extra_raw.empty:
                 frames.append(extra_raw)
         raw = pd.concat(frames) if frames else pd.DataFrame()
@@ -461,13 +488,13 @@ def analyze(body: HomeRequest, request: Request):
             raise HTTPException(503, f"{source} não retornou dados para os ativos selecionados. Tente novamente.")
         peers = get_sector_peers() if b3_tickers else pd.DataFrame()
         result = build_analysis(raw, peers, tickers, universe_frame)
-        if any(t in b3_tickers for t in result["missing_tickers"]):
+        if set(b3_tickers) - covered_b3:
             clear_fundamentus_cache()
         result["consensus"] = consensus(tickers, asset_classes={item["ticker"]: item["asset_class"] for item in result["companies"]})
         result["id"] = uuid.uuid4().hex
         result["revision"] = body.revision
         export_fields = EXPORT_FIELDS
-        if extra_tickers:
+        if "Classe" in raw:
             raw["Classe"] = raw["Classe"].fillna("acao_br") if "Classe" in raw else "acao_br"
             raw["Moeda"] = raw["Moeda"].fillna("BRL") if "Moeda" in raw else "BRL"
             raw["Fonte"] = raw["Fonte"].fillna("Fundamentus") if "Fonte" in raw else "Fundamentus"

@@ -221,7 +221,7 @@ def _convert_usd_columns_to_brl(prices: pd.DataFrame, usd_symbols: list[str], st
 
 @cache_data(ttl=3600)
 def get_portfolio_prices(tickers_yf, start_date):
-    from utils.assets import build_synthetic_fixed_income_prices, is_synthetic_fixed_income, is_usd_symbol
+    from utils.assets import build_synthetic_fixed_income_prices, is_synthetic_fixed_income, is_usd_symbol, parse_fixed_income_asset
 
     symbols = tuple(tickers_yf)
     synthetic = [s for s in symbols if is_synthetic_fixed_income(s)]
@@ -243,10 +243,12 @@ def get_portfolio_prices(tickers_yf, start_date):
     combined = pd.concat([y_prices, treasury_close], axis=1).sort_index()
     if synthetic:
         cdi_rates = None
-        try:
-            cdi_rates = get_cdi_daily_rates(start_date)
-        except Exception:
-            logger.debug("CDI daily rates unavailable for synthetic prices; using fallback rate", exc_info=True)
+        if any((parse_fixed_income_asset(symbol) or {"kind": "cdi_pct"})["kind"] in {"cdi_pct", "cdi_spread", "poupanca"}
+               for symbol in synthetic):
+            try:
+                cdi_rates = get_cdi_daily_rates(start_date)
+            except Exception:
+                logger.debug("CDI daily rates unavailable for synthetic prices; using fallback rate", exc_info=True)
         s_prices = build_synthetic_fixed_income_prices(
             synthetic, start_date, index=combined.index if not combined.empty else None, cdi_rates=cdi_rates
         )

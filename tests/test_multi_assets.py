@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import app as api_module, home, news, portfolio, screener, simulation, state
-from utils import assets, db, portfolio_data
+from utils import assets, db, market_data, portfolio_data
 from utils.news import is_relevant_company_news
 
 HEADERS = {"Origin": "http://localhost:3000", "X-B3Lab-Request": "1"}
@@ -19,6 +19,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "_DB", str(tmp_path / "multi_assets.sqlite"))
     monkeypatch.setattr(state, "_states", {})
     monkeypatch.setattr(home, "search_yahoo_assets", lambda query: [])
+    monkeypatch.setattr(home, "load_fii_market_data", pd.DataFrame)
+    monkeypatch.setattr(home, "get_yahoo_quotes", lambda symbols: {})
     with TestClient(api_module.app) as test_client:
         yield test_client
 
@@ -91,16 +93,26 @@ def test_home_analysis_supports_mixed_b3_us_fii_reit_and_fixed_income(client, mo
     monkeypatch.setattr(home, "get_fundamentus_data", lambda tickers: pd.DataFrame(
         {"Empresa": ["Petrobras"], "Setor": ["Energia"], "Cotacao": ["35,00"], "PL": [600], "ROIC": ["12,00%"]}, index=tickers))
     monkeypatch.setattr(home, "get_sector_peers", pd.DataFrame)
-    assets.get_extra_asset_fundamentals.clear()
+    market_data.get_yahoo_info.clear()
+    info_calls = []
+    quote_batches = []
 
     def yahoo_ticker(symbol):
-        quote_type = {"TLT": "ETF", "SPY": "ETF", "BTC-USD": "CRYPTOCURRENCY"}.get(symbol, "EQUITY")
+        info_calls.append(symbol)
+        assert symbol not in {"TLT", "BTC-USD"}
+        quote_type = "ETF" if symbol == "SPY" else "EQUITY"
         return SimpleNamespace(info={"quoteType": quote_type, "regularMarketPrice": 90, "totalAssets": 3000000,
                                      "trailingPE": 19, "priceToBook": 1.25, "returnOnEquity": .15, "returnOnAssets": .12,
                                      "revenueGrowth": .25, "trailingAnnualDividendYield": 0.0, "yield": .035,
                                      "debtToEquity": 200, "currentRatio": 2, "enterpriseValue": 100, "ebitda": 10})
 
-    monkeypatch.setattr(assets.yf, "Ticker", yahoo_ticker)
+    monkeypatch.setattr(market_data.yf, "Ticker", yahoo_ticker)
+
+    def market_quotes(symbols):
+        quote_batches.append(symbols)
+        return {symbol: {"price": 90, "currency": "USD", "source": "Yahoo Finance"} for symbol in symbols}
+
+    monkeypatch.setattr(home, "get_yahoo_quotes", market_quotes)
 
     monkeypatch.setattr(home, "get_market_target_data", lambda t: {
         "company_name": t,
@@ -115,12 +127,14 @@ def test_home_analysis_supports_mixed_b3_us_fii_reit_and_fixed_income(client, mo
     })
 
     response = client.post("/api/home/analyze", headers=HEADERS, json={"tickers": tickers, "revision": sel["revision"]})
-    assets.get_extra_asset_fundamentals.clear()
+    market_data.get_yahoo_info.clear()
     assert response.status_code == 200
     data = response.json()
     by_ticker = {c["ticker"]: c for c in data["companies"]}
 
     assert set(by_ticker) == set(tickers)
+    assert quote_batches == [("BTC-USD", "TLT")]
+    assert sorted(info_calls) == ["AAPL", "AAPL34.SA", "HGLG11.SA", "O", "SPY"]
     assert by_ticker["AAPL"]["market"]["currency"] == "USD"
     assert by_ticker["O"]["market"]["currency"] == "USD"
     assert by_ticker["HGLG11"]["market"]["currency"] == "BRL"
@@ -169,12 +183,12 @@ def test_yahoo_classification_uses_instrument_type_before_theme(symbol, quote_ty
 
 
 def test_home_uses_nasdaq_quote_when_yahoo_is_unavailable(client, monkeypatch):
-    assets.get_extra_asset_fundamentals.clear()
+    market_data.get_yahoo_info.clear()
     assets._get_nasdaq_quote.clear()
     home.get_market_target_data.clear()
     yahoo_info = {}
     nasdaq_calls = []
-    monkeypatch.setattr(assets.yf, "Ticker", lambda symbol: SimpleNamespace(info=yahoo_info))
+    monkeypatch.setattr(market_data.yf, "Ticker", lambda symbol: SimpleNamespace(info=yahoo_info))
 
     def nasdaq_quote(url, *, params, **kwargs):
         nasdaq_calls.append(url)
@@ -219,20 +233,68 @@ def test_home_uses_nasdaq_quote_when_yahoo_is_unavailable(client, monkeypatch):
         assert recovered["consensus"]["has_targets"] is True
         assert len(nasdaq_calls) == 2
     finally:
-        assets.get_extra_asset_fundamentals.clear()
+        market_data.get_yahoo_info.clear()
         assets._get_nasdaq_quote.clear()
         home.get_market_target_data.clear()
+
+
+def test_home_and_consensus_share_yahoo_info_until_explicit_refresh(client, monkeypatch):
+    market_data.get_yahoo_info.clear()
+    home.get_market_target_data.clear()
+    calls = []
+
+    def fetch(symbol):
+        calls.append(symbol)
+        return SimpleNamespace(info={"regularMarketPrice": 100, "targetMeanPrice": 110 + len(calls)})
+
+    monkeypatch.setattr(market_data.yf, "Ticker", fetch)
+    client.get("/api/session")
+    tickers = ["AAPL"]
+    selection = client.put("/api/session/selection", headers=HEADERS, json={"tickers": tickers, "revision": 0}).json()
+    payload = {"tickers": tickers, "revision": selection["revision"]}
+    try:
+        initial = client.post("/api/home/analyze", headers=HEADERS, json=payload).json()
+        assert initial["consensus"]["rows"][0]["target_mean"] == 111
+        assert calls == ["AAPL"]
+        refreshed = client.post("/api/home/consensus/refresh", headers=HEADERS, json=payload).json()
+        assert refreshed["rows"][0]["target_mean"] == 112
+        assert calls == ["AAPL", "AAPL"]
+    finally:
+        market_data.get_yahoo_info.clear()
+        home.get_market_target_data.clear()
+
+
+def test_home_uses_validated_fii_snapshot_without_yahoo_info(client, monkeypatch):
+    def unexpected_info(symbol):
+        pytest.fail(f"unexpected Yahoo Finance fundamentals for {symbol}")
+
+    monkeypatch.setattr(assets, "get_yahoo_info", unexpected_info)
+    monkeypatch.setattr(home, "load_fii_market_data", lambda: pd.DataFrame(
+        {"price": [140.5], "pvp": [.89], "dy": [9.9], "liq2m": [715_027]}, index=["HGLG11"]))
+    client.get("/api/session")
+    tickers = ["HGLG11"]
+    selection = client.put("/api/session/selection", headers=HEADERS, json={"tickers": tickers, "revision": 0}).json()
+    response = client.post("/api/home/analyze", headers=HEADERS, json={
+        "tickers": tickers, "revision": selection["revision"]})
+
+    assert response.status_code == 200
+    company = response.json()["companies"][0]
+    assert company["source"] == "Fundamentus · FIIs"
+    assert company["indicators"] == {"pvp": .89, "dy": 9.9}
+    assert company["market"]["volume_2m"] == 715_027
 
 
 def test_unavailable_yahoo_quote_does_not_use_catalog_values(monkeypatch):
     def unavailable(symbol):
         raise RuntimeError("Yahoo unavailable")
 
-    monkeypatch.setattr(assets.yf, "Ticker", unavailable)
+    monkeypatch.setattr(assets, "get_yahoo_info", unavailable)
+    monkeypatch.setattr(assets, "get_yahoo_quotes", lambda symbols: {})
+    assets._get_nasdaq_quote.clear()
     monkeypatch.setattr(assets.requests, "get", lambda *args, **kwargs: SimpleNamespace(
         raise_for_status=lambda: None, json=lambda: {"data": None}))
-    assert assets.get_extra_asset_fundamentals.__wrapped__("AAPL")["available"] is False
-    assert assets.get_extra_asset_fundamentals.__wrapped__("TLT")["price"] is None
+    assert assets.get_extra_asset_fundamentals("AAPL")["available"] is False
+    assert assets.get_extra_asset_fundamentals("TLT")["price"] is None
 
 
 def test_portfolio_and_simulation_with_multi_asset_classes(monkeypatch):
@@ -293,6 +355,10 @@ def test_portfolio_and_simulation_with_multi_asset_classes(monkeypatch):
 def test_screener_supports_all_multi_asset_classes(client, monkeypatch):
     monkeypatch.setattr(screener, "get_full_market_data", lambda: pd.DataFrame(
         {"P/L": [10, 20], "Liq.2meses": [2_000_000, 8_000_000]}, index=["PETR4", "TLT"]))
+    fii = pd.DataFrame({"price": [42.5], "pvp": [0.9], "dy": [12.5], "liq2m": [2_000_000],
+                        "setor": ["Logística"]}, index=["HGLG11"])
+    fii.attrs["fetched_at"] = "2026-01-02T18:00:00+00:00"
+    monkeypatch.setattr(screener, "get_fii_market_data", lambda: fii.copy())
     client.get("/api/session")
     cfg = client.get("/api/screener/config").json()
     class_keys = {item["key"] for item in cfg["asset_classes"]}
@@ -310,7 +376,12 @@ def test_screener_supports_all_multi_asset_classes(client, monkeypatch):
         assert len(body["rows"]) == body["matched_count"]
         if cls == "b3":
             assert [row["ticker"] for row in body["rows"]] == ["PETR4"]
-        if cls != "b3":
+        if cls == "fii":
+            assert body["source"] == "Fundamentus · FIIs"
+            assert body["fetched_at"] == fii.attrs["fetched_at"]
+            assert body["rows"][0]["dy"] == .125
+            assert body["rows"][0]["cotacao"] == 42.5
+        elif cls != "b3":
             assert body["fetched_at"] is None and "referência" in body["source"]
         if cls in {"titulo", "outros"}:
             assert {column["key"] for column in body["available_columns"]}.isdisjoint({"dy", "pvp", "pl", "roe"})
@@ -323,6 +394,23 @@ def test_screener_supports_all_multi_asset_classes(client, monkeypatch):
     unfiltered = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": "titulo"}).json()
     modeled = next(row for row in unfiltered["rows"] if row["ticker"] == "CDI")
     assert modeled["cotacao"] is None and modeled["liq2m"] is None
+
+
+def test_screener_does_not_substitute_fii_reference_values_during_outage(client, monkeypatch):
+    def offline():
+        raise RuntimeError("provider offline")
+
+    monkeypatch.setattr(screener, "get_fii_market_data", offline)
+    monkeypatch.setattr(screener, "get_full_market_data", lambda: pd.DataFrame({"P/L": [10]}, index=["PETR4"]))
+    client.get("/api/session")
+
+    funds = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": "fii"})
+    combined = client.post("/api/screener/query", headers=HEADERS, json={"asset_class": "all"})
+    assert funds.status_code == 503
+    assert "Fundamentus" in funds.json()["detail"]
+    assert combined.status_code == 200
+    assert "FIIs indisponíveis" in combined.json()["source"]
+    assert all(row["asset_class"] != "fii" for row in combined.json()["rows"])
 
 
 def test_usd_fixed_income_history_includes_fx_but_does_not_quote_units(monkeypatch):
@@ -357,19 +445,15 @@ def test_only_real_instrument_mentions_drive_portfolio_news():
 
 
 def test_fii_falls_back_to_yahoo_dividend_yield_when_trailing_is_zero(monkeypatch):
-    assets.get_extra_asset_fundamentals.clear()
-    monkeypatch.setattr(assets.yf, "Ticker", lambda symbol: SimpleNamespace(info={
+    monkeypatch.setattr(assets, "get_yahoo_info", lambda symbol: {
         "quoteType": "EQUITY",
         "regularMarketPrice": 140.5,
         "priceToBook": 0.89,
         "trailingAnnualDividendYield": 0.0,
         "dividendYield": 9.9,
         "currency": "BRL",
-    }))
-    try:
-        data = assets.get_extra_asset_fundamentals("HGLG11")
-    finally:
-        assets.get_extra_asset_fundamentals.clear()
+    })
+    data = assets.get_extra_asset_fundamentals("HGLG11", fii_table=pd.DataFrame())
     assert data["indicators"]["dy"] == pytest.approx(9.9)
     assert data["indicators"]["pvp"] == pytest.approx(0.89)
 

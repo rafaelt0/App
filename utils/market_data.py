@@ -8,11 +8,15 @@ import datetime
 import logging
 import math
 import threading
+from io import StringIO
 from pathlib import Path
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 import pandas as pd
+import requests
+from requests.sessions import Session as UncachedSession
 from utils.cache import cache_data
 import yfinance as yf
 from utils.formatting import normalize_numeric_text
@@ -78,6 +82,105 @@ def clean_numeric_column(col):
     return pd.to_numeric(col.map(normalize_numeric_text), errors="coerce")
 
 
+@cache_data(ttl=900, max_entries=512, cache_if=bool)
+def get_yahoo_info(symbol):
+    """Share the full Yahoo response between analysis and analyst consensus."""
+    with YFINANCE_REQUEST_LOCK:
+        return yf.Ticker(symbol).info or {}
+
+
+def _positive_number(value):
+    try:
+        value = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return value if math.isfinite(value) and value > 0 else None
+
+
+def _fetch_public_market_data(url, **kwargs):
+    """Bypass the global HTTP cache installed by the Fundamentus stock scraper."""
+    with UncachedSession() as session:
+        response = session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4, **kwargs)
+        response.raise_for_status()
+        return response
+
+
+@cache_data(ttl=120, cache_if=bool)
+def get_yahoo_quotes(symbols: tuple[str, ...]) -> dict[str, dict]:
+    """Load delayed, unadjusted market quotes without requesting corporate fundamentals."""
+    quotes = {}
+    for offset in range(0, len(symbols), 20):
+        batch = set(symbols[offset:offset + 20])
+        try:
+            response = _fetch_public_market_data(
+                "https://query1.finance.yahoo.com/v7/finance/spark",
+                params={"symbols": ",".join(sorted(batch)), "range": "5d", "interval": "1d"},
+            )
+            rows = response.json()["spark"]["result"]
+            if not isinstance(rows, list):
+                raise ValueError("Yahoo Finance não retornou uma lista de cotações.")
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                symbol = row.get("symbol")
+                items = row.get("response")
+                if not isinstance(symbol, str) or symbol not in batch or not isinstance(items, list) or not items:
+                    continue
+                meta = items[0].get("meta") if isinstance(items[0], dict) else None
+                if not isinstance(meta, dict):
+                    continue
+                price = _positive_number(meta.get("regularMarketPrice"))
+                currency = meta.get("currency")
+                stamp = _positive_number(meta.get("regularMarketTime"))
+                if meta.get("symbol") != symbol or price is None or stamp is None:
+                    continue
+                if not isinstance(currency, str) or len(currency) != 3 or not currency.isascii() or not currency.isalpha():
+                    continue
+                try:
+                    zone = ZoneInfo(meta.get("exchangeTimezoneName") or "UTC")
+                except (TypeError, ValueError, ZoneInfoNotFoundError):
+                    zone = datetime.timezone.utc
+                try:
+                    quote_date = datetime.datetime.fromtimestamp(stamp, zone).date().isoformat()
+                except (OSError, OverflowError, ValueError):
+                    continue
+                quotes[symbol] = {
+                    "price": price, "currency": currency, "last_quote_date": quote_date,
+                    "low_52w": _positive_number(meta.get("fiftyTwoWeekLow")),
+                    "high_52w": _positive_number(meta.get("fiftyTwoWeekHigh")),
+                    "source": "Yahoo Finance",
+                }
+        except (requests.RequestException, AttributeError, KeyError, TypeError, ValueError):
+            logger.warning("Yahoo Finance quotes unavailable for %s", ", ".join(sorted(batch)), exc_info=True)
+    return quotes
+
+
+@cache_data(ttl=900, stale=DAY_SECONDS)
+def get_fii_market_data() -> pd.DataFrame:
+    """Read the dedicated Fundamentus FII table in one request; yields are percentage points."""
+    response = _fetch_public_market_data("https://www.fundamentus.com.br/fii_resultado.php")
+    columns = {"Papel": "ticker", "Segmento": "setor", "Cotação": "price",
+               "P/VP": "pvp", "Dividend Yield": "dy", "Liquidez": "liq2m"}
+    raw, *_ = pd.read_html(StringIO(response.content.decode("iso-8859-1")),
+                           attrs={"id": "tabelaResultado"}, decimal=",", thousands=".",
+                           converters=dict.fromkeys(columns, str))
+    if raw.empty or not columns.keys() <= set(raw.columns):
+        raise ValueError("Fundamentus não retornou a tabela de FIIs esperada.")
+    frame = raw[list(columns)].rename(columns=columns)
+    frame["ticker"] = frame["ticker"].str.strip().str.upper()
+    frame = frame.loc[frame["ticker"].str.fullmatch(r"[A-Z0-9]{4}11", na=False)]
+    if frame.empty:
+        raise ValueError("Fundamentus não retornou FIIs válidos.")
+    frame = frame.drop_duplicates("ticker").set_index("ticker")
+    for column in ("price", "pvp", "dy"):
+        frame[column] = clean_numeric_column(frame[column]).replace([math.inf, -math.inf], float("nan"))
+    frame["liq2m"] = clean_numeric_column(frame["liq2m"].str.replace(".", "", regex=False))
+    frame["price"] = frame["price"].where(frame["price"].gt(0))
+    frame["pvp"] = frame["pvp"].where(frame["pvp"].gt(0))
+    frame.attrs["fetched_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return frame
+
+
 def compute_target_upside(current_price, target_price):
     """Return target-price upside in percent, or None for invalid prices."""
     try:
@@ -112,8 +215,7 @@ def get_market_target_data(ticker_b3):
     symbol = provider_symbol(ticker_b3)
     default_currency = "BRL" if symbol.endswith(".SA") else "USD"
     try:
-        with YFINANCE_REQUEST_LOCK:
-            info = yf.Ticker(symbol).info or {}
+        info = get_yahoo_info(symbol)
         if not info:
             return {"_error": "Yahoo Finance não retornou dados"}
         return {

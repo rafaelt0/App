@@ -182,13 +182,15 @@ export default function ScreenerPage() {
       })}</ul>
       <div className="param-run">
         <button disabled={actionBusy} onClick={clearFilters}>Restaurar filtros iniciais</button>
-        {(isB3 || assetClass === "all") && <button disabled={actionBusy} title="Limpa o cache Fundamentus e busca os dados de novo" onClick={()=>void sourceRefresh()}>{actionBusy ? "Atualizando…":"Atualizar dados Fundamentus"}</button>}
+        {(isB3 || assetClass === "fii" || assetClass === "all") && <button disabled={actionBusy} title="Limpa o cache Fundamentus e busca os dados de novo" onClick={()=>void sourceRefresh()}>{actionBusy ? "Atualizando…":"Atualizar dados Fundamentus"}</button>}
       </div>
       {result && <>
         <details className="disclosure"><summary>Colunas ({columnCount} de {result.available_columns.length})</summary><fieldset className="column-picker"><legend className="visually-hidden">Indicadores na tabela</legend>{result.available_columns.map(column=><label key={column.key}><input type="checkbox" checked={visible?.includes(column.key) ?? false} onChange={event=>setVisible(current=>{const next=new Set(current ?? []);if(event.target.checked)next.add(column.key);else next.delete(column.key);return result.available_columns.map(item=>item.key).filter(key=>next.has(key));})}/>{column.label}</label>)}</fieldset></details>
         <details className="disclosure"><summary>Entenda os indicadores</summary><dl className="glossary">{result.available_columns.filter(column=>visible?.includes(column.key) && column.help).map(column=><div key={column.key}><dt>{column.label}</dt><dd>{column.help}</dd></div>)}</dl></details>
       </>}
-      <p className="param-hint">{isB3 ? "Dados da Fundamentus, com atraso." : "Valores de referência, sem cotação ao vivo. Valores monetários e limites usam a moeda de cada ativo, sem conversão. A ordenação de valores monetários é feita por moeda."}</p>
+      <p className="param-hint">{isB3 || assetClass === "fii"
+        ? "Dados da Fundamentus, com atraso."
+        : `${assetClass === "all" ? "Ações B3 e FIIs usam dados da Fundamentus, com atraso. As demais classes usam valores de referência." : "Valores de referência, sem cotação ao vivo."} Valores monetários e limites usam a moeda de cada ativo, sem conversão.`}</p>
     </Pane>
     <Pane title="Resultados" className="pane-screener" flush
       meta={result && !busy && !invalidCriteria ? <span role="status"><b className="scr-count">{result.matched_count}</b> de {result.total_count}{result.metrics.mean_dy !== null ? ` · Proventos / preço médios ${formatValue(result.metrics.mean_dy,"percent",2)}` : ""}{result.metrics.mean_roe !== null ? ` · ROE médio ${formatValue(result.metrics.mean_roe,"percent",2)}` : ""}{result.fetched_at ? ` · coleta há ${result.age_minutes} min`:""}</span> : <span role="status">{error || invalidCriteria ? "Resultado indisponível":"Atualizando…"}</span>}
