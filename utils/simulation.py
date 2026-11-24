@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 
 
+_DAYS_PER_BLOCK = 256
+
+
 def _normalized_weights(weights):
     weights = np.asarray(weights, dtype=float)
     if (
@@ -52,11 +55,16 @@ def simulate_portfolio(
     portfolio_values[0] = initial_value
     for first in range(0, simulations, chunk_size):
         count = min(chunk_size, simulations - first)
-        log_returns = rng.multivariate_normal(mu, covariance, size=(days, count))
-        daily_returns = np.expm1(log_returns) @ weights
-        portfolio_values[1:, first:first + count] = initial_value * np.cumprod(
-            1 + daily_returns, axis=0
-        )
+        daily_returns = np.empty((days, count), dtype=float)
+        # Consecutive day blocks keep the same draw order within each group of paths.
+        for start in range(0, days, _DAYS_PER_BLOCK):
+            block = daily_returns[start:start + _DAYS_PER_BLOCK]
+            log_returns = rng.multivariate_normal(mu, covariance, size=block.shape)
+            np.expm1(log_returns, out=log_returns)
+            np.matmul(log_returns, weights, out=block)
+        daily_returns += 1
+        np.cumprod(daily_returns, axis=0, out=daily_returns)
+        np.multiply(initial_value, daily_returns, out=portfolio_values[1:, first:first + count])
 
     dates = pd.date_range(start=start_date, periods=days + 1, freq="B")
     result = pd.DataFrame(portfolio_values, index=dates)
@@ -82,7 +90,10 @@ def bootstrap_terminal_values(returns, weights, days, simulations, initial_value
         count = min(chunk_size, simulations - first)
         # ponytail: iid daily blocks omit volatility clustering; use multi-day blocks if validated.
         indices = rng.integers(len(returns), size=(days, count))
-        daily_returns = returns[indices] @ weights
+        daily_returns = np.empty((days, count), dtype=float)
+        for start in range(0, days, _DAYS_PER_BLOCK):
+            block = slice(start, start + _DAYS_PER_BLOCK)
+            daily_returns[block] = returns[indices[block]] @ weights
         final_values[first:first + count] = initial_value * np.prod(1 + daily_returns, axis=0)
 
     return final_values
