@@ -1,14 +1,21 @@
 .desk-home {
   grid-template-columns: minmax(0, 1fr) minmax(290px, 340px);
-  grid-template-rows: auto 1fr;
-  grid-template-areas: "mon mac" "sec news";
-  align-content: start;
+  grid-template-rows: minmax(0, 1fr);
 }
-.desk-home.has-selection {
-  grid-template-rows: auto auto minmax(0, 1fr);
-  grid-template-areas: "mon mac" "res news" "sec news";
+/* Columns size on their own. A short selection stays compact and the analysis sits under it; the map and headlines take leftover height. */
+.home-main, .home-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  background: var(--line);
 }
-.home-result { grid-area: res; display: grid; align-content: start; min-width: 0; background: var(--pane); }
+.home-main > .pane-monitor,
+.home-main > .home-result,
+.home-rail > .pane-macro { flex: none; }
+.home-main > .pane-sectors,
+.home-rail > .pane-news { flex: 1 1 auto; }
+.home-result { display: grid; align-content: start; min-width: 0; background: var(--pane); }
 .home-result > .note { margin: 8px 10px; }
 #selecao-de-acoes, #resultado-analise { scroll-margin-top: calc(var(--cmd-h) + 12px); }
 

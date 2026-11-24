@@ -173,7 +173,8 @@ export default function HomePage() {
   const analyzeLabel = busy ? "Analisando…" : ready ? "Atualizar análise" : selection.length === 1 ? `Analisar ${selection[0]}` : `Comparar ${selection.length} ativos`;
   const undo = sectorUndo?.revision === session.revision ? sectorUndo : null;
 
-  return <div className={`desk desk-home${selection.length || busy ? " has-selection" : ""}`}>
+  return <div className="desk desk-home">
+    <div className="home-main">
     <Monitor selection={selection} stocks={stocks} watchlist={session.watchlist} ready={ready} busy={disabled}
       picker={<>
         <StockPicker selection={selection} action={selection.length ? "Adicionar" : "Analisar"} disabled={disabled || selection.length >= MAX_SELECTION} onChoose={ticker => addStock(ticker, selection.length === 0 ? "stay" : undefined)} />
@@ -207,7 +208,10 @@ export default function HomePage() {
     <SectorMap stocks={stocks} selection={selection} busy={disabled} onSector={sector => void selectSector(sector)}
       onAdd={ticker => addStock(ticker, selection.length === 0 ? "scroll" : undefined)} onRefresh={() => void run("source")}
       note={mapNote && <Notice tone={mapNote.failed ? "negative" : "info"}>{mapNote.text} {undo && <button type="button" disabled={disabled} onClick={() => void editSelection(undo.tickers)}>Desfazer</button>}</Notice>} />
-    <Macro />
-    <Headlines />
+    </div>
+    <div className="home-rail">
+      <Macro />
+      <Headlines />
+    </div>
   </div>;
 }
