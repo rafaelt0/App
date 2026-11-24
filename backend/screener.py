@@ -350,7 +350,7 @@ def query(body: Query, request: Request):
 
         def _load_us():
             frame = get_us_market_data()
-            return _provenance(frame, "Yahoo Finance · Ações EUA", fetched_at=frame.attrs.get("fetched_at"))
+            return _ensure_provenance(frame, body, "Yahoo Finance · Ações EUA")
 
         if body.asset_class in {"b3", "acao_br"}:
             b3 = _load_b3()
@@ -370,6 +370,10 @@ def query(body: Query, request: Request):
             except Exception as exc:
                 raise HTTPException(503, "Os dados de ações americanas no Yahoo Finance estão indisponíveis. Tente novamente.") from exc
             result, exported = screen(us, body, source="Yahoo Finance · Ações EUA", normalized=True)
+            result["unavailable_indicators"] = [
+                column["label"] for column in result["available_columns"]
+                if column["key"] in CRITERION_FIELDS.values() and us[column["key"]].isna().all()
+            ]
         else:
             if body.asset_class == "all":
                 def _safe(fn):

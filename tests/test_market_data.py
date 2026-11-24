@@ -95,6 +95,27 @@ def test_yahoo_bulk_quotes_keep_correct_symbols_and_native_units(monkeypatch):
     assert quotes["BTC-USD"]["last_quote_date"] == "2026-11-19"
 
 
+def test_yahoo_chart_liquidity_uses_recent_daily_volume(monkeypatch):
+    day = 86_400
+    latest = 1_795_127_400
+    volumes = [90_000, 100, None, 300]
+
+    def fetch(url, *, params):
+        assert url.endswith("/v8/finance/chart/BRK-B")
+        assert params == {"range": "3mo", "interval": "1d"}
+        return SimpleNamespace(json=lambda: {"chart": {"result": [{
+            "meta": {"symbol": "BRK-B", "regularMarketVolume": 900_000},
+            "timestamp": [latest - 75 * day, latest - 58 * day, latest - day, latest],
+            "indicators": {"quote": [{"volume": volumes}]},
+        }]}})
+
+    monkeypatch.setattr(market_data, "_fetch_public_market_data", fetch)
+    assert market_data._fetch_public_chart_liquidity("BRK-B") == ("BRK-B", 200)
+
+    volumes[1] = None
+    assert market_data._fetch_public_chart_liquidity("BRK-B") == ("BRK-B", None)
+
+
 def test_fundamentus_fii_feed_keeps_yield_points_and_brl_turnover(monkeypatch):
     content = """<table id="tabelaResultado"><tr><th>Papel</th><th>Segmento</th><th>Cotação</th><th>P/VP</th>
       <th>Dividend Yield</th><th>Liquidez</th></tr><tr><td>HGLG11</td><td>Logística</td><td>140,50</td>

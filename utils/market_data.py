@@ -11,7 +11,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote as url_quote, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
@@ -37,6 +37,11 @@ DAY_SECONDS = 86400
 # Covers a weekend plus a holiday. Within it a stale quote snapshot is served at
 # once, labelled with its fetch time, while a background refresh replaces it.
 QUOTE_STALE_SECONDS = 4 * DAY_SECONDS
+YAHOO_CHART_URL = "https://query2.finance.yahoo.com/v8/finance/chart/{symbol}"
+# Fundamentus' Liq.2meses is a two-month mean; 61 days covers the sessions.
+LIQUIDITY_WINDOW_DAYS = 61
+# Chart history is fetched one symbol at a time and only on the fallback path.
+LIQUIDITY_WORKERS = 6
 
 
 def _clear_fundamentus_http_cache() -> None:
@@ -107,6 +112,54 @@ def _fetch_public_market_data(url, **kwargs):
         return response
 
 
+def _quote_date(stamp, zone_name):
+    """Exchange-local calendar date for a Yahoo epoch quote stamp."""
+    try:
+        zone = ZoneInfo(zone_name or "UTC")
+    except (TypeError, ValueError, ZoneInfoNotFoundError):
+        zone = datetime.timezone.utc
+    try:
+        return datetime.datetime.fromtimestamp(stamp, zone).date().isoformat()
+    except (OSError, OverflowError, ValueError):
+        return None
+
+
+def _average_daily_volume(result) -> float | None:
+    """Mean daily volume over the last two months of real chart sessions."""
+    timestamps = result.get("timestamp")
+    blocks = (result.get("indicators") or {}).get("quote") or []
+    volumes = blocks[0].get("volume") if blocks and isinstance(blocks[0], dict) else None
+    if not isinstance(timestamps, list) or not isinstance(volumes, list):
+        return None
+    pairs = []
+    for stamp, volume in zip(timestamps, volumes):
+        stamp, volume = _positive_number(stamp), _positive_number(volume)
+        if stamp is not None and volume is not None:
+            pairs.append((stamp, volume))
+    if not pairs:
+        return None
+    latest = max(stamp for stamp, _ in pairs)
+    window = [volume for stamp, volume in pairs if stamp >= latest - LIQUIDITY_WINDOW_DAYS * DAY_SECONDS]
+    return sum(window) / len(window) if len(window) > 1 else None
+
+
+def _fetch_public_chart_liquidity(symbol):
+    """Two-month average daily volume from Yahoo's public chart history, never one session."""
+    try:
+        response = _fetch_public_market_data(
+            YAHOO_CHART_URL.format(symbol=url_quote(symbol, safe="")),
+            params={"range": "3mo", "interval": "1d"},
+        )
+        results = (response.json().get("chart") or {}).get("result") or []
+        result = results[0] if results and isinstance(results[0], dict) else None
+        if not isinstance(result, dict) or (result.get("meta") or {}).get("symbol") != symbol:
+            return symbol, None
+        return symbol, _average_daily_volume(result)
+    except (requests.RequestException, AttributeError, KeyError, TypeError, ValueError):
+        logger.debug("Yahoo Finance chart history unavailable for %s", symbol, exc_info=True)
+        return symbol, None
+
+
 @cache_data(ttl=120, cache_if=bool)
 def get_yahoo_quotes(symbols: tuple[str, ...]) -> dict[str, dict]:
     """Load delayed, unadjusted market quotes without requesting corporate fundamentals."""
@@ -138,13 +191,8 @@ def get_yahoo_quotes(symbols: tuple[str, ...]) -> dict[str, dict]:
                     continue
                 if not isinstance(currency, str) or len(currency) != 3 or not currency.isascii() or not currency.isalpha():
                     continue
-                try:
-                    zone = ZoneInfo(meta.get("exchangeTimezoneName") or "UTC")
-                except (TypeError, ValueError, ZoneInfoNotFoundError):
-                    zone = datetime.timezone.utc
-                try:
-                    quote_date = datetime.datetime.fromtimestamp(stamp, zone).date().isoformat()
-                except (OSError, OverflowError, ValueError):
+                quote_date = _quote_date(stamp, meta.get("exchangeTimezoneName"))
+                if quote_date is None:
                     continue
                 quotes[symbol] = {
                     "price": price, "currency": currency, "last_quote_date": quote_date,
@@ -185,7 +233,12 @@ def get_fii_market_data() -> pd.DataFrame:
 
 @cache_data(ttl=900, stale=DAY_SECONDS, cache_if=lambda frame: not frame.empty)
 def get_us_market_data() -> pd.DataFrame:
-    """Load live Yahoo Finance fundamentals for catalog US equities; ratios/margins are fractions."""
+    """Load live Yahoo Finance fundamentals for catalog US equities; ratios/margins are fractions.
+
+    If the authenticated endpoints fail, use public quotes and daily volume
+    history. Report the source and quote date per row, with unavailable
+    fundamentals left blank.
+    """
     from utils.assets import EXTRA_ASSETS_BY_TICKER, yahoo_equity_screener_row
 
     entries = [
@@ -208,8 +261,8 @@ def get_us_market_data() -> pd.DataFrame:
                 timeout=8,
             )
             for row in (payload.get("quoteResponse") or {}).get("result") or []:
-                sym = row.get("symbol")
-                if isinstance(sym, str):
+                sym = row.get("symbol") if isinstance(row, dict) else None
+                if isinstance(sym, str) and sym in batch:
                     quotes[sym] = row
         except Exception:
             logger.warning("Yahoo Finance US batch quote unavailable for offset=%d", offset, exc_info=True)
@@ -234,16 +287,44 @@ def get_us_market_data() -> pd.DataFrame:
             logger.debug("Yahoo Finance US summary unavailable for %s", symbol, exc_info=True)
             return symbol, {}
 
-    summary_symbols = [sym for sym in symbols if sym in quotes] or symbols
-    with ThreadPoolExecutor(max_workers=min(10, max(1, len(summary_symbols)))) as pool:
-        summaries = dict(pool.map(_fetch_summary, summary_symbols))
+    with ThreadPoolExecutor(max_workers=min(10, max(1, len(symbols)))) as pool:
+        summaries = dict(pool.map(_fetch_summary, symbols))
+
+    def usable_price(info: dict) -> float | None:
+        return (_positive_number(info.get("regularMarketPrice"))
+                or _positive_number(info.get("currentPrice"))
+                or _positive_number(info.get("previousClose")))
+
+    missing_price = tuple(sym for sym in symbols if usable_price(quotes.get(sym, {})) is None)
+    public_quotes = get_yahoo_quotes(missing_price) if missing_price else {}
+    public_quotes = {sym: quote for sym, quote in public_quotes.items() if quote["currency"].upper() == "USD"}
+    average_volumes = {}
+    if public_quotes:
+        logger.info("Yahoo Finance US quotes: %d of %d symbols via public spark", len(public_quotes), len(symbols))
+        with ThreadPoolExecutor(max_workers=min(LIQUIDITY_WORKERS, len(public_quotes))) as pool:
+            average_volumes = dict(pool.map(_fetch_public_chart_liquidity, public_quotes))
 
     rows = []
     for ticker, item in entries:
         sym = item["yahoo_symbol"]
-        combined = {**quotes.get(sym, {}), **summaries.get(sym, {})}
+        quote = quotes.get(sym, {})
+        combined = {**quote, **summaries.get(sym, {})}
+        public_quote = public_quotes.get(sym)
+        if public_quote:
+            combined.update(regularMarketPrice=public_quote["price"], currency=public_quote["currency"])
+            quote_date = public_quote.get("last_quote_date")
+            source = "Yahoo Finance · cotação pública"
+            average = average_volumes.get(sym)
+            if average is not None and _positive_number(combined.get("averageDailyVolume3Month")) is None:
+                combined.update(averageDailyVolume3Month=None, averageVolume=average)
+        else:
+            combined["regularMarketPrice"] = usable_price(combined)
+            stamp = _positive_number(quote.get("regularMarketTime"))
+            quote_date = _quote_date(stamp, quote.get("exchangeTimezoneName")) if stamp is not None else None
+            source = "Yahoo Finance · Ações EUA"
         row = yahoo_equity_screener_row(ticker, item, combined)
         if row is not None:
+            row.update(source=source, quote_date=quote_date)
             rows.append(row)
     if not rows:
         raise ValueError("Yahoo Finance não retornou dados para as ações americanas.")

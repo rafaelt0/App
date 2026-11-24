@@ -7,7 +7,7 @@ export type ScreenerColumn = Column & {help?:string|null};
 export type ScreenerAssetClass = "b3"|"all"|"fii"|"acao_us"|"reit"|"titulo"|"etf"|"outros";
 export type Config = {presets:{name:string;description:string;criteria:Criteria}[];sorts:Sort[];columns:ScreenerColumn[];default_columns:string[];asset_classes:{key:ScreenerAssetClass;label:string;fields:string[]}[]};
 export type Controls = {preset:string;pl_enabled:boolean;roe_enabled:boolean;dy_enabled:boolean;c5y_enabled:boolean;liq2m_enabled:boolean;pl_min:number;pl_max:number;pl_min_exclusive:boolean;roe_min:number;dy_min:number;c5y_min:number;liq2m_min:number};
-export type Result = {id:string;total_count:number;matched_count:number;active_filters:string[];source?:string;fetched_at:string|null;age_minutes:number|null;metrics:{mean_dy:number|null;mean_roe:number|null};available_columns:ScreenerColumn[];default_columns:string[];rows:Record<string,unknown>[]};
+export type Result = {id:string;total_count:number;matched_count:number;active_filters:string[];source?:string;fetched_at:string|null;age_minutes:number|null;metrics:{mean_dy:number|null;mean_roe:number|null};available_columns:ScreenerColumn[];default_columns:string[];rows:Record<string,unknown>[];unavailable_indicators?:string[]};
 export const defaults:Controls = {preset:"Explorar B3",pl_enabled:false,roe_enabled:false,dy_enabled:false,c5y_enabled:false,liq2m_enabled:true,pl_min:0,pl_max:15,pl_min_exclusive:false,roe_min:12,dy_min:5,c5y_min:10,liq2m_min:1000000};
 export function applyPreset(current:Controls, name:string, criteria:Criteria):Controls {
   if(name === "Personalizado") return {...current,preset:name};
