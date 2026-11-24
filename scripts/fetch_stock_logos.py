@@ -21,7 +21,7 @@ OUTPUT = ROOT / "frontend/public/stock-logos"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 SAFE_SVG_ELEMENTS = {
     "svg", "defs", "clipPath", "rect", "g", "path", "circle", "ellipse",
-    "linearGradient", "stop", "mask",
+    "linearGradient", "stop", "mask", "title", "desc",
 }
 
 
