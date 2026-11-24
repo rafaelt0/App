@@ -16,6 +16,7 @@ Supports:
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
 import logging
 import math
@@ -851,6 +852,149 @@ def search_yahoo_assets(query: str) -> list[dict[str, Any]]:
     return results
 
 
+_NASDAQ_HEADERS = {
+    "Accept": "application/json",
+    "Referer": "https://www.nasdaq.com/",
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+}
+
+
+def _finite_num(val: Any) -> float | None:
+    try:
+        f = float(val)
+        return f if math.isfinite(f) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_financial_institution(sector: str | None, industry: str | None, *, ebitda: float | None = None, current_ratio: float | None = None) -> bool:
+    text = f"{sector or ''} {industry or ''}".casefold()
+    if any(term in text for term in ("bank", "insurance", "capital markets", "credit services", "asset management", "financial conglomerates")):
+        return True
+    return ("financial" in (sector or "").casefold() or (sector or "").casefold() == "finance") and ebitda is None and current_ratio is None
+
+
+def _yahoo_pvp_and_equity(info: dict[str, Any], price: float | None, market_cap: float | None) -> tuple[float | None, float | None]:
+    pvp = _finite_num(info.get("priceToBook"))
+    book_value = _finite_num(info.get("bookValue"))
+    # Yahoo mixes Class A book value with Class B price on dual-class shares like BRK-B.
+    if pvp is not None and 0 < pvp < 0.05 and price and book_value and book_value > price * 100:
+        total_debt = _finite_num(info.get("totalDebt"))
+        debt_to_equity = _finite_num(info.get("debtToEquity"))
+        if total_debt is not None and total_debt > 0 and debt_to_equity is not None and debt_to_equity > 0:
+            equity = total_debt / (debt_to_equity / 100.0)
+            if market_cap is not None and market_cap > 0 and equity > 0:
+                return market_cap / equity, equity
+        return None, None
+    equity = (market_cap / pvp) if (market_cap is not None and market_cap > 0 and pvp is not None and pvp > 0) else None
+    return pvp, equity
+
+
+def _yahoo_dy_percent(info: dict[str, Any], price: float | None) -> float | None:
+    field = "yield" if info.get("quoteType") in {"ETF", "MUTUALFUND"} else "trailingAnnualDividendYield"
+    raw = _finite_num(info.get(field))
+    raw_dy = raw * 100.0 if raw is not None else None
+    if raw_dy is None or raw_dy == 0.0:
+        # Yahoo Finance often returns trailingAnnualDividendYield=0.0 for FIIs or omits it
+        # while reporting the 12m yield in percentage points under `dividendYield`.
+        fallback_dy = _finite_num(info.get("dividendYield"))
+        if fallback_dy is not None and fallback_dy > 0:
+            raw_dy = fallback_dy
+    if raw_dy is None and price is not None and price > 0:
+        rate = _finite_num(info.get("trailingAnnualDividendRate"))
+        if rate is not None and rate >= 0:
+            raw_dy = (rate / price) * 100.0
+    return raw_dy
+
+
+def yahoo_equity_screener_row(ticker: str, meta: dict[str, Any], info: dict[str, Any]) -> dict[str, Any] | None:
+    """Convert one Yahoo Finance info dict into a normalized US-equity Screener row (fractions)."""
+    if not info:
+        return None
+    price = _finite_num(info.get("regularMarketPrice")) or _finite_num(info.get("currentPrice")) or _finite_num(info.get("previousClose"))
+    if price is None or price <= 0:
+        return None
+    market_cap = _finite_num(info.get("marketCap"))
+    pvp, _ = _yahoo_pvp_and_equity(info, price, market_cap)
+    pl = _finite_num(info.get("trailingPE"))
+    if pl is None:
+        eps = _finite_num(info.get("trailingEps"))
+        if eps is not None and eps != 0:
+            pl = price / eps
+    ev_ebitda = _finite_num(info.get("enterpriseToEbitda"))
+    ev = _finite_num(info.get("enterpriseValue"))
+    ebitda = _finite_num(info.get("ebitda"))
+    if ev_ebitda is None and ev is not None and ev > 0 and ebitda is not None and ebitda != 0:
+        ev_ebitda = ev / ebitda
+    if ev is not None and ev <= 0 and ev_ebitda is not None and ev_ebitda < 0:
+        ev_ebitda = None
+    roe = _finite_num(info.get("returnOnEquity"))
+    if pvp is not None and pvp < 0:
+        pvp = None
+        roe = None
+    dy_pct = _yahoo_dy_percent(info, price)
+    dy = dy_pct / 100.0 if dy_pct is not None else None
+    avg_vol = _finite_num(info.get("averageDailyVolume3Month")) or _finite_num(info.get("averageVolume"))
+    liq2m = avg_vol * price if avg_vol is not None and avg_vol > 0 else None
+    return {
+        "ticker": ticker,
+        "currency": str(info.get("currency") or meta.get("currency") or "USD").upper(),
+        "asset_class": meta["asset_class"],
+        "setor": meta["sector"],
+        "cotacao": price,
+        "pl": pl,
+        "pvp": pvp,
+        "dy": dy,
+        "roe": roe,
+        "evebitda": ev_ebitda,
+        "mrgliq": _finite_num(info.get("profitMargins")),
+        "mrgebit": _finite_num(info.get("operatingMargins")),
+        "liq2m": liq2m,
+    }
+
+
+def _parse_nasdaq_number(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text or text in {"--", "N/A", "NaN", "∞", "-∞"}:
+        return None
+    cleaned = text.replace("$", "").replace(",", "").replace("%", "").strip()
+    return _finite_num(cleaned)
+
+
+def _nasdaq_table_latest(table: dict[str, Any] | None) -> dict[str, float]:
+    rows = (table or {}).get("rows") if isinstance(table, dict) else None
+    if not isinstance(rows, list):
+        return {}
+    values: dict[str, float] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        label = str(row.get("value1") or "").strip()
+        if not label or label in values:
+            continue
+        number = _parse_nasdaq_number(row.get("value2"))
+        if number is not None:
+            values[label] = number
+    return values
+
+
+def _fetch_nasdaq_json(path: str, params: dict[str, str]) -> dict[str, Any]:
+    try:
+        response = requests.get(
+            f"https://api.nasdaq.com/api/{path}",
+            params=params,
+            headers=_NASDAQ_HEADERS,
+            timeout=5,
+        )
+        response.raise_for_status()
+        data = response.json().get("data")
+        return data if isinstance(data, dict) else {}
+    except (requests.RequestException, AttributeError, TypeError, ValueError):
+        logger.debug("Nasdaq endpoint %s unavailable", path, exc_info=True)
+        return {}
+
+
 @cache_data(ttl=60, cache_if=bool)
 def _get_nasdaq_quote(symbol: str, asset_class: str, currency: str) -> dict[str, Any]:
     """Get a USD quote from Nasdaq for a US stock, REIT, or listed ETF."""
@@ -868,12 +1012,7 @@ def _get_nasdaq_quote(symbol: str, asset_class: str, currency: str) -> dict[str,
         response = requests.get(
             f"https://api.nasdaq.com/api/quote/{nasdaq_symbol}/info",
             params={"assetclass": instrument},
-            headers={
-                "Accept": "application/json",
-                "Referer": "https://www.nasdaq.com/",
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                              "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            },
+            headers=_NASDAQ_HEADERS,
             timeout=4,
         )
         response.raise_for_status()
@@ -908,6 +1047,95 @@ def _get_nasdaq_quote(symbol: str, asset_class: str, currency: str) -> dict[str,
         except ValueError:
             pass
     return quote
+
+
+@cache_data(ttl=300, cache_if=bool)
+def _get_nasdaq_fundamentals(symbol: str, asset_class: str, currency: str) -> dict[str, Any]:
+    """Fetch quote, summary, and annual financial statements from Nasdaq in parallel."""
+    if currency != "USD" or asset_class not in {"acao_us", "reit"} or not re.fullmatch(r"[A-Z]+(?:-[A-Z])?", symbol):
+        return {}
+    nasdaq_symbol = symbol.replace("-", ".")
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        quote_future = pool.submit(_get_nasdaq_quote, symbol, asset_class, currency)
+        summary_future = pool.submit(_fetch_nasdaq_json, f"quote/{nasdaq_symbol}/summary", {"assetclass": "stocks"})
+        financials_future = pool.submit(_fetch_nasdaq_json, f"company/{nasdaq_symbol}/financials", {"frequency": "1"})
+        quote = quote_future.result()
+        if not quote:
+            return {}
+        summary = summary_future.result()
+        financials = financials_future.result()
+
+    summary_data = summary.get("summaryData") if isinstance(summary.get("summaryData"), dict) else {}
+    def _summary_val(key: str) -> Any:
+        entry = summary_data.get(key)
+        return entry.get("value") if isinstance(entry, dict) else None
+
+    price = quote["price"]
+    market_cap = _parse_nasdaq_number(_summary_val("MarketCap"))
+    share_volume = _parse_nasdaq_number(_summary_val("ShareVolume"))
+    volume_2m = share_volume * price if share_volume is not None and share_volume > 0 else None
+    dy = _parse_nasdaq_number(_summary_val("Yield"))
+    sector_text = str(_summary_val("Sector") or "").strip()
+    industry_text = str(_summary_val("Industry") or "").strip()
+
+    ratios = _nasdaq_table_latest(financials.get("financialRatiosTable"))
+    income = _nasdaq_table_latest(financials.get("incomeStatementTable"))
+    balance = _nasdaq_table_latest(financials.get("balanceSheetTable"))
+
+    # Nasdaq financial statement dollar lines are reported in $ thousands.
+    net_income_k = income.get("Net Income Applicable to Common Shareholders")
+    if net_income_k is None:
+        net_income_k = income.get("Net Income")
+    ebit_k = income.get("Operating Income")
+    equity_k = balance.get("Total Equity")
+
+    pl = market_cap / (net_income_k * 1000.0) if market_cap and net_income_k and net_income_k != 0 else None
+    pvp = market_cap / (equity_k * 1000.0) if market_cap and equity_k and equity_k != 0 else None
+    roe = ratios.get("After Tax ROE")
+    net_margin = ratios.get("Profit Margin")
+    ebit_margin = ratios.get("Operating Margin")
+    current_ratio_pct = ratios.get("Current Ratio")
+    current_ratio = current_ratio_pct / 100.0 if current_ratio_pct is not None else None
+
+    candidates = {
+        "pl": pl,
+        "pvp": pvp,
+        "ev_ebitda": None,
+        "roe": roe,
+        "net_margin": net_margin,
+        "ebit_margin": ebit_margin,
+        "dy": dy,
+    }
+    indicators = {key: value for key, value in candidates.items() if key in ASSET_INDICATORS[asset_class]}
+
+    health_data: dict[str, float | None] = {}
+    if asset_class in EQUITY_CLASSES:
+        if current_ratio is not None:
+            health_data["current_ratio"] = current_ratio
+        if not _is_financial_institution(sector_text, industry_text, current_ratio=current_ratio):
+            cash_k = balance.get("Cash and Cash Equivalents")
+            st_inv_k = balance.get("Short-Term Investments") or 0.0
+            st_debt_k = balance.get("Short-Term Debt / Current Portion of Long-Term Debt")
+            lt_debt_k = balance.get("Long-Term Debt")
+            total_debt_k = (st_debt_k or 0.0) + (lt_debt_k or 0.0) if (st_debt_k is not None or lt_debt_k is not None) else None
+            total_cash_k = (cash_k + st_inv_k) if cash_k is not None else None
+            if total_debt_k is not None and total_cash_k is not None and equity_k is not None and equity_k > 0:
+                health_data["debt_equity"] = (total_debt_k - total_cash_k) / equity_k
+            if market_cap and total_debt_k is not None and total_cash_k is not None and ebit_k is not None and ebit_k != 0:
+                ev = market_cap + (total_debt_k - total_cash_k) * 1000.0
+                if ev > 0:
+                    health_data["ev_ebit"] = ev / (ebit_k * 1000.0)
+
+    detail = {
+        **quote,
+        "market_cap": market_cap,
+        "volume_2m": volume_2m,
+        "indicators": indicators,
+        "health": health_data,
+    }
+    if industry_text and industry_text not in {"N/A", "--"}:
+        detail["subsector"] = industry_text
+    return detail
 
 
 def get_extra_asset_fundamentals(
@@ -977,36 +1205,40 @@ def get_extra_asset_fundamentals(
             meta = register_dynamic_asset(classified)
     asset_class = meta["asset_class"]
 
-    def _num(val: Any) -> float | None:
-        try:
-            f = float(val)
-            return f if math.isfinite(f) else None
-        except (TypeError, ValueError):
-            return None
-
     def _pct(field: str) -> float | None:
-        value = _num(info.get(field))
+        value = _finite_num(info.get(field))
         return value * 100.0 if value is not None else None
 
-    current_price = _num(info.get("regularMarketPrice")) or _num(info.get("currentPrice"))
-    price = current_price or _num(info.get("previousClose"))
-    quote_time = _num(info.get("regularMarketTime")) if current_price is not None else None
+    current_price = _finite_num(info.get("regularMarketPrice")) or _finite_num(info.get("currentPrice"))
+    price = current_price or _finite_num(info.get("previousClose"))
+    quote_time = _finite_num(info.get("regularMarketTime")) if current_price is not None else None
     try:
         quote_date = dt.datetime.fromtimestamp(quote_time, dt.timezone.utc).date().isoformat() if quote_time else None
     except (OSError, ValueError, OverflowError):
         quote_date = None
-    low_52w = _num(info.get("fiftyTwoWeekLow"))
-    high_52w = _num(info.get("fiftyTwoWeekHigh"))
-    raw_dy = _pct("yield" if info.get("quoteType") in {"ETF", "MUTUALFUND"} else "trailingAnnualDividendYield")
-    if raw_dy is None or raw_dy == 0.0:
-        # Yahoo Finance often returns trailingAnnualDividendYield=0.0 for Brazilian FIIs (e.g. HGLG11, KNRI11, XPML11)
-        # while reporting the 12m yield in percentage points under `dividendYield`.
-        fallback_dy = _num(info.get("dividendYield"))
-        if fallback_dy is not None and fallback_dy > 0:
-            raw_dy = fallback_dy
+    low_52w = _finite_num(info.get("fiftyTwoWeekLow"))
+    high_52w = _finite_num(info.get("fiftyTwoWeekHigh"))
+    market_cap = _finite_num(info.get("marketCap")) if asset_class in EQUITY_CLASSES | {"reit"} else None
+    avg_vol = _finite_num(info.get("averageDailyVolume3Month")) or _finite_num(info.get("averageVolume"))
+    volume_2m = avg_vol * price if price is not None and price > 0 and avg_vol is not None and avg_vol > 0 else None
+    raw_dy = _yahoo_dy_percent(info, price)
+
+    pl = _finite_num(info.get("trailingPE"))
+    if pl is None and price is not None and price > 0:
+        eps = _finite_num(info.get("trailingEps"))
+        if eps is not None and eps != 0:
+            pl = price / eps
+    pvp, book_equity = _yahoo_pvp_and_equity(info, price, market_cap)
+    enterprise_value = _finite_num(info.get("enterpriseValue"))
+    ebitda = _finite_num(info.get("ebitda"))
+    ev_ebitda = _finite_num(info.get("enterpriseToEbitda"))
+    if ev_ebitda is None and enterprise_value is not None and enterprise_value > 0 and ebitda is not None and ebitda != 0:
+        ev_ebitda = enterprise_value / ebitda
+    if enterprise_value is not None and enterprise_value <= 0 and ev_ebitda is not None and ev_ebitda < 0:
+        ev_ebitda = None
+
     candidates = {
-        "pl": _num(info.get("trailingPE")), "pvp": _num(info.get("priceToBook")),
-        "ev_ebitda": _num(info.get("enterpriseToEbitda")), "roe": _pct("returnOnEquity"),
+        "pl": pl, "pvp": pvp, "ev_ebitda": ev_ebitda, "roe": _pct("returnOnEquity"),
         "net_margin": _pct("profitMargins"), "ebit_margin": _pct("operatingMargins"),
         "dy": raw_dy,
     }
@@ -1016,8 +1248,23 @@ def get_extra_asset_fundamentals(
     company_name = str(info.get("longName") or info.get("shortName") or meta.get("company") or canonical)
     sector = str(meta.get("sector") or info.get("sector") or "Mercado Global")
     subsector = str(info.get("industry") or ASSET_CLASS_LABELS.get(meta.get("asset_class", ""), ""))
-    market_cap = _num(info.get("marketCap")) if asset_class in EQUITY_CLASSES | {"reit"} else None
-    current_ratio = _num(info.get("currentRatio")) if asset_class in EQUITY_CLASSES else None
+    current_ratio = _finite_num(info.get("currentRatio")) if asset_class in EQUITY_CLASSES else None
+
+    health_data: dict[str, float | None] = {}
+    if asset_class in EQUITY_CLASSES:
+        if current_ratio is not None:
+            health_data["current_ratio"] = current_ratio
+        if not _is_financial_institution(info.get("sector"), info.get("industry"), ebitda=ebitda, current_ratio=current_ratio):
+            total_debt = _finite_num(info.get("totalDebt"))
+            total_cash = _finite_num(info.get("totalCash"))
+            if total_debt is not None and total_cash is not None and book_equity is not None and book_equity > 0:
+                health_data["debt_equity"] = (total_debt - total_cash) / book_equity
+            total_revenue = _finite_num(info.get("totalRevenue"))
+            operating_margins = _finite_num(info.get("operatingMargins"))
+            if (enterprise_value is not None and enterprise_value > 0
+                    and total_revenue is not None and total_revenue > 0
+                    and operating_margins is not None and operating_margins != 0):
+                health_data["ev_ebit"] = enterprise_value / (total_revenue * operating_margins)
 
     result = {
         "ticker": canonical,
@@ -1030,16 +1277,21 @@ def get_extra_asset_fundamentals(
         "price": price,
         "low_52w": low_52w,
         "high_52w": high_52w,
+        "volume_2m": volume_2m,
         "market_cap": market_cap,
         "last_quote_date": quote_date,
         "indicators": indicators,
-        "health": {"current_ratio": current_ratio} if asset_class in EQUITY_CLASSES else {},
+        "health": health_data,
         "source": "Yahoo Finance",
     }
     if not result["available"]:
-        quote = _get_nasdaq_quote(symbol, asset_class, currency)
-        if quote:
-            result.update(quote, available=True)
+        fallback = (
+            _get_nasdaq_fundamentals(symbol, asset_class, currency)
+            if asset_class in {"acao_us", "reit"}
+            else _get_nasdaq_quote(symbol, asset_class, currency)
+        )
+        if fallback:
+            result.update(fallback, available=True)
     return result
 
 

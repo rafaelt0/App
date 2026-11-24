@@ -1,6 +1,7 @@
 These local assets correspond to the issuer logos listed in
 `frontend/lib/stock-logo-manifest.json`. The catalogue includes Wikimedia Commons
-previews, brapi issuer icons, a Fintz icon, and official assets from the Vale,
+previews, brapi issuer icons, a Fintz icon, Parqet issuer icons for US equities
+(shared with their corresponding B3 BDRs), and official assets from the Vale,
 PetzCobasi, and Grupo Toky investor sites. Logos are bundled locally so the
 interface does not depend on those sources at runtime. Share classes of the same
 company in the local B3 list share one asset.

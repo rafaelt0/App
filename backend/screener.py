@@ -1,4 +1,5 @@
 """Full-market screening retains source fractions; only presentation/export scales percentages."""
+from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
 import uuid
 from typing import Literal
@@ -10,7 +11,7 @@ from pydantic import Field, model_validator
 from backend.serialization import StrictModel, clean_json, csv_response
 from backend.state import artifact, begin, publish, session
 from utils.assets import ASSET_CLASSES, ASSET_CLASS_LABELS, ASSET_INDICATORS, EXTRA_ASSETS_BY_TICKER, catalog_screener_rows
-from utils.market_data import clean_numeric_column, get_fii_market_data, get_full_market_data
+from utils.market_data import clean_numeric_column, get_fii_market_data, get_full_market_data, get_us_market_data
 from utils.screener import PRESET_FILTERS, filter_stocks, prepare_export
 
 router = APIRouter(prefix="/api/screener", tags=["screener"])
@@ -231,38 +232,57 @@ def query(body: Query, request: Request):
             raise HTTPException(422, "A ordenação não se aplica à classe de ativo selecionada.")
 
         b3 = pd.DataFrame()
-        if body.asset_class in {"b3", "all", "acao_br"}:
-            try:
-                raw = get_full_market_data()
-                if raw is not None:
-                    b3 = normalize_market(raw.loc[~raw.index.isin(EXTRA_ASSETS_BY_TICKER)])
-            except Exception:
-                if body.asset_class != "all":
-                    raise
+        fii = pd.DataFrame()
+        us = pd.DataFrame()
+
+        def _load_b3():
+            raw = get_full_market_data()
+            return normalize_market(raw.loc[~raw.index.isin(EXTRA_ASSETS_BY_TICKER)]) if raw is not None else pd.DataFrame()
+
+        def _load_fii():
+            frame = get_fii_market_data().rename(columns={"price": "cotacao"}).assign(currency="BRL", asset_class="fii")
+            frame["dy"] /= 100
+            return frame
+
         if body.asset_class in {"b3", "acao_br"}:
+            b3 = _load_b3()
             result, exported = screen(b3, body, normalized=True)
+        elif body.asset_class == "fii":
+            try:
+                fii = _load_fii()
+            except Exception as exc:
+                raise HTTPException(503, "O painel de FIIs da Fundamentus está indisponível. Tente novamente.") from exc
+            result, exported = screen(fii, body, source="Fundamentus · FIIs", normalized=True)
+        elif body.asset_class == "acao_us":
+            try:
+                us = get_us_market_data()
+            except Exception as exc:
+                raise HTTPException(503, "Os dados de ações americanas no Yahoo Finance estão indisponíveis. Tente novamente.") from exc
+            result, exported = screen(us, body, source="Yahoo Finance · Ações EUA", normalized=True)
         else:
-            fii = pd.DataFrame()
-            if body.asset_class in {"fii", "all"}:
-                try:
-                    fii = get_fii_market_data().rename(columns={"price": "cotacao"}).assign(currency="BRL", asset_class="fii")
-                    fii["dy"] /= 100
-                except Exception as exc:
-                    if body.asset_class == "fii":
-                        raise HTTPException(503, "O painel de FIIs da Fundamentus está indisponível. Tente novamente.") from exc
-            if body.asset_class == "fii":
-                frame, source = fii, "Fundamentus · FIIs"
-            else:
-                reference = catalog_screener_rows(body.asset_class, SCREEN_FIELDS)
-                source = f"Catálogo de referência · {ASSET_CLASS_LABELS.get(body.asset_class, 'Multi-Ativos')} (sem cotação ao vivo)"
-                frame = reference
+            if body.asset_class == "all":
+                def _safe(fn):
+                    try:
+                        return fn()
+                    except Exception:
+                        return pd.DataFrame()
+
+                with ThreadPoolExecutor(max_workers=3) as pool:
+                    b3_fut = pool.submit(_safe, _load_b3)
+                    fii_fut = pool.submit(_safe, _load_fii)
+                    us_fut = pool.submit(_safe, get_us_market_data)
+                    b3, fii, us = b3_fut.result(), fii_fut.result(), us_fut.result()
+            reference = catalog_screener_rows(body.asset_class, SCREEN_FIELDS)
+            source = f"Catálogo de referência · {ASSET_CLASS_LABELS.get(body.asset_class, 'Multi-Ativos')} (sem cotação ao vivo)"
+            frame = reference
             if body.asset_class == "all":
                 b3 = b3.loc[~b3.index.isin(fii.index)]
-                reference = reference.loc[reference["asset_class"] != "fii"]
-                frame = pd.concat([b3.assign(currency="BRL", asset_class="acao_br"), fii, reference])
+                reference = reference.loc[~reference["asset_class"].isin({"fii", "acao_us"})]
+                frame = pd.concat([b3.assign(currency="BRL", asset_class="acao_br"), fii, us, reference])
                 frame = frame.reindex(columns=frame.columns.union(sorted(fields), sort=False))
                 source += " + Fundamentus · ações B3" if not b3.empty else " (ações B3 indisponíveis)"
                 source += " + Fundamentus · FIIs" if not fii.empty else " (FIIs indisponíveis)"
+                source += " + Yahoo Finance · ações EUA" if not us.empty else " (ações EUA indisponíveis)"
             result, exported = screen(frame, body, source=source, normalized=True)
     except HTTPException:
         raise

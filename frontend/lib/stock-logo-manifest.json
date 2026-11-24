@@ -3081,5 +3081,808 @@
     "license": "Official brand asset; issuer trademark; no reuse license stated in source",
     "source": "https://investors.grupotoky.com.br/",
     "sourceAssetUrl": "https://cdn-sites-assets.mziq.com/wp-content/uploads/sites/590/2025/03/Logo-grupo-toky.png"
+  },
+  {
+    "company": "Apple Inc.",
+    "tickers": [
+      "AAPL",
+      "AAPL34"
+    ],
+    "asset": "aapl.svg",
+    "author": "Apple Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/AAPL?format=svg"
+  },
+  {
+    "company": "Microsoft Corporation",
+    "tickers": [
+      "MSFT",
+      "MSFT34"
+    ],
+    "asset": "msft.svg",
+    "author": "Microsoft Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/MSFT?format=svg"
+  },
+  {
+    "company": "NVIDIA Corporation",
+    "tickers": [
+      "NVDA",
+      "NVDC34"
+    ],
+    "asset": "nvda.svg",
+    "author": "NVIDIA Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/NVDA?format=svg"
+  },
+  {
+    "company": "Amazon.com Inc.",
+    "tickers": [
+      "AMZN",
+      "AMZO34"
+    ],
+    "asset": "amzn.svg",
+    "author": "Amazon.com Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/AMZN?format=svg"
+  },
+  {
+    "company": "Alphabet Inc.",
+    "tickers": [
+      "GOOGL",
+      "GOOG",
+      "GOGL34"
+    ],
+    "asset": "googl.png",
+    "author": "Alphabet Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/GOOGL?format=png"
+  },
+  {
+    "company": "Meta Platforms Inc.",
+    "tickers": [
+      "META",
+      "M1TA34"
+    ],
+    "asset": "meta.svg",
+    "author": "Meta Platforms Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/META?format=svg"
+  },
+  {
+    "company": "Tesla Inc.",
+    "tickers": [
+      "TSLA",
+      "TSLA34"
+    ],
+    "asset": "tsla.svg",
+    "author": "Tesla Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/TSLA?format=svg"
+  },
+  {
+    "company": "Berkshire Hathaway Inc.",
+    "tickers": [
+      "BRK-B",
+      "BERK34"
+    ],
+    "asset": "brk-b.svg",
+    "author": "Berkshire Hathaway Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/BRK-B?format=svg"
+  },
+  {
+    "company": "Broadcom Inc.",
+    "tickers": [
+      "AVGO"
+    ],
+    "asset": "avgo.svg",
+    "author": "Broadcom Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/AVGO?format=svg"
+  },
+  {
+    "company": "Eli Lilly and Company",
+    "tickers": [
+      "LLY"
+    ],
+    "asset": "lly.svg",
+    "author": "Eli Lilly and Company",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/LLY?format=svg"
+  },
+  {
+    "company": "JPMorgan Chase & Co.",
+    "tickers": [
+      "JPM"
+    ],
+    "asset": "jpm.svg",
+    "author": "JPMorgan Chase & Co.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/JPM?format=svg"
+  },
+  {
+    "company": "Visa Inc.",
+    "tickers": [
+      "V"
+    ],
+    "asset": "v.svg",
+    "author": "Visa Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/V?format=svg"
+  },
+  {
+    "company": "Mastercard Incorporated",
+    "tickers": [
+      "MA"
+    ],
+    "asset": "ma.svg",
+    "author": "Mastercard Incorporated",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/MA?format=svg"
+  },
+  {
+    "company": "Walmart Inc.",
+    "tickers": [
+      "WMT"
+    ],
+    "asset": "wmt.svg",
+    "author": "Walmart Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/WMT?format=svg"
+  },
+  {
+    "company": "Exxon Mobil Corporation",
+    "tickers": [
+      "XOM"
+    ],
+    "asset": "xom.svg",
+    "author": "Exxon Mobil Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/XOM?format=svg"
+  },
+  {
+    "company": "UnitedHealth Group Inc.",
+    "tickers": [
+      "UNH"
+    ],
+    "asset": "unh.svg",
+    "author": "UnitedHealth Group Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/UNH?format=svg"
+  },
+  {
+    "company": "Costco Wholesale Corporation",
+    "tickers": [
+      "COST"
+    ],
+    "asset": "cost.svg",
+    "author": "Costco Wholesale Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/COST?format=svg"
+  },
+  {
+    "company": "The Home Depot Inc.",
+    "tickers": [
+      "HD"
+    ],
+    "asset": "hd.svg",
+    "author": "The Home Depot Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/HD?format=svg"
+  },
+  {
+    "company": "Procter & Gamble Co.",
+    "tickers": [
+      "PG"
+    ],
+    "asset": "pg.png",
+    "author": "Procter & Gamble Co.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/PG?format=png"
+  },
+  {
+    "company": "Johnson & Johnson",
+    "tickers": [
+      "JNJ"
+    ],
+    "asset": "jnj.svg",
+    "author": "Johnson & Johnson",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/JNJ?format=svg"
+  },
+  {
+    "company": "Oracle Corporation",
+    "tickers": [
+      "ORCL"
+    ],
+    "asset": "orcl.svg",
+    "author": "Oracle Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/ORCL?format=svg"
+  },
+  {
+    "company": "Netflix Inc.",
+    "tickers": [
+      "NFLX"
+    ],
+    "asset": "nflx.png",
+    "author": "Netflix Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/NFLX?format=png"
+  },
+  {
+    "company": "Advanced Micro Devices Inc.",
+    "tickers": [
+      "AMD"
+    ],
+    "asset": "amd.svg",
+    "author": "Advanced Micro Devices Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/AMD?format=svg"
+  },
+  {
+    "company": "Salesforce Inc.",
+    "tickers": [
+      "CRM"
+    ],
+    "asset": "crm.svg",
+    "author": "Salesforce Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/CRM?format=svg"
+  },
+  {
+    "company": "Bank of America Corp.",
+    "tickers": [
+      "BAC"
+    ],
+    "asset": "bac.svg",
+    "author": "Bank of America Corp.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/BAC?format=svg"
+  },
+  {
+    "company": "The Coca-Cola Company",
+    "tickers": [
+      "KO"
+    ],
+    "asset": "ko.svg",
+    "author": "The Coca-Cola Company",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/KO?format=svg"
+  },
+  {
+    "company": "PepsiCo Inc.",
+    "tickers": [
+      "PEP"
+    ],
+    "asset": "pep.svg",
+    "author": "PepsiCo Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/PEP?format=svg"
+  },
+  {
+    "company": "Chevron Corporation",
+    "tickers": [
+      "CVX"
+    ],
+    "asset": "cvx.svg",
+    "author": "Chevron Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/CVX?format=svg"
+  },
+  {
+    "company": "Merck & Co. Inc.",
+    "tickers": [
+      "MRK"
+    ],
+    "asset": "mrk.svg",
+    "author": "Merck & Co. Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/MRK?format=svg"
+  },
+  {
+    "company": "AbbVie Inc.",
+    "tickers": [
+      "ABBV"
+    ],
+    "asset": "abbv.svg",
+    "author": "AbbVie Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/ABBV?format=svg"
+  },
+  {
+    "company": "Adobe Inc.",
+    "tickers": [
+      "ADBE"
+    ],
+    "asset": "adbe.svg",
+    "author": "Adobe Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/ADBE?format=svg"
+  },
+  {
+    "company": "The Walt Disney Company",
+    "tickers": [
+      "DIS"
+    ],
+    "asset": "dis.svg",
+    "author": "The Walt Disney Company",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/DIS?format=svg"
+  },
+  {
+    "company": "McDonald's Corporation",
+    "tickers": [
+      "MCD"
+    ],
+    "asset": "mcd.svg",
+    "author": "McDonald's Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/MCD?format=svg"
+  },
+  {
+    "company": "Cisco Systems Inc.",
+    "tickers": [
+      "CSCO"
+    ],
+    "asset": "csco.svg",
+    "author": "Cisco Systems Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/CSCO?format=svg"
+  },
+  {
+    "company": "International Business Machines",
+    "tickers": [
+      "IBM"
+    ],
+    "asset": "ibm.svg",
+    "author": "International Business Machines",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/IBM?format=svg"
+  },
+  {
+    "company": "GE Aerospace",
+    "tickers": [
+      "GE"
+    ],
+    "asset": "ge.svg",
+    "author": "GE Aerospace",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/GE?format=svg"
+  },
+  {
+    "company": "Caterpillar Inc.",
+    "tickers": [
+      "CAT"
+    ],
+    "asset": "cat.svg",
+    "author": "Caterpillar Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/CAT?format=svg"
+  },
+  {
+    "company": "NIKE Inc.",
+    "tickers": [
+      "NKE"
+    ],
+    "asset": "nke.svg",
+    "author": "NIKE Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/NKE?format=svg"
+  },
+  {
+    "company": "Intel Corporation",
+    "tickers": [
+      "INTC"
+    ],
+    "asset": "intc.svg",
+    "author": "Intel Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/INTC?format=svg"
+  },
+  {
+    "company": "QUALCOMM Incorporated",
+    "tickers": [
+      "QCOM"
+    ],
+    "asset": "qcom.svg",
+    "author": "QUALCOMM Incorporated",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/QCOM?format=svg"
+  },
+  {
+    "company": "Texas Instruments Inc.",
+    "tickers": [
+      "TXN"
+    ],
+    "asset": "txn.svg",
+    "author": "Texas Instruments Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/TXN?format=svg"
+  },
+  {
+    "company": "Uber Technologies Inc.",
+    "tickers": [
+      "UBER"
+    ],
+    "asset": "uber.svg",
+    "author": "Uber Technologies Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/UBER?format=svg"
+  },
+  {
+    "company": "The Goldman Sachs Group Inc.",
+    "tickers": [
+      "GS"
+    ],
+    "asset": "gs.svg",
+    "author": "The Goldman Sachs Group Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/GS?format=svg"
+  },
+  {
+    "company": "Morgan Stanley",
+    "tickers": [
+      "MS"
+    ],
+    "asset": "ms.svg",
+    "author": "Morgan Stanley",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/MS?format=svg"
+  },
+  {
+    "company": "BlackRock Inc.",
+    "tickers": [
+      "BLK"
+    ],
+    "asset": "blk.svg",
+    "author": "BlackRock Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/BLK?format=svg"
+  },
+  {
+    "company": "Pfizer Inc.",
+    "tickers": [
+      "PFE"
+    ],
+    "asset": "pfe.svg",
+    "author": "Pfizer Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/PFE?format=svg"
+  },
+  {
+    "company": "Palantir Technologies Inc.",
+    "tickers": [
+      "PLTR"
+    ],
+    "asset": "pltr.svg",
+    "author": "Palantir Technologies Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/PLTR?format=svg"
+  },
+  {
+    "company": "Palo Alto Networks Inc.",
+    "tickers": [
+      "PANW"
+    ],
+    "asset": "panw.svg",
+    "author": "Palo Alto Networks Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/PANW?format=svg"
+  },
+  {
+    "company": "CrowdStrike Holdings Inc.",
+    "tickers": [
+      "CRWD"
+    ],
+    "asset": "crwd.png",
+    "author": "CrowdStrike Holdings Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/CRWD?format=png"
+  },
+  {
+    "company": "Snowflake Inc.",
+    "tickers": [
+      "SNOW"
+    ],
+    "asset": "snow.png",
+    "author": "Snowflake Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/SNOW?format=png"
+  },
+  {
+    "company": "Shopify Inc.",
+    "tickers": [
+      "SHOP"
+    ],
+    "asset": "shop.svg",
+    "author": "Shopify Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/SHOP?format=svg"
+  },
+  {
+    "company": "MercadoLibre Inc.",
+    "tickers": [
+      "MELI",
+      "MELI34"
+    ],
+    "asset": "meli.png",
+    "author": "MercadoLibre Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/MELI?format=png"
+  },
+  {
+    "company": "Nu Holdings Ltd. (Nubank)",
+    "tickers": [
+      "NU",
+      "ROXO34"
+    ],
+    "asset": "nu.svg",
+    "author": "Nu Holdings Ltd. (Nubank)",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/NU?format=svg"
+  },
+  {
+    "company": "Taiwan Semiconductor (TSMC ADR)",
+    "tickers": [
+      "TSM"
+    ],
+    "asset": "tsm.svg",
+    "author": "Taiwan Semiconductor (TSMC ADR)",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/TSM?format=svg"
+  },
+  {
+    "company": "ASML Holding N.V. (ADR)",
+    "tickers": [
+      "ASML"
+    ],
+    "asset": "asml.svg",
+    "author": "ASML Holding N.V. (ADR)",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/ASML?format=svg"
+  },
+  {
+    "company": "Novo Nordisk A/S (ADR)",
+    "tickers": [
+      "NVO"
+    ],
+    "asset": "nvo.svg",
+    "author": "Novo Nordisk A/S (ADR)",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/NVO?format=svg"
+  },
+  {
+    "company": "Spotify Technology S.A.",
+    "tickers": [
+      "SPOT"
+    ],
+    "asset": "spot.svg",
+    "author": "Spotify Technology S.A.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/SPOT?format=svg"
+  },
+  {
+    "company": "Coinbase Global Inc.",
+    "tickers": [
+      "COIN"
+    ],
+    "asset": "coin.svg",
+    "author": "Coinbase Global Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/COIN?format=svg"
+  },
+  {
+    "company": "The Boeing Company",
+    "tickers": [
+      "BA"
+    ],
+    "asset": "ba.svg",
+    "author": "The Boeing Company",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/BA?format=svg"
+  },
+  {
+    "company": "Lockheed Martin Corporation",
+    "tickers": [
+      "LMT"
+    ],
+    "asset": "lmt.svg",
+    "author": "Lockheed Martin Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/LMT?format=svg"
+  },
+  {
+    "company": "RTX Corporation",
+    "tickers": [
+      "RTX"
+    ],
+    "asset": "rtx.svg",
+    "author": "RTX Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/RTX?format=svg"
+  },
+  {
+    "company": "Deere & Company (John Deere)",
+    "tickers": [
+      "DE"
+    ],
+    "asset": "de.png",
+    "author": "Deere & Company (John Deere)",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/DE?format=png"
+  },
+  {
+    "company": "Union Pacific Corporation",
+    "tickers": [
+      "UNP"
+    ],
+    "asset": "unp.svg",
+    "author": "Union Pacific Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/UNP?format=svg"
+  },
+  {
+    "company": "NextEra Energy Inc.",
+    "tickers": [
+      "NEE"
+    ],
+    "asset": "nee.svg",
+    "author": "NextEra Energy Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/NEE?format=svg"
+  },
+  {
+    "company": "Linde plc",
+    "tickers": [
+      "LIN"
+    ],
+    "asset": "lin.svg",
+    "author": "Linde plc",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/LIN?format=svg"
+  },
+  {
+    "company": "Starbucks Corporation",
+    "tickers": [
+      "SBUX"
+    ],
+    "asset": "sbux.svg",
+    "author": "Starbucks Corporation",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/SBUX?format=svg"
+  },
+  {
+    "company": "Airbnb Inc.",
+    "tickers": [
+      "ABNB"
+    ],
+    "asset": "abnb.svg",
+    "author": "Airbnb Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/ABNB?format=svg"
+  },
+  {
+    "company": "PayPal Holdings Inc.",
+    "tickers": [
+      "PYPL"
+    ],
+    "asset": "pypl.svg",
+    "author": "PayPal Holdings Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/PYPL?format=svg"
+  },
+  {
+    "company": "Verizon Communications Inc.",
+    "tickers": [
+      "VZ"
+    ],
+    "asset": "vz.png",
+    "author": "Verizon Communications Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/VZ?format=png"
+  },
+  {
+    "company": "AT&T Inc.",
+    "tickers": [
+      "T"
+    ],
+    "asset": "t.svg",
+    "author": "AT&T Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/T?format=svg"
+  },
+  {
+    "company": "Philip Morris International",
+    "tickers": [
+      "PM"
+    ],
+    "asset": "pm.svg",
+    "author": "Philip Morris International",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/PM?format=svg"
+  },
+  {
+    "company": "Altria Group Inc.",
+    "tickers": [
+      "MO"
+    ],
+    "asset": "mo.svg",
+    "author": "Altria Group Inc.",
+    "license": "Issuer trademark; no reuse license stated by the asset source",
+    "source": "https://parqet.com/",
+    "sourceAssetUrl": "https://assets.parqet.com/logos/symbol/MO?format=svg"
   }
 ]
