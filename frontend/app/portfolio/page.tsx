@@ -10,6 +10,10 @@ import { Diagnostics, ExportButton, formatValue, Idle, Loading, Metrics, Notice,
 import { PortfolioPreview } from "../../components/Examples";
 import { tickerColor } from "../../components/Shell";
 import { ElapsedLoading, MonthlyReturns, runFacts, WeightList } from "../../components/PortfolioParts";
+import HurdlePanel from "../../components/HurdlePanel";
+import { RebalancePanel } from "../../components/RebalancePanel";
+import IncomeCalendar from "../../components/IncomeCalendar";
+import MacroShockPanel from "../../components/MacroShockPanel";
 import { api } from "../../lib/api";
 import { handoffTickers, period, strategies } from "../../lib/portfolio";
 import type { PortfolioInputs, PortfolioResult, StressResult, Strategy } from "../../lib/portfolio";
@@ -232,7 +236,7 @@ export default function PortfolioPage() {
   const companies = new Map(stocks.map(stock => [stock.ticker, stock.company]));
   const core = [["total_return", "Retorno Total", "percent"], ["volatility", "Volatilidade Anual", "percent"], ["sharpe", "Índice Sharpe", "ratio"], ["sortino", "Índice Sortino", "ratio"], ["max_drawdown", "Queda máxima (Max Drawdown)", "percent"]] as const;
   const extra = [["annual_return", "Retorno Anualizado", "percent"], ["beta", "Beta vs IBOV", "ratio"], ["annual_alpha", "Alpha Anual", "percent"], ["daily_var", "VaR Diário 95% (paramétrico normal)", "percent"], ["historical_var_95", "VaR Histórico 95% (diário)", "percent"], ["cvar_95", "CVaR 95% (diário)", "percent"], ["information_ratio", "Information Ratio (anualizado)", "ratio"]] as const;
-  const sections: [string, string][] = activeResult ? [["pf-resumo", "Resumo"], ["pf-pesos", "Pesos"], ["pf-valor", "Valor"], ["pf-compra", "Compra"], ...(activeResult.charts.frontier ? [["pf-fronteira", "Fronteira"]] as [string, string][] : []), ...(activeResult.charts.drawdown ? [["pf-drawdown", "Drawdown"]] as [string, string][] : []), ["pf-mensal", "Mensal"], ...(activeResult.stress ? [["pf-stress", "Stress"]] as [string, string][] : []), ["pf-risco", "Risco"], ...(activeResult.charts.rolling_beta || activeResult.charts.rolling_sharpe ? [["pf-moveis", "Móveis"]] as [string, string][] : [])] : [];
+  const sections: [string, string][] = activeResult ? [["pf-resumo", "Resumo"], ["pf-pesos", "Pesos"], ["pf-valor", "Valor"], ["pf-compra", "Compra"], ["pf-aporte", "Aporte"], ["pf-hurdle", "Hurdle IR"], ["pf-proventos", "Proventos"], ...(activeResult.charts.frontier ? [["pf-fronteira", "Fronteira"]] as [string, string][] : []), ...(activeResult.charts.drawdown ? [["pf-drawdown", "Drawdown"]] as [string, string][] : []), ["pf-mensal", "Mensal"], ...(activeResult.stress ? [["pf-stress", "Stress"]] as [string, string][] : []), ["pf-macro", "Choque macro"], ["pf-risco", "Risco"], ...(activeResult.charts.rolling_beta || activeResult.charts.rolling_sharpe ? [["pf-moveis", "Móveis"]] as [string, string][] : [])] : [];
   // The compact setup header stays above results so it is easy to find and reopen.
   const folded = foldParams && (!!activeResult || busy || staleResult);
   const recap = [windowLabels[windowChoice] ?? `${inputs.lookback_days} dias`, strategyShort[inputs.strategy], formatValue(inputs.capital, "money", 2)].join(" · ");
@@ -361,6 +365,18 @@ export default function PortfolioPage() {
         </Pane>}
         {activeResult.charts.rolling_beta && <Pane id="pf-moveis" title="Beta móvel 60d vs IBOV" className="span-6"><Chart figure={activeResult.charts.rolling_beta} height={240} /></Pane>}
         {activeResult.charts.rolling_sharpe && <Pane id={activeResult.charts.rolling_beta ? undefined : "pf-moveis"} title="Sharpe móvel 60d anualizado" className="span-6"><Chart figure={activeResult.charts.rolling_sharpe} height={240} /></Pane>}
+        <Pane id="pf-hurdle" title="Hurdle após impostos e retorno real" className="span-12" meta="CDI · IPCA + 6% · SOFR · CPI EUA">
+          <HurdlePanel key={activeResult.id} revision={session.revision} portfolioId={activeResult.id} />
+        </Pane>
+        <Pane id="pf-aporte" title="Aporte do mês (só compra)" className="span-12" meta="Importação B3/corretora · sem vendas nem IR">
+          <RebalancePanel key={activeResult.id} revision={session.revision} portfolioId={activeResult.id} tickers={session.selection} />
+        </Pane>
+        <div id="pf-proventos" className="span-12">
+          <IncomeCalendar key={activeResult.id} revision={session.revision} portfolioId={activeResult.id} capital={activeResult.inputs.capital} />
+        </div>
+        <Pane id="pf-macro" title="Simulador de choque macroeconômico" className="span-12" meta="Brasil (Selic, IPCA, USD/BRL) e Global (US 10Y, S&P 500, DXY)">
+          <MacroShockPanel key={activeResult.id} revision={session.revision} portfolioId={activeResult.id} capital={activeResult.inputs.capital} />
+        </Pane>
         <div className="span-12 board-foot">
           <p>Fontes: {activeResult.source.adjusted_prices}; {activeResult.source.trade_quotes}; Selic: {activeResult.source.selic_source} ({(activeResult.source.selic_annual * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% a.a.); taxa livre de risco histórica: {activeResult.source.historical_rf}.</p>
         </div>
