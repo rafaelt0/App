@@ -38,7 +38,7 @@ _capacity = asyncio.Semaphore(2)
 # so a first visit's parallel requests do not each mint their own cookie.
 PUBLIC_ROUTES = {("GET", "/api/universe"), ("GET", "/api/universe/search"), ("GET", "/api/universe/liquidity"),
                  ("GET", "/api/universe/changes"), ("GET", "/api/market/strip"), ("GET", "/api/market/quotes"),
-                 ("POST", "/api/news/market")}
+                 ("GET", "/api/stress/presets"), ("POST", "/api/news/market")}
 
 
 def allowed_origin(origin: str | None) -> bool:
@@ -232,12 +232,16 @@ def clear_portfolio(request: Request):
         return session_payload(ctx)
 
 
-from backend import home, market, news, portfolio, screener, simulation
+from backend import home, hurdle, income, market, news, portfolio, rebalance, screener, simulation, stress
 
 app.include_router(home.router)
 app.include_router(home.catalog_router)
 app.include_router(screener.router)
 app.include_router(portfolio.router)
+app.include_router(hurdle.router)
+app.include_router(rebalance.router)
+app.include_router(income.router)
+app.include_router(stress.router)
 app.include_router(simulation.router)
 app.include_router(news.router)
 app.include_router(market.router)
